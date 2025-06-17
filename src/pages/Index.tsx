@@ -29,7 +29,8 @@ import {
   Copy,
   Upload,
   X,
-  Trash2
+  Trash2,
+  Camera
 } from "lucide-react";
 import CarouselImageManager from "@/components/CarouselImageManager";
 import ImageEditor from "@/components/ImageEditor";
@@ -68,6 +69,7 @@ const Index = () => {
   const [hookTopic, setHookTopic] = useState('');
   const [generatedHooks, setGeneratedHooks] = useState<string[]>([]);
   const [appliedHook, setAppliedHook] = useState<string>('');
+  const [basePhoto, setBasePhoto] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -111,6 +113,29 @@ const Index = () => {
     setFormData(prev => ({ ...prev, description: randomIdea }));
   };
 
+  const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setBasePhoto(reader.result as string);
+        toast({
+          title: "Foto caricata! 📸",
+          description: "La foto sarà usata come base per il contenuto"
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeBasePhoto = () => {
+    setBasePhoto(null);
+    toast({
+      title: "Foto rimossa",
+      description: "La foto base è stata rimossa"
+    });
+  };
+
   const generateHooks = () => {
     if (!hookTopic.trim()) {
       toast({
@@ -151,7 +176,6 @@ const Index = () => {
   const removeHook = () => {
     setGeneratedContent(prev => {
       const lines = prev.split('\n');
-      // Rimuovi la prima riga (hook) e ricrea il contenuto
       lines.shift();
       return lines.join('\n');
     });
@@ -162,20 +186,58 @@ const Index = () => {
     });
   };
 
+  const getRelevantImages = (topic: string) => {
+    const topicLower = topic.toLowerCase();
+    
+    // Immagini specifiche per argomenti fisioterapici
+    const imageCategories = {
+      'mal di schiena': [
+        'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center', // esercizi schiena
+        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center', // stretching
+        'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center', // fisioterapia
+        'https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=400&h=400&fit=crop&crop=center', // postura
+        'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center'  // esercizi
+      ],
+      'postura': [
+        'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&h=400&fit=crop&crop=center', // postura corretta
+        'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center', // ergonomia
+        'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center', // esercizi posturali
+        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center', // stretching
+        'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center'  // fisioterapia
+      ],
+      'esercizi': [
+        'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center', // esercizi
+        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center', // stretching
+        'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center', // movimento
+        'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center', // fisioterapia
+        'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&h=400&fit=crop&crop=center'  // allenamento
+      ],
+      'riabilitazione': [
+        'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center', // fisioterapia
+        'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center', // terapia
+        'https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=400&h=400&fit=crop&crop=center', // recupero
+        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center', // movimento
+        'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center'  // esercizi
+      ]
+    };
+
+    // Trova la categoria più pertinente
+    for (const [category, images] of Object.entries(imageCategories)) {
+      if (topicLower.includes(category)) {
+        return images;
+      }
+    }
+
+    // Default per argomenti fisioterapici generici
+    return imageCategories['mal di schiena'];
+  };
+
   const generateCarouselSlides = () => {
     const numSlides = parseInt(formData.numSlides);
     const slides: CarouselSlide[] = [];
     
-    // Array di immagini placeholder reali
-    const placeholderImages = [
-      'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center',
-      'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center',
-      'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center',
-      'https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=400&h=400&fit=crop&crop=center',
-      'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center',
-      'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&h=400&fit=crop&crop=center',
-      'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center'
-    ];
+    // Ottieni immagini pertinenti al topic
+    const relevantImages = getRelevantImages(formData.description);
     
     for (let i = 0; i < numSlides; i++) {
       slides.push({
@@ -183,7 +245,8 @@ const Index = () => {
         content: i === 0 
           ? `${formData.description.toUpperCase()}`
           : `Slide ${i + 1}: Contenuto per ${formData.description}`,
-        imageUrl: placeholderImages[i % placeholderImages.length]
+        imageUrl: relevantImages[i % relevantImages.length],
+        userImageUrl: basePhoto && i === 0 ? basePhoto : undefined
       });
     }
     
@@ -552,6 +615,57 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
                   </Select>
                 </div>
               </div>
+
+              {/* Upload foto base */}
+              <Card className="bg-gray-700/50 border-gray-600">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-white text-sm flex items-center">
+                    <Camera className="h-4 w-4 mr-2" />
+                    📸 Carica una foto base (Opzionale)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {basePhoto ? (
+                    <div className="relative">
+                      <img 
+                        src={basePhoto} 
+                        alt="Foto base"
+                        className="w-full h-32 object-cover rounded-lg"
+                      />
+                      <Button
+                        onClick={removeBasePhoto}
+                        size="sm"
+                        variant="destructive"
+                        className="absolute top-2 right-2 p-1 h-6 w-6"
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-gray-500 rounded-lg p-4 text-center">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                        id="base-photo-upload"
+                      />
+                      <label 
+                        htmlFor="base-photo-upload" 
+                        className="cursor-pointer flex flex-col items-center"
+                      >
+                        <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                        <span className="text-gray-300 text-sm">
+                          Clicca per caricare una foto
+                        </span>
+                        <span className="text-gray-500 text-xs mt-1">
+                          Questa foto sarà usata come base per il contenuto
+                        </span>
+                      </label>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
               <Button 
                 onClick={generateContent} 
