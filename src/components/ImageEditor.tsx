@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Wand2, Undo2, Redo2, Trash2, Type } from "lucide-react";
-import { defaultRunwareService } from "@/services/runwareService";
+import { defaultOpenAIService } from "@/services/openaiService";
 import { useToast } from "@/hooks/use-toast";
 import TextEditor from "./TextEditor";
 
@@ -74,13 +73,13 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
       let enhancePrompt = '';
       
       if (style === 'cartoon') {
-        enhancePrompt = 'Trasforma questa immagine in stile cartoon, colori vivaci, aspetto animato, alta qualità, TUTTO IL TESTO IN ITALIANO';
+        enhancePrompt = 'Trasforma questa immagine in stile cartoon vivace e colorato, con colori brillanti e aspetto animato di alta qualità. IMPORTANTE: tutto il testo nell\'immagine deve essere scritto in italiano perfetto.';
       } else if (style === 'professional') {
-        enhancePrompt = 'Migliora questa immagine per renderla più professionale, alta qualità, dettagli nitidi, buona illuminazione, TESTO COMPLETAMENTE IN ITALIANO';
+        enhancePrompt = 'Crea un\'immagine professionale e raffinata con alta qualità, dettagli nitidi e ottima illuminazione. IMPORTANTE: tutto il testo nell\'immagine deve essere scritto in italiano perfetto.';
       } else if (style === 'artistic') {
-        enhancePrompt = 'Trasforma questa immagine in un capolavoro artistico, stile creativo, bellissimi colori, TUTTO IL TESTO DEVE ESSERE IN ITALIANO';
+        enhancePrompt = 'Trasforma in un capolavoro artistico con stile creativo e bellissimi colori vibranti. IMPORTANTE: tutto il testo nell\'immagine deve essere scritto in italiano perfetto.';
       } else if (style === 'custom' && prompt) {
-        enhancePrompt = `${prompt}, IMPORTANTE: tutto il testo deve essere in italiano`;
+        enhancePrompt = `${prompt}. IMPORTANTE: tutto il testo nell\'immagine deve essere scritto in italiano perfetto.`;
       }
 
       if (!enhancePrompt) {
@@ -92,13 +91,9 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
         return;
       }
 
-      const result = await defaultRunwareService.generateImage({
+      const result = await defaultOpenAIService.generateImage({
         positivePrompt: enhancePrompt,
-        model: "runware:100@1",
-        numberResults: 1,
-        outputFormat: "WEBP",
-        CFGScale: 7,
-        strength: 0.7
+        numberResults: 1
       });
 
       if (result.imageURL) {
@@ -107,7 +102,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
         
         toast({
           title: "Immagine migliorata! ✨",
-          description: "La tua immagine è stata migliorata con successo"
+          description: "La tua immagine è stata migliorata con successo usando DALL-E"
         });
       }
     } catch (error) {
