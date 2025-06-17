@@ -30,12 +30,12 @@ const Index = () => {
   const [generatedIdeas, setGeneratedIdeas] = useState('');
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
   const [userUploadedImage, setUserUploadedImage] = useState<string | null>(null);
-  const [generatedAIImage, setGeneratedAIImage] = useState<string | null>(null);
+  const [generatedAIImages, setGeneratedAIImages] = useState<string[]>([]);
   const [isGeneratingAIImage, setIsGeneratingAIImage] = useState(false);
   const [imageHook, setImageHook] = useState('');
   const [hookVariants, setHookVariants] = useState<string[]>([]);
   const [isGeneratingHooks, setIsGeneratingHooks] = useState(false);
-  const [carouselSlides, setCarouselSlides] = useState<Array<{type: string, content: string}>>([]);
+  const [carouselSlides, setCarouselSlides] = useState<Array<{type: string, content: string, imageUrl?: string}>>([]);
   const [isGeneratingCarousel, setIsGeneratingCarousel] = useState(false);
 
   // Template per la generazione di contenuti
@@ -167,7 +167,7 @@ Condividi nei commenti, rispondo a tutti! 👇
   const resetState = (keepIdeas = false) => {
     setGeneratedPost('');
     setUserUploadedImage(null);
-    setGeneratedAIImage(null);
+    setGeneratedAIImages([]);
     setImageHook('');
     setHookVariants([]);
     setCarouselSlides([]);
@@ -295,6 +295,13 @@ Condividi nei commenti, rispondo a tutti! 👇
       slideObjects.push({ type: 'cta', content: ctaText });
       
       setCarouselSlides(slideObjects);
+      
+      // Genera immagini per ogni slide del carosello
+      if (slideObjects.length > 0) {
+        setTimeout(() => {
+          generateCarouselImages(slideObjects);
+        }, 500);
+      }
     } catch (error) {
       toast({
         title: "Errore",
@@ -303,6 +310,48 @@ Condividi nei commenti, rispondo a tutti! 👇
       });
     } finally {
       setIsGeneratingCarousel(false);
+    }
+  };
+
+  const generateCarouselImages = async (slides: Array<{type: string, content: string}>) => {
+    setIsGeneratingAIImage(true);
+    
+    try {
+      const imagePrompts = slides.map((slide, index) => {
+        if (slide.type === 'cta') {
+          return `Call to action design for ${prompt}, modern, professional, ${platform} style, vibrant colors, motivational`;
+        }
+        return `Professional infographic style image representing: ${slide.content.substring(0, 100)}... Modern design, ${platform} format, clear visual hierarchy`;
+      });
+
+      console.log("Generando", imagePrompts.length, "immagini per il carosello...");
+      
+      const generatedImages = await defaultRunwareService.generateMultipleImages(imagePrompts);
+      
+      if (generatedImages.length > 0) {
+        // Aggiorna le slide con le immagini generate
+        const updatedSlides = slides.map((slide, index) => ({
+          ...slide,
+          imageUrl: generatedImages[index]?.imageURL || undefined
+        }));
+        
+        setCarouselSlides(updatedSlides);
+        setGeneratedAIImages(generatedImages.map(img => img.imageURL));
+        
+        toast({
+          title: "Immagini generate! 🎨",
+          description: `${generatedImages.length} immagini create per il carosello`
+        });
+      }
+    } catch (error) {
+      console.error('Errore generazione immagini carosello:', error);
+      toast({
+        title: "Avviso",
+        description: "Alcune immagini non sono state generate correttamente",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingAIImage(false);
     }
   };
 
@@ -356,38 +405,44 @@ Condividi nei commenti, rispondo a tutti! 👇
     }
 
     setIsGeneratingAIImage(true);
-    setGeneratedAIImage(null);
+    setGeneratedAIImages([]);
     
     try {
-      // Creo un prompt ottimizzato per l'immagine basato sul post
-      const imagePrompt = `Professional social media image based on: ${prompt}. High quality, modern design, vibrant colors, suitable for ${platform}`;
+      let imagePrompts: string[] = [];
       
-      const params: GenerateImageParams = {
-        positivePrompt: imagePrompt,
-        model: "runware:100@1",
-        numberResults: 1,
-        outputFormat: "WEBP",
-        CFGScale: 1,
-        scheduler: "FlowMatchEulerDiscreteScheduler",
-        strength: 0.8
-      };
+      if (postType === 'carosello') {
+        // Per i caroselli, genera immagini multiple
+        imagePrompts = [
+          `Professional cover image for social media post about: ${prompt}. Modern design, ${platform} style, eye-catching, vibrant colors`,
+          `Infographic style illustration representing: ${prompt}. Clean design, professional, suitable for ${platform}`,
+          `Motivational quote design about: ${prompt}. Typography focus, inspiring, modern aesthetic for ${platform}`
+        ];
+      } else {
+        // Per post singoli
+        imagePrompts = [
+          `Professional social media image for: ${prompt}. High quality, modern design, vibrant colors, suitable for ${platform}`
+        ];
+      }
 
-      const result = await defaultRunwareService.generateImage(params);
+      console.log("Generando", imagePrompts.length, "immagini...");
       
-      if (result.imageURL) {
-        setGeneratedAIImage(result.imageURL);
+      const generatedImages = await defaultRunwareService.generateMultipleImages(imagePrompts);
+      
+      if (generatedImages.length > 0) {
+        const imageUrls = generatedImages.map(img => img.imageURL);
+        setGeneratedAIImages(imageUrls);
         setUserUploadedImage(null); // Rimuovi immagine caricata se presente
         
         toast({
-          title: "Immagine generata! 🎨",
-          description: "Immagine AI creata con successo"
+          title: "Immagini generate! 🎨",
+          description: `${generatedImages.length} ${generatedImages.length === 1 ? 'immagine creata' : 'immagini create'} con successo`
         });
       }
     } catch (error) {
       console.error('Errore generazione immagine AI:', error);
       toast({
         title: "Errore",
-        description: "Errore durante la generazione dell'immagine AI",
+        description: "Errore durante la generazione delle immagini AI",
         variant: "destructive"
       });
     } finally {
@@ -445,7 +500,8 @@ Condividi nei commenti, rispondo a tutti! 👇
     <ArrowRight className="w-12 h-12 text-white" />
   );
 
-  const currentImage = userUploadedImage || generatedAIImage;
+  const currentImages = userUploadedImage ? [userUploadedImage] : generatedAIImages;
+  const currentImage = currentImages[0];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white p-4 sm:p-6">
@@ -662,7 +718,7 @@ Condividi nei commenti, rispondo a tutti! 👇
                         </div>
                       </div>
 
-                      {/* Slide di testo */}
+                      {/* Slide di testo/immagini generate */}
                       {isGeneratingCarousel ? (
                         <div className="snap-center flex-shrink-0 w-full max-w-sm aspect-square p-8 rounded-lg flex justify-center items-center bg-gray-800">
                           <div className="text-center">
@@ -674,28 +730,42 @@ Condividi nei commenti, rispondo a tutti! 👇
                         carouselSlides.map((slide, index) => (
                           <div
                             key={index}
-                            className={`snap-center relative flex-shrink-0 w-full max-w-sm aspect-square p-8 rounded-lg flex flex-col justify-center items-center text-center border-2 border-gray-700 ${
+                            className={`snap-center relative flex-shrink-0 w-full max-w-sm aspect-square rounded-lg overflow-hidden border-2 border-gray-700 ${
                               slide.type === 'cta' ? 'bg-gradient-to-br from-blue-600 to-indigo-700' : 'bg-gray-800'
                             }`}
                           >
                             <div className="absolute top-4 right-4 bg-black/50 text-white text-xs font-bold px-2 py-1 rounded-full">
                               {index + 2} / {carouselSlides.length + 1}
                             </div>
-                            {slide.type === 'text' && (
-                              <>
-                                <QuoteIcon />
-                                <p className="text-xl md:text-2xl text-white font-semibold leading-relaxed">
-                                  {slide.content}
-                                </p>
-                              </>
-                            )}
-                            {slide.type === 'cta' && (
-                              <>
-                                <ArrowRightIcon />
-                                <p className="text-2xl md:text-3xl text-white font-bold mt-6">
-                                  {slide.content}
-                                </p>
-                              </>
+                            
+                            {slide.imageUrl ? (
+                              <div className="relative w-full h-full">
+                                <img src={slide.imageUrl} alt={`Slide ${index + 2}`} className="w-full h-full object-cover" />
+                                <div className="absolute bottom-0 left-0 right-0 p-4 pt-12 bg-gradient-to-t from-black/80 to-transparent">
+                                  <p className="text-white text-lg font-semibold leading-tight">
+                                    {slide.content}
+                                  </p>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="p-8 flex flex-col justify-center items-center text-center h-full">
+                                {slide.type === 'text' && (
+                                  <>
+                                    <Quote className="w-10 h-10 text-blue-400 mb-6" />
+                                    <p className="text-xl md:text-2xl text-white font-semibold leading-relaxed">
+                                      {slide.content}
+                                    </p>
+                                  </>
+                                )}
+                                {slide.type === 'cta' && (
+                                  <>
+                                    <ArrowRight className="w-12 h-12 text-white" />
+                                    <p className="text-2xl md:text-3xl text-white font-bold mt-6">
+                                      {slide.content}
+                                    </p>
+                                  </>
+                                )}
+                              </div>
                             )}
                           </div>
                         ))
@@ -738,7 +808,6 @@ Condividi nei commenti, rispondo a tutti! 👇
                 <CardTitle className="text-white">Strumenti Avanzati</CardTitle>
               </CardHeader>
               <CardContent>
-                {/* Input API Key Runware */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <input
                     type="file"
@@ -767,7 +836,7 @@ Condividi nei commenti, rispondo a tutti! 👇
                     ) : (
                       <>
                         <Palette className="mr-2 h-4 w-4" />
-                        Genera Immagine AI
+                        Genera Immagini AI
                       </>
                     )}
                   </Button>
@@ -789,6 +858,27 @@ Condividi nei commenti, rispondo a tutti! 👇
                     )}
                   </Button>
                 </div>
+
+                {/* Visualizzazione immagini multiple generate */}
+                {generatedAIImages.length > 1 && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-200 mb-4">🎨 Immagini Generate</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      {generatedAIImages.map((imageUrl, index) => (
+                        <div key={index} className="relative group">
+                          <img 
+                            src={imageUrl} 
+                            alt={`Immagine generata ${index + 1}`}
+                            className="w-full h-32 object-cover rounded-lg border-2 border-gray-600 hover:border-blue-500 transition-colors cursor-pointer"
+                          />
+                          <div className="absolute top-2 right-2 bg-black/50 text-white text-xs font-bold px-2 py-1 rounded-full">
+                            {index + 1}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {hookVariants.length > 0 && (
                   <div className="mb-6">
