@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,13 +71,13 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
       let enhancePrompt = '';
       
       if (style === 'cartoon') {
-        enhancePrompt = 'Transform this image into a cartoon style, vibrant colors, animated look, high quality';
+        enhancePrompt = 'Trasforma questa immagine in stile cartoon, colori vivaci, aspetto animato, alta qualità, TUTTO IL TESTO IN ITALIANO';
       } else if (style === 'professional') {
-        enhancePrompt = 'Enhance this image to look more professional, high quality, sharp details, good lighting';
+        enhancePrompt = 'Migliora questa immagine per renderla più professionale, alta qualità, dettagli nitidi, buona illuminazione, TESTO COMPLETAMENTE IN ITALIANO';
       } else if (style === 'artistic') {
-        enhancePrompt = 'Transform this image into an artistic masterpiece, creative style, beautiful colors';
+        enhancePrompt = 'Trasforma questa immagine in un capolavoro artistico, stile creativo, bellissimi colori, TUTTO IL TESTO DEVE ESSERE IN ITALIANO';
       } else if (style === 'custom' && prompt) {
-        enhancePrompt = prompt;
+        enhancePrompt = `${prompt}, IMPORTANTE: tutto il testo deve essere in italiano`;
       }
 
       if (!enhancePrompt) {

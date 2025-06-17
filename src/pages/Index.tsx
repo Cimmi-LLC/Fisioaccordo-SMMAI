@@ -319,9 +319,9 @@ Condividi nei commenti, rispondo a tutti! 👇
     try {
       const imagePrompts = slides.map((slide, index) => {
         if (slide.type === 'cta') {
-          return `Call to action design for ${prompt}, modern, professional, ${platform} style, vibrant colors, motivational`;
+          return `Immagine di call to action per ${prompt}, design moderno e professionale, stile ${platform}, colori vivaci, motivazionale, TESTO COMPLETAMENTE IN ITALIANO, grafica accattivante`;
         }
-        return `Professional infographic style image representing: ${slide.content.substring(0, 100)}... Modern design, ${platform} format, clear visual hierarchy`;
+        return `Infografica professionale che rappresenta: ${slide.content.substring(0, 100)}... Design moderno, formato ${platform}, gerarchia visiva chiara, TUTTO IL TESTO DEVE ESSERE IN ITALIANO, stile professionale italiano`;
       });
 
       console.log("Generando", imagePrompts.length, "immagini per il carosello...");
@@ -410,13 +410,13 @@ Condividi nei commenti, rispondo a tutti! 👇
       
       if (postType === 'carosello') {
         imagePrompts = [
-          `Professional cover image for social media post about: ${prompt}. Modern design, ${platform} style, eye-catching, vibrant colors`,
-          `Infographic style illustration representing: ${prompt}. Clean design, professional, suitable for ${platform}`,
-          `Motivational quote design about: ${prompt}. Typography focus, inspiring, modern aesthetic for ${platform}`
+          `Immagine di copertina professionale per post sui social media su: ${prompt}. Design moderno, stile ${platform}, accattivante, colori vivaci, TUTTO IL TESTO IN ITALIANO`,
+          `Illustrazione stile infografica che rappresenta: ${prompt}. Design pulito, professionale, adatto per ${platform}, TESTO COMPLETAMENTE IN ITALIANO`,
+          `Design di citazione motivazionale su: ${prompt}. Focus tipografico, ispirazionale, estetica moderna per ${platform}, SOLO TESTO ITALIANO`
         ];
       } else {
         imagePrompts = [
-          `Professional social media image for: ${prompt}. High quality, modern design, vibrant colors, suitable for ${platform}`
+          `Immagine professionale per social media su: ${prompt}. Alta qualità, design moderno, colori vivaci, adatto per ${platform}, TUTTO IL TESTO DEVE ESSERE IN ITALIANO`
         ];
       }
 
