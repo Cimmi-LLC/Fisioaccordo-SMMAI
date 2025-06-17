@@ -149,15 +149,15 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
                             className="hidden"
                             id={`upload-${index}`}
                           />
-                          <label htmlFor={`upload-${index}`}>
-                            <Button
-                              as="span"
-                              size="sm"
-                              className="p-1 h-6 w-6 bg-purple-600 hover:bg-purple-700 cursor-pointer"
-                            >
+                          <Button
+                            asChild
+                            size="sm"
+                            className="p-1 h-6 w-6 bg-purple-600 hover:bg-purple-700 cursor-pointer"
+                          >
+                            <label htmlFor={`upload-${index}`}>
                               <Upload className="w-3 h-3" />
-                            </Button>
-                          </label>
+                            </label>
+                          </Button>
                         </div>
                       </div>
                       
