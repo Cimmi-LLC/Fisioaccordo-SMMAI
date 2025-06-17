@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Sparkles, Copy, Upload, Image, Quote, ArrowRight, Lightbulb, Target, Zap, Palette } from "lucide-react";
+import { Loader2, Sparkles, Copy, Upload, Image, Quote, ArrowRight, Lightbulb, Target, Zap, Palette, X, Edit2 } from "lucide-react";
 import { defaultRunwareService, GenerateImageParams } from "@/services/runwareService";
+import ImageEditor from "@/components/ImageEditor";
 
 const Index = () => {
   const { toast } = useToast();
@@ -37,6 +38,11 @@ const Index = () => {
   const [isGeneratingHooks, setIsGeneratingHooks] = useState(false);
   const [carouselSlides, setCarouselSlides] = useState<Array<{type: string, content: string, imageUrl?: string}>>([]);
   const [isGeneratingCarousel, setIsGeneratingCarousel] = useState(false);
+  
+  // Nuovi stati per l'editor
+  const [editingImageIndex, setEditingImageIndex] = useState<number | null>(null);
+  const [showImageEditor, setShowImageEditor] = useState(false);
+  const [editingImageUrl, setEditingImageUrl] = useState('');
 
   // Template per la generazione di contenuti
   const generateContent = (type: string, topic: string, additionalParams: any = {}): string | string[] => {
@@ -190,7 +196,6 @@ Condividi nei commenti, rispondo a tutti! 👇
     resetState(true);
     
     try {
-      // Simula un delay per il realismo
       await new Promise(resolve => setTimeout(resolve, 1500));
       
       const content = generateContent('post', prompt, { 
@@ -200,14 +205,12 @@ Condividi nei commenti, rispondo a tutti! 👇
         audience 
       });
       
-      // Assicuriamoci che sia una stringa
       if (typeof content === 'string') {
         setGeneratedPost(content);
       } else {
         setGeneratedPost(content[0] || '');
       }
       
-      // Se è un carosello, genera automaticamente le slide
       if (postType === 'carosello') {
         setTimeout(() => {
           generateCarouselContent();
@@ -246,7 +249,6 @@ Condividi nei commenti, rispondo a tutti! 👇
       await new Promise(resolve => setTimeout(resolve, 1200));
       const ideas = generateContent('ideas', ideaTopic);
       
-      // Assicuriamoci che sia una stringa
       if (typeof ideas === 'string') {
         setGeneratedIdeas(ideas);
       } else {
@@ -276,7 +278,6 @@ Condividi nei commenti, rispondo a tutti! 👇
       const slides = generateContent('carousel', prompt);
       const cta = generateContent('cta', prompt);
       
-      // Gestione sicura dei tipi
       let slideTexts: string[] = [];
       if (Array.isArray(slides)) {
         slideTexts = slides;
@@ -296,7 +297,6 @@ Condividi nei commenti, rispondo a tutti! 👇
       
       setCarouselSlides(slideObjects);
       
-      // Genera immagini per ogni slide del carosello
       if (slideObjects.length > 0) {
         setTimeout(() => {
           generateCarouselImages(slideObjects);
@@ -329,7 +329,6 @@ Condividi nei commenti, rispondo a tutti! 👇
       const generatedImages = await defaultRunwareService.generateMultipleImages(imagePrompts);
       
       if (generatedImages.length > 0) {
-        // Aggiorna le slide con le immagini generate
         const updatedSlides = slides.map((slide, index) => ({
           ...slide,
           imageUrl: generatedImages[index]?.imageURL || undefined
@@ -372,7 +371,6 @@ Condividi nei commenti, rispondo a tutti! 👇
       await new Promise(resolve => setTimeout(resolve, 800));
       const hooks = generateContent('hooks', prompt);
       
-      // Gestione sicura dei tipi
       if (Array.isArray(hooks)) {
         setHookVariants(hooks);
       } else {
@@ -411,14 +409,12 @@ Condividi nei commenti, rispondo a tutti! 👇
       let imagePrompts: string[] = [];
       
       if (postType === 'carosello') {
-        // Per i caroselli, genera immagini multiple
         imagePrompts = [
           `Professional cover image for social media post about: ${prompt}. Modern design, ${platform} style, eye-catching, vibrant colors`,
           `Infographic style illustration representing: ${prompt}. Clean design, professional, suitable for ${platform}`,
           `Motivational quote design about: ${prompt}. Typography focus, inspiring, modern aesthetic for ${platform}`
         ];
       } else {
-        // Per post singoli
         imagePrompts = [
           `Professional social media image for: ${prompt}. High quality, modern design, vibrant colors, suitable for ${platform}`
         ];
@@ -431,7 +427,7 @@ Condividi nei commenti, rispondo a tutti! 👇
       if (generatedImages.length > 0) {
         const imageUrls = generatedImages.map(img => img.imageURL);
         setGeneratedAIImages(imageUrls);
-        setUserUploadedImage(null); // Rimuovi immagine caricata se presente
+        setUserUploadedImage(null);
         
         toast({
           title: "Immagini generate! 🎨",
@@ -490,6 +486,49 @@ Condividi nei commenti, rispondo a tutti! 👇
         description: "Testo copiato negli appunti"
       });
     });
+  };
+
+  const handleImageEdit = (imageUrl: string, imageIndex?: number) => {
+    setEditingImageUrl(imageUrl);
+    setEditingImageIndex(imageIndex ?? null);
+    setShowImageEditor(true);
+  };
+
+  const handleImageUpdate = (newImageUrl: string) => {
+    if (editingImageIndex !== null) {
+      // Aggiorna immagine nel carosello
+      const updatedSlides = [...carouselSlides];
+      if (updatedSlides[editingImageIndex]) {
+        updatedSlides[editingImageIndex].imageUrl = newImageUrl;
+        setCarouselSlides(updatedSlides);
+      }
+      
+      // Aggiorna anche l'array delle immagini generate
+      const updatedImages = [...generatedAIImages];
+      if (updatedImages[editingImageIndex]) {
+        updatedImages[editingImageIndex] = newImageUrl;
+        setGeneratedAIImages(updatedImages);
+      }
+    } else {
+      // Aggiorna immagine singola
+      setUserUploadedImage(newImageUrl);
+    }
+  };
+
+  const removeImageHook = () => {
+    setImageHook('');
+    toast({
+      title: "Hook rimosso",
+      description: "L'hook è stato rimosso dall'immagine",
+    });
+  };
+
+  const toggleImageHook = (hook: string) => {
+    if (imageHook === hook) {
+      removeImageHook();
+    } else {
+      setImageHook(hook);
+    }
   };
 
   const QuoteIcon = () => (
@@ -678,126 +717,182 @@ Condividi nei commenti, rispondo a tutti! 👇
             </CardContent>
           </Card>
 
-          {/* Pannello di anteprima */}
-          <Card className="bg-gray-900/50 border-gray-700 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="text-white">Anteprima</CardTitle>
-            </CardHeader>
-            <CardContent className="min-h-[400px] flex flex-col items-center justify-center">
-              {postType === 'carosello' ? (
-                <div className="w-full">
-                  {isLoading ? (
-                    <div className="p-8 text-center">
-                      <Loader2 className="w-12 h-12 animate-spin text-blue-400 mx-auto mb-4" />
-                      <p className="text-gray-300">Generazione contenuto...</p>
-                    </div>
-                  ) : generatedPost ? (
-                    <div className="w-full flex space-x-4 overflow-x-auto p-4 snap-x snap-mandatory">
-                      {/* Prima slide con immagine */}
-                      <div className="snap-center flex-shrink-0 w-full max-w-sm">
-                        <div className="relative group inline-block mx-auto rounded-lg shadow-lg overflow-hidden border-2 border-blue-500/50 aspect-square bg-gray-700">
-                          {currentImage ? (
-                            <img src={currentImage} alt="Slide 1" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex flex-col justify-center items-center text-center p-4">
-                              <Image className="w-16 h-16 text-gray-500 mb-4" />
-                              <p className="font-semibold text-lg">Slide 1</p>
-                              <p className="text-sm text-gray-400">Carica o genera un'immagine</p>
-                            </div>
-                          )}
-                          {imageHook && (
-                            <div className="absolute bottom-0 left-0 right-0 p-6 pt-16 bg-gradient-to-t from-black/80 to-transparent">
-                              <p className="text-white text-2xl lg:text-3xl font-bold text-center drop-shadow-2xl">
-                                {imageHook}
-                              </p>
-                            </div>
-                          )}
-                          <div className="absolute top-4 right-4 bg-black/50 text-white text-xs font-bold px-2 py-1 rounded-full">
-                            1 / {carouselSlides.length > 0 ? carouselSlides.length + 1 : 1}
-                          </div>
-                        </div>
+          {/* Pannello di anteprima con editor integrato */}
+          <div className="space-y-4">
+            <Card className="bg-gray-900/50 border-gray-700 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-white">Anteprima</CardTitle>
+              </CardHeader>
+              <CardContent className="min-h-[400px] flex flex-col items-center justify-center">
+                {postType === 'carosello' ? (
+                  <div className="w-full">
+                    {isLoading ? (
+                      <div className="p-8 text-center">
+                        <Loader2 className="w-12 h-12 animate-spin text-blue-400 mx-auto mb-4" />
+                        <p className="text-gray-300">Generazione contenuto...</p>
                       </div>
-
-                      {/* Slide di testo/immagini generate */}
-                      {isGeneratingCarousel ? (
-                        <div className="snap-center flex-shrink-0 w-full max-w-sm aspect-square p-8 rounded-lg flex justify-center items-center bg-gray-800">
-                          <div className="text-center">
-                            <Loader2 className="w-8 h-8 animate-spin text-blue-400 mx-auto mb-2" />
-                            <p className="text-gray-300">Generazione slide...</p>
-                          </div>
-                        </div>
-                      ) : carouselSlides.length > 0 ? (
-                        carouselSlides.map((slide, index) => (
-                          <div
-                            key={index}
-                            className={`snap-center relative flex-shrink-0 w-full max-w-sm aspect-square rounded-lg overflow-hidden border-2 border-gray-700 ${
-                              slide.type === 'cta' ? 'bg-gradient-to-br from-blue-600 to-indigo-700' : 'bg-gray-800'
-                            }`}
-                          >
-                            <div className="absolute top-4 right-4 bg-black/50 text-white text-xs font-bold px-2 py-1 rounded-full">
-                              {index + 2} / {carouselSlides.length + 1}
-                            </div>
-                            
-                            {slide.imageUrl ? (
-                              <div className="relative w-full h-full">
-                                <img src={slide.imageUrl} alt={`Slide ${index + 2}`} className="w-full h-full object-cover" />
-                                <div className="absolute bottom-0 left-0 right-0 p-4 pt-12 bg-gradient-to-t from-black/80 to-transparent">
-                                  <p className="text-white text-lg font-semibold leading-tight">
-                                    {slide.content}
-                                  </p>
-                                </div>
-                              </div>
+                    ) : generatedPost ? (
+                      <div className="w-full flex space-x-4 overflow-x-auto p-4 snap-x snap-mandatory">
+                        {/* Prima slide con immagine */}
+                        <div className="snap-center flex-shrink-0 w-full max-w-sm">
+                          <div className="relative group inline-block mx-auto rounded-lg shadow-lg overflow-hidden border-2 border-blue-500/50 aspect-square bg-gray-700">
+                            {currentImage ? (
+                              <>
+                                <img src={currentImage} alt="Slide 1" className="w-full h-full object-cover" />
+                                <Button
+                                  onClick={() => handleImageEdit(currentImage)}
+                                  className="absolute top-2 left-2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                  size="sm"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </Button>
+                              </>
                             ) : (
-                              <div className="p-8 flex flex-col justify-center items-center text-center h-full">
-                                {slide.type === 'text' && (
-                                  <>
-                                    <Quote className="w-10 h-10 text-blue-400 mb-6" />
-                                    <p className="text-xl md:text-2xl text-white font-semibold leading-relaxed">
-                                      {slide.content}
-                                    </p>
-                                  </>
-                                )}
-                                {slide.type === 'cta' && (
-                                  <>
-                                    <ArrowRight className="w-12 h-12 text-white" />
-                                    <p className="text-2xl md:text-3xl text-white font-bold mt-6">
-                                      {slide.content}
-                                    </p>
-                                  </>
-                                )}
+                              <div className="w-full h-full flex flex-col justify-center items-center text-center p-4">
+                                <Image className="w-16 h-16 text-gray-500 mb-4" />
+                                <p className="font-semibold text-lg">Slide 1</p>
+                                <p className="text-sm text-gray-400">Carica o genera un'immagine</p>
                               </div>
                             )}
+                            {imageHook && (
+                              <div className="absolute bottom-0 left-0 right-0 p-6 pt-16 bg-gradient-to-t from-black/80 to-transparent">
+                                <div 
+                                  className="relative cursor-pointer group"
+                                  onClick={removeImageHook}
+                                >
+                                  <p className="text-white text-2xl lg:text-3xl font-bold text-center drop-shadow-2xl">
+                                    {imageHook}
+                                  </p>
+                                  <Button
+                                    className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                    size="sm"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                            <div className="absolute top-4 right-4 bg-black/50 text-white text-xs font-bold px-2 py-1 rounded-full">
+                              1 / {carouselSlides.length > 0 ? carouselSlides.length + 1 : 1}
+                            </div>
                           </div>
-                        ))
-                      ) : (
-                        <div className="snap-center flex-shrink-0 w-full max-w-sm aspect-square p-8 rounded-lg flex justify-center items-center bg-gray-800">
-                          <p className="text-gray-400">Nessuna slide generata</p>
                         </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 text-center">Genera il contenuto per vedere l'anteprima</p>
-                  )}
-                </div>
-              ) : currentImage ? (
-                <div className="relative inline-block mx-auto max-w-sm rounded-lg shadow-lg overflow-hidden border-2 border-blue-500/50">
-                  <img src={currentImage} alt="Anteprima" className="w-full h-auto block" />
-                  {imageHook && (
-                    <div className="absolute bottom-0 left-0 right-0 p-5 pt-12 bg-gradient-to-t from-black/80 to-transparent">
-                      <p className="text-white text-xl font-bold drop-shadow-2xl">
-                        {imageHook}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center">
-                  <Image className="w-24 h-24 text-gray-600 mx-auto mb-4" />
-                  <p className="text-gray-500">L'anteprima apparirà qui</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+
+                        {/* Slide di testo/immagini generate */}
+                        {isGeneratingCarousel ? (
+                          <div className="snap-center flex-shrink-0 w-full max-w-sm aspect-square p-8 rounded-lg flex justify-center items-center bg-gray-800">
+                            <div className="text-center">
+                              <Loader2 className="w-8 h-8 animate-spin text-blue-400 mx-auto mb-2" />
+                              <p className="text-gray-300">Generazione slide...</p>
+                            </div>
+                          </div>
+                        ) : carouselSlides.length > 0 ? (
+                          carouselSlides.map((slide, index) => (
+                            <div
+                              key={index}
+                              className={`snap-center relative group flex-shrink-0 w-full max-w-sm aspect-square rounded-lg overflow-hidden border-2 border-gray-700 ${
+                                slide.type === 'cta' ? 'bg-gradient-to-br from-blue-600 to-indigo-700' : 'bg-gray-800'
+                              }`}
+                            >
+                              <div className="absolute top-4 right-4 bg-black/50 text-white text-xs font-bold px-2 py-1 rounded-full">
+                                {index + 2} / {carouselSlides.length + 1}
+                              </div>
+                              
+                              {slide.imageUrl ? (
+                                <div className="relative w-full h-full">
+                                  <img src={slide.imageUrl} alt={`Slide ${index + 2}`} className="w-full h-full object-cover" />
+                                  <Button
+                                    onClick={() => handleImageEdit(slide.imageUrl!, index)}
+                                    className="absolute top-2 left-2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                    size="sm"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </Button>
+                                  <div className="absolute bottom-0 left-0 right-0 p-4 pt-12 bg-gradient-to-t from-black/80 to-transparent">
+                                    <p className="text-white text-lg font-semibold leading-tight">
+                                      {slide.content}
+                                    </p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="p-8 flex flex-col justify-center items-center text-center h-full">
+                                  {slide.type === 'text' && (
+                                    <>
+                                      <Quote className="w-10 h-10 text-blue-400 mb-6" />
+                                      <p className="text-xl md:text-2xl text-white font-semibold leading-relaxed">
+                                        {slide.content}
+                                      </p>
+                                    </>
+                                  )}
+                                  {slide.type === 'cta' && (
+                                    <>
+                                      <ArrowRight className="w-12 h-12 text-white" />
+                                      <p className="text-2xl md:text-3xl text-white font-bold mt-6">
+                                        {slide.content}
+                                      </p>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="snap-center flex-shrink-0 w-full max-w-sm aspect-square p-8 rounded-lg flex justify-center items-center bg-gray-800">
+                            <p className="text-gray-400">Nessuna slide generata</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 text-center">Genera il contenuto per vedere l'anteprima</p>
+                    )}
+                  </div>
+                ) : currentImage ? (
+                  <div className="relative group inline-block mx-auto max-w-sm rounded-lg shadow-lg overflow-hidden border-2 border-blue-500/50">
+                    <img src={currentImage} alt="Anteprima" className="w-full h-auto block" />
+                    <Button
+                      onClick={() => handleImageEdit(currentImage)}
+                      className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      size="sm"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </Button>
+                    {imageHook && (
+                      <div className="absolute bottom-0 left-0 right-0 p-5 pt-12 bg-gradient-to-t from-black/80 to-transparent">
+                        <div 
+                          className="relative cursor-pointer group"
+                          onClick={removeImageHook}
+                        >
+                          <p className="text-white text-xl font-bold drop-shadow-2xl">
+                            {imageHook}
+                          </p>
+                          <Button
+                            className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            size="sm"
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <Image className="w-24 h-24 text-gray-600 mx-auto mb-4" />
+                    <p className="text-gray-500">L'anteprima apparirà qui</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Editor immagine */}
+            {showImageEditor && (
+              <ImageEditor
+                imageUrl={editingImageUrl}
+                onImageUpdate={handleImageUpdate}
+                onClose={() => setShowImageEditor(false)}
+              />
+            )}
+          </div>
         </div>
 
         {/* Sezione strumenti avanzati */}
@@ -871,7 +966,14 @@ Condividi nei commenti, rispondo a tutti! 👇
                             alt={`Immagine generata ${index + 1}`}
                             className="w-full h-32 object-cover rounded-lg border-2 border-gray-600 hover:border-blue-500 transition-colors cursor-pointer"
                           />
-                          <div className="absolute top-2 right-2 bg-black/50 text-white text-xs font-bold px-2 py-1 rounded-full">
+                          <Button
+                            onClick={() => handleImageEdit(imageUrl, index)}
+                            className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            size="sm"
+                          >
+                            <Edit2 className="w-3 h-3" />
+                          </Button>
+                          <div className="absolute top-2 left-2 bg-black/50 text-white text-xs font-bold px-2 py-1 rounded-full">
                             {index + 1}
                           </div>
                         </div>
@@ -887,15 +989,18 @@ Condividi nei commenti, rispondo a tutti! 👇
                       {hookVariants.map((variant, i) => (
                         <Button
                           key={i}
-                          onClick={() => setImageHook(variant)}
+                          onClick={() => toggleImageHook(variant)}
                           variant={imageHook === variant ? "default" : "outline"}
-                          className={`p-4 h-auto text-left whitespace-normal ${
+                          className={`p-4 h-auto text-left whitespace-normal relative ${
                             imageHook === variant 
                               ? 'bg-blue-600 border-blue-400 text-white' 
                               : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'
                           }`}
                         >
                           {variant}
+                          {imageHook === variant && (
+                            <X className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full p-1" />
+                          )}
                         </Button>
                       ))}
                     </div>
