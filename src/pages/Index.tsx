@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Wand2, Download, Edit, Upload, Zap, ArrowRight, Image, Plus } from "lucide-react";
+import { Loader2, Wand2, Download, Edit, Upload, Zap, ArrowRight, Image, Plus, Lightbulb } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { defaultOpenAIService } from "@/services/openaiService";
 import ImageEditor from "@/components/ImageEditor";
@@ -41,6 +40,27 @@ const Index = () => {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showCarouselManager, setShowCarouselManager] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  const contentIdeas = [
+    "5 esercizi di stretching per chi lavora al computer",
+    "Come prevenire il mal di schiena in ufficio",
+    "Riabilitazione post-infortunio sportivo: cosa aspettarsi",
+    "Dolore cervicale: cause e rimedi efficaci",
+    "Esercizi per migliorare la postura quotidiana",
+    "Quando è il momento giusto per iniziare la fisioterapia",
+    "Come preparare il corpo all'attività fisica dopo un periodo di stop",
+    "Tecniche di rilassamento per ridurre stress e tensioni muscolari"
+  ];
+
+  const generateContentIdea = () => {
+    const randomIdea = contentIdeas[Math.floor(Math.random() * contentIdeas.length)];
+    setTopic(randomIdea);
+    setAudience('pazienti che cercano benessere e prevenzione');
+    toast({
+      title: "💡 Idea generata!",
+      description: "Argomento perfetto per i tuoi pazienti"
+    });
+  };
 
   const generateContent = async () => {
     if (!topic.trim()) {
@@ -363,6 +383,34 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
       <div className="container mx-auto max-w-7xl">
+        {/* Sezione Idee per Contenuti */}
+        <Card className="bg-gradient-to-r from-green-600 to-blue-600 border-0 backdrop-blur-sm mb-6">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="text-center md:text-left">
+                <h2 className="text-2xl font-bold text-white mb-2 flex items-center gap-2">
+                  <Lightbulb className="h-6 w-6" />
+                  💡 Hai bisogno di idee?
+                </h2>
+                <p className="text-white/90 text-lg">
+                  Contenuti specifici per fisioterapisti e centri medici
+                </p>
+                <p className="text-white/70 text-sm mt-1">
+                  Argomenti pensati per educare e coinvolgere i tuoi pazienti
+                </p>
+              </div>
+              <Button
+                onClick={generateContentIdea}
+                className="bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm px-8 py-3 text-lg font-semibold"
+                size="lg"
+              >
+                <Lightbulb className="mr-2 h-5 w-5" />
+                Genera Idea per Contenuto
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Colonna sinistra - Form di generazione */}
           <div className="space-y-6">
