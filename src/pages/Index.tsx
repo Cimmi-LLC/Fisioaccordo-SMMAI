@@ -290,9 +290,9 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
-      <div className="container mx-auto max-w-6xl">
+      <div className="container mx-auto max-w-7xl">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Form di generazione */}
+          {/* Colonna sinistra - Form di generazione */}
           <div className="space-y-6">
             {/* Sezione 1: Argomento */}
             <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
@@ -460,7 +460,7 @@ const Index = () => {
                     className="w-full bg-red-600 hover:bg-red-700 text-white text-left justify-start p-4 h-auto"
                   >
                     <div>
-                      <div className="font-semibold">🔥 La verità su [X] errori che tutti commettono con [argomento] che nessuno ti dice</div>
+                      <div className="font-semibold">🔥 La verità su [X] che nessuno ti dice</div>
                     </div>
                   </Button>
                   
@@ -469,7 +469,7 @@ const Index = () => {
                     className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-left justify-start p-4 h-auto"
                   >
                     <div>
-                      <div className="font-semibold">🛑 STOP! Stai sbagliando tutto con [X] errori che tutti commettono con [argomento]</div>
+                      <div className="font-semibold">🛑 STOP! Stai sbagliando tutto con [argomento]</div>
                     </div>
                   </Button>
                   
@@ -478,7 +478,7 @@ const Index = () => {
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white text-left justify-start p-4 h-auto"
                   >
                     <div>
-                      <div className="font-semibold">⚡ Come [X] errori che tutti commettono con [argomento] mi ha cambiato la vita (e può cambiare la tua)</div>
+                      <div className="font-semibold">⚡ Come [argomento] mi ha cambiato la vita (e può cambiare la tua)</div>
                     </div>
                   </Button>
                 </div>
@@ -486,29 +486,55 @@ const Index = () => {
             </Card>
           </div>
 
-          {/* Anteprima e risultati */}
+          {/* Colonna destra - Area Anteprima */}
           <div className="space-y-6">
-            {/* Anteprima generata */}
-            {generatedContent.length > 0 && (
-              <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
-                <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <CardTitle className="text-white flex items-center">
-                      <Image className="mr-2 h-5 w-5" />
-                      Immagini Generate ({generatedContent.length})
-                    </CardTitle>
-                    {generatedContent.length > 1 && (
-                      <Button
-                        onClick={() => setShowCarouselManager(true)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                        size="sm"
-                      >
-                        📱 Gestisci Carosello
-                      </Button>
-                    )}
+            {/* Anteprima del Post */}
+            <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-white flex items-center">
+                  📱 Anteprima Post
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {generatedPost ? (
+                  <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-600">
+                    <Textarea
+                      value={generatedPost}
+                      onChange={(e) => setGeneratedPost(e.target.value)}
+                      className="bg-transparent border-none text-white resize-none min-h-[200px]"
+                      placeholder="Il testo del post apparirà qui..."
+                    />
                   </div>
-                </CardHeader>
-                <CardContent>
+                ) : (
+                  <div className="bg-gray-900/30 p-8 rounded-lg border-2 border-dashed border-gray-600 text-center">
+                    <div className="text-gray-400 text-lg mb-2">📝</div>
+                    <p className="text-gray-400">Il testo del post apparirà qui dopo la generazione</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Anteprima Immagini */}
+            <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-white flex items-center">
+                    <Image className="mr-2 h-5 w-5" />
+                    Anteprima Immagini
+                  </CardTitle>
+                  {generatedContent.length > 1 && (
+                    <Button
+                      onClick={() => setShowCarouselManager(true)}
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                      size="sm"
+                    >
+                      📱 Gestisci Carosello
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {generatedContent.length > 0 ? (
                   <div className="grid grid-cols-1 gap-4">
                     {generatedContent.map((item, index) => (
                       <div key={index} className="relative group">
@@ -534,29 +560,40 @@ const Index = () => {
                             <Download className="w-4 h-4" />
                           </Button>
                         </div>
+                        <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                          Immagine {index + 1}
+                        </div>
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                ) : (
+                  <div className="bg-gray-900/30 p-8 rounded-lg border-2 border-dashed border-gray-600 text-center">
+                    <div className="text-gray-400 text-4xl mb-4">🖼️</div>
+                    <p className="text-gray-400 text-lg">Le immagini generate appariranno qui</p>
+                    <p className="text-gray-500 text-sm mt-2">Clicca su "Genera Contenuto" per iniziare</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-            {/* Testo del Post Completo */}
-            {generatedPost && (
-              <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="text-white">Testo del Post Completo</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Textarea
-                    value={generatedPost}
-                    onChange={(e) => setGeneratedPost(e.target.value)}
-                    className="bg-gray-700 border-gray-600 text-white min-h-[200px]"
-                    placeholder="Il testo generato apparirà qui..."
-                  />
-                </CardContent>
-              </Card>
-            )}
+            {/* Statistiche del Contenuto */}
+            <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-white">📊 Statistiche Contenuto</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4 text-center">
+                  <div className="bg-gray-900/50 p-3 rounded-lg">
+                    <div className="text-blue-400 text-2xl font-bold">{generatedPost.length}</div>
+                    <div className="text-gray-400 text-sm">Caratteri Testo</div>
+                  </div>
+                  <div className="bg-gray-900/50 p-3 rounded-lg">
+                    <div className="text-green-400 text-2xl font-bold">{generatedContent.length}</div>
+                    <div className="text-gray-400 text-sm">Immagini Generate</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
