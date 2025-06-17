@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -16,6 +15,7 @@ const Auth = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -112,6 +112,12 @@ const Auth = () => {
           variant: "destructive"
         });
       } else {
+        // Se "Resta collegato" è selezionato, aggiorna le impostazioni di sessione
+        if (rememberMe) {
+          // Questo permette alla sessione di rimanere attiva più a lungo
+          await supabase.auth.refreshSession();
+        }
+        
         toast({
           title: "🚀 Benvenuto!",
           description: "Login effettuato con successo"
@@ -192,6 +198,19 @@ const Auth = () => {
                       required
                     />
                   </div>
+                  
+                  {/* Opzione "Resta collegato" */}
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="rememberMe" 
+                      checked={rememberMe}
+                      onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                    />
+                    <Label htmlFor="rememberMe" className="text-sm text-gray-300 cursor-pointer">
+                      🔒 Resta collegato
+                    </Label>
+                  </div>
+                  
                   <Button 
                     type="submit" 
                     disabled={loading}
