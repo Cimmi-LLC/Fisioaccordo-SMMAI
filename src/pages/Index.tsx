@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Wand2, Download, Edit, Upload, Zap, ArrowRight, Image } from "lucide-react";
+import { Loader2, Wand2, Download, Edit, Upload, Zap, ArrowRight, Image, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { defaultOpenAIService } from "@/services/openaiService";
 import ImageEditor from "@/components/ImageEditor";
@@ -21,6 +21,7 @@ interface GeneratedContent {
 
 const Index = () => {
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Form state
   const [topic, setTopic] = useState('');
@@ -39,6 +40,7 @@ const Index = () => {
   const [editingImage, setEditingImage] = useState<string | null>(null);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showCarouselManager, setShowCarouselManager] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const generateContent = async () => {
     if (!topic.trim()) {
@@ -157,11 +159,9 @@ const Index = () => {
       let prompt = '';
       switch (tool) {
         case 'upload':
-          toast({
-            title: "Carica Immagine",
-            description: "Funzione di upload immagine in arrivo",
-          });
-          break;
+          fileInputRef.current?.click();
+          setIsGenerating(false);
+          return;
         case 'ai':
           prompt = `Immagine AI avanzata per ${topic || 'social media'}, qualità professionale, design moderno`;
           break;
@@ -199,6 +199,65 @@ const Index = () => {
       });
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleFileUpload = (file: File) => {
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const imageUrl = e.target?.result as string;
+        setGeneratedContent(prev => [...prev, {
+          type: 'uploaded',
+          content: 'Immagine caricata dall\'utente',
+          imageUrl: imageUrl
+        }]);
+        
+        toast({
+          title: "Immagine caricata!",
+          description: "Immagine aggiunta con successo"
+        });
+      };
+      reader.readAsDataURL(file);
+    } else {
+      toast({
+        title: "Formato non supportato",
+        description: "Carica solo file immagine (JPG, PNG, etc.)",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileUpload(file);
+    }
+  };
+
+  const handleImageAreaClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    const imageFile = files.find(file => file.type.startsWith('image/'));
+    
+    if (imageFile) {
+      handleFileUpload(imageFile);
     }
   };
 
@@ -417,30 +476,32 @@ const Index = () => {
                 <CardTitle className="text-white">Strumenti Avanzati</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 gap-3">
                   <Button
                     onClick={() => generateAdvancedTool('upload')}
-                    className="bg-gray-600 hover:bg-gray-700 text-white"
+                    className="bg-gray-600 hover:bg-gray-700 text-white flex items-center justify-center gap-2 py-3 text-sm"
                     disabled={isGenerating}
                   >
-                    <Upload className="mr-2 h-4 w-4" />
-                    Carica Immagine
+                    <Upload className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">Carica Immagine</span>
                   </Button>
+                  
                   <Button
                     onClick={() => generateAdvancedTool('ai')}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    className="bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2 py-3 text-sm"
                     disabled={isGenerating}
                   >
-                    <Zap className="mr-2 h-4 w-4" />
-                    Genera Immagine AI
+                    <Zap className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">Genera Immagine AI</span>
                   </Button>
+                  
                   <Button
                     onClick={() => generateAdvancedTool('hook')}
-                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                    className="bg-orange-600 hover:bg-orange-700 text-white flex items-center justify-center gap-2 py-3 text-sm"
                     disabled={isGenerating}
                   >
-                    <ArrowRight className="mr-2 h-4 w-4" />
-                    Genera Hook A/B Test
+                    <ArrowRight className="h-4 w-4 flex-shrink-0" />
+                    <span className="truncate">Genera Hook A/B Test</span>
                   </Button>
                 </div>
               </CardContent>
@@ -459,8 +520,8 @@ const Index = () => {
                     onClick={() => generateHookVariant('verita')}
                     className="w-full bg-red-600 hover:bg-red-700 text-white text-left justify-start p-4 h-auto"
                   >
-                    <div>
-                      <div className="font-semibold">🔥 La verità su [X] che nessuno ti dice</div>
+                    <div className="text-sm">
+                      <div className="font-semibold">🔥 La verità che nessuno ti dice</div>
                     </div>
                   </Button>
                   
@@ -468,8 +529,8 @@ const Index = () => {
                     onClick={() => generateHookVariant('stop')}
                     className="w-full bg-yellow-600 hover:bg-yellow-700 text-white text-left justify-start p-4 h-auto"
                   >
-                    <div>
-                      <div className="font-semibold">🛑 STOP! Stai sbagliando tutto con [argomento]</div>
+                    <div className="text-sm">
+                      <div className="font-semibold">🛑 STOP! Stai sbagliando tutto</div>
                     </div>
                   </Button>
                   
@@ -477,8 +538,8 @@ const Index = () => {
                     onClick={() => generateHookVariant('errori')}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white text-left justify-start p-4 h-auto"
                   >
-                    <div>
-                      <div className="font-semibold">⚡ Come [argomento] mi ha cambiato la vita (e può cambiare la tua)</div>
+                    <div className="text-sm">
+                      <div className="font-semibold">⚡ Come mi ha cambiato la vita</div>
                     </div>
                   </Button>
                 </div>
@@ -488,6 +549,15 @@ const Index = () => {
 
           {/* Colonna destra - Area Anteprima */}
           <div className="space-y-6">
+            {/* Input nascosto per file upload */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileInputChange}
+              className="hidden"
+            />
+            
             {/* Anteprima del Post */}
             <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
               <CardHeader>
@@ -501,7 +571,7 @@ const Index = () => {
                     <Textarea
                       value={generatedPost}
                       onChange={(e) => setGeneratedPost(e.target.value)}
-                      className="bg-transparent border-none text-white resize-none min-h-[200px]"
+                      className="bg-transparent border-none text-white resize-none min-h-[200px] focus:ring-0 focus:outline-none"
                       placeholder="Il testo del post apparirà qui..."
                     />
                   </div>
@@ -525,7 +595,7 @@ const Index = () => {
                   {generatedContent.length > 1 && (
                     <Button
                       onClick={() => setShowCarouselManager(true)}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-3 py-1"
                       size="sm"
                     >
                       📱 Gestisci Carosello
@@ -565,12 +635,48 @@ const Index = () => {
                         </div>
                       </div>
                     ))}
+                    
+                    {/* Area per aggiungere nuove immagini */}
+                    <div 
+                      className={`bg-gray-900/30 p-8 rounded-lg border-2 border-dashed transition-all cursor-pointer hover:bg-gray-800/30 ${
+                        isDragging ? 'border-blue-400 bg-blue-900/20' : 'border-gray-600'
+                      }`}
+                      onClick={handleImageAreaClick}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                    >
+                      <div className="text-center">
+                        <Plus className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                        <p className="text-gray-400 text-sm">
+                          Clicca per aggiungere un'immagine
+                        </p>
+                        <p className="text-gray-500 text-xs mt-1">
+                          o trascina qui un file
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 ) : (
-                  <div className="bg-gray-900/30 p-8 rounded-lg border-2 border-dashed border-gray-600 text-center">
-                    <div className="text-gray-400 text-4xl mb-4">🖼️</div>
-                    <p className="text-gray-400 text-lg">Le immagini generate appariranno qui</p>
-                    <p className="text-gray-500 text-sm mt-2">Clicca su "Genera Contenuto" per iniziare</p>
+                  <div 
+                    className={`bg-gray-900/30 p-8 rounded-lg border-2 border-dashed transition-all cursor-pointer hover:bg-gray-800/30 ${
+                      isDragging ? 'border-blue-400 bg-blue-900/20' : 'border-gray-600'
+                    }`}
+                    onClick={handleImageAreaClick}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                  >
+                    <div className="text-center">
+                      <div className="text-gray-400 text-4xl mb-4">🖼️</div>
+                      <p className="text-gray-400 text-lg">Le immagini generate appariranno qui</p>
+                      <p className="text-gray-500 text-sm mt-2">
+                        Clicca su "Genera Contenuto" per iniziare o clicca qui per caricare un'immagine
+                      </p>
+                      <p className="text-gray-500 text-xs mt-1">
+                        Puoi anche trascinare e rilasciare file qui
+                      </p>
+                    </div>
                   </div>
                 )}
               </CardContent>
