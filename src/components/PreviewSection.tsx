@@ -83,6 +83,179 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
     reader.readAsDataURL(file);
   };
 
+  const renderSlideWithText = (slide: CarouselSlide, index: number) => {
+    // Estrai le parti principali del testo per il layout
+    const lines = slide.content.split('\n').filter(line => line.trim());
+    const mainTitle = lines[0] || '';
+    const subtitle = lines[1] || '';
+    const bodyText = lines.slice(2).join('\n') || '';
+    
+    // Diversi layout basati sul tipo di slide
+    const getSlideLayout = () => {
+      if (index === 0) {
+        // Prima slide - Layout accattivante per fermare lo scroll
+        return (
+          <div className="absolute inset-0 flex flex-col justify-center items-center text-center p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+            <div className="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold mb-2 animate-pulse">
+              🚨 ATTENZIONE
+            </div>
+            <h1 className="text-white text-lg font-black mb-2 leading-tight drop-shadow-lg">
+              {mainTitle.replace('🚨', '').trim()}
+            </h1>
+            <p className="text-yellow-300 text-sm font-semibold mb-3 drop-shadow-md">
+              {subtitle}
+            </p>
+            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 py-2">
+              <p className="text-white text-xs font-medium">
+                👉 Swipe per la soluzione →
+              </p>
+            </div>
+          </div>
+        );
+      } else if (index === 1) {
+        // Seconda slide - Problema/Errore
+        return (
+          <div className="absolute inset-0 flex flex-col justify-end p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
+            <div className="bg-red-500/90 backdrop-blur-sm rounded-lg p-3 border-l-4 border-white">
+              <div className="flex items-center mb-2">
+                <span className="text-white text-lg">❌</span>
+                <h2 className="text-white text-sm font-bold ml-2">ERRORE COMUNE</h2>
+              </div>
+              <p className="text-white text-xs leading-relaxed">
+                {bodyText.substring(0, 120)}...
+              </p>
+            </div>
+          </div>
+        );
+      } else if (index === 2) {
+        // Terza slide - Soluzione
+        return (
+          <div className="absolute inset-0 flex flex-col justify-center p-4 bg-gradient-to-br from-green-600/80 via-black/60 to-black/80">
+            <div className="bg-white/95 backdrop-blur-sm rounded-lg p-3 shadow-xl">
+              <div className="flex items-center mb-2">
+                <span className="text-green-600 text-lg">✅</span>
+                <h2 className="text-green-800 text-sm font-bold ml-2">LA SOLUZIONE</h2>
+              </div>
+              <p className="text-gray-800 text-xs leading-relaxed font-medium">
+                3 passi per risolvere il problema
+              </p>
+              <div className="mt-2 space-y-1">
+                <div className="text-xs text-gray-700">1️⃣ Identifica la causa</div>
+                <div className="text-xs text-gray-700">2️⃣ Applica il protocollo</div>
+                <div className="text-xs text-gray-700">3️⃣ Mantieni i risultati</div>
+              </div>
+            </div>
+          </div>
+        );
+      } else if (index === 3) {
+        // Quarta slide - Risultati
+        return (
+          <div className="absolute inset-0 flex flex-col justify-between p-4 bg-gradient-to-t from-purple-900/90 via-purple-600/60 to-transparent">
+            <div className="bg-yellow-400 text-purple-900 px-2 py-1 rounded-full text-xs font-bold self-start">
+              🔥 RISULTATI GARANTITI
+            </div>
+            <div className="bg-white/95 backdrop-blur-sm rounded-lg p-3">
+              <h3 className="text-purple-900 text-sm font-bold mb-2">Cosa ottieni:</h3>
+              <div className="space-y-1">
+                <div className="text-xs text-purple-800">• Miglioramento in 7 giorni</div>
+                <div className="text-xs text-purple-800">• Dolore ridotto del 80%</div>
+                <div className="text-xs text-purple-800">• Movimento naturale</div>
+              </div>
+            </div>
+          </div>
+        );
+      } else {
+        // Ultima slide - Call to Action
+        return (
+          <div className="absolute inset-0 flex flex-col justify-center items-center p-4 bg-gradient-to-br from-orange-600/90 via-red-600/80 to-purple-900/90">
+            <div className="bg-white rounded-lg p-4 text-center shadow-2xl max-w-full">
+              <div className="text-2xl mb-2">🎯</div>
+              <h3 className="text-gray-900 text-sm font-bold mb-2">VUOI RISULTATI?</h3>
+              <div className="space-y-1 mb-3">
+                <div className="text-xs text-gray-700">📞 Consulenza GRATUITA</div>
+                <div className="text-xs text-gray-700">💬 Scrivici in DM</div>
+              </div>
+              <div className="bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold">
+                PRENOTA ORA
+              </div>
+            </div>
+          </div>
+        );
+      }
+    };
+
+    return (
+      <div 
+        key={index}
+        className="relative aspect-square rounded-lg overflow-hidden group border border-gray-600 bg-gray-800"
+      >
+        {/* Immagine di sfondo */}
+        {slide.userImageUrl || slide.imageUrl ? (
+          <img 
+            src={slide.userImageUrl || slide.imageUrl} 
+            alt={`Slide ${index + 1}`}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              target.src = `https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center`;
+            }}
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
+            Slide {index + 1}
+          </div>
+        )}
+        
+        {/* Overlay con testo stilizzato */}
+        {getSlideLayout()}
+        
+        {/* Controlli hover */}
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+          <Button
+            onClick={() => onImageEdit(slide.userImageUrl || slide.imageUrl || '', index)}
+            size="sm"
+            className="p-1 h-6 w-6 bg-blue-600 hover:bg-blue-700"
+          >
+            ✏️
+          </Button>
+          <Button
+            onClick={() => downloadImage(slide.userImageUrl || slide.imageUrl || '', index)}
+            size="sm"
+            className="p-1 h-6 w-6 bg-green-600 hover:bg-green-700"
+          >
+            <Download className="w-3 h-3" />
+          </Button>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                uploadImageToSlide(index, file);
+              }
+            }}
+            className="hidden"
+            id={`upload-${index}`}
+          />
+          <Button
+            asChild
+            size="sm"
+            className="p-1 h-6 w-6 bg-purple-600 hover:bg-purple-700 cursor-pointer"
+          >
+            <label htmlFor={`upload-${index}`}>
+              <Upload className="w-3 h-3" />
+            </label>
+          </Button>
+        </div>
+        
+        {/* Numero slide */}
+        <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full font-bold">
+          {index + 1}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
       <CardHeader>
@@ -91,82 +264,12 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
       <CardContent>
         {generatedContent ? (
           <div className="space-y-4">
-            {/* Anteprima slide del carosello */}
+            {/* Anteprima slide del carosello con testo sovrapposto */}
             {carouselSlides.length > 0 && (
               <div className="mb-4">
-                <h3 className="text-white font-semibold mb-3">Slide del Carosello</h3>
-                <div className="grid grid-cols-2 gap-2 mb-4">
-                  {carouselSlides.slice(0, 4).map((slide, index) => (
-                    <div 
-                      key={index}
-                      className="relative aspect-square rounded-lg overflow-hidden group border border-gray-600"
-                    >
-                      {slide.userImageUrl || slide.imageUrl ? (
-                        <img 
-                          src={slide.userImageUrl || slide.imageUrl} 
-                          alt={`Slide ${index + 1}`}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = `https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center`;
-                          }}
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
-                          Slide {index + 1}
-                        </div>
-                      )}
-                      
-                      {/* Overlay con contenuto della slide */}
-                      <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
-                        <div className="text-white text-xs font-medium line-clamp-4">
-                          {slide.content}
-                        </div>
-                        <div className="flex gap-1">
-                          <Button
-                            onClick={() => onImageEdit(slide.userImageUrl || slide.imageUrl || '', index)}
-                            size="sm"
-                            className="p-1 h-6 w-6 bg-blue-600 hover:bg-blue-700"
-                          >
-                            ✏️
-                          </Button>
-                          <Button
-                            onClick={() => downloadImage(slide.userImageUrl || slide.imageUrl || '', index)}
-                            size="sm"
-                            className="p-1 h-6 w-6 bg-green-600 hover:bg-green-700"
-                          >
-                            <Download className="w-3 h-3" />
-                          </Button>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                uploadImageToSlide(index, file);
-                              }
-                            }}
-                            className="hidden"
-                            id={`upload-${index}`}
-                          />
-                          <Button
-                            asChild
-                            size="sm"
-                            className="p-1 h-6 w-6 bg-purple-600 hover:bg-purple-700 cursor-pointer"
-                          >
-                            <label htmlFor={`upload-${index}`}>
-                              <Upload className="w-3 h-3" />
-                            </label>
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      {/* Numero slide */}
-                      <div className="absolute top-1 left-1 bg-black/50 text-white text-xs px-1 rounded">
-                        {index + 1}
-                      </div>
-                    </div>
-                  ))}
+                <h3 className="text-white font-semibold mb-3">Slide del Carosello con Testo</h3>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  {carouselSlides.slice(0, 4).map((slide, index) => renderSlideWithText(slide, index))}
                 </div>
                 
                 {carouselSlides.length > 4 && (
