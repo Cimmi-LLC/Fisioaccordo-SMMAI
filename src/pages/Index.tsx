@@ -1,4 +1,5 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -6,9 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Wand2, Download, Edit, Upload, Zap, ArrowRight, Image, Plus, Lightbulb } from "lucide-react";
+import { Loader2, Wand2, Download, Edit, Upload, Zap, ArrowRight, Image, Plus, Lightbulb, LogOut, Save, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { defaultOpenAIService } from "@/services/openaiService";
+import { contentService } from "@/services/contentService";
+import { useAuth } from "@/hooks/useAuth";
 import ImageEditor from "@/components/ImageEditor";
 import CarouselImageManager from "@/components/CarouselImageManager";
 
@@ -19,7 +22,9 @@ interface GeneratedContent {
 }
 
 const Index = () => {
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, loading: authLoading, signOut, isAuthenticated } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Form state
@@ -32,6 +37,7 @@ const Index = () => {
   
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent[]>([]);
   const [generatedPost, setGeneratedPost] = useState('');
   
@@ -52,6 +58,41 @@ const Index = () => {
     "Tecniche di rilassamento per ridurre stress e tensioni muscolari"
   ];
 
+  // Redirect se non autenticato
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      navigate('/auth');
+    }
+  }, [authLoading, isAuthenticated, navigate]);
+
+  // Mostra loading durante il controllo autenticazione
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-400 mx-auto mb-4" />
+          <p className="text-white">Caricamento...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Se non autenticato, non mostrare nulla (verrà reindirizzato)
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (!error) {
+      toast({
+        title: "👋 Arrivederci!",
+        description: "Logout effettuato con successo"
+      });
+      navigate('/auth');
+    }
+  };
+
   const generateContentIdea = () => {
     const randomIdea = contentIdeas[Math.floor(Math.random() * contentIdeas.length)];
     setTopic(randomIdea);
@@ -60,6 +101,56 @@ const Index = () => {
       title: "💡 Idea generata!",
       description: "Argomento perfetto per i tuoi pazienti"
     });
+  };
+
+  const saveContent = async () => {
+    if (!generatedPost.trim() || generatedContent.length === 0) {
+      toast({
+        title: "Niente da salvare",
+        description: "Genera prima del contenuto",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const contentTitle = topic.length > 50 ? topic.substring(0, 50) + '...' : topic;
+      const imageUrls = generatedContent.map(item => item.imageUrl);
+
+      const { data, error } = await contentService.saveContent({
+        title: contentTitle,
+        contentText: generatedPost,
+        topic,
+        audience,
+        platform,
+        postType,
+        tone,
+        length,
+        images: imageUrls
+      });
+
+      if (error) {
+        toast({
+          title: "Errore salvataggio",
+          description: "Impossibile salvare il contenuto",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "💾 Contenuto salvato!",
+          description: "Il tuo post è stato salvato nel database"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Errore",
+        description: "Problema durante il salvataggio",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const generateContent = async () => {
@@ -383,6 +474,41 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
       <div className="container mx-auto max-w-7xl">
+        {/* Header con info utente */}
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-white">PhysioContent AI</h1>
+            <p className="text-gray-300">Benvenuto, {user?.email}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={saveContent}
+              disabled={isSaving || !generatedPost}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvataggio...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Salva Contenuto
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={handleSignOut}
+              variant="outline"
+              className="border-gray-600 text-gray-300 hover:bg-gray-700"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
+          </div>
+        </div>
+
         {/* Sezione Idee per Contenuti */}
         <Card className="bg-gradient-to-r from-green-600 to-blue-600 border-0 backdrop-blur-sm mb-6">
           <CardContent className="p-6">
