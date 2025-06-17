@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -27,7 +26,10 @@ import {
   Plus,
   Image,
   Wand2,
-  Copy
+  Copy,
+  Upload,
+  X,
+  Trash2
 } from "lucide-react";
 import CarouselImageManager from "@/components/CarouselImageManager";
 import ImageEditor from "@/components/ImageEditor";
@@ -65,6 +67,7 @@ const Index = () => {
   const [showHookGenerator, setShowHookGenerator] = useState(false);
   const [hookTopic, setHookTopic] = useState('');
   const [generatedHooks, setGeneratedHooks] = useState<string[]>([]);
+  const [appliedHook, setAppliedHook] = useState<string>('');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -138,9 +141,24 @@ const Index = () => {
       lines[0] = hook;
       return lines.join('\n');
     });
+    setAppliedHook(hook);
     toast({
       title: "Hook applicato! 🎯",
       description: "L'hook è stato inserito nel tuo contenuto"
+    });
+  };
+
+  const removeHook = () => {
+    setGeneratedContent(prev => {
+      const lines = prev.split('\n');
+      // Rimuovi la prima riga (hook) e ricrea il contenuto
+      lines.shift();
+      return lines.join('\n');
+    });
+    setAppliedHook('');
+    toast({
+      title: "Hook rimosso",
+      description: "L'hook è stato rimosso dal contenuto"
     });
   };
 
@@ -148,13 +166,24 @@ const Index = () => {
     const numSlides = parseInt(formData.numSlides);
     const slides: CarouselSlide[] = [];
     
+    // Array di immagini placeholder reali
+    const placeholderImages = [
+      'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center',
+      'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center',
+      'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center',
+      'https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=400&h=400&fit=crop&crop=center',
+      'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center',
+      'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&h=400&fit=crop&crop=center',
+      'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center'
+    ];
+    
     for (let i = 0; i < numSlides; i++) {
       slides.push({
         type: i === 0 ? 'cover' : 'content',
         content: i === 0 
           ? `${formData.description.toUpperCase()}`
           : `Slide ${i + 1}: Contenuto per ${formData.description}`,
-        imageUrl: `https://images.unsplash.com/photo-${1559757148 + i}?w=400&h=400&fit=crop`
+        imageUrl: placeholderImages[i % placeholderImages.length]
       });
     }
     
@@ -283,6 +312,21 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
       title: "Copiato! 📋",
       description: "Contenuto copiato negli appunti"
     });
+  };
+
+  const uploadImageToSlide = (slideIndex: number, file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const updatedSlides = [...carouselSlides];
+      updatedSlides[slideIndex].userImageUrl = reader.result as string;
+      setCarouselSlides(updatedSlides);
+      
+      toast({
+        title: "Immagine caricata! 📸",
+        description: `Immagine caricata per la slide ${slideIndex + 1}`
+      });
+    };
+    reader.readAsDataURL(file);
   };
 
   if (authLoading) {
@@ -539,26 +583,72 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
                 <div className="space-y-4">
                   {/* Anteprima slide del carosello */}
                   {carouselSlides.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                      {carouselSlides.slice(0, 4).map((slide, index) => (
-                        <div 
-                          key={index}
-                          className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all"
-                          onClick={() => handleImageEdit(slide.userImageUrl || slide.imageUrl || '', index)}
-                        >
-                          {slide.userImageUrl || slide.imageUrl ? (
-                            <img 
-                              src={slide.userImageUrl || slide.imageUrl} 
-                              alt={`Slide ${index + 1}`}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
-                              Slide {index + 1}
+                    <div className="mb-4">
+                      <div className="grid grid-cols-2 gap-2 mb-4">
+                        {carouselSlides.slice(0, 4).map((slide, index) => (
+                          <div 
+                            key={index}
+                            className="relative aspect-square rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all group"
+                            onClick={() => handleImageEdit(slide.userImageUrl || slide.imageUrl || '', index)}
+                          >
+                            {slide.userImageUrl || slide.imageUrl ? (
+                              <img 
+                                src={slide.userImageUrl || slide.imageUrl} 
+                                alt={`Slide ${index + 1}`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = `https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center`;
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
+                                Slide {index + 1}
+                              </div>
+                            )}
+                            
+                            {/* Overlay per upload */}
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    uploadImageToSlide(index, file);
+                                  }
+                                }}
+                                className="absolute inset-0 opacity-0 cursor-pointer"
+                              />
+                              <Upload className="w-8 h-8 text-white" />
                             </div>
-                          )}
-                        </div>
-                      ))}
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {carouselSlides.length > 4 && (
+                        <p className="text-gray-400 text-sm text-center">
+                          +{carouselSlides.length - 4} altre slide
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Hook applicato */}
+                  {appliedHook && (
+                    <div className="bg-orange-600/20 border border-orange-500 rounded-lg p-3 mb-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-orange-300 text-sm font-medium">Hook applicato:</span>
+                        <Button
+                          onClick={removeHook}
+                          size="sm"
+                          variant="ghost"
+                          className="text-orange-300 hover:text-orange-200 p-1 h-auto"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <p className="text-orange-100 text-sm mt-1">{appliedHook}</p>
                     </div>
                   )}
                   
