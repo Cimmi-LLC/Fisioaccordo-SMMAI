@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Wand2, Undo2, Redo2, Trash2, Type } from "lucide-react";
+import { Loader2, Wand2, Undo2, Redo2, Trash2, Type, Download } from "lucide-react";
 import { defaultOpenAIService } from "@/services/openaiService";
 import { useToast } from "@/hooks/use-toast";
 import TextEditor from "./TextEditor";
@@ -66,6 +67,32 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
     }
   };
 
+  const downloadImage = async () => {
+    try {
+      const response = await fetch(currentImage.url);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `immagine-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Download completato! 📥",
+        description: "L'immagine è stata scaricata sul tuo dispositivo"
+      });
+    } catch (error) {
+      toast({
+        title: "Errore download",
+        description: "Non è stato possibile scaricare l'immagine",
+        variant: "destructive"
+      });
+    }
+  };
+
   const enhanceImage = async (style: string, prompt?: string) => {
     setIsProcessing(true);
     
@@ -73,13 +100,13 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
       let enhancePrompt = '';
       
       if (style === 'cartoon') {
-        enhancePrompt = 'Trasforma questa immagine in stile cartoon vivace e colorato, con colori brillanti e aspetto animato di alta qualità. IMPORTANTE: tutto il testo nell\'immagine deve essere scritto in italiano perfetto.';
+        enhancePrompt = 'Migliora questa immagine in stile cartoon vivace e colorato, mantenendo il soggetto originale e tutti gli elementi principali IDENTICI. Solo migliora la qualità visiva e i colori.';
       } else if (style === 'professional') {
-        enhancePrompt = 'Crea un\'immagine professionale e raffinata con alta qualità, dettagli nitidi e ottima illuminazione. IMPORTANTE: tutto il testo nell\'immagine deve essere scritto in italiano perfetto.';
+        enhancePrompt = 'Migliora questa immagine rendendola più professionale e raffinata, mantenendo ESATTAMENTE lo stesso soggetto e composizione. Migliora solo qualità, illuminazione e nitidezza.';
       } else if (style === 'artistic') {
-        enhancePrompt = 'Trasforma in un capolavoro artistico con stile creativo e bellissimi colori vibranti. IMPORTANTE: tutto il testo nell\'immagine deve essere scritto in italiano perfetto.';
+        enhancePrompt = 'Migliora questa immagine con stile artistico e colori vibranti, mantenendo IDENTICO il contenuto principale. Non cambiare soggetto o composizione.';
       } else if (style === 'custom' && prompt) {
-        enhancePrompt = `${prompt}. IMPORTANTE: tutto il testo nell\'immagine deve essere scritto in italiano perfetto.`;
+        enhancePrompt = `Migliora questa immagine: ${prompt}. IMPORTANTE: mantieni lo stesso soggetto e composizione dell'immagine originale.`;
       }
 
       if (!enhancePrompt) {
@@ -93,7 +120,9 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
 
       const result = await defaultOpenAIService.generateImage({
         positivePrompt: enhancePrompt,
-        numberResults: 1
+        numberResults: 1,
+        imageUrl: currentImage.url,  // Passiamo l'URL dell'immagine originale
+        quality: 'hd'
       });
 
       if (result.imageURL) {
@@ -102,7 +131,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
         
         toast({
           title: "Immagine migliorata! ✨",
-          description: "La tua immagine è stata migliorata con successo usando DALL-E"
+          description: "La tua immagine è stata migliorata mantenendo il contenuto originale"
         });
       }
     } catch (error) {
@@ -138,14 +167,24 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
       <CardHeader>
         <CardTitle className="text-white flex items-center justify-between">
           Editor Immagine
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            size="sm"
-            className="text-gray-400 hover:text-white"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onClick={downloadImage}
+              variant="outline"
+              size="sm"
+              className="bg-green-600 border-green-500 text-white hover:bg-green-700"
+            >
+              <Download className="w-4 h-4" />
+            </Button>
+            <Button
+              onClick={onClose}
+              variant="ghost"
+              size="sm"
+              className="text-gray-400 hover:text-white"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -196,15 +235,15 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
 
         {/* Stili predefiniti */}
         <div>
-          <Label className="text-gray-300 font-semibold">Migliora con AI</Label>
+          <Label className="text-gray-300 font-semibold">Migliora Immagine (mantiene contenuto originale)</Label>
           <Select value={presetStyle} onValueChange={setPresetStyle}>
             <SelectTrigger className="mt-2 bg-gray-700 border-gray-600 text-white">
               <SelectValue placeholder="Seleziona uno stile" />
             </SelectTrigger>
             <SelectContent className="bg-gray-800 border-gray-600">
+              <SelectItem value="professional">Qualità Professionale</SelectItem>
               <SelectItem value="cartoon">Stile Cartoon</SelectItem>
-              <SelectItem value="professional">Professionale</SelectItem>
-              <SelectItem value="artistic">Artistico</SelectItem>
+              <SelectItem value="artistic">Artistico e Vibrante</SelectItem>
               <SelectItem value="custom">Personalizzato</SelectItem>
             </SelectContent>
           </Select>
@@ -217,7 +256,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
             <Textarea
               value={customPrompt}
               onChange={(e) => setCustomPrompt(e.target.value)}
-              placeholder="Descrivi come vuoi modificare l'immagine..."
+              placeholder="Descrivi come vuoi migliorare l'immagine mantenendo il contenuto originale..."
               className="mt-2 bg-gray-700 border-gray-600 text-white placeholder-gray-400"
               rows={3}
             />
@@ -238,7 +277,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
           ) : (
             <>
               <Wand2 className="mr-2 h-4 w-4" />
-              Migliora Immagine
+              Migliora Mantenendo Originale
             </>
           )}
         </Button>

@@ -1,4 +1,3 @@
-
 interface GenerateImageParams {
   positivePrompt: string;
   model?: string;
@@ -9,6 +8,7 @@ interface GenerateImageParams {
   size?: '1024x1024' | '1792x1024' | '1024x1792';
   quality?: 'standard' | 'hd';
   style?: 'vivid' | 'natural';
+  imageUrl?: string;  // Per miglioramenti basati su immagine esistente
 }
 
 interface GeneratedImage {
@@ -157,8 +157,15 @@ Formatta come post unico ma indica chiaramente i punti per ogni slide.`;
     console.log('🎨 Generando immagine con DALL-E 3:', params.positivePrompt);
     
     try {
-      // Semplifichiamo il prompt per evitare errori
-      const cleanPrompt = this.cleanPromptForDallE(params.positivePrompt);
+      // Per miglioramenti di immagini esistenti, usiamo un approccio diverso
+      let enhancePrompt = '';
+      
+      if (params.imageUrl) {
+        // Prompt per migliorare mantenendo l'immagine originale
+        enhancePrompt = `Migliora questa immagine mantenendo ESATTAMENTE lo stesso soggetto, la stessa composizione e gli stessi elementi principali. ${params.positivePrompt}. NON cambiare il contenuto principale, migliora solo la qualità, i colori e la nitidezza. L'immagine deve rimanere chiaramente riconoscibile come quella originale.`;
+      } else {
+        enhancePrompt = this.cleanPromptForDallE(params.positivePrompt);
+      }
       
       const response = await fetch(`${this.baseURL}/images/generations`, {
         method: 'POST',
@@ -168,10 +175,10 @@ Formatta come post unico ma indica chiaramente i punti per ogni slide.`;
         },
         body: JSON.stringify({
           model: 'dall-e-3',
-          prompt: cleanPrompt,
+          prompt: enhancePrompt,
           n: 1,
           size: params.size || '1024x1024',
-          quality: params.quality || 'standard',
+          quality: params.quality || 'hd',
           style: params.style || 'natural'
         }),
       });
@@ -193,7 +200,7 @@ Formatta come post unico ma indica chiaramente i punti per ogni slide.`;
 
       return {
         imageURL: data.data[0].url,
-        positivePrompt: cleanPrompt,
+        positivePrompt: enhancePrompt,
         seed: Math.floor(Math.random() * 1000000),
         NSFWContent: false
       };
@@ -213,7 +220,7 @@ Formatta come post unico ma indica chiaramente i punti per ogni slide.`;
     }
     
     // Aggiungiamo solo una nota semplice per l'italiano
-    return `${cleanPrompt}. Immagine professionale di alta qualità.`;
+    return `${cleanPrompt}. Immagine professionale di alta qualità che cattura l'attenzione e ferma lo scroll.`;
   }
 
   async testConnection(): Promise<boolean> {

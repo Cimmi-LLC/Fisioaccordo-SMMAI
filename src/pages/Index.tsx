@@ -85,35 +85,35 @@ const Index = () => {
   const getRelevantImages = (topic: string) => {
     const topicLower = topic.toLowerCase();
     
-    // Immagini specifiche per argomenti fisioterapici
+    // Immagini ottimizzate per fermare lo scroll e catturare l'attenzione
     const imageCategories = {
       'mal di schiena': [
-        'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center'
+        'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center', // Persona con mal di schiena
+        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center', // Esercizi schiena
+        'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center', // Fisioterapia schiena
+        'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center', // Stretching
+        'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center'  // Postura
       ],
       'postura': [
-        'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center'
+        'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center', // Postura corretta
+        'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&h=400&fit=crop&crop=center', // Postura ufficio
+        'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center', // Ergonomia
+        'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center', // Stretching posturale
+        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center'  // Esercizi postura
       ],
       'esercizi': [
-        'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&h=400&fit=crop&crop=center'
+        'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center', // Esercizi fisioterapia
+        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center', // Allenamento
+        'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center', // Stretching
+        'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center', // Riabilitazione
+        'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center'  // Movimento
       ],
       'riabilitazione': [
-        'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center'
+        'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center', // Fisioterapia
+        'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center', // Riabilitazione
+        'https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=400&h=400&fit=crop&crop=center', // Terapia
+        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center', // Recupero
+        'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center'  // Esercizi riabilitativi
       ]
     };
 
@@ -131,16 +131,24 @@ const Index = () => {
   const generateCarouselSlides = () => {
     const numSlides = parseInt(formData.numSlides);
     const slides: CarouselSlide[] = [];
+    const topic = formData.description;
     
     // Ottieni immagini pertinenti al topic
-    const relevantImages = getRelevantImages(formData.description);
+    const relevantImages = getRelevantImages(topic);
+    
+    // Contenuti specifici per ogni slide che fermano lo scroll
+    const slideContents = [
+      `🚨 ${topic.toUpperCase()}\n\nSCOPRI LA VERITÀ che i dottori non ti dicono!\n\n👉 Swipe per la soluzione →`,
+      `❌ ERRORE #1\n\nLa maggior parte delle persone fa questo sbaglio con ${topic}...\n\n💡 Ecco cosa dovresti fare invece:`,
+      `✅ LA SOLUZIONE\n\n3 passi scientifici per risolvere ${topic}:\n\n1️⃣ [Primo step]\n2️⃣ [Secondo step]\n3️⃣ [Terzo step]`,
+      `🔥 RISULTATI GARANTITI\n\nCosa succede quando applichi questo metodo:\n\n• Miglioramento in 7 giorni\n• Dolore ridotto del 80%\n• Movimento naturale`,
+      `🎯 CALL TO ACTION\n\nVuoi risultati concreti?\n\n📞 Prenota consulenza GRATUITA\n💬 Scrivici in DM\n🏢 ${user?.user_metadata?.clinic_name || 'Il tuo studio'}\n\n#fisioterapia #salute`
+    ];
     
     for (let i = 0; i < numSlides; i++) {
       slides.push({
         type: i === 0 ? 'cover' : 'content',
-        content: i === 0 
-          ? `${formData.description.toUpperCase()}`
-          : `Slide ${i + 1}: Contenuto per ${formData.description}`,
+        content: slideContents[i] || `Slide ${i + 1}: ${topic}`,
         imageUrl: relevantImages[i % relevantImages.length],
         userImageUrl: basePhoto && i === 0 ? basePhoto : undefined
       });
@@ -164,34 +172,50 @@ const Index = () => {
     try {
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      const mockContent = `🏥 **${formData.description.toUpperCase()}** 🏥
+      // Copy ottimizzato per fermare lo scroll e generare engagement
+      const mockContent = `🚨 **${formData.description.toUpperCase()}** - LA VERITÀ CHE NESSUNO TI DICE!
 
-💡 Hai mai pensato a quanto sia importante prendersi cura di questo aspetto della tua salute?
+💡 Se soffri di ${formData.description}, questo post può cambiarti la vita!
 
-Come fisioterapista, vedo ogni giorno quanto una corretta prevenzione possa fare la differenza.
+❌ ERRORE COMUNE: La maggior parte delle persone fa questo sbaglio...
 
-✅ 3 consigli pratici:
-1. Mantieni una postura corretta
-2. Fai stretching quotidiano  
-3. Non ignorare i primi segnali di dolore
+Come fisioterapista con oltre 10 anni di esperienza, vedo ogni giorno persone che:
+• Ignorano i primi segnali
+• Usano rimedi temporanei
+• Non affrontano la causa principale
 
-🎯 La prevenzione è sempre meglio della cura!
+🔥 ECCO LA SOLUZIONE che funziona davvero:
 
-Vuoi saperne di più? Prenota una valutazione gratuita!
+✅ 3 PASSI SCIENTIFICI:
+1️⃣ Identificazione della causa principale
+2️⃣ Protocollo personalizzato di esercizi
+3️⃣ Mantenimento a lungo termine
 
-📞 Chiamaci o scrivici in DM
-🏢 ${user?.user_metadata?.clinic_name || 'Il tuo studio'}
+🎯 RISULTATI GARANTITI in 7-14 giorni:
+• Riduzione del dolore del 80%
+• Movimento naturale e fluido
+• Prevenzione di ricadute
 
-#fisioterapia #salute #benessere #prevenzione`;
+💥 TESTIMONIANZA: "In 10 giorni ho risolto un problema che avevo da 2 anni!" - Maria, 45 anni
+
+🚀 VUOI RISULTATI CONCRETI?
+
+📞 Prenota una valutazione GRATUITA di 30 minuti
+💬 Scrivici in DM "VALUTAZIONE"
+🏢 ${user?.user_metadata?.clinic_name || 'Il tuo studio di fisioterapia'}
+
+⏰ ATTENZIONE: Solo 5 posti disponibili questa settimana!
+
+#fisioterapia #salute #benessere #${formData.description.replace(/\s+/g, '')}`;
 
       setGeneratedContent(mockContent);
       
-      // Genera le slide del carosello
+      // Genera le slide del carosello con contenuti specifici
       generateCarouselSlides();
       
       toast({
         title: "🎉 Contenuto generato!",
-        description: "Il tuo post è pronto per essere pubblicato"
+        description: "Post ottimizzato per massimo engagement e conversioni"
       });
 
     } catch (error) {
@@ -266,28 +290,50 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
   };
 
   const applyHookToContent = (hook: string) => {
+    // Applica l'hook alla prima slide del carosello
+    if (carouselSlides.length > 0) {
+      const updatedSlides = [...carouselSlides];
+      updatedSlides[0].content = `${hook}\n\n👉 Swipe per scoprire di più →`;
+      setCarouselSlides(updatedSlides);
+    }
+    
+    // Applica anche al contenuto principale
     setGeneratedContent(prev => {
       const lines = prev.split('\n');
       lines[0] = hook;
       return lines.join('\n');
     });
+    
     setAppliedHook(hook);
     toast({
       title: "Hook applicato! 🎯",
-      description: "L'hook è stato inserito nel tuo contenuto"
+      description: "L'hook è stato inserito nella prima slide e nel contenuto"
     });
   };
 
   const removeHook = () => {
+    // Rimuovi dalla prima slide
+    if (carouselSlides.length > 0) {
+      const updatedSlides = [...carouselSlides];
+      const originalContent = updatedSlides[0].content.split('\n\n👉 Swipe')[0];
+      if (originalContent !== updatedSlides[0].content) {
+        // Restore original first slide content
+        updatedSlides[0].content = `🚨 ${formData.description.toUpperCase()}\n\nSCOPRI LA VERITÀ che i dottori non ti dicono!\n\n👉 Swipe per la soluzione →`;
+      }
+      setCarouselSlides(updatedSlides);
+    }
+    
+    // Rimuovi dal contenuto principale
     setGeneratedContent(prev => {
       const lines = prev.split('\n');
       lines.shift();
       return lines.join('\n');
     });
+    
     setAppliedHook('');
     toast({
       title: "Hook rimosso",
-      description: "L'hook è stato rimosso dal contenuto"
+      description: "L'hook è stato rimosso dal contenuto e dalla prima slide"
     });
   };
 

@@ -42,6 +42,32 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
     });
   };
 
+  const downloadImage = async (imageUrl: string, slideIndex: number) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `slide-${slideIndex + 1}-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Download completato! 📥",
+        description: `Slide ${slideIndex + 1} scaricata sul tuo dispositivo`
+      });
+    } catch (error) {
+      toast({
+        title: "Errore download",
+        description: "Non è stato possibile scaricare l'immagine",
+        variant: "destructive"
+      });
+    }
+  };
+
   const uploadImageToSlide = (slideIndex: number, file: File) => {
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -68,12 +94,12 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
             {/* Anteprima slide del carosello */}
             {carouselSlides.length > 0 && (
               <div className="mb-4">
+                <h3 className="text-white font-semibold mb-3">Slide del Carosello</h3>
                 <div className="grid grid-cols-2 gap-2 mb-4">
                   {carouselSlides.slice(0, 4).map((slide, index) => (
                     <div 
                       key={index}
-                      className="relative aspect-square rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all group"
-                      onClick={() => onImageEdit(slide.userImageUrl || slide.imageUrl || '', index)}
+                      className="relative aspect-square rounded-lg overflow-hidden group border border-gray-600"
                     >
                       {slide.userImageUrl || slide.imageUrl ? (
                         <img 
@@ -91,20 +117,53 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
                         </div>
                       )}
                       
-                      {/* Overlay per upload */}
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) {
-                              uploadImageToSlide(index, file);
-                            }
-                          }}
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                        />
-                        <Upload className="w-8 h-8 text-white" />
+                      {/* Overlay con contenuto della slide */}
+                      <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-2">
+                        <div className="text-white text-xs font-medium line-clamp-4">
+                          {slide.content}
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            onClick={() => onImageEdit(slide.userImageUrl || slide.imageUrl || '', index)}
+                            size="sm"
+                            className="p-1 h-6 w-6 bg-blue-600 hover:bg-blue-700"
+                          >
+                            ✏️
+                          </Button>
+                          <Button
+                            onClick={() => downloadImage(slide.userImageUrl || slide.imageUrl || '', index)}
+                            size="sm"
+                            className="p-1 h-6 w-6 bg-green-600 hover:bg-green-700"
+                          >
+                            <Download className="w-3 h-3" />
+                          </Button>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                uploadImageToSlide(index, file);
+                              }
+                            }}
+                            className="hidden"
+                            id={`upload-${index}`}
+                          />
+                          <label htmlFor={`upload-${index}`}>
+                            <Button
+                              as="span"
+                              size="sm"
+                              className="p-1 h-6 w-6 bg-purple-600 hover:bg-purple-700 cursor-pointer"
+                            >
+                              <Upload className="w-3 h-3" />
+                            </Button>
+                          </label>
+                        </div>
+                      </div>
+                      
+                      {/* Numero slide */}
+                      <div className="absolute top-1 left-1 bg-black/50 text-white text-xs px-1 rounded">
+                        {index + 1}
                       </div>
                     </div>
                   ))}
