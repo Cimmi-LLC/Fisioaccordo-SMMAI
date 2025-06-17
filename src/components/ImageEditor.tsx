@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -5,9 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Wand2, Undo2, Redo2, Trash2 } from "lucide-react";
+import { Loader2, Wand2, Undo2, Redo2, Trash2, Type } from "lucide-react";
 import { defaultRunwareService } from "@/services/runwareService";
 import { useToast } from "@/hooks/use-toast";
+import TextEditor from "./TextEditor";
 
 interface ImageVersion {
   url: string;
@@ -30,6 +32,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
     { url: imageUrl, timestamp: Date.now() }
   ]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [showTextEditor, setShowTextEditor] = useState(false);
 
   const currentImage = imageHistory[currentIndex];
   const canGoBack = currentIndex > 0;
@@ -119,6 +122,22 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
     }
   };
 
+  const handleTextEditorUpdate = (newUrl: string) => {
+    addToHistory(newUrl, "Modifiche testo aggiunte");
+    onImageUpdate(newUrl);
+    setShowTextEditor(false);
+  };
+
+  if (showTextEditor) {
+    return (
+      <TextEditor
+        imageUrl={currentImage.url}
+        onImageUpdate={handleTextEditorUpdate}
+        onClose={() => setShowTextEditor(false)}
+      />
+    );
+  }
+
   return (
     <Card className="bg-gray-800/50 border-gray-700">
       <CardHeader>
@@ -170,6 +189,15 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
             <Redo2 className="w-4 h-4" />
           </Button>
         </div>
+
+        {/* Editor di testo */}
+        <Button
+          onClick={() => setShowTextEditor(true)}
+          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+        >
+          <Type className="mr-2 h-4 w-4" />
+          Aggiungi/Modifica Testo
+        </Button>
 
         {/* Stili predefiniti */}
         <div>

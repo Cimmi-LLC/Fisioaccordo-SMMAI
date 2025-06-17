@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Sparkles, Copy, Upload, Image, Quote, ArrowRight, Lightbulb, Target, Zap, Palette, X, Edit2 } from "lucide-react";
 import { defaultRunwareService, GenerateImageParams } from "@/services/runwareService";
 import ImageEditor from "@/components/ImageEditor";
+import CarouselImageManager from "@/components/CarouselImageManager";
 
 const Index = () => {
   const { toast } = useToast();
@@ -36,13 +37,15 @@ const Index = () => {
   const [imageHook, setImageHook] = useState('');
   const [hookVariants, setHookVariants] = useState<string[]>([]);
   const [isGeneratingHooks, setIsGeneratingHooks] = useState(false);
-  const [carouselSlides, setCarouselSlides] = useState<Array<{type: string, content: string, imageUrl?: string}>>([]);
+  const [carouselSlides, setCarouselSlides] = useState<Array<{type: string, content: string, imageUrl?: string, userImageUrl?: string}>>([]);
   const [isGeneratingCarousel, setIsGeneratingCarousel] = useState(false);
   
-  // Nuovi stati per l'editor
+  // Nuovi stati per l'editor e controllo slide
   const [editingImageIndex, setEditingImageIndex] = useState<number | null>(null);
   const [showImageEditor, setShowImageEditor] = useState(false);
   const [editingImageUrl, setEditingImageUrl] = useState('');
+  const [numberOfSlides, setNumberOfSlides] = useState(5);
+  const [numberOfImages, setNumberOfImages] = useState(3);
 
   // Template per la generazione di contenuti
   const generateContent = (type: string, topic: string, additionalParams: any = {}): string | string[] => {
@@ -142,13 +145,14 @@ Condividi nei commenti, rispondo a tutti! 👇
         `💰 Come ${topic} mi ha cambiato la vita (e può cambiare la tua)`
       ],
       
-      carousel: [
-        `Il problema con ${topic} non è quello che pensi...`,
-        `La maggior parte delle persone fallisce perché...`,
-        `Ecco cosa dovresti fare invece:`,
-        `I risultati che otterrai saranno...`,
-        `Inizia subito! Condividi se ti è stato utile 🔥`
-      ],
+      carousel: Array.from({ length: numberOfSlides }, (_, i) => {
+        if (i === 0) return `Il problema con ${topic} non è quello che pensi...`;
+        if (i === numberOfSlides - 1) return `🔥 Sei pronto a trasformare il tuo approccio a ${topic}? Inizia oggi stesso!`;
+        if (i === 1) return `La maggior parte delle persone fallisce perché...`;
+        if (i === 2) return `Ecco cosa dovresti fare invece:`;
+        if (i === 3) return `I risultati che otterrai saranno...`;
+        return `Punto ${i}: Strategia fondamentale per ${topic}`;
+      }),
       
       cta: `🔥 Sei pronto a trasformare il tuo approccio a ${topic}? Inizia oggi stesso!`
     };
@@ -276,7 +280,6 @@ Condividi nei commenti, rispondo a tutti! 👇
     try {
       await new Promise(resolve => setTimeout(resolve, 1000));
       const slides = generateContent('carousel', prompt);
-      const cta = generateContent('cta', prompt);
       
       let slideTexts: string[] = [];
       if (Array.isArray(slides)) {
@@ -285,15 +288,10 @@ Condividi nei commenti, rispondo a tutti! 👇
         slideTexts = [slides];
       }
       
-      let ctaText = '';
-      if (typeof cta === 'string') {
-        ctaText = cta;
-      } else if (Array.isArray(cta)) {
-        ctaText = cta[0] || '';
-      }
-      
-      const slideObjects = slideTexts.map((text: string) => ({ type: 'text', content: text }));
-      slideObjects.push({ type: 'cta', content: ctaText });
+      const slideObjects = slideTexts.map((text: string) => ({ 
+        type: text.includes('🔥') ? 'cta' : 'text', 
+        content: text 
+      }));
       
       setCarouselSlides(slideObjects);
       
@@ -409,15 +407,15 @@ Condividi nei commenti, rispondo a tutti! 👇
       let imagePrompts: string[] = [];
       
       if (postType === 'carosello') {
-        imagePrompts = [
-          `Immagine di copertina professionale per post sui social media su: ${prompt}. Design moderno, stile ${platform}, accattivante, colori vivaci, TUTTO IL TESTO IN ITALIANO`,
-          `Illustrazione stile infografica che rappresenta: ${prompt}. Design pulito, professionale, adatto per ${platform}, TESTO COMPLETAMENTE IN ITALIANO`,
-          `Design di citazione motivazionale su: ${prompt}. Focus tipografico, ispirazionale, estetica moderna per ${platform}, SOLO TESTO ITALIANO`
-        ];
+        imagePrompts = Array.from({ length: numberOfImages }, (_, i) => {
+          if (i === 0) return `Immagine di copertina professionale per post sui social media su: ${prompt}. Design moderno, stile ${platform}, accattivante, colori vivaci, TUTTO IL TESTO IN ITALIANO`;
+          if (i === numberOfImages - 1) return `Design di citazione motivazionale su: ${prompt}. Focus tipografico, ispirazionale, estetica moderna per ${platform}, SOLO TESTO ITALIANO`;
+          return `Illustrazione stile infografica che rappresenta: ${prompt}. Design pulito, professionale, adatto per ${platform}, TESTO COMPLETAMENTE IN ITALIANO`;
+        });
       } else {
-        imagePrompts = [
+        imagePrompts = Array.from({ length: numberOfImages }, () => 
           `Immagine professionale per social media su: ${prompt}. Alta qualità, design moderno, colori vivaci, adatto per ${platform}, TUTTO IL TESTO DEVE ESSERE IN ITALIANO`
-        ];
+        );
       }
 
       console.log("Generando", imagePrompts.length, "immagini...");
@@ -499,7 +497,11 @@ Condividi nei commenti, rispondo a tutti! 👇
       // Aggiorna immagine nel carosello
       const updatedSlides = [...carouselSlides];
       if (updatedSlides[editingImageIndex]) {
-        updatedSlides[editingImageIndex].imageUrl = newImageUrl;
+        if (updatedSlides[editingImageIndex].userImageUrl) {
+          updatedSlides[editingImageIndex].userImageUrl = newImageUrl;
+        } else {
+          updatedSlides[editingImageIndex].imageUrl = newImageUrl;
+        }
         setCarouselSlides(updatedSlides);
       }
       
@@ -695,6 +697,41 @@ Condividi nei commenti, rispondo a tutti! 👇
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Controlli per numero di slide/immagini */}
+                {postType === 'carosello' && (
+                  <div>
+                    <Label className="text-gray-300 font-semibold">Numero Slide</Label>
+                    <Select value={numberOfSlides.toString()} onValueChange={(value) => setNumberOfSlides(parseInt(value))}>
+                      <SelectTrigger className="mt-2 bg-gray-700 border-gray-600 text-white">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-600">
+                        <SelectItem value="3">3 Slide</SelectItem>
+                        <SelectItem value="4">4 Slide</SelectItem>
+                        <SelectItem value="5">5 Slide</SelectItem>
+                        <SelectItem value="6">6 Slide</SelectItem>
+                        <SelectItem value="7">7 Slide</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                <div>
+                  <Label className="text-gray-300 font-semibold">Numero Immagini</Label>
+                  <Select value={numberOfImages.toString()} onValueChange={(value) => setNumberOfImages(parseInt(value))}>
+                    <SelectTrigger className="mt-2 bg-gray-700 border-gray-600 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-800 border-gray-600">
+                      <SelectItem value="1">1 Immagine</SelectItem>
+                      <SelectItem value="2">2 Immagini</SelectItem>
+                      <SelectItem value="3">3 Immagini</SelectItem>
+                      <SelectItem value="4">4 Immagini</SelectItem>
+                      <SelectItem value="5">5 Immagini</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <Button
@@ -787,55 +824,58 @@ Condividi nei commenti, rispondo a tutti! 👇
                             </div>
                           </div>
                         ) : carouselSlides.length > 0 ? (
-                          carouselSlides.map((slide, index) => (
-                            <div
-                              key={index}
-                              className={`snap-center relative group flex-shrink-0 w-full max-w-sm aspect-square rounded-lg overflow-hidden border-2 border-gray-700 ${
-                                slide.type === 'cta' ? 'bg-gradient-to-br from-blue-600 to-indigo-700' : 'bg-gray-800'
-                              }`}
-                            >
-                              <div className="absolute top-4 right-4 bg-black/50 text-white text-xs font-bold px-2 py-1 rounded-full">
-                                {index + 2} / {carouselSlides.length + 1}
-                              </div>
-                              
-                              {slide.imageUrl ? (
-                                <div className="relative w-full h-full">
-                                  <img src={slide.imageUrl} alt={`Slide ${index + 2}`} className="w-full h-full object-cover" />
-                                  <Button
-                                    onClick={() => handleImageEdit(slide.imageUrl!, index)}
-                                    className="absolute top-2 left-2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                                    size="sm"
-                                  >
-                                    <Edit2 className="w-4 h-4" />
-                                  </Button>
-                                  <div className="absolute bottom-0 left-0 right-0 p-4 pt-12 bg-gradient-to-t from-black/80 to-transparent">
-                                    <p className="text-white text-lg font-semibold leading-tight">
-                                      {slide.content}
-                                    </p>
+                          carouselSlides.map((slide, index) => {
+                            const slideImage = slide.userImageUrl || slide.imageUrl;
+                            return (
+                              <div
+                                key={index}
+                                className={`snap-center relative group flex-shrink-0 w-full max-w-sm aspect-square rounded-lg overflow-hidden border-2 border-gray-700 ${
+                                  slide.type === 'cta' ? 'bg-gradient-to-br from-blue-600 to-indigo-700' : 'bg-gray-800'
+                                }`}
+                              >
+                                <div className="absolute top-4 right-4 bg-black/50 text-white text-xs font-bold px-2 py-1 rounded-full">
+                                  {index + 2} / {carouselSlides.length + 1}
+                                </div>
+                                
+                                {slideImage ? (
+                                  <div className="relative w-full h-full">
+                                    <img src={slideImage} alt={`Slide ${index + 2}`} className="w-full h-full object-cover" />
+                                    <Button
+                                      onClick={() => handleImageEdit(slideImage, index)}
+                                      className="absolute top-2 left-2 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                      size="sm"
+                                    >
+                                      <Edit2 className="w-4 h-4" />
+                                    </Button>
+                                    <div className="absolute bottom-0 left-0 right-0 p-4 pt-12 bg-gradient-to-t from-black/80 to-transparent">
+                                      <p className="text-white text-lg font-semibold leading-tight">
+                                        {slide.content}
+                                      </p>
+                                    </div>
                                   </div>
-                                </div>
-                              ) : (
-                                <div className="p-8 flex flex-col justify-center items-center text-center h-full">
-                                  {slide.type === 'text' && (
-                                    <>
-                                      <Quote className="w-10 h-10 text-blue-400 mb-6" />
-                                      <p className="text-xl md:text-2xl text-white font-semibold leading-relaxed">
-                                        {slide.content}
-                                      </p>
-                                    </>
-                                  )}
-                                  {slide.type === 'cta' && (
-                                    <>
-                                      <ArrowRight className="w-12 h-12 text-white" />
-                                      <p className="text-2xl md:text-3xl text-white font-bold mt-6">
-                                        {slide.content}
-                                      </p>
-                                    </>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          ))
+                                ) : (
+                                  <div className="p-8 flex flex-col justify-center items-center text-center h-full">
+                                    {slide.type === 'text' && (
+                                      <>
+                                        <Quote className="w-10 h-10 text-blue-400 mb-6" />
+                                        <p className="text-xl md:text-2xl text-white font-semibold leading-relaxed">
+                                          {slide.content}
+                                        </p>
+                                      </>
+                                    )}
+                                    {slide.type === 'cta' && (
+                                      <>
+                                        <ArrowRight className="w-12 h-12 text-white" />
+                                        <p className="text-2xl md:text-3xl text-white font-bold mt-6">
+                                          {slide.content}
+                                        </p>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })
                         ) : (
                           <div className="snap-center flex-shrink-0 w-full max-w-sm aspect-square p-8 rounded-lg flex justify-center items-center bg-gray-800">
                             <p className="text-gray-400">Nessuna slide generata</p>
@@ -890,6 +930,16 @@ Condividi nei commenti, rispondo a tutti! 👇
                 imageUrl={editingImageUrl}
                 onImageUpdate={handleImageUpdate}
                 onClose={() => setShowImageEditor(false)}
+              />
+            )}
+
+            {/* Gestione immagini carosello */}
+            {postType === 'carosello' && carouselSlides.length > 0 && (
+              <CarouselImageManager
+                slides={carouselSlides}
+                onSlidesUpdate={setCarouselSlides}
+                onImageEdit={handleImageEdit}
+                maxSlides={7}
               />
             )}
           </div>
