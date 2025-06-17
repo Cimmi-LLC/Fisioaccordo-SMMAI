@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,7 +36,7 @@ const Index = () => {
   const [isGeneratingCarousel, setIsGeneratingCarousel] = useState(false);
 
   // Template per la generazione di contenuti
-  const generateContent = (type: string, topic: string, additionalParams: any = {}) => {
+  const generateContent = (type: string, topic: string, additionalParams: any = {}): string | string[] => {
     const templates = {
       post: {
         breve: `Ecco un post conciso e d'impatto su ${topic}:
@@ -197,7 +196,12 @@ Condividi nei commenti, rispondo a tutti! 👇
         audience 
       });
       
-      setGeneratedPost(content);
+      // Assicuriamoci che sia una stringa
+      if (typeof content === 'string') {
+        setGeneratedPost(content);
+      } else {
+        setGeneratedPost(content[0] || '');
+      }
       
       // Se è un carosello, genera automaticamente le slide
       if (postType === 'carosello') {
@@ -237,7 +241,13 @@ Condividi nei commenti, rispondo a tutti! 👇
     try {
       await new Promise(resolve => setTimeout(resolve, 1200));
       const ideas = generateContent('ideas', ideaTopic);
-      setGeneratedIdeas(ideas);
+      
+      // Assicuriamoci che sia una stringa
+      if (typeof ideas === 'string') {
+        setGeneratedIdeas(ideas);
+      } else {
+        setGeneratedIdeas(ideas.join('\n\n'));
+      }
       
       toast({
         title: "Idee generate! 💡",
@@ -262,8 +272,23 @@ Condividi nei commenti, rispondo a tutti! 👇
       const slides = generateContent('carousel', prompt);
       const cta = generateContent('cta', prompt);
       
-      const slideObjects = slides.map((text: string) => ({ type: 'text', content: text }));
-      slideObjects.push({ type: 'cta', content: cta });
+      // Gestione sicura dei tipi
+      let slideTexts: string[] = [];
+      if (Array.isArray(slides)) {
+        slideTexts = slides;
+      } else {
+        slideTexts = [slides];
+      }
+      
+      let ctaText = '';
+      if (typeof cta === 'string') {
+        ctaText = cta;
+      } else if (Array.isArray(cta)) {
+        ctaText = cta[0] || '';
+      }
+      
+      const slideObjects = slideTexts.map((text: string) => ({ type: 'text', content: text }));
+      slideObjects.push({ type: 'cta', content: ctaText });
       
       setCarouselSlides(slideObjects);
     } catch (error) {
@@ -293,7 +318,13 @@ Condividi nei commenti, rispondo a tutti! 👇
     try {
       await new Promise(resolve => setTimeout(resolve, 800));
       const hooks = generateContent('hooks', prompt);
-      setHookVariants(hooks);
+      
+      // Gestione sicura dei tipi
+      if (Array.isArray(hooks)) {
+        setHookVariants(hooks);
+      } else {
+        setHookVariants([hooks]);
+      }
       
       toast({
         title: "Hook generati! 🔥",
