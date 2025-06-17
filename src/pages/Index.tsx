@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,18 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Loader2, ImagePlus, Wand2, TestTube } from "lucide-react";
+import { Loader2, Wand2, TestTube } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Carousel, CarouselContent, CarouselItem } from "@/components/ui/carousel";
 import { defaultOpenAIService } from "@/services/openaiService";
-import CarouselImageManager from "@/components/CarouselImageManager";
-import ImageEditor from "@/components/ImageEditor";
-
-interface CarouselSlide {
-  type: string;
-  content: string;
-  userImageUrl?: string;
-}
 
 interface GeneratedContent {
   type: string;
@@ -34,34 +25,6 @@ const Index = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent[]>([]);
-  const [isEditingCarousel, setIsEditingCarousel] = useState(false);
-  const [editingImage, setEditingImage] = useState<string | null>(null);
-  const [editingSlideIndex, setEditingSlideIndex] = useState<number | null>(null);
-
-  const [carouselSlides, setCarouselSlides] = useState<CarouselSlide[]>([
-    { type: 'text', content: 'Slide 1: Inserisci qui il contenuto' },
-  ]);
-
-  const handleSlidesUpdate = (newSlides: CarouselSlide[]) => {
-    setCarouselSlides(newSlides);
-  };
-
-  const handleImageEdit = (imageUrl: string, slideIndex: number) => {
-    setEditingImage(imageUrl);
-    setEditingSlideIndex(slideIndex);
-  };
-
-  const handleImageUpdate = (newUrl: string) => {
-    if (editingSlideIndex !== null) {
-      const updatedSlides = [...carouselSlides];
-      if (updatedSlides[editingSlideIndex]) {
-        updatedSlides[editingSlideIndex].userImageUrl = newUrl;
-        setCarouselSlides(updatedSlides);
-      }
-      setEditingImage(null);
-      setEditingSlideIndex(null);
-    }
-  };
 
   const testConnection = async () => {
     setIsTesting(true);
@@ -113,20 +76,20 @@ const Index = () => {
         let finalPrompt = '';
         
         if (contentType === 'social-carousel') {
-          finalPrompt = `Slide ${i + 1} di un carosello social per Instagram: ${prompt}`;
+          finalPrompt = `Immagine ${i + 1} per social media: ${prompt}`;
         } else if (contentType === 'ad-creative') {
-          finalPrompt = `Creativo pubblicitario professionale numero ${i + 1}: ${prompt}`;
+          finalPrompt = `Pubblicità ${i + 1}: ${prompt}`;
         } else if (contentType === 'infographic') {
-          finalPrompt = `Sezione ${i + 1} di infografica moderna: ${prompt}`;
+          finalPrompt = `Infografica ${i + 1}: ${prompt}`;
         } else {
-          finalPrompt = `Variazione ${i + 1}: ${prompt}`;
+          finalPrompt = `${prompt} - variazione ${i + 1}`;
         }
 
         const result = await defaultOpenAIService.generateImage({
           positivePrompt: finalPrompt,
           numberResults: 1,
-          quality: 'hd',
-          style: 'vivid'
+          quality: 'standard',
+          style: 'natural'
         });
 
         if (result.imageURL) {
@@ -144,7 +107,7 @@ const Index = () => {
       
       toast({
         title: "Contenuti generati! 🎨",
-        description: `${results.length} immagini create con DALL-E 3 di alta qualità`
+        description: `${results.length} immagini create con DALL-E 3`
       });
     } catch (error) {
       console.error('❌ Errore nella generazione:', error);
@@ -157,81 +120,6 @@ const Index = () => {
       setIsGenerating(false);
     }
   };
-
-  const renderContent = useCallback(() => {
-    if (isEditingCarousel) {
-      return (
-        <CarouselImageManager
-          slides={carouselSlides}
-          onSlidesUpdate={handleSlidesUpdate}
-          onImageEdit={handleImageEdit}
-        />
-      );
-    }
-
-    if (editingImage) {
-      return (
-        <ImageEditor
-          imageUrl={editingImage}
-          onImageUpdate={handleImageUpdate}
-          onClose={() => {
-            setEditingImage(null);
-            setEditingSlideIndex(null);
-          }}
-        />
-      );
-    }
-
-    if (generatedContent.length > 0) {
-      if (contentType === 'social-carousel') {
-        return (
-          <Carousel className="w-full max-w-4xl mx-auto">
-            <CarouselContent className="gap-4">
-              {generatedContent.map((slide, index) => (
-                <CarouselItem key={index} className="flex-1 min-w-full">
-                  <Card className="bg-gray-800/50 border-gray-700">
-                    <CardHeader>
-                      <CardTitle className="text-white">Slide {index + 1}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <img
-                        src={slide.imageUrl}
-                        alt={`Slide ${index + 1}`}
-                        className="w-full aspect-square object-cover rounded-md mb-4"
-                      />
-                      <p className="text-gray-400 text-sm">{slide.content}</p>
-                    </CardContent>
-                  </Card>
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-          </Carousel>
-        );
-      } else {
-        return (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {generatedContent.map((item, index) => (
-              <Card key={index} className="bg-gray-800/50 border-gray-700">
-                <CardHeader>
-                  <CardTitle className="text-white">Immagine {index + 1}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <img
-                    src={item.imageUrl}
-                    alt={`Immagine ${index + 1}`}
-                    className="w-full aspect-square object-cover rounded-md mb-4"
-                  />
-                  <p className="text-gray-400 text-sm">{item.content}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        );
-      }
-    }
-
-    return null;
-  }, [generatedContent, contentType, isEditingCarousel, editingImage, carouselSlides]);
 
   return (
     <div className="container mx-auto p-4">
@@ -330,17 +218,29 @@ const Index = () => {
         </CardContent>
       </Card>
 
-      {contentType === 'social-carousel' && generatedContent.length === imageCount && (
-        <Button
-          onClick={() => setIsEditingCarousel(true)}
-          className="mt-4 bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          <ImagePlus className="mr-2 h-4 w-4" />
-          Gestisci Immagini Carosello
-        </Button>
+      {/* Visualizzazione risultati */}
+      {generatedContent.length > 0 && (
+        <div className="mt-6">
+          <h2 className="text-xl font-semibold text-white mb-4">Immagini Generate</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {generatedContent.map((item, index) => (
+              <Card key={index} className="bg-gray-800/50 border-gray-700">
+                <CardHeader>
+                  <CardTitle className="text-white text-lg">Immagine {index + 1}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <img
+                    src={item.imageUrl}
+                    alt={`Immagine ${index + 1}`}
+                    className="w-full aspect-square object-cover rounded-md mb-4"
+                  />
+                  <p className="text-gray-400 text-sm">{item.content}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
       )}
-
-      <div className="mt-4">{renderContent()}</div>
     </div>
   );
 };
