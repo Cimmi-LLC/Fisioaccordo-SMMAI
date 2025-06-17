@@ -24,8 +24,20 @@ import {
   Download,
   Share,
   Lightbulb,
-  Plus
+  Plus,
+  Image,
+  Wand2,
+  Copy
 } from "lucide-react";
+import CarouselImageManager from "@/components/CarouselImageManager";
+import ImageEditor from "@/components/ImageEditor";
+
+interface CarouselSlide {
+  type: string;
+  content: string;
+  imageUrl?: string;
+  userImageUrl?: string;
+}
 
 const Index = () => {
   const navigate = useNavigate();
@@ -45,9 +57,14 @@ const Index = () => {
   });
   
   const [generatedContent, setGeneratedContent] = useState('');
-  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [carouselSlides, setCarouselSlides] = useState<CarouselSlide[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [savedContents, setSavedContents] = useState<any[]>([]);
+  const [selectedImageForEdit, setSelectedImageForEdit] = useState<string | null>(null);
+  const [editingSlideIndex, setEditingSlideIndex] = useState<number | null>(null);
+  const [showHookGenerator, setShowHookGenerator] = useState(false);
+  const [hookTopic, setHookTopic] = useState('');
+  const [generatedHooks, setGeneratedHooks] = useState<string[]>([]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -88,6 +105,60 @@ const Index = () => {
     ];
     const randomIdea = ideas[Math.floor(Math.random() * ideas.length)];
     setIdeaInput(randomIdea);
+    setFormData(prev => ({ ...prev, description: randomIdea }));
+  };
+
+  const generateHooks = () => {
+    if (!hookTopic.trim()) {
+      toast({
+        title: "Campo obbligatorio",
+        description: "Inserisci un argomento per generare gli hook",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const hooks = [
+      `🚨 ATTENZIONE: Se soffri di ${hookTopic}, questo post può cambiarti la vita!`,
+      `❌ ERRORE COMUNE: La maggior parte delle persone con ${hookTopic} fa questo sbaglio...`,
+      `🔥 RIVELAZIONE SHOCK: Quello che i dottori non ti dicono su ${hookTopic}`,
+      `💡 SEGRETO SVELATO: Come ho risolto il mio ${hookTopic} in 30 giorni`,
+      `⚡ TECNICA RIVOLUZIONARIA: Il metodo che sta trasformando il trattamento di ${hookTopic}`,
+      `🎯 RISULTATI GARANTITI: 3 passi per eliminare ${hookTopic} per sempre`,
+      `🚀 BREAKING NEWS: Nuova scoperta scientifica su ${hookTopic}`,
+      `💥 TRASFORMAZIONE INCREDIBILE: Da ${hookTopic} cronico a guarigione completa`
+    ];
+    
+    setGeneratedHooks(hooks);
+  };
+
+  const applyHookToContent = (hook: string) => {
+    setGeneratedContent(prev => {
+      const lines = prev.split('\n');
+      lines[0] = hook;
+      return lines.join('\n');
+    });
+    toast({
+      title: "Hook applicato! 🎯",
+      description: "L'hook è stato inserito nel tuo contenuto"
+    });
+  };
+
+  const generateCarouselSlides = () => {
+    const numSlides = parseInt(formData.numSlides);
+    const slides: CarouselSlide[] = [];
+    
+    for (let i = 0; i < numSlides; i++) {
+      slides.push({
+        type: i === 0 ? 'cover' : 'content',
+        content: i === 0 
+          ? `${formData.description.toUpperCase()}`
+          : `Slide ${i + 1}: Contenuto per ${formData.description}`,
+        imageUrl: `https://images.unsplash.com/photo-${1559757148 + i}?w=400&h=400&fit=crop`
+      });
+    }
+    
+    setCarouselSlides(slides);
   };
 
   const generateContent = async () => {
@@ -103,7 +174,6 @@ const Index = () => {
     setIsGenerating(true);
     
     try {
-      // Simula generazione contenuto con AI
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       const mockContent = `🏥 **${formData.description.toUpperCase()}** 🏥
@@ -128,12 +198,8 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
 
       setGeneratedContent(mockContent);
       
-      // Genera immagini mock basate sul numero selezionato
-      const numImagesInt = parseInt(formData.numImages);
-      const mockImages = Array.from({ length: numImagesInt }, (_, index) => 
-        `https://images.unsplash.com/photo-${1559757148 + index}?w=400&h=400`
-      );
-      setGeneratedImages(mockImages);
+      // Genera le slide del carosello
+      generateCarouselSlides();
       
       toast({
         title: "🎉 Contenuto generato!",
@@ -164,7 +230,7 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
         postType: formData.postType,
         tone: formData.tone,
         length: formData.length,
-        images: generatedImages
+        images: carouselSlides.map(slide => slide.userImageUrl || slide.imageUrl || '')
       });
 
       if (error) {
@@ -196,10 +262,48 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
     }
   };
 
+  const handleImageEdit = (imageUrl: string, slideIndex: number) => {
+    setSelectedImageForEdit(imageUrl);
+    setEditingSlideIndex(slideIndex);
+  };
+
+  const handleImageUpdate = (newUrl: string) => {
+    if (editingSlideIndex !== null) {
+      const updatedSlides = [...carouselSlides];
+      updatedSlides[editingSlideIndex].userImageUrl = newUrl;
+      setCarouselSlides(updatedSlides);
+    }
+    setSelectedImageForEdit(null);
+    setEditingSlideIndex(null);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copiato! 📋",
+      description: "Contenuto copiato negli appunti"
+    });
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-white" />
+      </div>
+    );
+  }
+
+  if (selectedImageForEdit && editingSlideIndex !== null) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
+        <ImageEditor
+          imageUrl={selectedImageForEdit}
+          onImageUpdate={handleImageUpdate}
+          onClose={() => {
+            setSelectedImageForEdit(null);
+            setEditingSlideIndex(null);
+          }}
+        />
       </div>
     );
   }
@@ -259,7 +363,7 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
               <Input
                 value={ideaInput}
                 onChange={(e) => setIdeaInput(e.target.value)}
-                placeholder="Inserisci un argomento (es. 'produttività', 'marketing')"
+                placeholder="Inserisci un argomento (es. 'mal di schiena', 'riabilitazione')"
                 className="bg-gray-700 border-gray-600 text-white flex-1"
               />
               <Button 
@@ -433,15 +537,30 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
             <CardContent>
               {generatedContent ? (
                 <div className="space-y-4">
-                  {/* Anteprima mock delle immagini generate */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-green-500 rounded-lg p-4 text-center text-white font-bold">
-                      TI CHE RINNI...
+                  {/* Anteprima slide del carosello */}
+                  {carouselSlides.length > 0 && (
+                    <div className="grid grid-cols-2 gap-2 mb-4">
+                      {carouselSlides.slice(0, 4).map((slide, index) => (
+                        <div 
+                          key={index}
+                          className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:ring-2 hover:ring-blue-500 transition-all"
+                          onClick={() => handleImageEdit(slide.userImageUrl || slide.imageUrl || '', index)}
+                        >
+                          {slide.userImageUrl || slide.imageUrl ? (
+                            <img 
+                              src={slide.userImageUrl || slide.imageUrl} 
+                              alt={`Slide ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
+                              Slide {index + 1}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                    <div className="bg-gradient-to-br from-orange-400 to-teal-500 rounded-lg p-4 text-center text-white font-bold">
-                      ALL DI APTION SHITIOB
-                    </div>
-                  </div>
+                  )}
                   
                   <div className="bg-gray-700/50 p-4 rounded-lg border border-gray-600">
                     <pre className="text-gray-300 whitespace-pre-wrap text-sm">
@@ -458,32 +577,23 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
                       Salva
                     </Button>
                     <Button 
+                      onClick={() => copyToClipboard(generatedContent)}
                       variant="outline"
                       className="flex-1 text-white border-gray-600 hover:bg-gray-700"
                     >
-                      <Share className="mr-2 h-4 w-4" />
-                      Condividi
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copia
                     </Button>
                   </div>
 
                   {/* Gestione Immagini Carosello */}
-                  <Card className="bg-gray-700/30 border-gray-600">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-white text-sm">🖼️ Gestione Immagini Carosello</CardTitle>
-                        <span className="bg-purple-600 text-white text-xs px-2 py-1 rounded">5/7 slide</span>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <Button 
-                        variant="outline"
-                        className="w-full text-white border-gray-600 hover:bg-gray-600"
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Aggiungi Slide
-                      </Button>
-                    </CardContent>
-                  </Card>
+                  {carouselSlides.length > 0 && (
+                    <CarouselImageManager
+                      slides={carouselSlides}
+                      onSlidesUpdate={setCarouselSlides}
+                      onImageEdit={handleImageEdit}
+                    />
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-400">
@@ -494,6 +604,65 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
             </CardContent>
           </Card>
         </div>
+
+        {/* Generatore Hook Forti */}
+        <Card className="mt-8 bg-gray-800/50 border-gray-700 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center justify-between">
+              <div className="flex items-center">
+                <Zap className="h-5 w-5 mr-2 text-yellow-400" />
+                🔥 Generatore Hook Forti
+              </div>
+              <Button
+                onClick={() => setShowHookGenerator(!showHookGenerator)}
+                variant="ghost"
+                size="sm"
+                className="text-gray-300"
+              >
+                {showHookGenerator ? 'Nascondi' : 'Mostra'}
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          {showHookGenerator && (
+            <CardContent className="space-y-4">
+              <div className="flex gap-4">
+                <Input
+                  value={hookTopic}
+                  onChange={(e) => setHookTopic(e.target.value)}
+                  placeholder="Inserisci l'argomento per gli hook (es. 'mal di schiena')"
+                  className="bg-gray-700 border-gray-600 text-white flex-1"
+                />
+                <Button 
+                  onClick={generateHooks}
+                  className="bg-orange-600 hover:bg-orange-700"
+                >
+                  <Zap className="h-4 w-4 mr-2" />
+                  Genera Hook
+                </Button>
+              </div>
+              
+              {generatedHooks.length > 0 && (
+                <div className="grid gap-2">
+                  {generatedHooks.map((hook, index) => (
+                    <div 
+                      key={index}
+                      className="bg-gray-700/50 p-3 rounded-lg border border-gray-600 flex items-center justify-between hover:bg-gray-700/70 transition-colors"
+                    >
+                      <span className="text-gray-300 text-sm flex-1">{hook}</span>
+                      <Button
+                        onClick={() => applyHookToContent(hook)}
+                        size="sm"
+                        className="ml-2 bg-blue-600 hover:bg-blue-700"
+                      >
+                        Applica
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          )}
+        </Card>
 
         {/* Contenuti salvati */}
         {savedContents.length > 0 && (
