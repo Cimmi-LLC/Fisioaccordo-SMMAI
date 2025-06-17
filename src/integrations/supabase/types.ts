@@ -72,6 +72,7 @@ export type Database = {
           status: string | null
           therapist_id: string | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           appointment_type?: string | null
@@ -91,6 +92,7 @@ export type Database = {
           status?: string | null
           therapist_id?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           appointment_type?: string | null
@@ -110,6 +112,7 @@ export type Database = {
           status?: string | null
           therapist_id?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -185,6 +188,7 @@ export type Database = {
           name: string
           room_id: string | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           acquisition_cost?: number | null
@@ -195,6 +199,7 @@ export type Database = {
           name: string
           room_id?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           acquisition_cost?: number | null
@@ -205,6 +210,7 @@ export type Database = {
           name?: string
           room_id?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -281,6 +287,7 @@ export type Database = {
           date: string
           id: string
           source: string
+          user_id: string | null
         }
         Insert: {
           campaign_name?: string | null
@@ -289,6 +296,7 @@ export type Database = {
           date: string
           id?: string
           source: string
+          user_id?: string | null
         }
         Update: {
           campaign_name?: string | null
@@ -297,6 +305,7 @@ export type Database = {
           date?: string
           id?: string
           source?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -416,6 +425,7 @@ export type Database = {
           phone: string | null
           postal_code: string | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           acquisition_source?: string | null
@@ -437,6 +447,7 @@ export type Database = {
           phone?: string | null
           postal_code?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           acquisition_source?: string | null
@@ -458,6 +469,49 @@ export type Database = {
           phone?: string | null
           postal_code?: string | null
           updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          first_name: string | null
+          gohighlevel_api_key: string | null
+          id: string
+          last_name: string | null
+          organization_name: string | null
+          phone: string | null
+          privacy_consent: boolean | null
+          terms_consent: boolean | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          first_name?: string | null
+          gohighlevel_api_key?: string | null
+          id: string
+          last_name?: string | null
+          organization_name?: string | null
+          phone?: string | null
+          privacy_consent?: boolean | null
+          terms_consent?: boolean | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          first_name?: string | null
+          gohighlevel_api_key?: string | null
+          id?: string
+          last_name?: string | null
+          organization_name?: string | null
+          phone?: string | null
+          privacy_consent?: boolean | null
+          terms_consent?: boolean | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -469,6 +523,7 @@ export type Database = {
           name: string
           room_type: string | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -477,6 +532,7 @@ export type Database = {
           name: string
           room_type?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -485,6 +541,7 @@ export type Database = {
           name?: string
           room_type?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -505,6 +562,7 @@ export type Database = {
           therapist_id: string | null
           treatment_type: string | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           appointment_id?: string | null
@@ -522,6 +580,7 @@ export type Database = {
           therapist_id?: string | null
           treatment_type?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           appointment_id?: string | null
@@ -539,6 +598,7 @@ export type Database = {
           therapist_id?: string | null
           treatment_type?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -579,6 +639,7 @@ export type Database = {
           name: string
           specialization: string | null
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -587,6 +648,7 @@ export type Database = {
           name: string
           specialization?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -595,6 +657,7 @@ export type Database = {
           name?: string
           specialization?: string | null
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -603,7 +666,65 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      delete_user_content: {
+        Args: { p_content_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      get_user_contents: {
+        Args: { p_user_id: string }
+        Returns: {
+          id: string
+          user_id: string
+          title: string
+          content_text: string
+          topic: string
+          audience: string
+          platform: string
+          post_type: string
+          tone: string
+          length: string
+          images: Json
+          engagement_stats: Json
+          is_published: boolean
+          published_at: string
+          created_at: string
+          updated_at: string
+        }[]
+      }
+      insert_generated_content: {
+        Args: {
+          p_user_id: string
+          p_title: string
+          p_content_text: string
+          p_topic: string
+          p_audience?: string
+          p_platform?: string
+          p_post_type?: string
+          p_tone?: string
+          p_length?: string
+          p_images?: string
+        }
+        Returns: {
+          id: string
+          user_id: string
+          title: string
+          content_text: string
+          topic: string
+          audience: string
+          platform: string
+          post_type: string
+          tone: string
+          length: string
+          images: Json
+          is_published: boolean
+          created_at: string
+          updated_at: string
+        }[]
+      }
+      mark_content_published: {
+        Args: { p_content_id: string; p_user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
