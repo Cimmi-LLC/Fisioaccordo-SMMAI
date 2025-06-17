@@ -571,9 +571,19 @@ const Index = () => {
             {/* Varianti di Hook */}
             <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
               <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  🔥 Varianti di Hook
-                </CardTitle>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-white flex items-center">
+                    🔥 Varianti di Hook
+                  </CardTitle>
+                  <Button
+                    onClick={generateContentIdea}
+                    className="bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1"
+                    size="sm"
+                  >
+                    <Lightbulb className="mr-1 h-4 w-4" />
+                    Rigenera Idea
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
