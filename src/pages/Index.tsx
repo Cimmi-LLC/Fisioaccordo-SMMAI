@@ -57,17 +57,19 @@ const Index = () => {
     setGeneratedPost('');
 
     try {
-      console.log('🚀 Generando contenuto con DALL-E 3...');
+      console.log('🚀 Generando contenuto con AI copywriter...');
       
-      // Genera il testo del post
-      let postText = '';
-      if (postType === 'carosello') {
-        postText = `📱 CAROSELLO: ${topic}\n\n🔥 Contenuto per ${audience || 'la tua audience'} su ${platform}\n\nStile: ${tone}\nLunghezza: ${length}\n\n💡 Hook coinvolgente che cattura l'attenzione\n📊 Punti chiave sviluppati nel carosello\n🎯 Call to action finale per engagement`;
-      } else {
-        postText = `📱 POST: ${topic}\n\n🔥 Contenuto per ${audience || 'la tua audience'} su ${platform}\n\nStile: ${tone}\nLunghezza: ${length}\n\n💡 ${topic} - La verità che nessuno ti dice\n🚀 Punti chiave che fanno la differenza\n💎 Call to action che converte`;
-      }
+      // Genera il testo del post usando GPT-4
+      const generatedText = await defaultOpenAIService.generateText({
+        topic,
+        audience,
+        length,
+        tone,
+        platform,
+        postType
+      });
       
-      setGeneratedPost(postText);
+      setGeneratedPost(generatedText);
 
       // Genera le immagini per il carosello
       const imageCount = postType === 'carosello' ? 3 : 1;
@@ -109,7 +111,7 @@ const Index = () => {
       
       toast({
         title: "🎨 Contenuto generato!",
-        description: `${results.length} immagini create con DALL-E 3`
+        description: `Copy professionale + ${results.length} immagini create con AI`
       });
     } catch (error) {
       console.error('❌ Errore nella generazione:', error);
@@ -133,24 +135,35 @@ const Index = () => {
       return;
     }
 
-    let hookText = '';
-    switch (variant) {
-      case 'verita':
-        hookText = `🔥 La verità su ${topic} che nessuno ti dice:\n\n• Punto 1 che fa riflettere\n• Punto 2 che sorprende\n• Punto 3 che cambia tutto\n\nContinua a leggere... 👇`;
-        break;
-      case 'stop':
-        hookText = `🛑 STOP! Stai sbagliando tutto con ${topic}!\n\n❌ Errore comune #1\n❌ Errore comune #2\n❌ Errore comune #3\n\nEcco la verità... 👇`;
-        break;
-      case 'errori':
-        hookText = `⚠️ Come ${topic} mi ha cambiato la vita (e può cambiare la tua):\n\n📈 Prima: situazione problematica\n🚀 Dopo: trasformazione incredibile\n💡 Il segreto: strategia vincente\n\nLa storia completa... 👇`;
-        break;
+    setIsGenerating(true);
+    try {
+      console.log(`🎯 Generando hook variant: ${variant}`);
+      
+      const hookText = await defaultOpenAIService.generateText({
+        topic,
+        audience,
+        length,
+        tone,
+        platform,
+        postType,
+        hookVariant: variant
+      });
+      
+      setGeneratedPost(hookText);
+      toast({
+        title: "🎯 Hook generato!",
+        description: "Variante di hook professionale pronta"
+      });
+    } catch (error) {
+      console.error('❌ Errore generazione hook:', error);
+      toast({
+        title: "Errore",
+        description: "Problema nella generazione del hook",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGenerating(false);
     }
-    
-    setGeneratedPost(hookText);
-    toast({
-      title: "Hook generato! 🎯",
-      description: "Variante di hook pronta per il tuo post"
-    });
   };
 
   const generateAdvancedTool = async (tool: string) => {
