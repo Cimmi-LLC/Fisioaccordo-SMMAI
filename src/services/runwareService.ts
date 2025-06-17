@@ -3,7 +3,7 @@ import { toast } from "@/hooks/use-toast";
 const API_ENDPOINT = "wss://ws-api.runware.ai/v1";
 
 // Add your Runware API key here
-const DEFAULT_API_KEY = "YOUR_RUNWARE_API_KEY_HERE"; // Replace with your actual API key
+const DEFAULT_API_KEY = "IldlzHOyHClcoD5UsnD1uDNd0X5U0wah"; // Your actual Runware API key
 
 export interface GenerateImageParams {
   positivePrompt: string;
