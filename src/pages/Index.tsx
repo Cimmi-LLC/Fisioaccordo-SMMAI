@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Sparkles, Copy, Upload, Image, Quote, ArrowRight, Lightbulb, Target, Zap, Palette } from "lucide-react";
-import { RunwareService, GenerateImageParams } from "@/services/runwareService";
+import { defaultRunwareService, GenerateImageParams } from "@/services/runwareService";
 
 const Index = () => {
   const { toast } = useToast();
@@ -32,8 +32,6 @@ const Index = () => {
   const [userUploadedImage, setUserUploadedImage] = useState<string | null>(null);
   const [generatedAIImage, setGeneratedAIImage] = useState<string | null>(null);
   const [isGeneratingAIImage, setIsGeneratingAIImage] = useState(false);
-  const [runwareApiKey, setRunwareApiKey] = useState('');
-  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [imageHook, setImageHook] = useState('');
   const [hookVariants, setHookVariants] = useState<string[]>([]);
   const [isGeneratingHooks, setIsGeneratingHooks] = useState(false);
@@ -357,22 +355,10 @@ Condividi nei commenti, rispondo a tutti! 👇
       return;
     }
 
-    if (!runwareApiKey) {
-      setShowApiKeyInput(true);
-      toast({
-        title: "API Key richiesta",
-        description: "Inserisci la tua API key di Runware per generare immagini AI",
-        variant: "destructive"
-      });
-      return;
-    }
-
     setIsGeneratingAIImage(true);
     setGeneratedAIImage(null);
     
     try {
-      const runwareService = new RunwareService(runwareApiKey);
-      
       // Creo un prompt ottimizzato per l'immagine basato sul post
       const imagePrompt = `Professional social media image based on: ${prompt}. High quality, modern design, vibrant colors, suitable for ${platform}`;
       
@@ -386,7 +372,7 @@ Condividi nei commenti, rispondo a tutti! 👇
         strength: 0.8
       };
 
-      const result = await runwareService.generateImage(params);
+      const result = await defaultRunwareService.generateImage(params);
       
       if (result.imageURL) {
         setGeneratedAIImage(result.imageURL);
@@ -753,37 +739,6 @@ Condividi nei commenti, rispondo a tutti! 👇
               </CardHeader>
               <CardContent>
                 {/* Input API Key Runware */}
-                {showApiKeyInput && (
-                  <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/50 rounded-lg">
-                    <Label htmlFor="apiKey" className="text-yellow-400 font-semibold mb-2 block">
-                      API Key Runware (richiesta per generare immagini AI)
-                    </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="apiKey"
-                        type="password"
-                        value={runwareApiKey}
-                        onChange={(e) => setRunwareApiKey(e.target.value)}
-                        placeholder="Inserisci la tua API key di Runware"
-                        className="flex-1 bg-gray-700 border-gray-600 text-white"
-                      />
-                      <Button
-                        onClick={() => setShowApiKeyInput(false)}
-                        className="bg-green-600 hover:bg-green-700"
-                        disabled={!runwareApiKey}
-                      >
-                        Salva
-                      </Button>
-                    </div>
-                    <p className="text-sm text-gray-400 mt-2">
-                      Ottieni la tua API key su{" "}
-                      <a href="https://runware.ai/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
-                        runware.ai
-                      </a>
-                    </p>
-                  </div>
-                )}
-
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <input
                     type="file"

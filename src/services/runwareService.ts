@@ -1,7 +1,9 @@
-
 import { toast } from "@/hooks/use-toast";
 
 const API_ENDPOINT = "wss://ws-api.runware.ai/v1";
+
+// Add your Runware API key here
+const DEFAULT_API_KEY = "YOUR_RUNWARE_API_KEY_HERE"; // Replace with your actual API key
 
 export interface GenerateImageParams {
   positivePrompt: string;
@@ -31,8 +33,8 @@ export class RunwareService {
   private isAuthenticated: boolean = false;
   private connectionPromise: Promise<void> | null = null;
 
-  constructor(apiKey: string) {
-    this.apiKey = apiKey;
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey || DEFAULT_API_KEY;
     this.connectionPromise = this.connect();
   }
 
@@ -174,3 +176,6 @@ export class RunwareService {
     });
   }
 }
+
+// Export a default instance with the pre-configured API key
+export const defaultRunwareService = new RunwareService();
