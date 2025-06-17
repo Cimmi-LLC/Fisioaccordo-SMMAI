@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,12 +7,24 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Loader2, ImagePlus, Wand2 } from "lucide-react";
+import { Loader2, ImagePlus, Wand2, TestTube } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Carousel } from "@/components/ui/carousel";
+import { Carousel, CarouselContent, CarouselItem } from "@/components/ui/carousel";
 import { defaultOpenAIService } from "@/services/openaiService";
 import CarouselImageManager from "@/components/CarouselImageManager";
 import ImageEditor from "@/components/ImageEditor";
+
+interface CarouselSlide {
+  type: string;
+  content: string;
+  userImageUrl?: string;
+}
+
+interface GeneratedContent {
+  type: string;
+  content: string;
+  imageUrl: string;
+}
 
 const Index = () => {
   const { toast } = useToast();
@@ -19,16 +32,17 @@ const Index = () => {
   const [imageCount, setImageCount] = useState(3);
   const [contentType, setContentType] = useState('social-carousel');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generatedContent, setGeneratedContent] = useState<any[]>([]);
+  const [isTesting, setIsTesting] = useState(false);
+  const [generatedContent, setGeneratedContent] = useState<GeneratedContent[]>([]);
   const [isEditingCarousel, setIsEditingCarousel] = useState(false);
   const [editingImage, setEditingImage] = useState<string | null>(null);
   const [editingSlideIndex, setEditingSlideIndex] = useState<number | null>(null);
 
-  const [carouselSlides, setCarouselSlides] = useState([
+  const [carouselSlides, setCarouselSlides] = useState<CarouselSlide[]>([
     { type: 'text', content: 'Slide 1: Inserisci qui il contenuto' },
   ]);
 
-  const handleSlidesUpdate = (newSlides: any[]) => {
+  const handleSlidesUpdate = (newSlides: CarouselSlide[]) => {
     setCarouselSlides(newSlides);
   };
 
@@ -49,6 +63,33 @@ const Index = () => {
     }
   };
 
+  const testConnection = async () => {
+    setIsTesting(true);
+    try {
+      const isConnected = await defaultOpenAIService.testConnection();
+      if (isConnected) {
+        toast({
+          title: "Connessione riuscita! ✅",
+          description: "DALL-E 3 è pronto per generare le tue immagini"
+        });
+      } else {
+        toast({
+          title: "Errore connessione ❌",
+          description: "Verifica la chiave API di OpenAI",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Test fallito",
+        description: "Problema nella connessione a DALL-E 3",
+        variant: "destructive"
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   const generateContent = async () => {
     if (!prompt.trim()) {
       toast({
@@ -63,25 +104,29 @@ const Index = () => {
     setGeneratedContent([]);
 
     try {
-      const results = [];
+      console.log(`🚀 Iniziando generazione di ${imageCount} immagini...`);
+      const results: GeneratedContent[] = [];
       const actualCount = Math.min(imageCount, 7);
 
       for (let i = 0; i < actualCount; i++) {
+        console.log(`📸 Generando immagine ${i + 1}/${actualCount}`);
         let finalPrompt = '';
         
         if (contentType === 'social-carousel') {
-          finalPrompt = `Slide ${i + 1} di un carosello social per Instagram: ${prompt}. Stile moderno e accattivante per social media. IMPORTANTE: tutto il testo deve essere scritto in italiano perfetto.`;
+          finalPrompt = `Slide ${i + 1} di un carosello social per Instagram: ${prompt}`;
         } else if (contentType === 'ad-creative') {
-          finalPrompt = `Creativo pubblicitario professionale: ${prompt}. Design accattivante per campagne marketing. IMPORTANTE: tutto il testo deve essere scritto in italiano perfetto.`;
+          finalPrompt = `Creativo pubblicitario professionale numero ${i + 1}: ${prompt}`;
         } else if (contentType === 'infographic') {
-          finalPrompt = `Infografica moderna e informativa: ${prompt}. Design pulito e facile da leggere. IMPORTANTE: tutto il testo deve essere scritto in italiano perfetto.`;
+          finalPrompt = `Sezione ${i + 1} di infografica moderna: ${prompt}`;
         } else {
-          finalPrompt = `${prompt}. IMPORTANTE: tutto il testo deve essere scritto in italiano perfetto.`;
+          finalPrompt = `Variazione ${i + 1}: ${prompt}`;
         }
 
         const result = await defaultOpenAIService.generateImage({
           positivePrompt: finalPrompt,
-          numberResults: 1
+          numberResults: 1,
+          quality: 'hd',
+          style: 'vivid'
         });
 
         if (result.imageURL) {
@@ -90,6 +135,8 @@ const Index = () => {
             content: finalPrompt,
             imageUrl: result.imageURL
           });
+          
+          console.log(`✅ Immagine ${i + 1} completata`);
         }
       }
 
@@ -97,13 +144,13 @@ const Index = () => {
       
       toast({
         title: "Contenuti generati! 🎨",
-        description: `${results.length} ${contentType === 'social-carousel' ? 'slide create' : 'immagini generate'} con DALL-E`
+        description: `${results.length} immagini create con DALL-E 3 di alta qualità`
       });
     } catch (error) {
-      console.error('Errore nella generazione:', error);
+      console.error('❌ Errore nella generazione:', error);
       toast({
-        title: "Errore",
-        description: "Errore durante la generazione del contenuto",
+        title: "Errore generazione",
+        description: "Problema durante la creazione delle immagini",
         variant: "destructive"
       });
     } finally {
@@ -141,7 +188,7 @@ const Index = () => {
           <Carousel className="w-full max-w-4xl mx-auto">
             <CarouselContent className="gap-4">
               {generatedContent.map((slide, index) => (
-                <div key={index} className="flex-1 min-w-full">
+                <CarouselItem key={index} className="flex-1 min-w-full">
                   <Card className="bg-gray-800/50 border-gray-700">
                     <CardHeader>
                       <CardTitle className="text-white">Slide {index + 1}</CardTitle>
@@ -152,10 +199,10 @@ const Index = () => {
                         alt={`Slide ${index + 1}`}
                         className="w-full aspect-square object-cover rounded-md mb-4"
                       />
-                      <p className="text-gray-400">{slide.content}</p>
+                      <p className="text-gray-400 text-sm">{slide.content}</p>
                     </CardContent>
                   </Card>
-                </div>
+                </CarouselItem>
               ))}
             </CarouselContent>
           </Carousel>
@@ -174,7 +221,7 @@ const Index = () => {
                     alt={`Immagine ${index + 1}`}
                     className="w-full aspect-square object-cover rounded-md mb-4"
                   />
-                  <p className="text-gray-400">{item.content}</p>
+                  <p className="text-gray-400 text-sm">{item.content}</p>
                 </CardContent>
               </Card>
             ))}
@@ -188,11 +235,32 @@ const Index = () => {
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4 text-white">Generatore di Contenuti AI</h1>
+      <h1 className="text-2xl font-bold mb-4 text-white">Generatore AI con DALL-E 3</h1>
 
       <Card className="bg-gray-800/50 border-gray-700">
         <CardHeader>
-          <CardTitle className="text-white">Configura la tua generazione</CardTitle>
+          <CardTitle className="text-white flex items-center justify-between">
+            Configura la tua generazione
+            <Button
+              onClick={testConnection}
+              disabled={isTesting}
+              variant="outline"
+              size="sm"
+              className="bg-green-600 hover:bg-green-700 text-white border-green-600"
+            >
+              {isTesting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Testing...
+                </>
+              ) : (
+                <>
+                  <TestTube className="mr-2 h-4 w-4" />
+                  Test DALL-E 3
+                </>
+              )}
+            </Button>
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -200,7 +268,7 @@ const Index = () => {
             <Textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Descrivi cosa vuoi generare..."
+              placeholder="Descrivi cosa vuoi generare con DALL-E 3..."
               className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
             />
           </div>
@@ -221,13 +289,15 @@ const Index = () => {
           </div>
 
           <div>
-            <Label className="text-gray-300">Numero di Immagini</Label>
+            <Label className="text-gray-300">Numero di Immagini (1-7)</Label>
             <div className="flex items-center space-x-2">
               <Input
                 type="number"
                 value={imageCount}
-                onChange={(e) => setImageCount(Number(e.target.value))}
+                onChange={(e) => setImageCount(Math.min(7, Math.max(1, Number(e.target.value))))}
                 className="bg-gray-700 border-gray-600 text-white w-20"
+                min={1}
+                max={7}
               />
               <Slider
                 value={[imageCount]}
@@ -248,12 +318,12 @@ const Index = () => {
             {isGenerating ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Generando...
+                Generando con DALL-E 3...
               </>
             ) : (
               <>
                 <Wand2 className="mr-2 h-4 w-4" />
-                Genera Contenuto
+                Genera con DALL-E 3
               </>
             )}
           </Button>
