@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { contentService } from "@/services/contentService";
@@ -20,7 +22,9 @@ import {
   Heart,
   Zap,
   Download,
-  Share
+  Share,
+  Lightbulb,
+  Plus
 } from "lucide-react";
 
 const Index = () => {
@@ -28,13 +32,16 @@ const Index = () => {
   const { toast } = useToast();
   const { user, loading: authLoading, signOut } = useAuth();
   
+  const [ideaInput, setIdeaInput] = useState('');
   const [formData, setFormData] = useState({
-    topic: '',
-    audience: 'pazienti',
+    description: '',
+    audience: '',
+    length: 'medio',
+    tone: 'professionale',
     platform: 'instagram',
     postType: 'carosello',
-    tone: 'professionale',
-    length: 'media'
+    numSlides: '5',
+    numImages: '1'
   });
   
   const [generatedContent, setGeneratedContent] = useState('');
@@ -68,11 +75,26 @@ const Index = () => {
     }));
   };
 
+  const generateIdea = () => {
+    const ideas = [
+      'Esercizi per il mal di schiena da ufficio',
+      'Prevenzione infortuni sportivi',
+      'Riabilitazione post-chirurgica',
+      'Stretching mattutino per iniziare la giornata',
+      'Fisioterapia per anziani',
+      'Recupero da distorsione caviglia',
+      'Postura corretta al computer',
+      'Benefici della terapia manuale'
+    ];
+    const randomIdea = ideas[Math.floor(Math.random() * ideas.length)];
+    setIdeaInput(randomIdea);
+  };
+
   const generateContent = async () => {
-    if (!formData.topic.trim()) {
+    if (!formData.description.trim()) {
       toast({
         title: "Campo obbligatorio",
-        description: "Inserisci un argomento per generare il contenuto",
+        description: "Inserisci una descrizione per generare il contenuto",
         variant: "destructive"
       });
       return;
@@ -81,10 +103,10 @@ const Index = () => {
     setIsGenerating(true);
     
     try {
-      // Simula generazione contenuto (sostituire con API reale)
+      // Simula generazione contenuto con AI
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      const mockContent = `🏥 **${formData.topic.toUpperCase()}** 🏥
+      const mockContent = `🏥 **${formData.description.toUpperCase()}** 🏥
 
 💡 Hai mai pensato a quanto sia importante prendersi cura di questo aspetto della tua salute?
 
@@ -105,10 +127,13 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
 #fisioterapia #salute #benessere #prevenzione`;
 
       setGeneratedContent(mockContent);
-      setGeneratedImages([
-        'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400',
-        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400'
-      ]);
+      
+      // Genera immagini mock basate sul numero selezionato
+      const numImagesInt = parseInt(formData.numImages);
+      const mockImages = Array.from({ length: numImagesInt }, (_, index) => 
+        `https://images.unsplash.com/photo-${1559757148 + index}?w=400&h=400`
+      );
+      setGeneratedImages(mockImages);
       
       toast({
         title: "🎉 Contenuto generato!",
@@ -131,9 +156,9 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
 
     try {
       const { error } = await contentService.saveContent({
-        title: formData.topic,
+        title: formData.description,
         contentText: generatedContent,
-        topic: formData.topic,
+        topic: formData.description,
         audience: formData.audience,
         platform: formData.platform,
         postType: formData.postType,
@@ -191,7 +216,7 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
               className="h-10 w-auto"
             />
             <h1 className="text-xl font-bold text-white">
-              FisioAccordo<span className="text-purple-300">(VIRAL)</span>ContentAI
+              Generatore di Post Social <Sparkles className="inline h-5 w-5 text-purple-300 ml-2" />
             </h1>
           </div>
           <div className="flex items-center space-x-4">
@@ -212,87 +237,188 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="text-center mb-8">
+          <h2 className="text-4xl font-bold text-white mb-4">
+            Generatore di Post Social ✨
+          </h2>
+          <p className="text-xl text-gray-300">
+            Crea contenuti coinvolgenti per i tuoi social media con l'intelligenza artificiale
+          </p>
+        </div>
+
+        {/* Sezione "Sei a corto di idee?" */}
+        <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm mb-8">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center">
+              <Lightbulb className="h-5 w-5 mr-2 text-yellow-400" />
+              💡 Sei a corto di idee?
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4">
+              <Input
+                value={ideaInput}
+                onChange={(e) => setIdeaInput(e.target.value)}
+                placeholder="Inserisci un argomento (es. 'produttività', 'marketing')"
+                className="bg-gray-700 border-gray-600 text-white flex-1"
+              />
+              <Button 
+                onClick={generateIdea}
+                className="bg-purple-600 hover:bg-purple-700 px-6"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Trova Idee
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Pannello di controllo */}
           <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
             <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <Sparkles className="h-5 w-5 mr-2 text-purple-400" />
-                Genera Contenuto
+              <CardTitle className="text-white">
+                Crea il tuo contenuto
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* 1. Descrivi il tuo post */}
               <div>
-                <Label className="text-gray-300">Argomento del post</Label>
-                <Input
-                  value={formData.topic}
-                  onChange={(e) => handleInputChange('topic', e.target.value)}
-                  placeholder="es. mal di schiena, riabilitazione ginocchio..."
-                  className="bg-gray-700 border-gray-600 text-white"
+                <Label className="text-gray-300 text-lg font-medium">1. Descrivi il tuo post</Label>
+                <Textarea
+                  value={formData.description}
+                  onChange={(e) => handleInputChange('description', e.target.value)}
+                  placeholder="mal di schiena al pc"
+                  className="bg-gray-700 border-gray-600 text-white mt-2 min-h-[100px]"
                 />
               </div>
 
+              {/* 2. Definisci la tua Audience */}
               <div>
-                <Label className="text-gray-300">Target Audience</Label>
-                <RadioGroup 
-                  value={formData.audience} 
-                  onValueChange={(value) => handleInputChange('audience', value)}
-                  className="mt-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="pazienti" id="pazienti" />
-                    <Label htmlFor="pazienti" className="text-gray-300">Pazienti</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="colleghi" id="colleghi" />
-                    <Label htmlFor="colleghi" className="text-gray-300">Colleghi Fisioterapisti</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="generale" id="generale" />
-                    <Label htmlFor="generale" className="text-gray-300">Pubblico Generale</Label>
-                  </div>
-                </RadioGroup>
+                <Label className="text-gray-300 text-lg font-medium flex items-center">
+                  <User className="h-4 w-4 mr-2" />
+                  2. Definisci la tua Audience (Opzionale)
+                </Label>
+                <Input
+                  value={formData.audience}
+                  onChange={(e) => handleInputChange('audience', e.target.value)}
+                  placeholder="lavoratori al pc"
+                  className="bg-gray-700 border-gray-600 text-white mt-2"
+                />
               </div>
 
-              <div>
-                <Label className="text-gray-300">Piattaforma</Label>
-                <RadioGroup 
-                  value={formData.platform} 
-                  onValueChange={(value) => handleInputChange('platform', value)}
-                  className="mt-2"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="instagram" id="instagram" />
-                    <Instagram className="h-4 w-4" />
-                    <Label htmlFor="instagram" className="text-gray-300">Instagram</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="linkedin" id="linkedin" />
-                    <Linkedin className="h-4 w-4" />
-                    <Label htmlFor="linkedin" className="text-gray-300">LinkedIn</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="facebook" id="facebook" />
-                    <Facebook className="h-4 w-4" />
-                    <Label htmlFor="facebook" className="text-gray-300">Facebook</Label>
-                  </div>
-                </RadioGroup>
+              {/* Opzioni in griglia */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Lunghezza */}
+                <div>
+                  <Label className="text-gray-300">Lunghezza</Label>
+                  <Select value={formData.length} onValueChange={(value) => handleInputChange('length', value)}>
+                    <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-700 border-gray-600">
+                      <SelectItem value="corto">Corto</SelectItem>
+                      <SelectItem value="medio">Medio</SelectItem>
+                      <SelectItem value="lungo">Lungo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Tono */}
+                <div>
+                  <Label className="text-gray-300">Tono</Label>
+                  <Select value={formData.tone} onValueChange={(value) => handleInputChange('tone', value)}>
+                    <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-700 border-gray-600">
+                      <SelectItem value="professionale">Professionale</SelectItem>
+                      <SelectItem value="informale">Informale</SelectItem>
+                      <SelectItem value="divertente">Divertente</SelectItem>
+                      <SelectItem value="motivazionale">Motivazionale</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Piattaforma */}
+                <div>
+                  <Label className="text-gray-300">Piattaforma</Label>
+                  <Select value={formData.platform} onValueChange={(value) => handleInputChange('platform', value)}>
+                    <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-700 border-gray-600">
+                      <SelectItem value="instagram">Instagram</SelectItem>
+                      <SelectItem value="linkedin">LinkedIn</SelectItem>
+                      <SelectItem value="facebook">Facebook</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Tipo di Post */}
+                <div>
+                  <Label className="text-gray-300">Tipo di Post</Label>
+                  <Select value={formData.postType} onValueChange={(value) => handleInputChange('postType', value)}>
+                    <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-700 border-gray-600">
+                      <SelectItem value="carosello">Carosello</SelectItem>
+                      <SelectItem value="post-singolo">Post Singolo</SelectItem>
+                      <SelectItem value="storia">Storia</SelectItem>
+                      <SelectItem value="reel">Reel</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Numero Slide */}
+                <div>
+                  <Label className="text-gray-300">Numero Slide</Label>
+                  <Select value={formData.numSlides} onValueChange={(value) => handleInputChange('numSlides', value)}>
+                    <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-700 border-gray-600">
+                      <SelectItem value="3">3 Slide</SelectItem>
+                      <SelectItem value="5">5 Slide</SelectItem>
+                      <SelectItem value="7">7 Slide</SelectItem>
+                      <SelectItem value="10">10 Slide</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Numero Immagini */}
+                <div>
+                  <Label className="text-gray-300">Numero Immagini</Label>
+                  <Select value={formData.numImages} onValueChange={(value) => handleInputChange('numImages', value)}>
+                    <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-700 border-gray-600">
+                      <SelectItem value="1">1 Immagine</SelectItem>
+                      <SelectItem value="2">2 Immagini</SelectItem>
+                      <SelectItem value="3">3 Immagini</SelectItem>
+                      <SelectItem value="4">4 Immagini</SelectItem>
+                      <SelectItem value="5">5 Immagini</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <Button 
                 onClick={generateContent} 
                 disabled={isGenerating}
-                className="w-full bg-purple-600 hover:bg-purple-700"
+                className="w-full bg-purple-600 hover:bg-purple-700 text-lg py-6"
               >
                 {isGenerating ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                     Generando contenuto...
                   </>
                 ) : (
                   <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Genera Contenuto
+                    <Sparkles className="mr-2 h-5 w-5" />
+                    3. Genera Contenuto
                   </>
                 )}
               </Button>
@@ -302,29 +428,26 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
           {/* Anteprima contenuto */}
           <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
             <CardHeader>
-              <CardTitle className="text-white">Anteprima Post</CardTitle>
+              <CardTitle className="text-white">Anteprima</CardTitle>
             </CardHeader>
             <CardContent>
               {generatedContent ? (
                 <div className="space-y-4">
+                  {/* Anteprima mock delle immagini generate */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-green-500 rounded-lg p-4 text-center text-white font-bold">
+                      TI CHE RINNI...
+                    </div>
+                    <div className="bg-gradient-to-br from-orange-400 to-teal-500 rounded-lg p-4 text-center text-white font-bold">
+                      ALL DI APTION SHITIOB
+                    </div>
+                  </div>
+                  
                   <div className="bg-gray-700/50 p-4 rounded-lg border border-gray-600">
                     <pre className="text-gray-300 whitespace-pre-wrap text-sm">
                       {generatedContent}
                     </pre>
                   </div>
-                  
-                  {generatedImages.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2">
-                      {generatedImages.map((img, index) => (
-                        <img 
-                          key={index}
-                          src={img} 
-                          alt={`Generated ${index + 1}`}
-                          className="w-full h-32 object-cover rounded-lg"
-                        />
-                      ))}
-                    </div>
-                  )}
 
                   <div className="flex gap-2">
                     <Button 
@@ -342,6 +465,25 @@ Vuoi saperne di più? Prenota una valutazione gratuita!
                       Condividi
                     </Button>
                   </div>
+
+                  {/* Gestione Immagini Carosello */}
+                  <Card className="bg-gray-700/30 border-gray-600">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-white text-sm">🖼️ Gestione Immagini Carosello</CardTitle>
+                        <span className="bg-purple-600 text-white text-xs px-2 py-1 rounded">5/7 slide</span>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <Button 
+                        variant="outline"
+                        className="w-full text-white border-gray-600 hover:bg-gray-600"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Aggiungi Slide
+                      </Button>
+                    </CardContent>
+                  </Card>
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-400">
