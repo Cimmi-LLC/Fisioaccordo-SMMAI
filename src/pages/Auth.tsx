@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Heart, Zap } from "lucide-react";
@@ -14,6 +15,7 @@ const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -42,6 +44,16 @@ const Auth = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!agreedToTerms) {
+      toast({
+        title: "Termini e condizioni",
+        description: "Devi accettare i termini e condizioni per registrarti",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -120,14 +132,17 @@ const Auth = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Header con branding */}
+        {/* Header con branding e logo */}
         <div className="text-center mb-8">
-          <div className="flex justify-center items-center gap-2 mb-4">
-            <Heart className="h-8 w-8 text-blue-400" />
-            <Zap className="h-8 w-8 text-purple-400" />
+          <div className="flex justify-center items-center mb-4">
+            <img 
+              src="/lovable-uploads/217c8d5c-ce96-40c5-ab52-ff057f4b0d15.png" 
+              alt="FisioAccordo Logo" 
+              className="h-16 w-auto"
+            />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">
-            PhysioContent AI
+            FisioAccordo<span className="text-purple-300">(VIRAL)</span>ContentAI
           </h1>
           <p className="text-gray-300">
             Genera contenuti professionali per i tuoi social
@@ -257,10 +272,30 @@ const Auth = () => {
                       required
                     />
                   </div>
+                  
+                  {/* Consensi e Privacy */}
+                  <div className="space-y-3 p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                    <div className="flex items-start space-x-2">
+                      <Checkbox 
+                        id="terms" 
+                        checked={agreedToTerms}
+                        onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
+                      />
+                      <Label htmlFor="terms" className="text-xs text-gray-300 leading-relaxed cursor-pointer">
+                        Accetto i <span className="text-blue-400 underline">Termini e Condizioni</span>, l'
+                        <span className="text-blue-400 underline">Informativa Privacy</span> e autorizzo 
+                        Cimmi LLC al trattamento dei miei dati personali per la fornitura del servizio, 
+                        l'invio di comunicazioni commerciali e l'analisi statistica dei contenuti generati. 
+                        Comprendo che i miei dati saranno trattati in conformità al GDPR e che posso 
+                        revocare il consenso in qualsiasi momento.
+                      </Label>
+                    </div>
+                  </div>
+
                   <Button 
                     type="submit" 
-                    disabled={loading}
-                    className="w-full bg-purple-600 hover:bg-purple-700"
+                    disabled={loading || !agreedToTerms}
+                    className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
                   >
                     {loading ? (
                       <>
@@ -280,6 +315,15 @@ const Auth = () => {
         <div className="text-center mt-6 text-gray-400 text-sm">
           <p>Crea contenuti professionali per Instagram, LinkedIn e Facebook</p>
           <p className="mt-2">✨ AI copywriting + immagini generate automaticamente</p>
+        </div>
+
+        {/* Disclaimer Copyright */}
+        <div className="mt-8 p-4 bg-gray-900/50 rounded-lg border border-gray-700">
+          <p className="text-xs text-gray-400 text-center leading-relaxed">
+            © 2024 Cimmi LLC. Tutti i diritti riservati.<br/>
+            FisioAccordo(VIRAL)ContentAI è proprietà esclusiva di Cimmi LLC.<br/>
+            È vietata la copia, riproduzione o replica di questa piattaforma senza autorizzazione scritta.
+          </p>
         </div>
       </div>
     </div>

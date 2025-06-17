@@ -30,7 +30,7 @@ export interface GeneratedContent {
 }
 
 export class ContentService {
-  async saveContent(params: SaveContentParams): Promise<{ data: GeneratedContent | null; error: any }> {
+  async saveContent(params: SaveContentParams): Promise<{ data: any; error: any }> {
     try {
       console.log('💾 Salvando contenuto nel database...');
       
@@ -63,7 +63,7 @@ export class ContentService {
     }
   }
 
-  async getUserContents(): Promise<{ data: GeneratedContent[] | null; error: any }> {
+  async getUserContents(): Promise<{ data: any[] | null; error: any }> {
     try {
       const { data, error } = await supabase
         .from('generated_contents')
