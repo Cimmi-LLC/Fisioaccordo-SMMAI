@@ -216,6 +216,63 @@ export type Database = {
           },
         ]
       }
+      generated_contents: {
+        Row: {
+          audience: string | null
+          content_text: string
+          created_at: string | null
+          engagement_stats: Json | null
+          id: string
+          images: Json | null
+          is_published: boolean | null
+          length: string | null
+          platform: string | null
+          post_type: string | null
+          published_at: string | null
+          title: string
+          tone: string | null
+          topic: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          audience?: string | null
+          content_text: string
+          created_at?: string | null
+          engagement_stats?: Json | null
+          id?: string
+          images?: Json | null
+          is_published?: boolean | null
+          length?: string | null
+          platform?: string | null
+          post_type?: string | null
+          published_at?: string | null
+          title: string
+          tone?: string | null
+          topic?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          audience?: string | null
+          content_text?: string
+          created_at?: string | null
+          engagement_stats?: Json | null
+          id?: string
+          images?: Json | null
+          is_published?: boolean | null
+          length?: string | null
+          platform?: string | null
+          post_type?: string | null
+          published_at?: string | null
+          title?: string
+          tone?: string | null
+          topic?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       marketing_costs: {
         Row: {
           campaign_name: string | null
