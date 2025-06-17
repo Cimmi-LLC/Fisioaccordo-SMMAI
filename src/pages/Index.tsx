@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Sparkles, Copy, Upload, Image, Quote, ArrowRight, Lightbulb, Target, Zap } from "lucide-react";
+import { Loader2, Sparkles, Copy, Upload, Image, Quote, ArrowRight, Lightbulb, Target, Zap, Palette } from "lucide-react";
+import { RunwareService, GenerateImageParams } from "@/services/runwareService";
 
 const Index = () => {
   const { toast } = useToast();
@@ -29,6 +30,10 @@ const Index = () => {
   const [generatedIdeas, setGeneratedIdeas] = useState('');
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
   const [userUploadedImage, setUserUploadedImage] = useState<string | null>(null);
+  const [generatedAIImage, setGeneratedAIImage] = useState<string | null>(null);
+  const [isGeneratingAIImage, setIsGeneratingAIImage] = useState(false);
+  const [runwareApiKey, setRunwareApiKey] = useState('');
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [imageHook, setImageHook] = useState('');
   const [hookVariants, setHookVariants] = useState<string[]>([]);
   const [isGeneratingHooks, setIsGeneratingHooks] = useState(false);
@@ -164,6 +169,7 @@ Condividi nei commenti, rispondo a tutti! 👇
   const resetState = (keepIdeas = false) => {
     setGeneratedPost('');
     setUserUploadedImage(null);
+    setGeneratedAIImage(null);
     setImageHook('');
     setHookVariants([]);
     setCarouselSlides([]);
@@ -341,6 +347,68 @@ Condividi nei commenti, rispondo a tutti! 👇
     }
   };
 
+  const generateAIImage = async () => {
+    if (!generatedPost) {
+      toast({
+        title: "Attenzione",
+        description: "Genera prima un post per creare un'immagine AI",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!runwareApiKey) {
+      setShowApiKeyInput(true);
+      toast({
+        title: "API Key richiesta",
+        description: "Inserisci la tua API key di Runware per generare immagini AI",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsGeneratingAIImage(true);
+    setGeneratedAIImage(null);
+    
+    try {
+      const runwareService = new RunwareService(runwareApiKey);
+      
+      // Creo un prompt ottimizzato per l'immagine basato sul post
+      const imagePrompt = `Professional social media image based on: ${prompt}. High quality, modern design, vibrant colors, suitable for ${platform}`;
+      
+      const params: GenerateImageParams = {
+        positivePrompt: imagePrompt,
+        model: "runware:100@1",
+        numberResults: 1,
+        outputFormat: "WEBP",
+        CFGScale: 1,
+        scheduler: "FlowMatchEulerDiscreteScheduler",
+        strength: 0.8
+      };
+
+      const result = await runwareService.generateImage(params);
+      
+      if (result.imageURL) {
+        setGeneratedAIImage(result.imageURL);
+        setUserUploadedImage(null); // Rimuovi immagine caricata se presente
+        
+        toast({
+          title: "Immagine generata! 🎨",
+          description: "Immagine AI creata con successo"
+        });
+      }
+    } catch (error) {
+      console.error('Errore generazione immagine AI:', error);
+      toast({
+        title: "Errore",
+        description: "Errore durante la generazione dell'immagine AI",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingAIImage(false);
+    }
+  };
+
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -390,6 +458,8 @@ Condividi nei commenti, rispondo a tutti! 👇
   const ArrowRightIcon = () => (
     <ArrowRight className="w-12 h-12 text-white" />
   );
+
+  const currentImage = userUploadedImage || generatedAIImage;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white p-4 sm:p-6">
@@ -584,13 +654,13 @@ Condividi nei commenti, rispondo a tutti! 👇
                       {/* Prima slide con immagine */}
                       <div className="snap-center flex-shrink-0 w-full max-w-sm">
                         <div className="relative group inline-block mx-auto rounded-lg shadow-lg overflow-hidden border-2 border-blue-500/50 aspect-square bg-gray-700">
-                          {userUploadedImage ? (
-                            <img src={userUploadedImage} alt="Slide 1" className="w-full h-full object-cover" />
+                          {currentImage ? (
+                            <img src={currentImage} alt="Slide 1" className="w-full h-full object-cover" />
                           ) : (
                             <div className="w-full h-full flex flex-col justify-center items-center text-center p-4">
                               <Image className="w-16 h-16 text-gray-500 mb-4" />
                               <p className="font-semibold text-lg">Slide 1</p>
-                              <p className="text-sm text-gray-400">Carica un'immagine per iniziare</p>
+                              <p className="text-sm text-gray-400">Carica o genera un'immagine</p>
                             </div>
                           )}
                           {imageHook && (
@@ -653,9 +723,9 @@ Condividi nei commenti, rispondo a tutti! 👇
                     <p className="text-gray-500 text-center">Genera il contenuto per vedere l'anteprima</p>
                   )}
                 </div>
-              ) : userUploadedImage ? (
+              ) : currentImage ? (
                 <div className="relative inline-block mx-auto max-w-sm rounded-lg shadow-lg overflow-hidden border-2 border-blue-500/50">
-                  <img src={userUploadedImage} alt="Anteprima" className="w-full h-auto block" />
+                  <img src={currentImage} alt="Anteprima" className="w-full h-auto block" />
                   {imageHook && (
                     <div className="absolute bottom-0 left-0 right-0 p-5 pt-12 bg-gradient-to-t from-black/80 to-transparent">
                       <p className="text-white text-xl font-bold drop-shadow-2xl">
@@ -682,7 +752,39 @@ Condividi nei commenti, rispondo a tutti! 👇
                 <CardTitle className="text-white">Strumenti Avanzati</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {/* Input API Key Runware */}
+                {showApiKeyInput && (
+                  <div className="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/50 rounded-lg">
+                    <Label htmlFor="apiKey" className="text-yellow-400 font-semibold mb-2 block">
+                      API Key Runware (richiesta per generare immagini AI)
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="apiKey"
+                        type="password"
+                        value={runwareApiKey}
+                        onChange={(e) => setRunwareApiKey(e.target.value)}
+                        placeholder="Inserisci la tua API key di Runware"
+                        className="flex-1 bg-gray-700 border-gray-600 text-white"
+                      />
+                      <Button
+                        onClick={() => setShowApiKeyInput(false)}
+                        className="bg-green-600 hover:bg-green-700"
+                        disabled={!runwareApiKey}
+                      >
+                        Salva
+                      </Button>
+                    </div>
+                    <p className="text-sm text-gray-400 mt-2">
+                      Ottieni la tua API key su{" "}
+                      <a href="https://runware.ai/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                        runware.ai
+                      </a>
+                    </p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <input
                     type="file"
                     ref={fileInputRef}
@@ -696,6 +798,23 @@ Condividi nei commenti, rispondo a tutti! 👇
                   >
                     <Upload className="mr-2 h-4 w-4" />
                     Carica Immagine
+                  </Button>
+                  <Button
+                    onClick={generateAIImage}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    disabled={isGeneratingAIImage}
+                  >
+                    {isGeneratingAIImage ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generando...
+                      </>
+                    ) : (
+                      <>
+                        <Palette className="mr-2 h-4 w-4" />
+                        Genera Immagine AI
+                      </>
+                    )}
                   </Button>
                   <Button
                     onClick={generateHookVariants}
