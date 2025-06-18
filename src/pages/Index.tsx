@@ -15,6 +15,7 @@ import IdeaGenerator from "@/components/IdeaGenerator";
 import ContentForm from "@/components/ContentForm";
 import PreviewSection from "@/components/PreviewSection";
 import HookGenerator from "@/components/HookGenerator";
+import InstagramConnection from "@/components/InstagramConnection";
 
 interface CarouselSlide {
   type: string;
@@ -475,6 +476,11 @@ Come fisioterapista con oltre 10 anni di esperienza, vedo ogni giorno persone ch
             </CardContent>
           </Card>
         )}
+
+        {/* Connessione Instagram */}
+        <div className="mt-8">
+          <InstagramConnection />
+        </div>
 
         {/* Footer con disclaimer */}
         <div className="mt-12 p-6 bg-gray-900/50 rounded-lg border border-gray-700">

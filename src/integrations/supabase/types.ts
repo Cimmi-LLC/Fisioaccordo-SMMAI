@@ -145,6 +145,66 @@ export type Database = {
           },
         ]
       }
+      business_clients: {
+        Row: {
+          address: string
+          city: string
+          company_name: string
+          country: string | null
+          created_at: string | null
+          email: string | null
+          id: string
+          is_active: boolean | null
+          pec_email: string | null
+          phone: string | null
+          postal_code: string
+          province: string
+          sdi_code: string | null
+          tax_code: string
+          updated_at: string | null
+          user_id: string
+          vat_number: string | null
+        }
+        Insert: {
+          address: string
+          city: string
+          company_name: string
+          country?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          pec_email?: string | null
+          phone?: string | null
+          postal_code: string
+          province: string
+          sdi_code?: string | null
+          tax_code: string
+          updated_at?: string | null
+          user_id: string
+          vat_number?: string | null
+        }
+        Update: {
+          address?: string
+          city?: string
+          company_name?: string
+          country?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          pec_email?: string | null
+          phone?: string | null
+          postal_code?: string
+          province?: string
+          sdi_code?: string | null
+          tax_code?: string
+          updated_at?: string | null
+          user_id?: string
+          vat_number?: string | null
+        }
+        Relationships: []
+      }
       calendar_integrations: {
         Row: {
           access_token: string | null
@@ -175,6 +235,66 @@ export type Database = {
           provider?: string
           refresh_token?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      company_settings: {
+        Row: {
+          address: string
+          city: string
+          company_name: string
+          country: string | null
+          created_at: string | null
+          email: string | null
+          id: string
+          invoice_counter: number | null
+          pec_email: string | null
+          phone: string | null
+          postal_code: string
+          province: string
+          sdi_code: string | null
+          tax_code: string
+          updated_at: string | null
+          user_id: string
+          vat_number: string
+        }
+        Insert: {
+          address: string
+          city: string
+          company_name: string
+          country?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          invoice_counter?: number | null
+          pec_email?: string | null
+          phone?: string | null
+          postal_code: string
+          province: string
+          sdi_code?: string | null
+          tax_code: string
+          updated_at?: string | null
+          user_id: string
+          vat_number: string
+        }
+        Update: {
+          address?: string
+          city?: string
+          company_name?: string
+          country?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          invoice_counter?: number | null
+          pec_email?: string | null
+          phone?: string | null
+          postal_code?: string
+          province?: string
+          sdi_code?: string | null
+          tax_code?: string
+          updated_at?: string | null
+          user_id?: string
+          vat_number?: string
         }
         Relationships: []
       }
@@ -278,6 +398,195 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      invoice_items: {
+        Row: {
+          appointment_id: string | null
+          created_at: string | null
+          description: string
+          id: string
+          invoice_id: string
+          quantity: number
+          tax_amount: number
+          tax_rate: number
+          total_amount: number
+          unit_price: number
+        }
+        Insert: {
+          appointment_id?: string | null
+          created_at?: string | null
+          description: string
+          id?: string
+          invoice_id: string
+          quantity?: number
+          tax_amount: number
+          tax_rate?: number
+          total_amount: number
+          unit_price: number
+        }
+        Update: {
+          appointment_id?: string | null
+          created_at?: string | null
+          description?: string
+          id?: string
+          invoice_id?: string
+          quantity?: number
+          tax_amount?: number
+          tax_rate?: number
+          total_amount?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_templates: {
+        Row: {
+          created_at: string | null
+          description: string
+          id: string
+          is_default: boolean | null
+          name: string
+          tax_rate: number
+          unit_price: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description: string
+          id?: string
+          is_default?: boolean | null
+          name: string
+          tax_rate?: number
+          unit_price: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string
+          id?: string
+          is_default?: boolean | null
+          name?: string
+          tax_rate?: number
+          unit_price?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      invoices: {
+        Row: {
+          business_client_id: string | null
+          client_type: string
+          created_at: string | null
+          due_date: string | null
+          health_card_data: Json | null
+          id: string
+          invoice_date: string
+          invoice_number: string
+          is_health_service: boolean | null
+          notes: string | null
+          patient_id: string | null
+          payment_method: string | null
+          payment_terms: string | null
+          sdi_identifier: string | null
+          sent_to_sdi_at: string | null
+          status: string
+          subtotal: number
+          tax_amount: number
+          total_amount: number
+          ts_sent_at: string | null
+          ts_status: string | null
+          ts_transmission_id: string | null
+          updated_at: string | null
+          user_id: string
+          xml_file_path: string | null
+        }
+        Insert: {
+          business_client_id?: string | null
+          client_type: string
+          created_at?: string | null
+          due_date?: string | null
+          health_card_data?: Json | null
+          id?: string
+          invoice_date: string
+          invoice_number: string
+          is_health_service?: boolean | null
+          notes?: string | null
+          patient_id?: string | null
+          payment_method?: string | null
+          payment_terms?: string | null
+          sdi_identifier?: string | null
+          sent_to_sdi_at?: string | null
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          ts_sent_at?: string | null
+          ts_status?: string | null
+          ts_transmission_id?: string | null
+          updated_at?: string | null
+          user_id: string
+          xml_file_path?: string | null
+        }
+        Update: {
+          business_client_id?: string | null
+          client_type?: string
+          created_at?: string | null
+          due_date?: string | null
+          health_card_data?: Json | null
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          is_health_service?: boolean | null
+          notes?: string | null
+          patient_id?: string | null
+          payment_method?: string | null
+          payment_terms?: string | null
+          sdi_identifier?: string | null
+          sent_to_sdi_at?: string | null
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          total_amount?: number
+          ts_sent_at?: string | null
+          ts_status?: string | null
+          ts_transmission_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+          xml_file_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_business_client_id_fkey"
+            columns: ["business_client_id"]
+            isOneToOne: false
+            referencedRelation: "business_clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       marketing_costs: {
         Row: {
@@ -408,6 +717,7 @@ export type Database = {
         Row: {
           acquisition_source: string | null
           address: string | null
+          birth_place: string | null
           city: string | null
           country: string | null
           created_at: string | null
@@ -415,9 +725,12 @@ export type Database = {
           email: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
+          exemption_code: string | null
           first_name: string
           first_visit_date: string | null
           gender: string | null
+          health_card_expiry: string | null
+          health_card_number: string | null
           id: string
           last_name: string
           medical_condition: string | null
@@ -430,6 +743,7 @@ export type Database = {
         Insert: {
           acquisition_source?: string | null
           address?: string | null
+          birth_place?: string | null
           city?: string | null
           country?: string | null
           created_at?: string | null
@@ -437,9 +751,12 @@ export type Database = {
           email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
+          exemption_code?: string | null
           first_name: string
           first_visit_date?: string | null
           gender?: string | null
+          health_card_expiry?: string | null
+          health_card_number?: string | null
           id?: string
           last_name: string
           medical_condition?: string | null
@@ -452,6 +769,7 @@ export type Database = {
         Update: {
           acquisition_source?: string | null
           address?: string | null
+          birth_place?: string | null
           city?: string | null
           country?: string | null
           created_at?: string | null
@@ -459,9 +777,12 @@ export type Database = {
           email?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
+          exemption_code?: string | null
           first_name?: string
           first_visit_date?: string | null
           gender?: string | null
+          health_card_expiry?: string | null
+          health_card_number?: string | null
           id?: string
           last_name?: string
           medical_condition?: string | null
@@ -631,6 +952,56 @@ export type Database = {
           },
         ]
       }
+      tessera_sanitaria_transmissions: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          invoice_id: string
+          response_data: Json | null
+          sent_at: string | null
+          status: string
+          transmission_id: string
+          updated_at: string
+          user_id: string
+          xml_content: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          invoice_id: string
+          response_data?: Json | null
+          sent_at?: string | null
+          status?: string
+          transmission_id: string
+          updated_at?: string
+          user_id: string
+          xml_content?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          invoice_id?: string
+          response_data?: Json | null
+          sent_at?: string | null
+          status?: string
+          transmission_id?: string
+          updated_at?: string
+          user_id?: string
+          xml_content?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tessera_sanitaria_transmissions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       therapists: {
         Row: {
           created_at: string | null
@@ -669,6 +1040,10 @@ export type Database = {
       delete_user_content: {
         Args: { p_content_id: string; p_user_id: string }
         Returns: undefined
+      }
+      get_next_invoice_number: {
+        Args: { p_user_id: string }
+        Returns: string
       }
       get_user_contents: {
         Args: { p_user_id: string }
