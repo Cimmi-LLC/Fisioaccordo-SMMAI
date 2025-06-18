@@ -399,6 +399,48 @@ export type Database = {
         }
         Relationships: []
       }
+      instagram_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          id: string
+          instagram_user_id: string
+          is_active: boolean | null
+          profile_data: Json | null
+          refresh_token: string | null
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          id?: string
+          instagram_user_id: string
+          is_active?: boolean | null
+          profile_data?: Json | null
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          id?: string
+          instagram_user_id?: string
+          is_active?: boolean | null
+          profile_data?: Json | null
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
       invoice_items: {
         Row: {
           appointment_id: string | null
@@ -1066,6 +1108,18 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_user_instagram_connections: {
+        Args: { p_user_id: string }
+        Returns: {
+          id: string
+          instagram_user_id: string
+          username: string
+          profile_data: Json
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }[]
+      }
       insert_generated_content: {
         Args: {
           p_user_id: string
@@ -1099,6 +1153,18 @@ export type Database = {
       mark_content_published: {
         Args: { p_content_id: string; p_user_id: string }
         Returns: undefined
+      }
+      upsert_instagram_connection: {
+        Args: {
+          p_user_id: string
+          p_instagram_user_id: string
+          p_username: string
+          p_access_token: string
+          p_refresh_token?: string
+          p_token_expires_at?: string
+          p_profile_data?: Json
+        }
+        Returns: string
       }
     }
     Enums: {

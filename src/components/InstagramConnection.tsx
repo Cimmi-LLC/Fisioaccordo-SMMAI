@@ -4,68 +4,112 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Instagram, CheckCircle, ExternalLink, BarChart3 } from "lucide-react";
+import { InstagramService } from '@/services/instagramService';
 
-interface InstagramData {
+interface InstagramConnectionData {
+  id: string;
+  instagram_user_id: string;
   username: string;
-  followers_count: number;
-  media_count: number;
-  account_type: string;
-  profile_picture_url?: string;
+  profile_data: {
+    username: string;
+    account_type: 'PERSONAL' | 'BUSINESS';
+    media_count: number;
+    followers_count?: number;
+  };
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 const InstagramConnection: React.FC = () => {
   const { toast } = useToast();
   const [isConnected, setIsConnected] = useState(false);
-  const [instagramData, setInstagramData] = useState<InstagramData | null>(null);
+  const [connectionData, setConnectionData] = useState<InstagramConnectionData | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Controlla se c'è già una connessione salvata
-    const savedConnection = localStorage.getItem('instagram_connection');
-    if (savedConnection) {
-      const data = JSON.parse(savedConnection);
-      setIsConnected(true);
-      setInstagramData(data);
-    }
+    loadInstagramConnections();
   }, []);
+
+  const loadInstagramConnections = async () => {
+    try {
+      const { data, error } = await InstagramService.getUserConnections();
+      
+      if (error) {
+        console.error('Errore caricamento connessioni:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        setConnectionData(data[0]);
+        setIsConnected(true);
+      }
+    } catch (error) {
+      console.error('Errore:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const connectInstagram = () => {
     setIsConnecting(true);
-    
-    // Simula la connessione Instagram (in un'app reale useresti l'API di Instagram)
-    setTimeout(() => {
-      const mockData: InstagramData = {
-        username: 'fisioterapista_pro',
-        followers_count: 2547,
-        media_count: 156,
-        account_type: 'BUSINESS'
-      };
+    try {
+      InstagramService.initiateAuth();
+    } catch (error) {
+      console.error('Errore avvio autenticazione:', error);
+      toast({
+        title: "❌ Errore",
+        description: "Impossibile avviare l'autenticazione Instagram",
+        variant: "destructive"
+      });
+      setIsConnecting(false);
+    }
+  };
+
+  const disconnectInstagram = async () => {
+    if (!connectionData) return;
+
+    try {
+      const { error } = await InstagramService.disconnectAccount(connectionData.id);
       
-      setInstagramData(mockData);
-      setIsConnected(true);
-      localStorage.setItem('instagram_connection', JSON.stringify(mockData));
+      if (error) {
+        toast({
+          title: "❌ Errore",
+          description: "Impossibile disconnettere l'account",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setIsConnected(false);
+      setConnectionData(null);
       
       toast({
-        title: "🎉 Instagram Collegato!",
-        description: "Il tuo account Instagram è stato collegato con successo"
+        title: "Account scollegato",
+        description: "Il tuo account Instagram è stato scollegato"
       });
-      
-      setIsConnecting(false);
-    }, 2000);
+    } catch (error) {
+      console.error('Errore disconnessione:', error);
+    }
   };
 
-  const disconnectInstagram = () => {
-    setIsConnected(false);
-    setInstagramData(null);
-    localStorage.removeItem('instagram_connection');
-    
-    toast({
-      title: "Account scollegato",
-      description: "Il tuo account Instagram è stato scollegato"
-    });
-  };
+  if (isLoading) {
+    return (
+      <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-pink-500"></div>
+            <span className="ml-2 text-gray-300">Caricamento...</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
-  if (isConnected && instagramData) {
+  if (isConnected && connectionData) {
+    const profileData = connectionData.profile_data;
+
     return (
       <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
         <CardHeader>
@@ -84,19 +128,21 @@ const InstagramConnection: React.FC = () => {
                   <Instagram className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <p className="text-white font-medium">@{instagramData.username}</p>
-                  <p className="text-gray-400 text-sm">{instagramData.account_type}</p>
+                  <p className="text-white font-medium">@{profileData.username}</p>
+                  <p className="text-gray-400 text-sm">{profileData.account_type}</p>
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-700/50 p-3 rounded-lg">
-                  <p className="text-pink-400 text-sm font-medium">Follower</p>
-                  <p className="text-white text-xl font-bold">{instagramData.followers_count.toLocaleString()}</p>
-                </div>
+                {profileData.followers_count !== undefined && (
+                  <div className="bg-gray-700/50 p-3 rounded-lg">
+                    <p className="text-pink-400 text-sm font-medium">Follower</p>
+                    <p className="text-white text-xl font-bold">{profileData.followers_count.toLocaleString()}</p>
+                  </div>
+                )}
                 <div className="bg-gray-700/50 p-3 rounded-lg">
                   <p className="text-purple-400 text-sm font-medium">Post</p>
-                  <p className="text-white text-xl font-bold">{instagramData.media_count}</p>
+                  <p className="text-white text-xl font-bold">{profileData.media_count}</p>
                 </div>
               </div>
             </div>
@@ -106,13 +152,13 @@ const InstagramConnection: React.FC = () => {
               <div className="bg-gradient-to-r from-pink-500/20 to-purple-600/20 p-4 rounded-lg border border-pink-500/30">
                 <h4 className="text-white font-medium mb-2 flex items-center">
                   <BarChart3 className="h-4 w-4 mr-2 text-pink-400" />
-                  Analisi Disponibili
+                  Dati Reali Disponibili
                 </h4>
                 <ul className="text-gray-300 text-sm space-y-1">
-                  <li>📊 Statistiche engagement</li>
-                  <li>📈 Crescita follower</li>
-                  <li>🎯 Analisi contenuti</li>
-                  <li>⏰ Orari ottimali posting</li>
+                  <li>✅ Profilo collegato</li>
+                  <li>✅ Conteggio post reale</li>
+                  {profileData.account_type === 'BUSINESS' && <li>✅ Follower count (Business)</li>}
+                  <li>🔄 Analytics in sviluppo</li>
                 </ul>
               </div>
               
@@ -160,15 +206,15 @@ const InstagramConnection: React.FC = () => {
             <ul className="space-y-2 text-gray-300 text-sm">
               <li className="flex items-start">
                 <span className="text-pink-400 mr-2">✓</span>
-                Analisi dettagliate delle performance dei tuoi post
+                Dati reali del tuo profilo Instagram
               </li>
               <li className="flex items-start">
                 <span className="text-pink-400 mr-2">✓</span>
-                Statistiche follower e engagement in tempo reale
+                Conteggio follower e post aggiornati
               </li>
               <li className="flex items-start">
                 <span className="text-pink-400 mr-2">✓</span>
-                Suggerimenti per orari ottimali di pubblicazione
+                Accesso a statistiche dettagliate (in arrivo)
               </li>
               <li className="flex items-start">
                 <span className="text-pink-400 mr-2">✓</span>
@@ -182,7 +228,7 @@ const InstagramConnection: React.FC = () => {
             <div className="bg-gradient-to-br from-pink-500/10 to-purple-600/10 p-6 rounded-lg border border-pink-500/20 text-center">
               <Instagram className="h-12 w-12 text-pink-400 mx-auto mb-4" />
               <p className="text-gray-300 mb-4 text-sm">
-                Collega il tuo account Instagram Business per sbloccare analytics avanzate
+                Collega il tuo account Instagram per accedere ai dati reali del tuo profilo
               </p>
               <Button 
                 onClick={connectInstagram}
