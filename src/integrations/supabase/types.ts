@@ -342,6 +342,101 @@ export type Database = {
           },
         ]
       }
+      exercise_materials: {
+        Row: {
+          created_at: string
+          description: string | null
+          exercise_id: string
+          external_url: string | null
+          file_name: string | null
+          file_size: number | null
+          file_url: string | null
+          id: string
+          material_type: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          exercise_id: string
+          external_url?: string | null
+          file_name?: string | null
+          file_size?: number | null
+          file_url?: string | null
+          id?: string
+          material_type: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          exercise_id?: string
+          external_url?: string | null
+          file_name?: string | null
+          file_size?: number | null
+          file_url?: string | null
+          id?: string
+          material_type?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_exercise_materials_exercise"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exercises: {
+        Row: {
+          body_part: string | null
+          created_at: string
+          description: string | null
+          difficulty_level: string | null
+          duration_minutes: number | null
+          id: string
+          instructions: string | null
+          name: string
+          repetitions: number | null
+          sets: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body_part?: string | null
+          created_at?: string
+          description?: string | null
+          difficulty_level?: string | null
+          duration_minutes?: number | null
+          id?: string
+          instructions?: string | null
+          name: string
+          repetitions?: number | null
+          sets?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body_part?: string | null
+          created_at?: string
+          description?: string | null
+          difficulty_level?: string | null
+          duration_minutes?: number | null
+          id?: string
+          instructions?: string | null
+          name?: string
+          repetitions?: number | null
+          sets?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       generated_contents: {
         Row: {
           audience: string | null
@@ -691,6 +786,123 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "patient_custom_fields_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patient_exercise_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string
+          created_at: string
+          exercise_id: string
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          patient_id: string
+          target_duration_minutes: number | null
+          target_frequency_per_week: number | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by: string
+          created_at?: string
+          exercise_id: string
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          patient_id: string
+          target_duration_minutes?: number | null
+          target_frequency_per_week?: number | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string
+          created_at?: string
+          exercise_id?: string
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          patient_id?: string
+          target_duration_minutes?: number | null
+          target_frequency_per_week?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_patient_exercise_assignments_exercise"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_patient_exercise_assignments_patient"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      patient_exercise_logs: {
+        Row: {
+          assignment_id: string
+          completed_at: string
+          created_at: string
+          difficulty_rating: number | null
+          duration_minutes: number | null
+          id: string
+          mood_rating: number | null
+          notes: string | null
+          pain_level: number | null
+          patient_id: string
+          repetitions_completed: number | null
+          sets_completed: number | null
+        }
+        Insert: {
+          assignment_id: string
+          completed_at?: string
+          created_at?: string
+          difficulty_rating?: number | null
+          duration_minutes?: number | null
+          id?: string
+          mood_rating?: number | null
+          notes?: string | null
+          pain_level?: number | null
+          patient_id: string
+          repetitions_completed?: number | null
+          sets_completed?: number | null
+        }
+        Update: {
+          assignment_id?: string
+          completed_at?: string
+          created_at?: string
+          difficulty_rating?: number | null
+          duration_minutes?: number | null
+          id?: string
+          mood_rating?: number | null
+          notes?: string | null
+          pain_level?: number | null
+          patient_id?: string
+          repetitions_completed?: number | null
+          sets_completed?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_patient_exercise_logs_assignment"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "patient_exercise_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_patient_exercise_logs_patient"
             columns: ["patient_id"]
             isOneToOne: false
             referencedRelation: "patients"

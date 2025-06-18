@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Instagram, CheckCircle, ExternalLink, BarChart3 } from "lucide-react";
+import { Instagram, CheckCircle, ExternalLink, BarChart3, AlertCircle, Zap } from "lucide-react";
 import { InstagramService } from '@/services/instagramService';
 
 interface InstagramConnectionData {
@@ -52,15 +52,20 @@ const InstagramConnection: React.FC = () => {
     }
   };
 
-  const connectInstagram = () => {
+  const connectInstagram = async () => {
     setIsConnecting(true);
     try {
       InstagramService.initiateAuth();
+      
+      toast({
+        title: "🚀 Connessione in corso...",
+        description: "Ti stiamo reindirizzando a Instagram. Autorizza l'accesso per collegare il tuo account."
+      });
     } catch (error) {
       console.error('Errore avvio autenticazione:', error);
       toast({
         title: "❌ Errore",
-        description: "Impossibile avviare l'autenticazione Instagram",
+        description: error instanceof Error ? error.message : "Impossibile avviare l'autenticazione Instagram",
         variant: "destructive"
       });
       setIsConnecting(false);
@@ -86,8 +91,8 @@ const InstagramConnection: React.FC = () => {
       setConnectionData(null);
       
       toast({
-        title: "Account scollegato",
-        description: "Il tuo account Instagram è stato scollegato"
+        title: "✅ Account scollegato",
+        description: "Il tuo account Instagram è stato scollegato con successo"
       });
     } catch (error) {
       console.error('Errore disconnessione:', error);
@@ -129,7 +134,7 @@ const InstagramConnection: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-white font-medium">@{profileData.username}</p>
-                  <p className="text-gray-400 text-sm">{profileData.account_type}</p>
+                  <p className="text-gray-400 text-sm">{profileData.account_type} Account</p>
                 </div>
               </div>
               
@@ -149,16 +154,16 @@ const InstagramConnection: React.FC = () => {
 
             {/* Azioni */}
             <div className="space-y-4">
-              <div className="bg-gradient-to-r from-pink-500/20 to-purple-600/20 p-4 rounded-lg border border-pink-500/30">
+              <div className="bg-gradient-to-r from-green-500/20 to-blue-600/20 p-4 rounded-lg border border-green-500/30">
                 <h4 className="text-white font-medium mb-2 flex items-center">
-                  <BarChart3 className="h-4 w-4 mr-2 text-pink-400" />
-                  Dati Reali Disponibili
+                  <CheckCircle className="h-4 w-4 mr-2 text-green-400" />
+                  Connesso e Funzionante
                 </h4>
                 <ul className="text-gray-300 text-sm space-y-1">
-                  <li>✅ Profilo collegato</li>
-                  <li>✅ Conteggio post reale</li>
-                  {profileData.account_type === 'BUSINESS' && <li>✅ Follower count (Business)</li>}
-                  <li>🔄 Analytics in sviluppo</li>
+                  <li>✅ Dati reali sincronizzati</li>
+                  <li>✅ API Instagram Graph attiva</li>
+                  <li>✅ Account {profileData.account_type.toLowerCase()}</li>
+                  <li>🔄 Analytics in tempo reale</li>
                 </ul>
               </div>
               
@@ -195,14 +200,29 @@ const InstagramConnection: React.FC = () => {
       <CardHeader>
         <CardTitle className="text-white flex items-center text-lg">
           <Instagram className="h-6 w-6 mr-2 text-pink-400" />
-          Collega il tuo Account Instagram
+          Collega il tuo Account Instagram Business
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid md:grid-cols-2 gap-6">
-          {/* Benefici */}
+          {/* Requisiti e Benefici */}
           <div>
-            <h4 className="text-white font-medium mb-3">🚀 Cosa ottieni collegando Instagram:</h4>
+            <div className="bg-blue-500/10 p-4 rounded-lg border border-blue-500/20 mb-4">
+              <h4 className="text-blue-400 font-medium mb-2 flex items-center">
+                <AlertCircle className="h-4 w-4 mr-2" />
+                Requisiti
+              </h4>
+              <ul className="text-gray-300 text-sm space-y-1">
+                <li>📱 Account Instagram Business</li>
+                <li>📄 Pagina Facebook collegata</li>
+                <li>✅ Admin della pagina Facebook</li>
+              </ul>
+            </div>
+
+            <h4 className="text-white font-medium mb-3 flex items-center">
+              <Zap className="h-4 w-4 mr-2 text-yellow-400" />
+              Cosa ottieni:
+            </h4>
             <ul className="space-y-2 text-gray-300 text-sm">
               <li className="flex items-start">
                 <span className="text-pink-400 mr-2">✓</span>
@@ -214,11 +234,11 @@ const InstagramConnection: React.FC = () => {
               </li>
               <li className="flex items-start">
                 <span className="text-pink-400 mr-2">✓</span>
-                Accesso a statistiche dettagliate (in arrivo)
+                Accesso completo alle Instagram API
               </li>
               <li className="flex items-start">
                 <span className="text-pink-400 mr-2">✓</span>
-                Contenuti personalizzati basati sul tuo pubblico
+                Analytics e insights dettagliati
               </li>
             </ul>
           </div>
@@ -227,13 +247,18 @@ const InstagramConnection: React.FC = () => {
           <div className="flex flex-col justify-center">
             <div className="bg-gradient-to-br from-pink-500/10 to-purple-600/10 p-6 rounded-lg border border-pink-500/20 text-center">
               <Instagram className="h-12 w-12 text-pink-400 mx-auto mb-4" />
+              
+              <h3 className="text-white font-semibold mb-2">Connessione Semplificata</h3>
               <p className="text-gray-300 mb-4 text-sm">
-                Collega il tuo account Instagram per accedere ai dati reali del tuo profilo
+                Sistema centralizzato - nessuna configurazione richiesta. 
+                Un clic e sei collegato! 🚀
               </p>
+              
               <Button 
                 onClick={connectInstagram}
                 disabled={isConnecting}
-                className="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700"
+                className="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white font-semibold"
+                size="lg"
               >
                 {isConnecting ? (
                   <>
@@ -242,13 +267,15 @@ const InstagramConnection: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <Instagram className="h-4 w-4 mr-2" />
-                    Collega Instagram
+                    <Instagram className="h-5 w-5 mr-2" />
+                    Collega Instagram Business
                   </>
                 )}
               </Button>
-              <p className="text-xs text-gray-400 mt-2">
-                Sicuro e conforme alle policy di Instagram
+              
+              <p className="text-xs text-gray-400 mt-3">
+                ✅ Sicuro e conforme alle policy Instagram<br/>
+                ⚡ Configurazione automatica
               </p>
             </div>
           </div>
