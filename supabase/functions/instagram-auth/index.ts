@@ -13,20 +13,28 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🚀 Instagram Auth Edge Function chiamata')
+    
     const { code, redirect_uri } = await req.json()
+    console.log('📝 Parametri ricevuti:', { code: code?.substring(0, 10) + '...', redirect_uri })
     
     if (!code) {
       throw new Error('Codice di autorizzazione mancante')
     }
 
     // Ottieni l'App Secret dalle variabili di ambiente di Supabase
-    const INSTAGRAM_APP_ID = Deno.env.get('INSTAGRAM_APP_ID')
+    const INSTAGRAM_APP_ID = '1440410323636643' // Il tuo App ID
     const INSTAGRAM_APP_SECRET = Deno.env.get('INSTAGRAM_APP_SECRET')
     
-    if (!INSTAGRAM_APP_ID || !INSTAGRAM_APP_SECRET) {
-      throw new Error('Credenziali Instagram non configurate')
+    console.log('🔑 App ID:', INSTAGRAM_APP_ID)
+    console.log('🔑 App Secret presente:', !!INSTAGRAM_APP_SECRET)
+    
+    if (!INSTAGRAM_APP_SECRET) {
+      throw new Error('INSTAGRAM_APP_SECRET non configurato nelle variabili di ambiente')
     }
 
+    console.log('🔄 Scambio codice per access token...')
+    
     // Scambia il codice per un access token
     const tokenResponse = await fetch('https://api.instagram.com/oauth/access_token', {
       method: 'POST',
@@ -43,16 +51,31 @@ serve(async (req) => {
     })
 
     const tokenData = await tokenResponse.json()
+    console.log('📡 Risposta token Instagram:', { 
+      ok: tokenResponse.ok, 
+      status: tokenResponse.status,
+      hasAccessToken: !!tokenData.access_token 
+    })
     
     if (!tokenResponse.ok) {
+      console.error('❌ Errore token Instagram:', tokenData)
       throw new Error(tokenData.error_message || 'Errore ottenimento token')
     }
+
+    console.log('✅ Token ottenuto, carico profilo...')
 
     // Ottieni informazioni del profilo
     const profileResponse = await fetch(`https://graph.instagram.com/me?fields=id,username,account_type,media_count&access_token=${tokenData.access_token}`)
     const profileData = await profileResponse.json()
 
+    console.log('👤 Risposta profilo Instagram:', { 
+      ok: profileResponse.ok, 
+      username: profileData.username,
+      account_type: profileData.account_type 
+    })
+
     if (!profileResponse.ok) {
+      console.error('❌ Errore profilo Instagram:', profileData)
       throw new Error('Errore caricamento profilo Instagram')
     }
 
@@ -60,13 +83,15 @@ serve(async (req) => {
     let followersCount = null;
     if (profileData.account_type === 'BUSINESS') {
       try {
+        console.log('📊 Account business rilevato, carico follower...')
         const followersResponse = await fetch(`https://graph.instagram.com/${profileData.id}?fields=followers_count&access_token=${tokenData.access_token}`)
         const followersData = await followersResponse.json()
         if (followersResponse.ok) {
           followersCount = followersData.followers_count
+          console.log('👥 Follower caricati:', followersCount)
         }
       } catch (error) {
-        console.log('Non è stato possibile ottenere il conteggio dei follower:', error)
+        console.log('⚠️ Non è stato possibile ottenere il conteggio dei follower:', error)
       }
     }
 
@@ -87,8 +112,11 @@ serve(async (req) => {
     )
 
     if (userError || !user) {
+      console.error('❌ Errore autenticazione utente:', userError)
       throw new Error('Utente non autenticato')
     }
+
+    console.log('💾 Salvo connessione nel database...')
 
     // Salva la connessione
     const profileDataToSave = {
@@ -107,8 +135,11 @@ serve(async (req) => {
     })
 
     if (saveError) {
+      console.error('❌ Errore salvataggio connessione:', saveError)
       throw new Error('Errore salvataggio connessione: ' + saveError.message)
     }
+
+    console.log('🎉 Connessione Instagram salvata con successo!')
 
     return new Response(
       JSON.stringify({ success: true, profile: profileDataToSave }),
@@ -119,7 +150,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Errore autenticazione Instagram:', error)
+    console.error('💥 Errore autenticazione Instagram:', error)
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Errore sconosciuto' 

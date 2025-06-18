@@ -10,13 +10,17 @@ export interface InstagramProfile {
 }
 
 export class InstagramService {
-  private static readonly INSTAGRAM_APP_ID = '1082478056354925'; // Questo sarà sostituito con il tuo App ID reale
+  private static readonly INSTAGRAM_APP_ID = '1440410323636643'; // Il tuo App ID reale
   private static readonly REDIRECT_URI = window.location.origin + '/auth/instagram/callback';
   
   // Avvia il processo di autenticazione Instagram
   static initiateAuth(): void {
     const scopes = ['user_profile', 'user_media'];
     const authUrl = `https://api.instagram.com/oauth/authorize?client_id=${this.INSTAGRAM_APP_ID}&redirect_uri=${encodeURIComponent(this.REDIRECT_URI)}&scope=${scopes.join(',')}&response_type=code`;
+    
+    console.log('🚀 Avvio autenticazione Instagram con URL:', authUrl);
+    console.log('📱 App ID utilizzato:', this.INSTAGRAM_APP_ID);
+    console.log('🔄 Redirect URI:', this.REDIRECT_URI);
     
     // Apri una nuova finestra per l'autenticazione
     const popup = window.open(
@@ -38,18 +42,24 @@ export class InstagramService {
   // Scambia il codice di autorizzazione per un access token
   static async exchangeCodeForToken(code: string): Promise<{ success: boolean; error?: string }> {
     try {
+      console.log('🔄 Scambio codice per token, codice ricevuto:', code);
+      
       // Questo dovrebbe essere fatto tramite un Edge Function per sicurezza
       const response = await supabase.functions.invoke('instagram-auth', {
         body: { code, redirect_uri: this.REDIRECT_URI }
       });
 
+      console.log('📡 Risposta Edge Function:', response);
+
       if (response.error) {
+        console.error('❌ Errore Edge Function:', response.error);
         throw new Error(response.error.message);
       }
 
+      console.log('✅ Token scambiato con successo!');
       return { success: true };
     } catch (error) {
-      console.error('Errore scambio token Instagram:', error);
+      console.error('❌ Errore scambio token Instagram:', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Errore sconosciuto' 
@@ -77,7 +87,6 @@ export class InstagramService {
     }
   }
 
-  // Disconnetti account Instagram
   static async disconnectAccount(connectionId: string) {
     try {
       const { error } = await supabase
