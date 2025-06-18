@@ -23,7 +23,7 @@ serve(async (req) => {
     }
 
     // Ottieni l'App Secret dalle variabili di ambiente di Supabase
-    const INSTAGRAM_APP_ID = '1440410323636643' // Il tuo App ID
+    const INSTAGRAM_APP_ID = '1075498781152908' // Nuovo App ID
     const INSTAGRAM_APP_SECRET = Deno.env.get('INSTAGRAM_APP_SECRET')
     
     console.log('🔑 App ID:', INSTAGRAM_APP_ID)

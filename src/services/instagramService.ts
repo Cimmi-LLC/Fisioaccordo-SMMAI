@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface InstagramProfile {
@@ -10,7 +9,7 @@ export interface InstagramProfile {
 }
 
 export class InstagramService {
-  private static readonly INSTAGRAM_APP_ID = '1440410323636643'; // Il tuo App ID reale
+  private static readonly INSTAGRAM_APP_ID = '1075498781152908'; // Nuovo App ID
   private static readonly REDIRECT_URI = window.location.origin + '/auth/instagram/callback';
   
   // Avvia il processo di autenticazione Instagram
