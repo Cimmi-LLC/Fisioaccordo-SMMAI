@@ -1,6 +1,6 @@
 
 // Main CopyService that aggregates all copy-related functionality
-export { CopyTemplate, KnowledgeEntry, CopyAnalysis } from './copy/types';
+export type { CopyTemplate, KnowledgeEntry, CopyAnalysis } from './copy/types';
 export { ADVANCED_TEMPLATES, getTemplatesByCategory } from './copy/templates';
 export { KNOWLEDGE_BASE, getKnowledgeByCategory } from './copy/knowledge';
 export { analyzeCopy } from './copy/analyzer';
