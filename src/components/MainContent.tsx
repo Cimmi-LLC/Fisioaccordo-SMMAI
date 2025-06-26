@@ -1,14 +1,14 @@
-
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useGlobalLoading } from "@/contexts/GlobalLoadingContext";
+import { useContentCache } from "@/contexts/ContentCacheContext";
 import { contentService } from "@/services/contentService";
-import { useLoadingState } from "@/hooks/useLoadingState";
 import IdeaGenerator from "./IdeaGenerator";
 import ContentForm from "./ContentForm";
 import PreviewSection from "./PreviewSection";
 import HookGenerator from "./HookGenerator";
-import CopyImprover from "./CopyImprover";
+import LazyCopyImprover from "./LazyCopyImprover";
 import SkeletonLoader from "./ui/skeleton-loader";
 import EnhancedProgress from "./ui/enhanced-progress";
 
@@ -25,9 +25,10 @@ interface MainContentProps {
   onCopyImproved: (improvedCopy: string) => void;
 }
 
-const MainContent: React.FC<MainContentProps> = ({ user, showCopyImprover, onCopyImproved }) => {
+const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImprover, onCopyImproved }) => {
   const { toast } = useToast();
-  const loadingState = useLoadingState();
+  const loadingState = useGlobalLoading();
+  const { cacheContent, getCachedContent } = useContentCache();
   
   const [ideaInput, setIdeaInput] = useState('');
   const [formData, setFormData] = useState({
@@ -51,61 +52,63 @@ const MainContent: React.FC<MainContentProps> = ({ user, showCopyImprover, onCop
   const [appliedHook, setAppliedHook] = useState<string>('');
   const [basePhoto, setBasePhoto] = useState<string | null>(null);
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = useCallback((field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
-  };
+  }, []);
 
-  const handleIdeaGenerated = (idea: string) => {
+  const handleIdeaGenerated = useCallback((idea: string) => {
     setFormData(prev => ({ ...prev, description: idea }));
-  };
+  }, []);
 
-  const getRelevantImages = (topic: string) => {
-    const topicLower = topic.toLowerCase();
-    
-    const imageCategories = {
-      'mal di schiena': [
-        'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center'
-      ],
-      'postura': [
-        'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center'
-      ],
-      'esercizi': [
-        'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center'
-      ],
-      'riabilitazione': [
-        'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center',
-        'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center'
-      ]
-    };
+  const getRelevantImages = useMemo(() => {
+    return (topic: string) => {
+      const topicLower = topic.toLowerCase();
+      
+      const imageCategories = {
+        'mal di schiena': [
+          'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center',
+          'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center',
+          'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center',
+          'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center',
+          'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center'
+        ],
+        'postura': [
+          'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center',
+          'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&h=400&fit=crop&crop=center',
+          'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center',
+          'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center',
+          'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center'
+        ],
+        'esercizi': [
+          'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center',
+          'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center',
+          'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center',
+          'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center',
+          'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center'
+        ],
+        'riabilitazione': [
+          'https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?w=400&h=400&fit=crop&crop=center',
+          'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&h=400&fit=crop&crop=center',
+          'https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=400&h=400&fit=crop&crop=center',
+          'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop&crop=center',
+          'https://images.unsplash.com/photo-1544027993-37dbfe43562a?w=400&h=400&fit=crop&crop=center'
+        ]
+      };
 
-    for (const [category, images] of Object.entries(imageCategories)) {
-      if (topicLower.includes(category)) {
-        return images;
+      for (const [category, images] of Object.entries(imageCategories)) {
+        if (topicLower.includes(category)) {
+          return images;
+        }
       }
-    }
 
-    return imageCategories['mal di schiena'];
-  };
+      return imageCategories['mal di schiena'];
+    };
+  }, []);
 
-  const generateCarouselSlides = () => {
+  const generateCarouselSlides = useCallback(() => {
     const numSlides = parseInt(formData.numSlides);
     const slides: CarouselSlide[] = [];
     const topic = formData.description;
@@ -130,14 +133,28 @@ const MainContent: React.FC<MainContentProps> = ({ user, showCopyImprover, onCop
     }
     
     setCarouselSlides(slides);
-  };
+  }, [formData.numSlides, formData.description, getRelevantImages, user, basePhoto]);
 
-  const generateContent = async () => {
+  const generateContent = useCallback(async () => {
     if (!formData.description.trim()) {
       toast({
         title: "⚠️ Campo obbligatorio",
         description: "Inserisci una descrizione per generare il contenuto",
         variant: "destructive"
+      });
+      return;
+    }
+
+    // Controlla cache
+    const cacheKey = `${formData.description}-${formData.platform}-${formData.tone}`;
+    const cached = getCachedContent(cacheKey);
+    
+    if (cached) {
+      setGeneratedContent(cached.content);
+      setCarouselSlides(cached.carouselSlides);
+      toast({
+        title: "⚡ Contenuto dalla cache!",
+        description: "Contenuto caricato istantaneamente dalla cache"
       });
       return;
     }
@@ -193,6 +210,10 @@ Come fisioterapista con oltre 10 anni di esperienza, vedo ogni giorno persone ch
       setGeneratedContent(mockContent);
       generateCarouselSlides();
       
+      // Cache il contenuto
+      const slidesForCache = carouselSlides.length > 0 ? carouselSlides : [];
+      cacheContent(cacheKey, mockContent, slidesForCache, formData);
+      
       loadingState.finishLoading(true, '🎉 Contenuto generato con successo!');
       
       toast({
@@ -210,7 +231,7 @@ Come fisioterapista con oltre 10 anni di esperienza, vedo ogni giorno persone ch
         variant: "destructive"
       });
     }
-  };
+  }, [formData, toast, loadingState, getCachedContent, cacheContent, generateCarouselSlides, user, carouselSlides]);
 
   const saveContent = async () => {
     if (!generatedContent) return;
@@ -344,7 +365,7 @@ Come fisioterapista con oltre 10 anni di esperienza, vedo ogni giorno persone ch
 
       {showCopyImprover && (
         <div className="mb-6 sm:mb-8">
-          <CopyImprover onCopyImproved={onCopyImproved} />
+          <LazyCopyImprover onCopyImproved={onCopyImproved} />
         </div>
       )}
 
@@ -418,6 +439,8 @@ Come fisioterapista con oltre 10 anni di esperienza, vedo ogni giorno persone ch
       />
     </div>
   );
-};
+});
+
+MainContent.displayName = 'MainContent';
 
 export default MainContent;

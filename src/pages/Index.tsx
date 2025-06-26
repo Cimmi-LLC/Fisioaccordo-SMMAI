@@ -2,19 +2,22 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
+import { useGlobalLoading } from "@/contexts/GlobalLoadingContext";
 import { contentService } from "@/services/contentService";
 import { Loader2 } from "lucide-react";
-import ImageEditor from "@/components/ImageEditor";
+import LazyImageEditor from "@/components/LazyImageEditor";
 import InstagramConnection from "@/components/InstagramConnection";
 import AppHeader from "@/components/AppHeader";
 import MainContent from "@/components/MainContent";
 import SavedContents from "@/components/SavedContents";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 const Index = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, loading: authLoading, signOut } = useAuth();
+  const globalLoading = useGlobalLoading();
   
   const [savedContents, setSavedContents] = useState<any[]>([]);
   const [loadingSavedContents, setLoadingSavedContents] = useState(false);
@@ -114,7 +117,7 @@ const Index = () => {
   if (selectedImageForEdit && editingSlideIndex !== null) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
-        <ImageEditor
+        <LazyImageEditor
           imageUrl={selectedImageForEdit}
           onImageUpdate={handleImageUpdate}
           onClose={() => {
@@ -128,27 +131,35 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
-      <AppHeader
-        user={user}
-        showCopyImprover={showCopyImprover}
-        onToggleCopyImprover={() => setShowCopyImprover(!showCopyImprover)}
-        onSignOut={handleSignOut}
-      />
+      <ErrorBoundary>
+        <AppHeader
+          user={user}
+          showCopyImprover={showCopyImprover}
+          onToggleCopyImprover={() => setShowCopyImprover(!showCopyImprover)}
+          onSignOut={handleSignOut}
+        />
+      </ErrorBoundary>
 
-      <MainContent
-        user={user}
-        showCopyImprover={showCopyImprover}
-        onCopyImproved={handleCopyImproved}
-      />
+      <ErrorBoundary>
+        <MainContent
+          user={user}
+          showCopyImprover={showCopyImprover}
+          onCopyImproved={handleCopyImproved}
+        />
+      </ErrorBoundary>
 
       <div className="max-w-7xl mx-auto px-4">
-        <SavedContents 
-          savedContents={savedContents} 
-          isLoading={loadingSavedContents}
-        />
+        <ErrorBoundary>
+          <SavedContents 
+            savedContents={savedContents} 
+            isLoading={loadingSavedContents}
+          />
+        </ErrorBoundary>
 
         <div className="mt-6 sm:mt-8">
-          <InstagramConnection />
+          <ErrorBoundary>
+            <InstagramConnection />
+          </ErrorBoundary>
         </div>
 
         {/* Footer migliorato */}
