@@ -3,11 +3,14 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { contentService } from "@/services/contentService";
+import { useLoadingState } from "@/hooks/useLoadingState";
 import IdeaGenerator from "./IdeaGenerator";
 import ContentForm from "./ContentForm";
 import PreviewSection from "./PreviewSection";
 import HookGenerator from "./HookGenerator";
 import CopyImprover from "./CopyImprover";
+import SkeletonLoader from "./ui/skeleton-loader";
+import EnhancedProgress from "./ui/enhanced-progress";
 
 interface CarouselSlide {
   type: string;
@@ -24,6 +27,7 @@ interface MainContentProps {
 
 const MainContent: React.FC<MainContentProps> = ({ user, showCopyImprover, onCopyImproved }) => {
   const { toast } = useToast();
+  const loadingState = useLoadingState();
   
   const [ideaInput, setIdeaInput] = useState('');
   const [formData, setFormData] = useState({
@@ -39,7 +43,6 @@ const MainContent: React.FC<MainContentProps> = ({ user, showCopyImprover, onCop
   
   const [generatedContent, setGeneratedContent] = useState('');
   const [carouselSlides, setCarouselSlides] = useState<CarouselSlide[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [selectedImageForEdit, setSelectedImageForEdit] = useState<string | null>(null);
   const [editingSlideIndex, setEditingSlideIndex] = useState<number | null>(null);
   const [showHookGenerator, setShowHookGenerator] = useState(false);
@@ -132,17 +135,26 @@ const MainContent: React.FC<MainContentProps> = ({ user, showCopyImprover, onCop
   const generateContent = async () => {
     if (!formData.description.trim()) {
       toast({
-        title: "Campo obbligatorio",
+        title: "⚠️ Campo obbligatorio",
         description: "Inserisci una descrizione per generare il contenuto",
         variant: "destructive"
       });
       return;
     }
 
-    setIsGenerating(true);
-    
     try {
-      // Rimuoviamo il mock delay e implementiamo logica reale
+      loadingState.startLoading('🚀 Generazione contenuto in corso...');
+      
+      // Simulazione di progress realistico
+      loadingState.updateProgress(20, '🧠 Analisi del topic...');
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      loadingState.updateProgress(50, '✍️ Creazione copy viral...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      loadingState.updateProgress(80, '🎨 Generazione slide...');
+      await new Promise(resolve => setTimeout(resolve, 600));
+      
       const mockContent = `🚨 **${formData.description.toUpperCase()}** - LA VERITÀ CHE NESSUNO TI DICE!
 
 💡 Se soffri di ${formData.description}, questo post può cambiarti la vita!
@@ -181,6 +193,8 @@ Come fisioterapista con oltre 10 anni di esperienza, vedo ogni giorno persone ch
       setGeneratedContent(mockContent);
       generateCarouselSlides();
       
+      loadingState.finishLoading(true, '🎉 Contenuto generato con successo!');
+      
       toast({
         title: "🎉 Contenuto generato!",
         description: "Post ottimizzato per massimo engagement e conversioni"
@@ -188,13 +202,13 @@ Come fisioterapista con oltre 10 anni di esperienza, vedo ogni giorno persone ch
 
     } catch (error) {
       console.error('Errore durante la generazione:', error);
+      loadingState.finishLoading(false, '❌ Errore durante la generazione');
+      
       toast({
-        title: "Errore",
-        description: "Errore durante la generazione del contenuto",
+        title: "❌ Errore",
+        description: "Errore durante la generazione del contenuto. Riprova.",
         variant: "destructive"
       });
-    } finally {
-      setIsGenerating(false);
     }
   };
 
@@ -202,6 +216,8 @@ Come fisioterapista con oltre 10 anni di esperienza, vedo ogni giorno persone ch
     if (!generatedContent) return;
 
     try {
+      loadingState.startLoading('💾 Salvataggio contenuto...');
+      
       const { error } = await contentService.saveContent({
         title: formData.description,
         contentText: generatedContent,
@@ -218,15 +234,19 @@ Come fisioterapista con oltre 10 anni di esperienza, vedo ogni giorno persone ch
         throw error;
       }
 
+      loadingState.finishLoading(true, '✅ Contenuto salvato!');
+      
       toast({
         title: "✅ Contenuto salvato!",
         description: "Il post è stato aggiunto ai tuoi contenuti salvati"
       });
     } catch (error) {
       console.error('Errore durante il salvataggio:', error);
+      loadingState.finishLoading(false, '❌ Errore salvataggio');
+      
       toast({
-        title: "Errore",
-        description: "Errore durante il salvataggio",
+        title: "❌ Errore",
+        description: "Errore durante il salvataggio. Riprova.",
         variant: "destructive"
       });
     }
@@ -296,48 +316,95 @@ Come fisioterapista con oltre 10 anni di esperienza, vedo ogni giorno persone ch
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="text-center mb-8">
-        <h2 className="text-4xl font-bold text-white mb-4">
+    <div className="max-w-7xl mx-auto px-4 py-4 sm:py-8">
+      <div className="text-center mb-6 sm:mb-8">
+        <h2 className="text-2xl sm:text-4xl font-bold text-white mb-2 sm:mb-4">
           Generatore di Post Social ✨
         </h2>
-        <p className="text-xl text-gray-300">
+        <p className="text-lg sm:text-xl text-gray-300 px-4">
           Crea contenuti coinvolgenti per i tuoi social media con l'intelligenza artificiale
         </p>
       </div>
 
+      {/* Progress indicator quando in loading */}
+      {loadingState.isLoading && (
+        <div className="mb-6">
+          <Card className="bg-gray-800/50 border-gray-700">
+            <CardContent className="p-4">
+              <EnhancedProgress
+                value={loadingState.progress}
+                status={loadingState.status}
+                message={loadingState.message}
+                size="md"
+              />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {showCopyImprover && (
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <CopyImprover onCopyImproved={onCopyImproved} />
         </div>
       )}
 
-      <IdeaGenerator
-        ideaInput={ideaInput}
-        setIdeaInput={setIdeaInput}
-        onIdeaGenerated={handleIdeaGenerated}
-      />
-
-      <div className="grid lg:grid-cols-2 gap-8">
-        <ContentForm
-          formData={formData}
-          onInputChange={handleInputChange}
-          isGenerating={isGenerating}
-          onGenerate={generateContent}
-          basePhoto={basePhoto}
-          onPhotoUpload={handlePhotoUpload}
-          onPhotoRemove={handlePhotoRemove}
+      <div className="mb-6 sm:mb-8">
+        <IdeaGenerator
+          ideaInput={ideaInput}
+          setIdeaInput={setIdeaInput}
+          onIdeaGenerated={handleIdeaGenerated}
         />
+      </div>
 
-        <PreviewSection
-          generatedContent={generatedContent}
-          carouselSlides={carouselSlides}
-          setCarouselSlides={setCarouselSlides}
-          appliedHook={appliedHook}
-          onRemoveHook={removeHook}
-          onImageEdit={handleImageEdit}
-          onSaveContent={saveContent}
-        />
+      <div className="grid lg:grid-cols-2 gap-6 sm:gap-8">
+        <div>
+          {loadingState.isLoading ? (
+            <Card className="bg-gray-800/50 border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-white">Configurazione Post</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SkeletonLoader type="form" />
+              </CardContent>
+            </Card>
+          ) : (
+            <ContentForm
+              formData={formData}
+              onInputChange={handleInputChange}
+              isGenerating={loadingState.isLoading}
+              onGenerate={generateContent}
+              basePhoto={basePhoto}
+              onPhotoUpload={setBasePhoto}
+              onPhotoRemove={() => setBasePhoto(null)}
+            />
+          )}
+        </div>
+
+        <div>
+          {loadingState.isLoading && !generatedContent ? (
+            <Card className="bg-gray-800/50 border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-white">Anteprima Contenuto</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <SkeletonLoader type="content" />
+                <div className="mt-6">
+                  <SkeletonLoader type="carousel" />
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <PreviewSection
+              generatedContent={generatedContent}
+              carouselSlides={carouselSlides}
+              setCarouselSlides={setCarouselSlides}
+              appliedHook={appliedHook}
+              onRemoveHook={() => setAppliedHook('')}
+              onImageEdit={handleImageEdit}
+              onSaveContent={saveContent}
+            />
+          )}
+        </div>
       </div>
 
       <HookGenerator
@@ -347,7 +414,7 @@ Come fisioterapista con oltre 10 anni di esperienza, vedo ogni giorno persone ch
         setHookTopic={setHookTopic}
         generatedHooks={generatedHooks}
         setGeneratedHooks={setGeneratedHooks}
-        onApplyHook={applyHookToContent}
+        onApplyHook={(hook) => setAppliedHook(hook)}
       />
     </div>
   );
