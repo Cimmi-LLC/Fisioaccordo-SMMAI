@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,7 +46,9 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
     }
 
     try {
+      console.log('Analyzing copy:', originalCopy);
       const copyAnalysis = CopyService.analyzeCopy(originalCopy);
+      console.log('Analysis result:', copyAnalysis);
       setAnalysis(copyAnalysis);
 
       toast({
@@ -75,7 +76,9 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
     }
 
     try {
+      console.log('Improving copy with templates:', selectedTemplates);
       const improved = CopyService.generateImprovedCopy(originalCopy, selectedTemplates);
+      console.log('Improved copy result:', improved);
       setImprovedCopy(improved);
       onCopyImproved(improved);
 
@@ -95,19 +98,23 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
 
   const handleApplyTemplate = (templateId: string) => {
     try {
+      console.log('Applying template:', templateId);
       const templates = CopyService.getTemplatesByCategory();
+      console.log('Available templates:', templates);
       const template = templates.find(t => t.id === templateId);
       
       if (template) {
-        // Evita duplicati
         if (!selectedTemplates.includes(templateId)) {
           setSelectedTemplates(prev => [...prev, templateId]);
+          console.log('Template applied successfully:', template.name);
         }
         
         toast({
           title: "Template applicato! 🎯",
           description: template.name
         });
+      } else {
+        console.error('Template not found:', templateId);
       }
     } catch (error) {
       console.error('Errore nell\'applicazione del template:', error);
@@ -152,6 +159,32 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
     if (score >= 70) return "Buono";
     if (score >= 60) return "Sufficiente";
     return "Da Migliorare";
+  };
+
+  // Safely get templates with error handling
+  const getTemplatesWithErrorHandling = (category?: string) => {
+    try {
+      console.log('Getting templates for category:', category);
+      const templates = CopyService.getTemplatesByCategory(category);
+      console.log('Templates retrieved:', templates?.length || 0);
+      return templates || [];
+    } catch (error) {
+      console.error('Error getting templates:', error);
+      return [];
+    }
+  };
+
+  // Safely get knowledge with error handling
+  const getKnowledgeWithErrorHandling = (category?: string) => {
+    try {
+      console.log('Getting knowledge for category:', category);
+      const knowledge = CopyService.getKnowledgeByCategory(category);
+      console.log('Knowledge retrieved:', knowledge?.length || 0);
+      return knowledge || [];
+    } catch (error) {
+      console.error('Error getting knowledge:', error);
+      return [];
+    }
   };
 
   return (
@@ -305,12 +338,13 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                   <SelectItem value="storytelling" className="text-white hover:bg-gray-600">Storytelling</SelectItem>
                   <SelectItem value="cta" className="text-white hover:bg-gray-600">Call to Action</SelectItem>
                   <SelectItem value="social-proof" className="text-white hover:bg-gray-600">Social Proof</SelectItem>
+                  <SelectItem value="viral" className="text-white hover:bg-gray-600">Viral</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-3 max-h-96 overflow-y-auto">
-              {CopyService.getTemplatesByCategory(selectedCategory).map((template) => (
+              {getTemplatesWithErrorHandling(selectedCategory).map((template) => (
                 <div key={template.id} className="bg-gray-700/50 p-4 rounded-lg border border-gray-600">
                   <div className="flex items-start justify-between mb-2">
                     <div>
@@ -321,7 +355,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                     </div>
                     <div className="flex items-center">
                       <TrendingUp className="w-4 h-4 text-green-400 mr-1" />
-                      <span className="text-green-400 text-sm">{template.effectiveness_score}%</span>
+                      <span className="text-green-400 text-sm">{template.effectiveness_score || 0}%</span>
                     </div>
                   </div>
                   
@@ -332,7 +366,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                   </div>
 
                   <div className="flex flex-wrap gap-2 mb-3">
-                    {template.use_cases.map((useCase) => (
+                    {(template.use_cases || []).map((useCase) => (
                       <Badge key={useCase} variant="secondary" className="text-xs bg-gray-600 text-gray-300">
                         {useCase}
                       </Badge>
@@ -350,13 +384,20 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                   </Button>
                 </div>
               ))}
+              
+              {getTemplatesWithErrorHandling(selectedCategory).length === 0 && (
+                <div className="text-center text-gray-400 py-8">
+                  <Wand2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>Nessun template disponibile per questa categoria</p>
+                </div>
+              )}
             </div>
           </TabsContent>
 
           {/* Tab Knowledge */}
           <TabsContent value="knowledge" className="space-y-4">
             <div className="space-y-4 max-h-96 overflow-y-auto">
-              {CopyService.getKnowledgeByCategory().map((knowledge) => (
+              {getKnowledgeWithErrorHandling().map((knowledge) => (
                 <div key={knowledge.id} className="bg-gray-700/50 p-4 rounded-lg border border-gray-600">
                   <div className="flex items-start justify-between mb-2">
                     <h4 className="text-white font-medium">{knowledge.title}</h4>
@@ -369,7 +410,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                   
                   <div className="space-y-2 mb-3">
                     <span className="text-gray-400 text-xs">Esempi:</span>
-                    {knowledge.examples.map((example, index) => (
+                    {(knowledge.examples || []).map((example, index) => (
                       <div key={index} className="bg-gray-800/50 p-2 rounded text-gray-300 text-sm">
                         "{example}"
                       </div>
@@ -377,7 +418,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                   </div>
 
                   <div className="flex flex-wrap gap-1">
-                    {knowledge.tags.map((tag) => (
+                    {(knowledge.tags || []).map((tag) => (
                       <Badge key={tag} variant="outline" className="text-xs border-gray-500 text-gray-300">
                         #{tag}
                       </Badge>
@@ -385,6 +426,13 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                   </div>
                 </div>
               ))}
+              
+              {getKnowledgeWithErrorHandling().length === 0 && (
+                <div className="text-center text-gray-400 py-8">
+                  <BookOpen className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>Nessuna conoscenza disponibile</p>
+                </div>
+              )}
             </div>
           </TabsContent>
 
