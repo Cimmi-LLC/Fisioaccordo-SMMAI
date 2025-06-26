@@ -2,156 +2,127 @@
 import { CopyTemplate } from './types';
 
 export const ADVANCED_TEMPLATES: CopyTemplate[] = [
+  // TEMPLATE BASATI SU CAMPAGNE DI SUCCESSO REALI
   {
-    id: 'truth-reveal',
-    name: 'Rivelazione della Verità',
+    id: 'ogilvy-classic',
+    name: 'Formula Ogilvy Classica',
     category: 'hook',
-    template: '🚨 VERITÀ SCIOCCANTE: La maggior parte delle persone con {problema} non sa che {verità_nascosta}. Ecco cosa {autorità} non ti dice mai...',
-    variables: ['problema', 'verità_nascosta', 'autorità'],
-    description: 'Hook potentissimo che crea curiosità e autorità',
-    effectiveness_score: 95,
-    use_cases: ['salute', 'business', 'relazioni', 'finanza']
-  },
-  {
-    id: 'mistake-pattern',
-    name: 'Pattern degli Errori',
-    category: 'hook',
-    template: '❌ ERRORE FATALE: Se hai {problema}, probabilmente stai commettendo questi 3 errori che peggiorano tutto. Errore #1: {errore_comune}...',
-    variables: ['problema', 'errore_comune'],
-    description: 'Pattern che identifica errori comuni e crea urgenza',
-    effectiveness_score: 92,
-    use_cases: ['educativo', 'problem-solving', 'guide']
-  },
-  {
-    id: 'transformation-story',
-    name: 'Storia di Trasformazione',
-    category: 'storytelling',
-    template: 'Da {situazione_prima} a {risultato_dopo} in soli {tempo}. Ecco esattamente cosa ho fatto (e cosa NON devi mai fare)...',
-    variables: ['situazione_prima', 'risultato_dopo', 'tempo'],
-    description: 'Storytelling potente con trasformazione credibile',
-    effectiveness_score: 88,
-    use_cases: ['testimonial', 'case-study', 'motivazionale']
-  },
-  {
-    id: 'urgency-scarcity',
-    name: 'Urgenza + Scarsità',
-    category: 'cta',
-    template: '⏰ ULTIMO GIORNO: Solo {numero} posti rimasti per {offerta}. Dopo mezzanotte il prezzo raddoppia. Non dire che non ti avevo avvisato...',
-    variables: ['numero', 'offerta'],
-    description: 'CTA con urgenza e scarsità psicologica',
-    effectiveness_score: 85,
-    use_cases: ['vendita', 'promozioni', 'eventi']
-  },
-  {
-    id: 'social-proof-authority',
-    name: 'Prova Sociale + Autorità',
-    category: 'social-proof',
-    template: '{numero_clienti}+ persone hanno già risolto {problema} con questo metodo. Anche {autorità_famosa} lo raccomanda. Vuoi essere il prossimo?',
-    variables: ['numero_clienti', 'problema', 'autorità_famosa'],
-    description: 'Combina numeri impressionanti con autorità riconosciuta',
-    effectiveness_score: 90,
-    use_cases: ['vendita', 'credibilità', 'conversione']
-  },
-  // NUOVI TEMPLATE VIRALI
-  {
-    id: 'viral-controversy',
-    name: 'Controversia Virale',
-    category: 'hook',
-    template: '🔥 OPINIONE IMPOPOLARE: {opinione_controversa} e tutti mi odiano per averlo detto. Ma dopo 3 anni di ricerche, ho la prova che ho ragione...',
-    variables: ['opinione_controversa'],
-    description: 'Crea dibattito e engagement attraverso opinioni polarizzanti',
-    effectiveness_score: 98,
-    use_cases: ['dibattito', 'engagement', 'discussione']
-  },
-  {
-    id: 'viral-secret-method',
-    name: 'Metodo Segreto',
-    category: 'hook',
-    template: '🤫 SEGRETO: Ho scoperto come {risultato_desiderato} in {tempo_record}. Il trucco che NESSUNO conosce (thread)...',
-    variables: ['risultato_desiderato', 'tempo_record'],
-    description: 'Promette informazioni esclusive e non disponibili altrove',
+    template: 'Come {target_audience} può {desiderio_specifico} senza {paura_principale} (anche se {situazione_difficile})',
+    variables: ['target_audience', 'desiderio_specifico', 'paura_principale', 'situazione_difficile'],
+    description: 'La formula testata da David Ogilvy per headline ad alta conversione',
     effectiveness_score: 96,
-    use_cases: ['tips', 'tutorial', 'strategie']
+    use_cases: ['lead-generation', 'vendita', 'engagement']
   },
   {
-    id: 'viral-behind-scenes',
-    name: 'Dietro le Quinte',
+    id: 'pas-professional',
+    name: 'PAS Professionale',
     category: 'storytelling',
-    template: '📹 DIETRO LE QUINTE: Quello che è successo REALMENTE quando {evento_importante}. La verità che non vedrete mai sui giornali...',
-    variables: ['evento_importante'],
-    description: 'Rivela informazioni interne e crea curiosità morbosa',
-    effectiveness_score: 94,
-    use_cases: ['storytelling', 'trasparenza', 'autenticità']
+    template: '🚨 PROBLEMA: {problema_specifico} ti sta {conseguenza_negativa}.\n\n💥 LA VERITÀ: Ogni giorno che passa, {aggravamento_situazione}. {statistica_scioccante}% delle persone con questo problema {conseguenza_estrema}.\n\n✅ SOLUZIONE: {soluzione_unica} che {beneficio_trasformativo} in soli {tempo_specifico}.',
+    variables: ['problema_specifico', 'conseguenza_negativa', 'aggravamento_situazione', 'statistica_scioccante', 'conseguenza_estrema', 'soluzione_unica', 'beneficio_trasformativo', 'tempo_specifico'],
+    description: 'Framework PAS ottimizzato per massima persuasione',
+    effectiveness_score: 98,
+    use_cases: ['problem-solving', 'vendita', 'awareness']
   },
   {
-    id: 'viral-before-after',
-    name: 'Prima vs Dopo Drammatico',
-    category: 'social-proof',
-    template: '😱 PRIMA vs DOPO: {situazione_drammatica_prima} ➡️ {risultato_incredibile_dopo}. La trasformazione che ha scioccato tutti (con foto)...',
-    variables: ['situazione_drammatica_prima', 'risultato_incredibile_dopo'],
-    description: 'Trasformazioni visive che fermano lo scroll',
-    effectiveness_score: 97,
-    use_cases: ['trasformazioni', 'risultati', 'case-study']
-  },
-  {
-    id: 'viral-industry-expose',
-    name: 'Scandalo del Settore',
-    category: 'hook',
-    template: '💣 SCANDALO: Lavorando nel settore {settore} per {anni} anni, ho visto cose che vi scioccherebbero. Ecco la verità che {industria} non vuole che sappiate...',
-    variables: ['settore', 'anni', 'industria'],
-    description: 'Espone i segreti di un settore specifico',
+    id: 'bab-transformation',
+    name: 'Before-After-Bridge Trasformativo',
+    category: 'storytelling',
+    template: '📉 PRIMA: {situazione_attuale_dolorosa}\n\n📈 DOPO: {visione_futuro_desiderato}\n\n🌉 IL PONTE: {nome_soluzione} è l\'unico sistema che ti porta da dove sei ora a dove vuoi essere. {prova_sociale_potente}',
+    variables: ['situazione_attuale_dolorosa', 'visione_futuro_desiderato', 'nome_soluzione', 'prova_sociale_potente'],
+    description: 'Framework BAB per creare desiderio intenso attraverso contrasto',
     effectiveness_score: 95,
-    use_cases: ['esposizione', 'verità', 'industria']
+    use_cases: ['trasformazione', 'coaching', 'corso-online']
   },
   {
-    id: 'viral-challenge-accepted',
-    name: 'Sfida Accettata',
+    id: 'mrbeast-retention',
+    name: 'Retention Hook Mr.Beast',
     category: 'hook',
-    template: '🎯 SFIDA ACCETTATA: Mi hanno sfidato a {obiettivo_impossibile} in {tempo_limitato}. Giorno 1: ecco cosa è successo (thread di aggiornamenti quotidiani)...',
-    variables: ['obiettivo_impossibile', 'tempo_limitato'],
-    description: 'Crea una serie di contenuti seguendo una sfida in tempo reale',
-    effectiveness_score: 93,
-    use_cases: ['serie', 'sfide', 'journey']
+    template: '{statement_shocking} MA quello che è successo dopo ha cambiato tutto. (Thread con tutti i dettagli che vi scioccheranno) 🧵\n\n1/{numero_totale}',
+    variables: ['statement_shocking', 'numero_totale'],
+    description: 'Hook stile Mr.Beast per retention massima e engagement virale',
+    effectiveness_score: 99,
+    use_cases: ['thread', 'storytelling', 'viral-content']
   },
   {
-    id: 'viral-mistake-cost',
-    name: 'Errore Costoso',
+    id: 'iman-authority',
+    name: 'Authority Building Iman Style',
     category: 'hook',
-    template: '💸 ERRORE da {costo_errore}: Ho commesso il più grande errore della mia vita con {argomento}. Mi è costato {conseguenze}. Imparate dai miei sbagli...',
-    variables: ['costo_errore', 'argomento', 'conseguenze'],
-    description: 'Condivide errori costosi per educare altri',
-    effectiveness_score: 91,
-    use_cases: ['educativo', 'lezioni', 'esperienze']
+    template: '{eta} anni, {risultato_specifico}. {tempo_fa} tutti mi davano del pazzo quando dicevo che {predizione_audace}. Oggi {validazione_predizione}.\n\nEcco come ho fatto (e come puoi replicarlo):',
+    variables: ['eta', 'risultato_specifico', 'tempo_fa', 'predizione_audace', 'validazione_predizione'],
+    description: 'Costruzione di autorità attraverso risultati + predizioni realizzate',
+    effectiveness_score: 94,
+    use_cases: ['personal-brand', 'autorità', 'credibilità']
   },
   {
-    id: 'viral-prediction-proven',
-    name: 'Predizione Realizzata',
+    id: 'neuro-trigger',
+    name: 'Neuro-Trigger Avanzato',
     category: 'hook',
-    template: '🔮 VI AVEVO AVVERTITI: {tempo_fa} avevo previsto che {predizione}. Tutti mi hanno dato del pazzo. Oggi eccoci qui... Thread di come ho fatto a saperlo:',
-    variables: ['tempo_fa', 'predizione'],
-    description: 'Rivendica predizioni passate che si sono avverate',
-    effectiveness_score: 89,
-    use_cases: ['autorevolezza', 'predizioni', 'analisi']
-  },
-  {
-    id: 'viral-zero-to-hero',
-    name: 'Da Zero a Eroe',
-    category: 'storytelling',
-    template: '📈 DA 0 A {risultato_finale}: La mia storia completa in {numero_punti} punti. Da {situazione_partenza} a {situazione_arrivo}. Thread con tutti i dettagli:',
-    variables: ['risultato_finale', 'numero_punti', 'situazione_partenza', 'situazione_arrivo'],
-    description: 'Racconta una trasformazione completa passo dopo passo',
+    template: '🧠 SCOPERTA NEUROSCIENTIFICA: Il tuo cervello produce {sostanza_chimica} quando {azione_specifica}. Ecco come "hackerare" questo meccanismo per {beneficio_desiderato} (studi scientifici inclusi)',
+    variables: ['sostanza_chimica', 'azione_specifica', 'beneficio_desiderato'],
+    description: 'Hook basato su neuroscienze per massima credibilità',
     effectiveness_score: 92,
-    use_cases: ['ispirazione', 'journey', 'motivazione']
+    use_cases: ['educativo', 'scientifico', 'autorevolezza']
   },
   {
-    id: 'viral-data-shock',
-    name: 'Dati Scioccanti',
-    category: 'hook',
-    template: '📊 DATI SCIOCCANTI: Ho analizzato {numero_campioni} {tipo_dati} e quello che ho scoperto vi lascerà senza parole. Il {percentuale}% di voi sta facendo questo errore...',
-    variables: ['numero_campioni', 'tipo_dati', 'percentuale'],
-    description: 'Presenta ricerche e dati in modo coinvolgente',
+    id: 'objection-crusher',
+    name: 'Distruttore di Obiezioni',
+    category: 'cta',
+    template: '"Ma {obiezione_comune}..." Lo so, è quello che pensano tutti. Ma considera questo: {reframe_potente}. {call_to_action_specifica} (Garanzia: {garanzia_specifica})',
+    variables: ['obiezione_comune', 'reframe_potente', 'call_to_action_specifica', 'garanzia_specifica'],
+    description: 'Neutralizza obiezioni e spinge all\'azione con garanzia forte',
     effectiveness_score: 88,
-    use_cases: ['ricerca', 'dati', 'statistiche']
+    use_cases: ['vendita', 'conversione', 'closing']
+  },
+  {
+    id: 'social-proof-stack',
+    name: 'Stack di Riprova Sociale',
+    category: 'social-proof',
+    template: '📊 I NUMERI PARLANO CHIARO:\n• {numero_clienti}+ clienti trasformati\n• {percentuale_successo}% di successo dimostrato\n• {numero_testimonianze} testimonianze verificate\n• Raccomandato da {autorità_settore}\n\n💬 "{testimonianza_potente}" - {nome_cliente}, {risultato_specifico}',
+    variables: ['numero_clienti', 'percentuale_successo', 'numero_testimonianze', 'autorità_settore', 'testimonianza_potente', 'nome_cliente', 'risultato_specifico'],
+    description: 'Stack multiplo di prove sociali per credibilità massima',
+    effectiveness_score: 91,
+    use_cases: ['credibilità', 'vendita', 'landing-page']
+  },
+  {
+    id: 'curiosity-gap',
+    name: 'Gap di Curiosità Professionale',
+    category: 'hook',
+    template: 'La differenza tra chi {risultato_desiderato} e chi {risultato_indesiderato} si riduce a {elemento_misterioso}. {percentuale}% delle persone non lo sa. Tu fai parte di quel {percentuale}%? Scoprilo qui: 👇',
+    variables: ['risultato_desiderato', 'risultato_indesiderato', 'elemento_misterioso', 'percentuale'],
+    description: 'Crea curiosità attraverso gap di conoscenza e auto-selezione',
+    effectiveness_score: 89,
+    use_cases: ['engagement', 'educativo', 'lead-generation']
+  },
+  {
+    id: 'controversial-truth',
+    name: 'Verità Controversa',
+    category: 'hook',
+    template: '🔥 VERITÀ SCOMODA: {opinione_controversa}. L\'industria {settore} mi odierà per aver detto questo, ma dopo {anni_esperienza} anni ho il DOVERE di dirvi la verità. Thread con prove documentate: 🧵',
+    variables: ['opinione_controversa', 'settore', 'anni_esperienza'],
+    description: 'Controversia costruttiva per engagement esplosivo e autorità',
+    effectiveness_score: 97,
+    use_cases: ['viral', 'autorità', 'debate']
+  },
+  // TEMPLATE SPECIFICI PER SETTORI
+  {
+    id: 'health-transformation',
+    name: 'Trasformazione Salute',
+    category: 'storytelling',
+    template: 'Da {condizione_prima} a {condizione_dopo} in {tempo_trasformazione}. Senza {metodo_evitato}, senza {altro_metodo_evitato}. Solo {approccio_naturale} che {meccanismo_funzionamento}.\n\n✅ RISULTATI VERIFICATI:\n{lista_benefici}\n\n👨‍⚕️ APPROVATO da {autorità_medica}',
+    variables: ['condizione_prima', 'condizione_dopo', 'tempo_trasformazione', 'metodo_evitato', 'altro_metodo_evitato', 'approccio_naturale', 'meccanismo_funzionamento', 'lista_benefici', 'autorità_medica'],
+    description: 'Template specifico per trasformazioni di salute con credibilità medica',
+    effectiveness_score: 93,
+    use_cases: ['salute', 'benessere', 'trasformazione']
+  },
+  {
+    id: 'business-case-study',
+    name: 'Case Study Business',
+    category: 'social-proof',
+    template: '📈 CASE STUDY: Come {nome_cliente} è passato da {situazione_iniziale} a {risultato_finale} usando {metodo_specifico}.\n\n🎯 STRATEGIA ESATTA:\n{step_1}\n{step_2}\n{step_3}\n\n💰 RISULTATI: {metriche_specifiche}\n\n🔥 Vuoi replicare questo successo?',
+    variables: ['nome_cliente', 'situazione_iniziale', 'risultato_finale', 'metodo_specifico', 'step_1', 'step_2', 'step_3', 'metriche_specifiche'],
+    description: 'Case study dettagliato per dimostrare efficacia del sistema',
+    effectiveness_score: 90,
+    use_cases: ['business', 'case-study', 'proof']
   }
 ];
 
