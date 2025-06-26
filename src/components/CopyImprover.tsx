@@ -66,6 +66,10 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
   };
 
   const handleImproveCopy = () => {
+    console.log('🎯 handleImproveCopy called');
+    console.log('Original copy:', originalCopy.substring(0, 100));
+    console.log('Selected templates:', selectedTemplates);
+
     if (!originalCopy.trim()) {
       toast({
         title: "Inserisci il copy",
@@ -76,21 +80,31 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
     }
 
     try {
-      console.log('Improving copy with templates:', selectedTemplates);
+      console.log('🚀 Starting copy improvement...');
       const improved = CopyService.generateImprovedCopy(originalCopy, selectedTemplates);
-      console.log('Improved copy result:', improved);
-      setImprovedCopy(improved);
-      onCopyImproved(improved);
+      console.log('✅ Improved copy generated:', improved.substring(0, 100));
+      
+      if (improved && improved !== originalCopy) {
+        setImprovedCopy(improved);
+        onCopyImproved(improved);
 
-      toast({
-        title: "Copy migliorato! ✨",
-        description: "Il tuo copy è stato ottimizzato con template avanzati"
-      });
+        toast({
+          title: "🔥 Copy super-ottimizzato!",
+          description: "Il tuo copy è stato trasformato in un format virale"
+        });
+      } else {
+        console.warn('⚠️ No improvement generated');
+        toast({
+          title: "Copy migliorato",
+          description: "Il copy è stato processato",
+          variant: "default"
+        });
+      }
     } catch (error) {
-      console.error('Errore nel miglioramento:', error);
+      console.error('💥 Error in handleImproveCopy:', error);
       toast({
         title: "Errore nel miglioramento",
-        description: "Si è verificato un errore durante il miglioramento del copy",
+        description: "Si è verificato un errore. Riprova con un testo più semplice.",
         variant: "destructive"
       });
     }
