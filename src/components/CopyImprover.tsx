@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,10 +16,12 @@ import {
   Sparkles,
   BarChart3,
   BookOpen,
-  Wand2
+  Wand2,
+  Upload
 } from "lucide-react";
 import { CopyService } from "@/services/copyService";
 import { useToast } from "@/hooks/use-toast";
+import ChatGPTImporter from "./ChatGPTImporter";
 
 interface CopyImproverProps {
   onCopyImproved: (improvedCopy: string) => void;
@@ -111,7 +112,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="analyze" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4 bg-gray-700">
+          <TabsList className="grid w-full grid-cols-5 bg-gray-700">
             <TabsTrigger value="analyze" className="text-gray-300">
               <BarChart3 className="w-4 h-4 mr-2" />
               Analizza
@@ -127,6 +128,10 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
             <TabsTrigger value="improve" className="text-gray-300">
               <Sparkles className="w-4 h-4 mr-2" />
               Migliora
+            </TabsTrigger>
+            <TabsTrigger value="import" className="text-gray-300">
+              <Upload className="w-4 h-4 mr-2" />
+              Import
             </TabsTrigger>
           </TabsList>
 
@@ -379,6 +384,11 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                 </div>
               </div>
             )}
+          </TabsContent>
+
+          {/* Tab Import ChatGPT */}
+          <TabsContent value="import" className="space-y-4">
+            <ChatGPTImporter />
           </TabsContent>
         </Tabs>
       </CardContent>

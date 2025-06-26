@@ -8,7 +8,8 @@ import { contentService } from "@/services/contentService";
 import { 
   Loader2, 
   LogOut, 
-  Sparkles
+  Sparkles,
+  Brain
 } from "lucide-react";
 import ImageEditor from "@/components/ImageEditor";
 import IdeaGenerator from "@/components/IdeaGenerator";
@@ -16,6 +17,7 @@ import ContentForm from "@/components/ContentForm";
 import PreviewSection from "@/components/PreviewSection";
 import HookGenerator from "@/components/HookGenerator";
 import InstagramConnection from "@/components/InstagramConnection";
+import CopyImprover from "@/components/CopyImprover";
 
 interface CarouselSlide {
   type: string;
@@ -52,6 +54,8 @@ const Index = () => {
   const [generatedHooks, setGeneratedHooks] = useState<string[]>([]);
   const [appliedHook, setAppliedHook] = useState<string>('');
   const [basePhoto, setBasePhoto] = useState<string | null>(null);
+  const [showCopyImprover, setShowCopyImprover] = useState(false);
+  const [improvedCopyFromAI, setImprovedCopyFromAI] = useState('');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -346,6 +350,26 @@ Come fisioterapista con oltre 10 anni di esperienza, vedo ogni giorno persone ch
     setBasePhoto(null);
   };
 
+  const handleCopyImproved = (improvedCopy: string) => {
+    setImprovedCopyFromAI(improvedCopy);
+    
+    // Applica il copy migliorato al contenuto generato
+    setGeneratedContent(improvedCopy);
+    
+    // Se è presente un carosello, aggiorna la prima slide con l'hook migliorato
+    if (carouselSlides.length > 0) {
+      const updatedSlides = [...carouselSlides];
+      const lines = improvedCopy.split('\n');
+      updatedSlides[0].content = `${lines[0]}\n\n👉 Swipe per scoprire di più →`;
+      setCarouselSlides(updatedSlides);
+    }
+    
+    toast({
+      title: "🚀 Copy super-ottimizzato!",
+      description: "Il tuo copy è stato migliorato con strategie avanzate di copywriting"
+    });
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
@@ -385,6 +409,15 @@ Come fisioterapista con oltre 10 anni di esperienza, vedo ogni giorno persone ch
             </h1>
           </div>
           <div className="flex items-center space-x-4">
+            <Button
+              onClick={() => setShowCopyImprover(!showCopyImprover)}
+              variant="outline"
+              size="sm"
+              className="text-white border-gray-600 hover:bg-gray-700"
+            >
+              <Brain className="h-4 w-4 mr-2" />
+              {showCopyImprover ? 'Nascondi' : 'Copy AI Pro'}
+            </Button>
             <span className="text-gray-300">
               Ciao, {user?.user_metadata?.first_name || 'Utente'}!
             </span>
@@ -410,6 +443,13 @@ Come fisioterapista con oltre 10 anni di esperienza, vedo ogni giorno persone ch
             Crea contenuti coinvolgenti per i tuoi social media con l'intelligenza artificiale
           </p>
         </div>
+
+        {/* Copy Improver Section */}
+        {showCopyImprover && (
+          <div className="mb-8">
+            <CopyImprover onCopyImproved={handleCopyImproved} />
+          </div>
+        )}
 
         {/* Generatore di idee */}
         <IdeaGenerator
