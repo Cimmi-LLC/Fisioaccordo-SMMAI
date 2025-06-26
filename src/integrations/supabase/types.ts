@@ -56,6 +56,7 @@ export type Database = {
       appointments: {
         Row: {
           appointment_type: string | null
+          booking_source: string | null
           cancellation_reason: string | null
           cancelled_at: string | null
           confirmed_at: string | null
@@ -64,18 +65,20 @@ export type Database = {
           equipment_ids: string[] | null
           id: string
           notes: string | null
-          patient_id: string
+          patient_id: string | null
           price: number | null
           rescheduled_from: string | null
           room_id: string | null
           scheduled_date: string
           status: string | null
           therapist_id: string | null
+          treatment_id: string | null
           updated_at: string | null
           user_id: string | null
         }
         Insert: {
           appointment_type?: string | null
+          booking_source?: string | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
           confirmed_at?: string | null
@@ -84,18 +87,20 @@ export type Database = {
           equipment_ids?: string[] | null
           id?: string
           notes?: string | null
-          patient_id: string
+          patient_id?: string | null
           price?: number | null
           rescheduled_from?: string | null
           room_id?: string | null
           scheduled_date: string
           status?: string | null
           therapist_id?: string | null
+          treatment_id?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
         Update: {
           appointment_type?: string | null
+          booking_source?: string | null
           cancellation_reason?: string | null
           cancelled_at?: string | null
           confirmed_at?: string | null
@@ -104,13 +109,14 @@ export type Database = {
           equipment_ids?: string[] | null
           id?: string
           notes?: string | null
-          patient_id?: string
+          patient_id?: string | null
           price?: number | null
           rescheduled_from?: string | null
           room_id?: string | null
           scheduled_date?: string
           status?: string | null
           therapist_id?: string | null
+          treatment_id?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -141,6 +147,13 @@ export type Database = {
             columns: ["therapist_id"]
             isOneToOne: false
             referencedRelation: "therapists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_appointments_treatment_id"
+            columns: ["treatment_id"]
+            isOneToOne: false
+            referencedRelation: "treatments"
             referencedColumns: ["id"]
           },
         ]
@@ -205,42 +218,76 @@ export type Database = {
         }
         Relationships: []
       }
+      calendar_debug_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          event_data: Json | null
+          event_type: string
+          id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       calendar_integrations: {
         Row: {
           access_token: string | null
           calendar_id: string
-          created_at: string | null
+          created_at: string
           id: string
           is_active: boolean | null
           provider: string
           refresh_token: string | null
-          updated_at: string | null
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
         }
         Insert: {
           access_token?: string | null
           calendar_id: string
-          created_at?: string | null
+          created_at?: string
           id?: string
           is_active?: boolean | null
           provider: string
           refresh_token?: string | null
-          updated_at?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
         }
         Update: {
           access_token?: string | null
           calendar_id?: string
-          created_at?: string | null
+          created_at?: string
           id?: string
           is_active?: boolean | null
           provider?: string
           refresh_token?: string | null
-          updated_at?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
       company_settings: {
         Row: {
           address: string
+          booking_slug: string | null
           city: string
           company_name: string
           country: string | null
@@ -254,12 +301,18 @@ export type Database = {
           province: string
           sdi_code: string | null
           tax_code: string
+          ts_certificate_path: string | null
+          ts_enabled: boolean | null
+          ts_password_hash: string | null
+          ts_transmitter_code: string | null
+          ts_username: string | null
           updated_at: string | null
           user_id: string
           vat_number: string
         }
         Insert: {
           address: string
+          booking_slug?: string | null
           city: string
           company_name: string
           country?: string | null
@@ -273,12 +326,18 @@ export type Database = {
           province: string
           sdi_code?: string | null
           tax_code: string
+          ts_certificate_path?: string | null
+          ts_enabled?: boolean | null
+          ts_password_hash?: string | null
+          ts_transmitter_code?: string | null
+          ts_username?: string | null
           updated_at?: string | null
           user_id: string
           vat_number: string
         }
         Update: {
           address?: string
+          booking_slug?: string | null
           city?: string
           company_name?: string
           country?: string | null
@@ -292,6 +351,11 @@ export type Database = {
           province?: string
           sdi_code?: string | null
           tax_code?: string
+          ts_certificate_path?: string | null
+          ts_enabled?: boolean | null
+          ts_password_hash?: string | null
+          ts_transmitter_code?: string | null
+          ts_username?: string | null
           updated_at?: string | null
           user_id?: string
           vat_number?: string
@@ -338,6 +402,54 @@ export type Database = {
             columns: ["room_id"]
             isOneToOne: false
             referencedRelation: "rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exercise_completions: {
+        Row: {
+          assignment_id: string
+          completed_at: string
+          created_at: string
+          duration_minutes: number | null
+          fatigue_rating: number | null
+          id: string
+          notes: string | null
+          patient_id: string
+        }
+        Insert: {
+          assignment_id: string
+          completed_at?: string
+          created_at?: string
+          duration_minutes?: number | null
+          fatigue_rating?: number | null
+          id?: string
+          notes?: string | null
+          patient_id: string
+        }
+        Update: {
+          assignment_id?: string
+          completed_at?: string
+          created_at?: string
+          duration_minutes?: number | null
+          fatigue_rating?: number | null
+          id?: string
+          notes?: string | null
+          patient_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_completions_assignment_id_fkey"
+            columns: ["assignment_id"]
+            isOneToOne: false
+            referencedRelation: "patient_exercise_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_completions_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
             referencedColumns: ["id"]
           },
         ]
@@ -436,6 +548,48 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      external_event_mappings: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          external_event_id: string
+          id: string
+          integration_id: string
+          provider: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          external_event_id: string
+          id?: string
+          integration_id: string
+          provider: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          external_event_id?: string
+          id?: string
+          integration_id?: string
+          provider?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_event_mappings_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_event_mappings_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_integrations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       generated_contents: {
         Row: {
@@ -796,9 +950,10 @@ export type Database = {
       patient_exercise_assignments: {
         Row: {
           assigned_at: string
-          assigned_by: string
+          assigned_by: string | null
           created_at: string
           exercise_id: string
+          frequency_type: string | null
           id: string
           is_active: boolean | null
           notes: string | null
@@ -809,9 +964,10 @@ export type Database = {
         }
         Insert: {
           assigned_at?: string
-          assigned_by: string
+          assigned_by?: string | null
           created_at?: string
           exercise_id: string
+          frequency_type?: string | null
           id?: string
           is_active?: boolean | null
           notes?: string | null
@@ -822,9 +978,10 @@ export type Database = {
         }
         Update: {
           assigned_at?: string
-          assigned_by?: string
+          assigned_by?: string | null
           created_at?: string
           exercise_id?: string
+          frequency_type?: string | null
           id?: string
           is_active?: boolean | null
           notes?: string | null
@@ -988,11 +1145,15 @@ export type Database = {
           id: string
           last_name: string
           medical_condition: string | null
+          nationality: string | null
           notes: string | null
           phone: string | null
           postal_code: string | null
+          province: string | null
+          referring_patient_id: string | null
+          tax_code: string | null
           updated_at: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           acquisition_source?: string | null
@@ -1014,11 +1175,15 @@ export type Database = {
           id?: string
           last_name: string
           medical_condition?: string | null
+          nationality?: string | null
           notes?: string | null
           phone?: string | null
           postal_code?: string | null
+          province?: string | null
+          referring_patient_id?: string | null
+          tax_code?: string | null
           updated_at?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           acquisition_source?: string | null
@@ -1040,13 +1205,25 @@ export type Database = {
           id?: string
           last_name?: string
           medical_condition?: string | null
+          nationality?: string | null
           notes?: string | null
           phone?: string | null
           postal_code?: string | null
+          province?: string | null
+          referring_patient_id?: string | null
+          tax_code?: string | null
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "patients_referring_patient_id_fkey"
+            columns: ["referring_patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -1137,7 +1314,7 @@ export type Database = {
           therapist_id: string | null
           treatment_type: string | null
           updated_at: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           appointment_id?: string | null
@@ -1155,7 +1332,7 @@ export type Database = {
           therapist_id?: string | null
           treatment_type?: string | null
           updated_at?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           appointment_id?: string | null
@@ -1173,7 +1350,7 @@ export type Database = {
           therapist_id?: string | null
           treatment_type?: string | null
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
@@ -1208,42 +1385,63 @@ export type Database = {
       }
       tessera_sanitaria_transmissions: {
         Row: {
+          acceptance_code: string | null
+          checksum: string | null
           created_at: string
           error_message: string | null
+          file_size: number | null
           id: string
           invoice_id: string
+          last_retry_at: string | null
+          rejection_reason: string | null
           response_data: Json | null
+          retry_count: number | null
           sent_at: string | null
           status: string
           transmission_id: string
           updated_at: string
           user_id: string
+          validation_errors: Json | null
           xml_content: string | null
         }
         Insert: {
+          acceptance_code?: string | null
+          checksum?: string | null
           created_at?: string
           error_message?: string | null
+          file_size?: number | null
           id?: string
           invoice_id: string
+          last_retry_at?: string | null
+          rejection_reason?: string | null
           response_data?: Json | null
+          retry_count?: number | null
           sent_at?: string | null
           status?: string
           transmission_id: string
           updated_at?: string
           user_id: string
+          validation_errors?: Json | null
           xml_content?: string | null
         }
         Update: {
+          acceptance_code?: string | null
+          checksum?: string | null
           created_at?: string
           error_message?: string | null
+          file_size?: number | null
           id?: string
           invoice_id?: string
+          last_retry_at?: string | null
+          rejection_reason?: string | null
           response_data?: Json | null
+          retry_count?: number | null
           sent_at?: string | null
           status?: string
           transmission_id?: string
           updated_at?: string
           user_id?: string
+          validation_errors?: Json | null
           xml_content?: string | null
         }
         Relationships: [
@@ -1252,6 +1450,50 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      therapist_availability: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          is_available: boolean | null
+          start_time: string
+          therapist_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_available?: boolean | null
+          start_time: string
+          therapist_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_available?: boolean | null
+          start_time?: string
+          therapist_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "therapist_availability_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "therapists"
             referencedColumns: ["id"]
           },
         ]
@@ -1286,6 +1528,110 @@ export type Database = {
         }
         Relationships: []
       }
+      treatments: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration_minutes: number
+          id: string
+          is_active: boolean
+          name: string
+          price: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          price?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration_minutes?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          price?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ts_configurations: {
+        Row: {
+          api_endpoint: string
+          certificate_serial: string | null
+          created_at: string | null
+          environment: string
+          id: string
+          is_active: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          api_endpoint: string
+          certificate_serial?: string | null
+          created_at?: string | null
+          environment?: string
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          api_endpoint?: string
+          certificate_serial?: string | null
+          created_at?: string | null
+          environment?: string
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ts_status_logs: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string | null
+          response_data: Json | null
+          status: string
+          transmission_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message?: string | null
+          response_data?: Json | null
+          status: string
+          transmission_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string | null
+          response_data?: Json | null
+          status?: string
+          transmission_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ts_status_logs_transmission_id_fkey"
+            columns: ["transmission_id"]
+            isOneToOne: false
+            referencedRelation: "tessera_sanitaria_transmissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1294,6 +1640,10 @@ export type Database = {
       delete_user_content: {
         Args: { p_content_id: string; p_user_id: string }
         Returns: undefined
+      }
+      generate_booking_slug: {
+        Args: { company_name: string }
+        Returns: string
       }
       get_next_invoice_number: {
         Args: { p_user_id: string }
