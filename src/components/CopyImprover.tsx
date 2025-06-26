@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,7 +36,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const { toast } = useToast();
 
-  const analyzeCopy = () => {
+  const handleAnalyzeCopy = () => {
     if (!originalCopy.trim()) {
       toast({
         title: "Inserisci il copy",
@@ -45,47 +46,98 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
       return;
     }
 
-    const copyAnalysis = CopyService.analyzeCopy(originalCopy);
-    setAnalysis(copyAnalysis);
+    try {
+      const copyAnalysis = CopyService.analyzeCopy(originalCopy);
+      setAnalysis(copyAnalysis);
 
-    toast({
-      title: "Analisi completata! 🎯",
-      description: `Score totale: ${copyAnalysis.score}/100`
-    });
-  };
-
-  const improveCopy = () => {
-    if (!originalCopy.trim()) return;
-
-    const improved = CopyService.generateImprovedCopy(originalCopy, selectedTemplates);
-    setImprovedCopy(improved);
-    onCopyImproved(improved);
-
-    toast({
-      title: "Copy migliorato! ✨",
-      description: "Il tuo copy è stato ottimizzato con template avanzati"
-    });
-  };
-
-  const applyTemplate = (templateId: string) => {
-    const templates = CopyService.getTemplatesByCategory();
-    const template = templates.find(t => t.id === templateId);
-    
-    if (template) {
-      setSelectedTemplates([...selectedTemplates, templateId]);
       toast({
-        title: "Template applicato! 🎯",
-        description: template.name
+        title: "Analisi completata! 🎯",
+        description: `Score totale: ${copyAnalysis.score}/100`
+      });
+    } catch (error) {
+      console.error('Errore nell\'analisi:', error);
+      toast({
+        title: "Errore nell'analisi",
+        description: "Si è verificato un errore durante l'analisi del copy",
+        variant: "destructive"
       });
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: "Copiato! 📋",
-      description: "Copy copiato negli appunti"
-    });
+  const handleImproveCopy = () => {
+    if (!originalCopy.trim()) {
+      toast({
+        title: "Inserisci il copy",
+        description: "Scrivi il testo da migliorare",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const improved = CopyService.generateImprovedCopy(originalCopy, selectedTemplates);
+      setImprovedCopy(improved);
+      onCopyImproved(improved);
+
+      toast({
+        title: "Copy migliorato! ✨",
+        description: "Il tuo copy è stato ottimizzato con template avanzati"
+      });
+    } catch (error) {
+      console.error('Errore nel miglioramento:', error);
+      toast({
+        title: "Errore nel miglioramento",
+        description: "Si è verificato un errore durante il miglioramento del copy",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleApplyTemplate = (templateId: string) => {
+    try {
+      const templates = CopyService.getTemplatesByCategory();
+      const template = templates.find(t => t.id === templateId);
+      
+      if (template) {
+        // Evita duplicati
+        if (!selectedTemplates.includes(templateId)) {
+          setSelectedTemplates(prev => [...prev, templateId]);
+        }
+        
+        toast({
+          title: "Template applicato! 🎯",
+          description: template.name
+        });
+      }
+    } catch (error) {
+      console.error('Errore nell\'applicazione del template:', error);
+      toast({
+        title: "Errore nel template",
+        description: "Si è verificato un errore nell'applicazione del template",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleRemoveTemplate = (templateId: string) => {
+    setSelectedTemplates(prev => prev.filter(id => id !== templateId));
+  };
+
+  const handleCopyToClipboard = (text: string) => {
+    try {
+      navigator.clipboard.writeText(text);
+      toast({
+        title: "Copiato! 📋",
+        description: "Copy copiato negli appunti"
+      });
+    } catch (error) {
+      console.error('Errore nella copia:', error);
+      toast({
+        title: "Errore nella copia",
+        description: "Non è stato possibile copiare il testo",
+        variant: "destructive"
+      });
+    }
   };
 
   const getScoreColor = (score: number) => {
@@ -113,23 +165,23 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
       <CardContent>
         <Tabs defaultValue="analyze" className="space-y-4">
           <TabsList className="grid w-full grid-cols-5 bg-gray-700">
-            <TabsTrigger value="analyze" className="text-gray-300">
+            <TabsTrigger value="analyze" className="text-gray-300 data-[state=active]:bg-gray-600 data-[state=active]:text-white">
               <BarChart3 className="w-4 h-4 mr-2" />
               Analizza
             </TabsTrigger>
-            <TabsTrigger value="templates" className="text-gray-300">
+            <TabsTrigger value="templates" className="text-gray-300 data-[state=active]:bg-gray-600 data-[state=active]:text-white">
               <Wand2 className="w-4 h-4 mr-2" />
               Template
             </TabsTrigger>
-            <TabsTrigger value="knowledge" className="text-gray-300">
+            <TabsTrigger value="knowledge" className="text-gray-300 data-[state=active]:bg-gray-600 data-[state=active]:text-white">
               <BookOpen className="w-4 h-4 mr-2" />
               Knowledge
             </TabsTrigger>
-            <TabsTrigger value="improve" className="text-gray-300">
+            <TabsTrigger value="improve" className="text-gray-300 data-[state=active]:bg-gray-600 data-[state=active]:text-white">
               <Sparkles className="w-4 h-4 mr-2" />
               Migliora
             </TabsTrigger>
-            <TabsTrigger value="import" className="text-gray-300">
+            <TabsTrigger value="import" className="text-gray-300 data-[state=active]:bg-gray-600 data-[state=active]:text-white">
               <Upload className="w-4 h-4 mr-2" />
               Import
             </TabsTrigger>
@@ -145,13 +197,14 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                 value={originalCopy}
                 onChange={(e) => setOriginalCopy(e.target.value)}
                 placeholder="🚨 ATTENZIONE: Se soffri di mal di schiena, questo post può cambiarti la vita! La maggior parte delle persone commette questi 3 errori..."
-                className="bg-gray-700 border-gray-600 text-white min-h-[120px]"
+                className="bg-gray-700 border-gray-600 text-white min-h-[120px] focus:border-purple-500 focus:ring-purple-500"
               />
             </div>
 
             <Button 
-              onClick={analyzeCopy}
-              className="w-full bg-purple-600 hover:bg-purple-700"
+              onClick={handleAnalyzeCopy}
+              className="w-full bg-purple-600 hover:bg-purple-700 transition-colors"
+              disabled={!originalCopy.trim()}
             >
               <Target className="mr-2 h-4 w-4" />
               Analizza Copy con AI
@@ -160,14 +213,14 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
             {analysis && (
               <div className="space-y-4 mt-6">
                 {/* Score Totale */}
-                <div className="bg-gray-700/50 p-4 rounded-lg">
+                <div className="bg-gray-700/50 p-4 rounded-lg border border-gray-600">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-gray-300 font-medium">Score Totale</span>
                     <span className={`text-2xl font-bold ${getScoreColor(analysis.score)}`}>
                       {analysis.score}/100
                     </span>
                   </div>
-                  <Progress value={analysis.score} className="h-2" />
+                  <Progress value={analysis.score} className="h-2 mb-2" />
                   <span className={`text-sm ${getScoreColor(analysis.score)}`}>
                     {getScoreLabel(analysis.score)}
                   </span>
@@ -175,7 +228,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
 
                 {/* Breakdown Dettagliato */}
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-gray-700/50 p-3 rounded-lg">
+                  <div className="bg-gray-700/50 p-3 rounded-lg border border-gray-600">
                     <div className="flex items-center justify-between">
                       <span className="text-gray-300 text-sm">🎯 Hook</span>
                       <span className={`font-bold ${getScoreColor(analysis.hook_rating)}`}>
@@ -185,7 +238,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                     <Progress value={analysis.hook_rating} className="h-1 mt-1" />
                   </div>
 
-                  <div className="bg-gray-700/50 p-3 rounded-lg">
+                  <div className="bg-gray-700/50 p-3 rounded-lg border border-gray-600">
                     <div className="flex items-center justify-between">
                       <span className="text-gray-300 text-sm">💭 Emozione</span>
                       <span className={`font-bold ${getScoreColor(analysis.emotion_rating)}`}>
@@ -195,7 +248,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                     <Progress value={analysis.emotion_rating} className="h-1 mt-1" />
                   </div>
 
-                  <div className="bg-gray-700/50 p-3 rounded-lg">
+                  <div className="bg-gray-700/50 p-3 rounded-lg border border-gray-600">
                     <div className="flex items-center justify-between">
                       <span className="text-gray-300 text-sm">📝 Chiarezza</span>
                       <span className={`font-bold ${getScoreColor(analysis.clarity_rating)}`}>
@@ -205,7 +258,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                     <Progress value={analysis.clarity_rating} className="h-1 mt-1" />
                   </div>
 
-                  <div className="bg-gray-700/50 p-3 rounded-lg">
+                  <div className="bg-gray-700/50 p-3 rounded-lg border border-gray-600">
                     <div className="flex items-center justify-between">
                       <span className="text-gray-300 text-sm">🎯 CTA</span>
                       <span className={`font-bold ${getScoreColor(analysis.cta_rating)}`}>
@@ -217,7 +270,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                 </div>
 
                 {/* Suggerimenti */}
-                {analysis.suggestions.length > 0 && (
+                {analysis.suggestions && analysis.suggestions.length > 0 && (
                   <div className="bg-blue-600/20 border border-blue-500 rounded-lg p-4">
                     <h4 className="text-blue-300 font-medium mb-2 flex items-center">
                       <Lightbulb className="w-4 h-4 mr-2" />
@@ -243,26 +296,26 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                 Filtra per categoria:
               </label>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+                <SelectTrigger className="bg-gray-700 border-gray-600 text-white focus:border-purple-500 focus:ring-purple-500">
                   <SelectValue placeholder="Tutte le categorie" />
                 </SelectTrigger>
-                <SelectContent className="bg-gray-700 border-gray-600">
-                  <SelectItem value="">Tutte le categorie</SelectItem>
-                  <SelectItem value="hook">Hook</SelectItem>
-                  <SelectItem value="storytelling">Storytelling</SelectItem>
-                  <SelectItem value="cta">Call to Action</SelectItem>
-                  <SelectItem value="social-proof">Social Proof</SelectItem>
+                <SelectContent className="bg-gray-700 border-gray-600 z-50">
+                  <SelectItem value="" className="text-white hover:bg-gray-600">Tutte le categorie</SelectItem>
+                  <SelectItem value="hook" className="text-white hover:bg-gray-600">Hook</SelectItem>
+                  <SelectItem value="storytelling" className="text-white hover:bg-gray-600">Storytelling</SelectItem>
+                  <SelectItem value="cta" className="text-white hover:bg-gray-600">Call to Action</SelectItem>
+                  <SelectItem value="social-proof" className="text-white hover:bg-gray-600">Social Proof</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-96 overflow-y-auto">
               {CopyService.getTemplatesByCategory(selectedCategory).map((template) => (
                 <div key={template.id} className="bg-gray-700/50 p-4 rounded-lg border border-gray-600">
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <h4 className="text-white font-medium">{template.name}</h4>
-                      <Badge variant="outline" className="text-xs mt-1">
+                      <Badge variant="outline" className="text-xs mt-1 border-gray-500 text-gray-300">
                         {template.category}
                       </Badge>
                     </div>
@@ -275,24 +328,25 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                   <p className="text-gray-400 text-sm mb-3">{template.description}</p>
                   
                   <div className="bg-gray-800/50 p-3 rounded border-l-4 border-purple-500 mb-3">
-                    <code className="text-purple-300 text-sm">{template.template}</code>
+                    <code className="text-purple-300 text-sm break-words">{template.template}</code>
                   </div>
 
                   <div className="flex flex-wrap gap-2 mb-3">
                     {template.use_cases.map((useCase) => (
-                      <Badge key={useCase} variant="secondary" className="text-xs">
+                      <Badge key={useCase} variant="secondary" className="text-xs bg-gray-600 text-gray-300">
                         {useCase}
                       </Badge>
                     ))}
                   </div>
 
                   <Button
-                    onClick={() => applyTemplate(template.id)}
+                    onClick={() => handleApplyTemplate(template.id)}
                     size="sm"
-                    className="bg-purple-600 hover:bg-purple-700"
+                    className="bg-purple-600 hover:bg-purple-700 transition-colors"
+                    disabled={selectedTemplates.includes(template.id)}
                   >
                     <Zap className="w-4 h-4 mr-2" />
-                    Applica Template
+                    {selectedTemplates.includes(template.id) ? 'Applicato' : 'Applica Template'}
                   </Button>
                 </div>
               ))}
@@ -301,7 +355,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
 
           {/* Tab Knowledge */}
           <TabsContent value="knowledge" className="space-y-4">
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-96 overflow-y-auto">
               {CopyService.getKnowledgeByCategory().map((knowledge) => (
                 <div key={knowledge.id} className="bg-gray-700/50 p-4 rounded-lg border border-gray-600">
                   <div className="flex items-start justify-between mb-2">
@@ -324,7 +378,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
 
                   <div className="flex flex-wrap gap-1">
                     {knowledge.tags.map((tag) => (
-                      <Badge key={tag} variant="outline" className="text-xs">
+                      <Badge key={tag} variant="outline" className="text-xs border-gray-500 text-gray-300">
                         #{tag}
                       </Badge>
                     ))}
@@ -337,9 +391,9 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
           {/* Tab Migliora */}
           <TabsContent value="improve" className="space-y-4">
             <Button 
-              onClick={improveCopy}
+              onClick={handleImproveCopy}
               disabled={!originalCopy.trim()}
-              className="w-full bg-green-600 hover:bg-green-700"
+              className="w-full bg-green-600 hover:bg-green-700 transition-colors"
             >
               <Sparkles className="mr-2 h-4 w-4" />
               Genera Copy Migliorato
@@ -359,9 +413,9 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                 </div>
 
                 <Button
-                  onClick={() => copyToClipboard(improvedCopy)}
+                  onClick={() => handleCopyToClipboard(improvedCopy)}
                   variant="outline"
-                  className="w-full text-white border-gray-600 hover:bg-gray-700"
+                  className="w-full text-white border-gray-600 hover:bg-gray-700 transition-colors"
                 >
                   <Copy className="mr-2 h-4 w-4" />
                   Copia Copy Migliorato
@@ -376,8 +430,12 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
                   {selectedTemplates.map((templateId) => {
                     const template = CopyService.getTemplatesByCategory().find(t => t.id === templateId);
                     return (
-                      <Badge key={templateId} className="bg-purple-600 text-xs">
-                        {template?.name}
+                      <Badge 
+                        key={templateId} 
+                        className="bg-purple-600 text-xs cursor-pointer hover:bg-purple-700"
+                        onClick={() => handleRemoveTemplate(templateId)}
+                      >
+                        {template?.name} ✕
                       </Badge>
                     );
                   })}
