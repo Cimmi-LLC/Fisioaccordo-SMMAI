@@ -17,7 +17,7 @@ interface UseHookManagerProps {
   carouselSlides: CarouselSlide[];
   setCarouselSlides: (slides: CarouselSlide[]) => void;
   generatedContent: string;
-  setGeneratedContent: (content: string) => void;
+  setGeneratedContent: (content: string | ((prev: string) => string)) => void;
   appliedHook: string;
   setAppliedHook: (hook: string) => void;
   formData: FormData;
