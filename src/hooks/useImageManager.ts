@@ -1,5 +1,5 @@
 
-import React from 'react';
+import { useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 
 interface CarouselSlide {
@@ -9,7 +9,7 @@ interface CarouselSlide {
   userImageUrl?: string;
 }
 
-interface ImageManagerProps {
+interface UseImageManagerProps {
   carouselSlides: CarouselSlide[];
   setCarouselSlides: (slides: CarouselSlide[]) => void;
   selectedImageForEdit: string | null;
@@ -18,22 +18,22 @@ interface ImageManagerProps {
   setEditingSlideIndex: (index: number | null) => void;
 }
 
-const ImageManager: React.FC<ImageManagerProps> = ({
+export const useImageManager = ({
   carouselSlides,
   setCarouselSlides,
   selectedImageForEdit,
   setSelectedImageForEdit,
   editingSlideIndex,
   setEditingSlideIndex
-}) => {
+}: UseImageManagerProps) => {
   const { toast } = useToast();
 
-  const handleImageEdit = (imageUrl: string, slideIndex: number) => {
+  const handleImageEdit = useCallback((imageUrl: string, slideIndex: number) => {
     setSelectedImageForEdit(imageUrl);
     setEditingSlideIndex(slideIndex);
-  };
+  }, [setSelectedImageForEdit, setEditingSlideIndex]);
 
-  const handleImageUpdate = (newUrl: string) => {
+  const handleImageUpdate = useCallback((newUrl: string) => {
     if (editingSlideIndex !== null) {
       const updatedSlides = [...carouselSlides];
       updatedSlides[editingSlideIndex].userImageUrl = newUrl;
@@ -46,12 +46,10 @@ const ImageManager: React.FC<ImageManagerProps> = ({
       title: "🎨 Immagine aggiornata!",
       description: "L'immagine è stata modificata con successo"
     });
-  };
+  }, [editingSlideIndex, carouselSlides, setCarouselSlides, setSelectedImageForEdit, setEditingSlideIndex, toast]);
 
   return {
     handleImageEdit,
     handleImageUpdate
   };
 };
-
-export default ImageManager;

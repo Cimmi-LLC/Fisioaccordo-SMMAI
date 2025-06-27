@@ -1,5 +1,5 @@
 
-import React from 'react';
+import { useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 
 interface CarouselSlide {
@@ -9,19 +9,21 @@ interface CarouselSlide {
   userImageUrl?: string;
 }
 
-interface HookManagerProps {
+interface FormData {
+  description: string;
+}
+
+interface UseHookManagerProps {
   carouselSlides: CarouselSlide[];
   setCarouselSlides: (slides: CarouselSlide[]) => void;
   generatedContent: string;
   setGeneratedContent: (content: string) => void;
   appliedHook: string;
   setAppliedHook: (hook: string) => void;
-  formData: {
-    description: string;
-  };
+  formData: FormData;
 }
 
-const HookManager: React.FC<HookManagerProps> = ({
+export const useHookManager = ({
   carouselSlides,
   setCarouselSlides,
   generatedContent,
@@ -29,10 +31,10 @@ const HookManager: React.FC<HookManagerProps> = ({
   appliedHook,
   setAppliedHook,
   formData
-}) => {
+}: UseHookManagerProps) => {
   const { toast } = useToast();
 
-  const applyHookToContent = (hook: string) => {
+  const applyHookToContent = useCallback((hook: string) => {
     if (carouselSlides.length > 0) {
       const updatedSlides = [...carouselSlides];
       updatedSlides[0].content = `${hook}\n\n👉 Swipe per scoprire di più →`;
@@ -50,9 +52,9 @@ const HookManager: React.FC<HookManagerProps> = ({
       title: "Hook applicato! 🎯",
       description: "L'hook è stato inserito nella prima slide e nel contenuto"
     });
-  };
+  }, [carouselSlides, setCarouselSlides, setGeneratedContent, setAppliedHook, toast]);
 
-  const removeHook = () => {
+  const removeHook = useCallback(() => {
     if (carouselSlides.length > 0) {
       const updatedSlides = [...carouselSlides];
       updatedSlides[0].content = `🚨 ${formData.description.toUpperCase()}\n\nSCOPRI LA VERITÀ che i dottori non ti dicono!\n\n👉 Swipe per la soluzione →`;
@@ -70,12 +72,10 @@ const HookManager: React.FC<HookManagerProps> = ({
       title: "Hook rimosso",
       description: "L'hook è stato rimosso dal contenuto e dalla prima slide"
     });
-  };
+  }, [carouselSlides, setCarouselSlides, setGeneratedContent, setAppliedHook, formData, toast]);
 
   return {
     applyHookToContent,
     removeHook
   };
 };
-
-export default HookManager;

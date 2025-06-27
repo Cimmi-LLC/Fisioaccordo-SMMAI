@@ -11,9 +11,9 @@ import SkeletonLoader from "./ui/skeleton-loader";
 import EnhancedProgress from "./ui/enhanced-progress";
 import { useContentGeneration } from "@/hooks/useContentGeneration";
 import { useCarouselSlides } from "@/hooks/useCarouselSlides";
-import HookManager from "./HookManager";
-import ImageManager from "./ImageManager";
-import PhotoManager from "./PhotoManager";
+import { useHookManager } from "@/hooks/useHookManager";
+import { useImageManager } from "@/hooks/useImageManager";
+import { usePhotoManager } from "@/hooks/usePhotoManager";
 
 interface MainContentProps {
   user: any;
@@ -48,8 +48,8 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
   const { carouselSlides, setCarouselSlides, generateCarouselSlides } = useCarouselSlides(formData, user, basePhoto);
   const { generatedContent, setGeneratedContent, generateContent, saveContent } = useContentGeneration(user, formData, generateCarouselSlides);
 
-  // Managers
-  const hookManager = HookManager({
+  // Managers as hooks
+  const hookManager = useHookManager({
     carouselSlides,
     setCarouselSlides,
     generatedContent,
@@ -59,7 +59,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
     formData
   });
 
-  const imageManager = ImageManager({
+  const imageManager = useImageManager({
     carouselSlides,
     setCarouselSlides,
     selectedImageForEdit,
@@ -68,7 +68,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
     setEditingSlideIndex
   });
 
-  const photoManager = PhotoManager({
+  const photoManager = usePhotoManager({
     basePhoto,
     setBasePhoto
   });
