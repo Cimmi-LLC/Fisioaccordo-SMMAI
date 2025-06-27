@@ -110,6 +110,17 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
       console.log('Applying template:', templateId);
       const templates = CopyService.getTemplatesByCategory();
       console.log('Available templates:', templates);
+      
+      if (!templates || templates.length === 0) {
+        console.warn('No templates available');
+        toast({
+          title: "⚠️ Nessun template disponibile",
+          description: "I template non sono al momento disponibili. Riprova più tardi.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       const template = templates.find(t => t.id === templateId);
       
       if (template) {
@@ -124,19 +135,32 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
         });
       } else {
         console.error('Template not found:', templateId);
+        toast({
+          title: "Template non trovato",
+          description: "Il template selezionato non è disponibile",
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error('Errore nell\'applicazione del template:', error);
       toast({
         title: "Errore nel template",
-        description: "Si è verificato un errore nell'applicazione del template",
+        description: "Si è verificato un errore nell'applicazione del template. Riprova.",
         variant: "destructive"
       });
     }
   };
 
   const handleRemoveTemplate = (templateId: string) => {
-    setSelectedTemplates(prev => prev.filter(id => id !== templateId));
+    try {
+      setSelectedTemplates(prev => prev.filter(id => id !== templateId));
+      toast({
+        title: "Template rimosso",
+        description: "Il template è stato rimosso dalla selezione"
+      });
+    } catch (error) {
+      console.error('Error removing template:', error);
+    }
   };
 
   const handleCopyToClipboard = (text: string) => {
@@ -156,28 +180,50 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
     }
   };
 
-  // Safely get templates with error handling
+  // Safely get templates with enhanced error handling
   const getTemplatesWithErrorHandling = (category?: string) => {
     try {
       console.log('Getting templates for category:', category);
       const templates = CopyService.getTemplatesByCategory(category);
       console.log('Templates retrieved:', templates?.length || 0);
-      return templates || [];
+      
+      if (!templates) {
+        console.warn('Templates is null or undefined');
+        return [];
+      }
+      
+      return Array.isArray(templates) ? templates : [];
     } catch (error) {
-      console.error('Error getting templates:', error);
+      console.error('Error getting templates with error handling:', error);
+      toast({
+        title: "Errore template",
+        description: "Si è verificato un errore nel caricamento dei template",
+        variant: "destructive"
+      });
       return [];
     }
   };
 
-  // Safely get knowledge with error handling
+  // Safely get knowledge with enhanced error handling
   const getKnowledgeWithErrorHandling = (category?: string) => {
     try {
       console.log('Getting knowledge for category:', category);
       const knowledge = CopyService.getKnowledgeByCategory(category);
       console.log('Knowledge retrieved:', knowledge?.length || 0);
-      return knowledge || [];
+      
+      if (!knowledge) {
+        console.warn('Knowledge is null or undefined');
+        return [];
+      }
+      
+      return Array.isArray(knowledge) ? knowledge : [];
     } catch (error) {
-      console.error('Error getting knowledge:', error);
+      console.error('Error getting knowledge with error handling:', error);
+      toast({
+        title: "Errore knowledge",
+        description: "Si è verificato un errore nel caricamento della knowledge base",
+        variant: "destructive"
+      });
       return [];
     }
   };

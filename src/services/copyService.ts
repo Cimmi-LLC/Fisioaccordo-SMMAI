@@ -1,20 +1,52 @@
 
-// Main CopyService that aggregates all copy-related functionality
-export type { CopyTemplate, KnowledgeEntry, CopyAnalysis } from './copy/types';
-import { ADVANCED_TEMPLATES, getTemplatesByCategory } from './copy/templates';
-import { KNOWLEDGE_BASE, getKnowledgeByCategory } from './copy/knowledge';
-import { analyzeCopy } from './copy/analyzer';
-import { generateImprovedCopy } from './copy/generator';
-
-// Re-export functions directly
-export { ADVANCED_TEMPLATES, getTemplatesByCategory } from './copy/templates';
-export { KNOWLEDGE_BASE, getKnowledgeByCategory } from './copy/knowledge';
-export { analyzeCopy } from './copy/analyzer';
-export { generateImprovedCopy } from './copy/generator';
+import { CopyTemplate } from './copy/types';
+import { getTemplatesByCategory as getTemplatesFromModule } from './copy/templates';
+import { getKnowledgeByCategory } from './copy/knowledge';
+import { generateImprovedCopy as generateFromModule } from './copy/generator';
+import { analyzeCopy as analyzeFromModule } from './copy/analyzer';
 
 export class CopyService {
-  static getTemplatesByCategory = getTemplatesByCategory;
-  static getKnowledgeByCategory = getKnowledgeByCategory;
-  static analyzeCopy = analyzeCopy;
-  static generateImprovedCopy = generateImprovedCopy;
+  static getTemplatesByCategory(category?: string): CopyTemplate[] {
+    try {
+      return getTemplatesFromModule(category);
+    } catch (error) {
+      console.error('Error getting templates:', error);
+      return [];
+    }
+  }
+
+  static getKnowledgeByCategory(category?: string) {
+    try {
+      return getKnowledgeByCategory(category);
+    } catch (error) {
+      console.error('Error getting knowledge:', error);
+      return [];
+    }
+  }
+
+  static generateImprovedCopy(originalText: string, selectedTemplates: string[] = []): string {
+    try {
+      return generateFromModule(originalText, selectedTemplates);
+    } catch (error) {
+      console.error('Error generating improved copy:', error);
+      return originalText;
+    }
+  }
+
+  static analyzeCopy(text: string) {
+    try {
+      return analyzeFromModule(text);
+    } catch (error) {
+      console.error('Error analyzing copy:', error);
+      return {
+        score: 0,
+        suggestions: [],
+        strengths: [],
+        weaknesses: [],
+        readabilityScore: 0,
+        emotionalImpact: 0,
+        persuasionScore: 0
+      };
+    }
+  }
 }
