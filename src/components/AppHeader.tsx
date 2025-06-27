@@ -17,7 +17,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   onSignOut 
 }) => {
   return (
-    <header className="bg-gray-900/50 backdrop-blur-sm border-b border-gray-700">
+    <header className="bg-gray-900/90 backdrop-blur-sm border-b border-gray-700">
       <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <img 
@@ -32,24 +32,24 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         <div className="flex items-center space-x-4">
           <Button
             onClick={onToggleCopyImprover}
-            variant="outline"
+            variant="secondary"
             size="sm"
-            className="text-white border-gray-600 hover:bg-gray-700"
+            className="bg-purple-600 hover:bg-purple-700 text-white border-0 shadow-lg"
           >
             <Brain className="h-4 w-4 mr-2" />
             {showCopyImprover ? 'Nascondi' : 'Copy AI Pro'}
           </Button>
-          <span className="text-gray-300">
+          <span className="text-gray-300 hidden sm:inline">
             Ciao, {user?.user_metadata?.first_name || 'Utente'}!
           </span>
           <Button 
-            variant="outline" 
+            variant="ghost" 
             size="sm"
             onClick={onSignOut}
-            className="text-white border-gray-600 hover:bg-gray-700"
+            className="bg-gray-700 hover:bg-gray-600 text-white border-0"
           >
             <LogOut className="h-4 w-4 mr-2" />
-            Esci
+            <span className="hidden sm:inline">Esci</span>
           </Button>
         </div>
       </div>
