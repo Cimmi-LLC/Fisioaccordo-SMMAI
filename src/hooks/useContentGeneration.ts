@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useGlobalLoading } from "@/contexts/GlobalLoadingContext";
 import { useContentCache } from "@/contexts/ContentCacheContext";
 import { contentService } from "@/services/contentService";
+import { IntelligentCopyService } from "@/services/intelligentCopyService";
 
 interface FormData {
   description: string;
@@ -46,64 +47,38 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
     }
 
     try {
-      loadingState.startLoading('🚀 Generazione contenuto in corso...');
+      loadingState.startLoading('🚀 Generazione contenuto AI in corso...');
       
       // Simulazione di progress realistico
-      loadingState.updateProgress(20, '🧠 Analisi del topic...');
+      loadingState.updateProgress(20, '🧠 Analisi semantica del topic...');
       await new Promise(resolve => setTimeout(resolve, 800));
       
-      loadingState.updateProgress(50, '✍️ Creazione copy viral...');
+      loadingState.updateProgress(50, '✍️ Generazione copy personalizzato...');
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      loadingState.updateProgress(80, '🎨 Generazione slide...');
+      loadingState.updateProgress(80, '🎨 Ottimizzazione per viralità...');
       await new Promise(resolve => setTimeout(resolve, 600));
       
-      const mockContent = `🚨 **${formData.description.toUpperCase()}** - LA VERITÀ CHE NESSUNO TI DICE!
+      // Usa il nuovo servizio intelligente invece del mock
+      const personalizedContent = await IntelligentCopyService.generatePersonalizedCopy(
+        formData.description,
+        formData.audience,
+        formData.platform,
+        formData.tone,
+        user
+      );
 
-💡 Se soffri di ${formData.description}, questo post può cambiarti la vita!
-
-❌ ERRORE COMUNE: La maggior parte delle persone fa questo sbaglio...
-
-Come fisioterapista con oltre 10 anni di esperienza, vedo ogni giorno persone che:
-• Ignorano i primi segnali
-• Usano rimedi temporanei
-• Non affrontano la causa principale
-
-🔥 ECCO LA SOLUZIONE che funziona davvero:
-
-✅ 3 PASSI SCIENTIFICI:
-1️⃣ Identificazione della causa principale
-2️⃣ Protocollo personalizzato di esercizi
-3️⃣ Mantenimento a lungo termine
-
-🎯 RISULTATI GARANTITI in 7-14 giorni:
-• Riduzione del dolore del 80%
-• Movimento naturale e fluido
-• Prevenzione di ricadute
-
-💥 TESTIMONIANZA: "In 10 giorni ho risolto un problema che avevo da 2 anni!" - Maria, 45 anni
-
-🚀 VUOI RISULTATI CONCRETI?
-
-📞 Prenota una valutazione GRATUITA di 30 minuti
-💬 Scrivici in DM "VALUTAZIONE"
-🏢 ${user?.user_metadata?.clinic_name || 'Il tuo studio di fisioterapia'}
-
-⏰ ATTENZIONE: Solo 5 posti disponibili questa settimana!
-
-#fisioterapia #salute #benessere #${formData.description.replace(/\s+/g, '')}`;
-
-      setGeneratedContent(mockContent);
+      setGeneratedContent(personalizedContent);
       generateCarouselSlides();
       
       // Cache il contenuto
-      cacheContent(cacheKey, mockContent, [], formData);
+      cacheContent(cacheKey, personalizedContent, [], formData);
       
-      loadingState.finishLoading(true, '🎉 Contenuto generato con successo!');
+      loadingState.finishLoading(true, '🎉 Copy personalizzato generato!');
       
       toast({
-        title: "🎉 Contenuto generato!",
-        description: "Post ottimizzato per massimo engagement e conversioni"
+        title: "🔥 Copy AI generato!",
+        description: "Contenuto 100% personalizzato basato sul tuo topic specifico"
       });
 
     } catch (error) {

@@ -7,6 +7,7 @@ import ContentForm from "./ContentForm";
 import PreviewSection from "./PreviewSection";
 import HookGenerator from "./HookGenerator";
 import LazyCopyImprover from "./LazyCopyImprover";
+import ViralFormatGenerator from "./ViralFormatGenerator";
 import SkeletonLoader from "./ui/skeleton-loader";
 import EnhancedProgress from "./ui/enhanced-progress";
 import { useContentGeneration } from "@/hooks/useContentGeneration";
@@ -43,6 +44,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
   const [generatedHooks, setGeneratedHooks] = useState<string[]>([]);
   const [appliedHook, setAppliedHook] = useState<string>('');
   const [basePhoto, setBasePhoto] = useState<string | null>(null);
+  const [showViralGenerator, setShowViralGenerator] = useState(false);
 
   // Custom hooks
   const { carouselSlides, setCarouselSlides, generateCarouselSlides } = useCarouselSlides(formData, user, basePhoto);
@@ -88,6 +90,11 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
     saveContent(carouselSlides);
   };
 
+  const handleViralContentGenerated = (content: string) => {
+    setGeneratedContent(content);
+    setShowViralGenerator(false);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-4 sm:py-8">
       <div className="text-center mb-6 sm:mb-8">
@@ -121,6 +128,18 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
         </div>
       )}
 
+      {/* Nuovo Generatore Format Virali */}
+      {showViralGenerator && (
+        <div className="mb-6 sm:mb-8">
+          <ViralFormatGenerator
+            topic={formData.description}
+            audience={formData.audience}
+            user={user}
+            onContentGenerated={handleViralContentGenerated}
+          />
+        </div>
+      )}
+
       <div className="mb-6 sm:mb-8">
         <IdeaGenerator
           ideaInput={ideaInput}
@@ -141,15 +160,27 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
               </CardContent>
             </Card>
           ) : (
-            <ContentForm
-              formData={formData}
-              onInputChange={handleInputChange}
-              isGenerating={loadingState.isLoading}
-              onGenerate={generateContent}
-              basePhoto={basePhoto}
-              onPhotoUpload={photoManager.handlePhotoUpload}
-              onPhotoRemove={photoManager.handlePhotoRemove}
-            />
+            <>
+              <ContentForm
+                formData={formData}
+                onInputChange={handleInputChange}
+                isGenerating={loadingState.isLoading}
+                onGenerate={generateContent}
+                basePhoto={basePhoto}
+                onPhotoUpload={photoManager.handlePhotoUpload}
+                onPhotoRemove={photoManager.handlePhotoRemove}
+              />
+              
+              {/* Pulsante per mostrare/nascondere il generatore viral */}
+              <div className="mt-4 text-center">
+                <button
+                  onClick={() => setShowViralGenerator(!showViralGenerator)}
+                  className="text-orange-400 hover:text-orange-300 underline text-sm"
+                >
+                  {showViralGenerator ? '🔥 Nascondi Format Virali' : '🔥 Mostra Format Virali'}
+                </button>
+              </div>
+            </>
           )}
         </div>
 
