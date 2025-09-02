@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,9 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { Loader2, Sparkles, User } from "lucide-react";
 import PhotoUpload from './PhotoUpload';
 import VisualTemplateSelector, { VisualTemplate } from './template/VisualTemplateSelector';
+import { BlotatoService } from '@/services/blotatoService';
 
 interface FormData {
   description: string;
@@ -20,16 +22,19 @@ interface FormData {
   numSlides: string;
   numImages: string;
   visualTemplate: VisualTemplate;
+  selectedPlatforms?: string[];
+  scheduleDate?: string;
 }
 
 interface ContentFormProps {
   formData: FormData;
-  onInputChange: (field: string, value: string) => void;
+  onInputChange: (field: string, value: string | string[]) => void;
   isGenerating: boolean;
   onGenerate: () => void;
   basePhoto: string | null;
   onPhotoUpload: (photo: string) => void;
   onPhotoRemove: () => void;
+  onPublish?: (platforms: string[]) => void;
 }
 
 const ContentForm: React.FC<ContentFormProps> = ({
@@ -39,8 +44,20 @@ const ContentForm: React.FC<ContentFormProps> = ({
   onGenerate,
   basePhoto,
   onPhotoUpload,
-  onPhotoRemove
+  onPhotoRemove,
+  onPublish
 }) => {
+  const supportedPlatforms = BlotatoService.getSupportedPlatforms();
+
+  const handlePlatformToggle = (platformId: string, checked: boolean) => {
+    const currentPlatforms = formData.selectedPlatforms || [];
+    if (checked) {
+      onInputChange('selectedPlatforms', [...currentPlatforms, platformId]);
+    } else {
+      onInputChange('selectedPlatforms', currentPlatforms.filter(id => id !== platformId));
+    }
+  };
+
   return (
     <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
       <CardHeader>
@@ -185,6 +202,53 @@ const ContentForm: React.FC<ContentFormProps> = ({
           onPhotoRemove={onPhotoRemove}
         />
 
+        {/* Platform Selection */}
+        <div className="space-y-3">
+          <Label className="text-gray-300 text-lg font-medium">Piattaforme di Pubblicazione</Label>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {supportedPlatforms.map((platform) => (
+              <div key={platform.id} className="flex items-center space-x-2 p-3 rounded-lg border border-gray-600 hover:bg-gray-700/50 transition-colors">
+                <Checkbox
+                  id={platform.id}
+                  checked={formData.selectedPlatforms?.includes(platform.id) || false}
+                  onCheckedChange={(checked) => handlePlatformToggle(platform.id, checked as boolean)}
+                />
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">{platform.icon}</span>
+                  <Label htmlFor={platform.id} className="text-xs font-medium cursor-pointer text-gray-300">
+                    {platform.name}
+                  </Label>
+                </div>
+              </div>
+            ))}
+          </div>
+          {formData.selectedPlatforms?.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {formData.selectedPlatforms.map(platformId => {
+                const platform = supportedPlatforms.find(p => p.id === platformId);
+                return platform ? (
+                  <Badge key={platformId} variant="secondary" className="text-xs">
+                    {platform.icon} {platform.name}
+                  </Badge>
+                ) : null;
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Schedule Date */}
+        <div className="space-y-2">
+          <Label htmlFor="scheduleDate" className="text-gray-300">Programma Pubblicazione (Opzionale)</Label>
+          <Input
+            id="scheduleDate"
+            type="datetime-local"
+            value={formData.scheduleDate || ''}
+            onChange={(e) => onInputChange('scheduleDate', e.target.value)}
+            min={new Date().toISOString().slice(0, 16)}
+            className="bg-gray-700 border-gray-600 text-white"
+          />
+        </div>
+
         <Button 
           onClick={onGenerate} 
           disabled={isGenerating}
@@ -202,6 +266,17 @@ const ContentForm: React.FC<ContentFormProps> = ({
             </>
           )}
         </Button>
+
+        {/* Publish Button */}
+        {onPublish && formData.selectedPlatforms?.length > 0 && (
+          <Button 
+            onClick={() => onPublish(formData.selectedPlatforms)}
+            variant="outline"
+            className="w-full border-purple-600 text-purple-400 hover:bg-purple-600 hover:text-white transition-colors"
+          >
+            📤 Pubblica su {formData.selectedPlatforms.length} Piattaform{formData.selectedPlatforms.length > 1 ? 'e' : 'a'}
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

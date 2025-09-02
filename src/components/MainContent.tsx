@@ -1,13 +1,14 @@
-
 import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGlobalLoading } from "@/contexts/GlobalLoadingContext";
+import { useToast } from "@/hooks/use-toast";
 import IdeaGenerator from "./IdeaGenerator";
 import ContentForm from "./ContentForm";
 import PreviewSection from "./PreviewSection";
 import HookGenerator from "./HookGenerator";
 import LazyCopyImprover from "./LazyCopyImprover";
 import ViralFormatGenerator from "./ViralFormatGenerator";
+import BlotatoConnection from "./BlotatoConnection";
 import SkeletonLoader from "./ui/skeleton-loader";
 import EnhancedProgress from "./ui/enhanced-progress";
 import { useContentGeneration } from "@/hooks/useContentGeneration";
@@ -15,6 +16,7 @@ import { useCarouselSlides } from "@/hooks/useCarouselSlides";
 import { useHookManager } from "@/hooks/useHookManager";
 import { useImageManager } from "@/hooks/useImageManager";
 import { usePhotoManager } from "@/hooks/usePhotoManager";
+import { BlotatoService } from '@/services/blotatoService';
 
 interface MainContentProps {
   user: any;
@@ -24,6 +26,7 @@ interface MainContentProps {
 
 const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImprover, onCopyImproved }) => {
   const loadingState = useGlobalLoading();
+  const { toast } = useToast();
   
   const [ideaInput, setIdeaInput] = useState('');
   const [formData, setFormData] = useState({
@@ -35,7 +38,9 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
     postType: 'carosello',
     numSlides: '5',
     numImages: '1',
-    visualTemplate: 'default' as const
+    visualTemplate: 'default' as const,
+    selectedPlatforms: ['instagram'] as string[],
+    scheduleDate: '',
   });
   
   const [selectedImageForEdit, setSelectedImageForEdit] = useState<string | null>(null);
@@ -76,7 +81,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
     setBasePhoto
   });
 
-  const handleInputChange = useCallback((field: string, value: string) => {
+  const handleInputChange = useCallback((field: string, value: string | string[]) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
@@ -94,6 +99,44 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
   const handleViralContentGenerated = (content: string) => {
     setGeneratedContent(content);
     setShowViralGenerator(false);
+  };
+
+  const handlePublish = async (platforms: string[]) => {
+    if (!generatedContent) {
+      toast({
+        title: "❌ Errore",
+        description: "Genera prima un contenuto da pubblicare",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      console.log('🚀 Pubblicazione contenuto su piattaforme:', platforms);
+      
+      const publishResult = await BlotatoService.publishPost({
+        content: generatedContent,
+        platforms: platforms,
+        images: basePhoto ? [basePhoto] : [],
+        ...(formData.scheduleDate && { scheduleFor: formData.scheduleDate })
+      });
+
+      if (publishResult.success) {
+        toast({
+          title: "🎉 Pubblicato!",
+          description: `Contenuto pubblicato con successo su ${platforms.length} piattaform${platforms.length > 1 ? 'e' : 'a'}`,
+        });
+      } else {
+        throw new Error(publishResult.error || 'Errore durante la pubblicazione');
+      }
+    } catch (error) {
+      console.error('Errore pubblicazione:', error);
+      toast({
+        title: "❌ Errore Pubblicazione",
+        description: error instanceof Error ? error.message : 'Errore sconosciuto',
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -170,6 +213,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
                 basePhoto={basePhoto}
                 onPhotoUpload={photoManager.handlePhotoUpload}
                 onPhotoRemove={photoManager.handlePhotoRemove}
+                onPublish={handlePublish}
               />
               
               {/* Pulsante per mostrare/nascondere il generatore viral */}
@@ -210,6 +254,11 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
             />
           )}
         </div>
+      </div>
+
+      {/* Blotato Multi-Platform Connection */}
+      <div className="mt-8">
+        <BlotatoConnection />
       </div>
 
       <HookGenerator
