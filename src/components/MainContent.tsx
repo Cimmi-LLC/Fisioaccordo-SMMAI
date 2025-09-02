@@ -34,7 +34,8 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
     platform: 'instagram',
     postType: 'carosello',
     numSlides: '5',
-    numImages: '1'
+    numImages: '1',
+    visualTemplate: 'default' as const
   });
   
   const [selectedImageForEdit, setSelectedImageForEdit] = useState<string | null>(null);

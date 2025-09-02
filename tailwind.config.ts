@@ -18,6 +18,10 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				fisio: ['Montserrat', 'sans-serif'],
+				'fisio-display': ['Montserrat', 'Arial', 'sans-serif']
+			},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
@@ -61,6 +65,18 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				fisio: {
+					DEFAULT: 'hsl(var(--fisio-primary))',
+					foreground: 'hsl(var(--fisio-primary-foreground))',
+					primary: 'hsl(var(--fisio-primary))',
+					'primary-foreground': 'hsl(var(--fisio-primary-foreground))',
+					secondary: 'hsl(var(--fisio-secondary))',
+					'secondary-foreground': 'hsl(var(--fisio-secondary-foreground))',
+					accent: 'hsl(var(--fisio-accent))',
+					'accent-foreground': 'hsl(var(--fisio-accent-foreground))',
+					background: 'hsl(var(--fisio-background))',
+					surface: 'hsl(var(--fisio-surface))'
 				}
 			},
 			borderRadius: {

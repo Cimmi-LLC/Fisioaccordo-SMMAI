@@ -45,6 +45,16 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Fisioaccordo Design System */
+    --fisio-primary: 340 82% 52%; /* Rosa Fucsia #E91E63 */
+    --fisio-primary-foreground: 0 0% 100%;
+    --fisio-secondary: 0 0% 20%; /* Nero/Grigio scuro */
+    --fisio-secondary-foreground: 0 0% 100%;
+    --fisio-accent: 0 0% 95%; /* Grigio chiaro */
+    --fisio-accent-foreground: 0 0% 20%;
+    --fisio-background: 0 0% 100%;
+    --fisio-surface: 0 0% 98%;
   }
 
   .dark {
@@ -84,6 +94,16 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Fisioaccordo Design System - Dark Mode */
+    --fisio-primary: 340 82% 52%;
+    --fisio-primary-foreground: 0 0% 100%;
+    --fisio-secondary: 0 0% 90%; 
+    --fisio-secondary-foreground: 0 0% 10%;
+    --fisio-accent: 0 0% 15%;
+    --fisio-accent-foreground: 0 0% 90%;
+    --fisio-background: 240 10% 3.9%;
+    --fisio-surface: 240 10% 8%;
   }
 }
 

@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Sparkles, User } from "lucide-react";
 import PhotoUpload from './PhotoUpload';
+import VisualTemplateSelector, { VisualTemplate } from './template/VisualTemplateSelector';
 
 interface FormData {
   description: string;
@@ -18,6 +19,7 @@ interface FormData {
   postType: string;
   numSlides: string;
   numImages: string;
+  visualTemplate: VisualTemplate;
 }
 
 interface ContentFormProps {
@@ -169,6 +171,12 @@ const ContentForm: React.FC<ContentFormProps> = ({
             </Select>
           </div>
         </div>
+
+        {/* Stile Visivo */}
+        <VisualTemplateSelector
+          value={formData.visualTemplate}
+          onChange={(template) => onInputChange('visualTemplate', template)}
+        />
 
         {/* Upload foto base */}
         <PhotoUpload
