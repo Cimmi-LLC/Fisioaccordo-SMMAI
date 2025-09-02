@@ -162,18 +162,31 @@ export class RunwareService {
 
     const taskUUID = crypto.randomUUID();
     
+    // Determine optimal dimensions based on content type
+    const getOptimalDimensions = () => {
+      const prompt = params.positivePrompt.toLowerCase();
+      if (prompt.includes('portrait') || prompt.includes('verticale') || prompt.includes('storia')) {
+        return { width: 1024, height: 1536 }; // Portrait/Stories
+      } else if (prompt.includes('landscape') || prompt.includes('orizzontale') || prompt.includes('feed')) {
+        return { width: 1536, height: 1024 }; // Landscape/Feed
+      }
+      return { width: 1024, height: 1024 }; // Square default
+    };
+
+    const dimensions = getOptimalDimensions();
+    
     return new Promise((resolve, reject) => {
       const message = [{
         taskType: "imageInference",
         taskUUID,
-        model: params.model || "runware:100@1",
-        width: 1024,
-        height: 1024,
+        model: params.model || "civitai:618692@691639", // Juggernaut XL for photorealistic quality
+        width: dimensions.width,
+        height: dimensions.height,
         numberResults: params.numberResults || 1,
-        outputFormat: params.outputFormat || "WEBP",
-        steps: 4,
-        CFGScale: params.CFGScale || 1,
-        scheduler: params.scheduler || "FlowMatchEulerDiscreteScheduler",
+        outputFormat: params.outputFormat || "PNG", // PNG for maximum quality
+        steps: 25, // Increased for premium quality
+        CFGScale: params.CFGScale || 7.5, // Optimal balance for photorealism
+        scheduler: params.scheduler || "DPMSolverMultistepScheduler", // Better quality scheduler
         strength: params.strength || 0.8,
         lora: params.lora || [],
         ...params,

@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Wand2, Undo2, Redo2, Trash2, Type, Download } from "lucide-react";
 import { defaultOpenAIService } from "@/services/openaiService";
 import { useToast } from "@/hooks/use-toast";
-import TextEditor from "./TextEditor";
+import AdvancedTextEditor from './AdvancedTextEditor';
 
 interface ImageVersion {
   url: string;
@@ -154,7 +154,7 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
 
   if (showTextEditor) {
     return (
-      <TextEditor
+      <AdvancedTextEditor
         imageUrl={currentImage.url}
         onImageUpdate={handleTextEditorUpdate}
         onClose={() => setShowTextEditor(false)}

@@ -154,17 +154,17 @@ Formatta come post unico ma indica chiaramente i punti per ogni slide.`;
   }
 
   async generateImage(params: GenerateImageParams): Promise<GeneratedImage> {
-    console.log('🎨 Generando immagine con DALL-E 3:', params.positivePrompt);
+    console.log('🎨 Generando immagine ultra-quality con DALL-E 3:', params.positivePrompt);
     
     try {
-      // Per miglioramenti di immagini esistenti, usiamo un approccio diverso
+      // Enhanced prompts for photorealistic quality
       let enhancePrompt = '';
       
       if (params.imageUrl) {
-        // Prompt per migliorare mantenendo l'immagine originale
-        enhancePrompt = `Migliora questa immagine mantenendo ESATTAMENTE lo stesso soggetto, la stessa composizione e gli stessi elementi principali. ${params.positivePrompt}. NON cambiare il contenuto principale, migliora solo la qualità, i colori e la nitidezza. L'immagine deve rimanere chiaramente riconoscibile come quella originale.`;
+        // Miglioramento immagini esistenti con qualità fotografica
+        enhancePrompt = `Transform this image into a professional, photorealistic, ultra-detailed 8K quality masterpiece while maintaining EXACTLY the same subject, composition and key elements. ${params.positivePrompt}. Enhance clarity, lighting, colors, and sharpness to magazine-quality standards. The image must remain clearly recognizable as the original but with stunning photographic quality.`;
       } else {
-        enhancePrompt = this.cleanPromptForDallE(params.positivePrompt);
+        enhancePrompt = this.buildPhotorealisticPrompt(params.positivePrompt);
       }
       
       const response = await fetch(`${this.baseURL}/images/generations`, {
@@ -177,9 +177,9 @@ Formatta come post unico ma indica chiaramente i punti per ogni slide.`;
           model: 'dall-e-3',
           prompt: enhancePrompt,
           n: 1,
-          size: params.size || '1024x1024',
-          quality: params.quality || 'hd',
-          style: params.style || 'natural'
+          size: params.size || '1792x1024', // Higher resolution by default
+          quality: 'hd', // Always use HD quality
+          style: 'natural' // Natural style for maximum realism
         }),
       });
 
@@ -210,17 +210,30 @@ Formatta come post unico ma indica chiaramente i punti per ogni slide.`;
     }
   }
 
-  private cleanPromptForDallE(prompt: string): string {
-    // Rimuoviamo istruzioni complesse che potrebbero causare errori
+  private buildPhotorealisticPrompt(prompt: string): string {
+    // Remove complex instructions that might cause errors
     let cleanPrompt = prompt.replace(/IMPORTANTE:.*?\./g, '');
     
-    // Manteniamo il prompt semplice e diretto
-    if (cleanPrompt.length > 200) {
-      cleanPrompt = cleanPrompt.substring(0, 200) + '...';
+    // Keep the core prompt but enhance for photorealism
+    if (cleanPrompt.length > 150) {
+      cleanPrompt = cleanPrompt.substring(0, 150);
     }
     
-    // Aggiungiamo solo una nota semplice per l'italiano
-    return `${cleanPrompt}. Immagine professionale di alta qualità che cattura l'attenzione e ferma lo scroll.`;
+    // Add photorealistic enhancement terms
+    const photoTerms = [
+      "photorealistic", "ultra-detailed", "8K resolution", "professional photography",
+      "studio lighting", "sharp focus", "vibrant colors", "high contrast",
+      "cinematic composition", "magazine quality", "crystal clear details"
+    ];
+    
+    const randomPhotoTerms = photoTerms.slice(0, 4).join(", ");
+    
+    return `${cleanPrompt}. Professional ${randomPhotoTerms}, stunning visual impact that stops social media scrolling, award-winning photography style.`;
+  }
+
+  private cleanPromptForDallE(prompt: string): string {
+    // Legacy method - now uses buildPhotorealisticPrompt
+    return this.buildPhotorealisticPrompt(prompt);
   }
 
   async testConnection(): Promise<boolean> {
