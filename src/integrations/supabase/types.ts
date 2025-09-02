@@ -7,8 +7,117 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.3 (519615d)"
+  }
   public: {
     Tables: {
+      accounting_costs: {
+        Row: {
+          cost_name: string
+          cost_value: number
+          created_at: string
+          id: string
+          is_predefined: boolean
+          section_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cost_name: string
+          cost_value?: number
+          created_at?: string
+          id?: string
+          is_predefined?: boolean
+          section_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cost_name?: string
+          cost_value?: number
+          created_at?: string
+          id?: string
+          is_predefined?: boolean
+          section_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      accounting_scenarios: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          name: string
+          results: Json
+          scenario_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id?: string
+          name: string
+          results: Json
+          scenario_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          name?: string
+          results?: Json
+          scenario_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      appointment_custom_fields: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          field_name: string
+          field_type: string
+          field_value: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          field_name: string
+          field_type?: string
+          field_value?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          field_name?: string
+          field_type?: string
+          field_value?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_custom_fields_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointment_status_changes: {
         Row: {
           appointment_id: string | null
@@ -53,8 +162,36 @@ export type Database = {
           },
         ]
       }
+      appointment_tags: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          id: string
+          name: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       appointments: {
         Row: {
+          appointment_tag_id: string | null
           appointment_type: string | null
           booking_source: string | null
           cancellation_reason: string | null
@@ -62,8 +199,9 @@ export type Database = {
           confirmed_at: string | null
           created_at: string | null
           duration_minutes: number | null
-          equipment_ids: string[] | null
+          equipment_id: string | null
           id: string
+          lead_id: string | null
           notes: string | null
           patient_id: string | null
           price: number | null
@@ -71,12 +209,13 @@ export type Database = {
           room_id: string | null
           scheduled_date: string
           status: string | null
-          therapist_id: string | null
-          treatment_id: string | null
+          therapist_id: string
+          treatment_id: string
           updated_at: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
+          appointment_tag_id?: string | null
           appointment_type?: string | null
           booking_source?: string | null
           cancellation_reason?: string | null
@@ -84,8 +223,9 @@ export type Database = {
           confirmed_at?: string | null
           created_at?: string | null
           duration_minutes?: number | null
-          equipment_ids?: string[] | null
+          equipment_id?: string | null
           id?: string
+          lead_id?: string | null
           notes?: string | null
           patient_id?: string | null
           price?: number | null
@@ -93,12 +233,13 @@ export type Database = {
           room_id?: string | null
           scheduled_date: string
           status?: string | null
-          therapist_id?: string | null
-          treatment_id?: string | null
+          therapist_id: string
+          treatment_id: string
           updated_at?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
+          appointment_tag_id?: string | null
           appointment_type?: string | null
           booking_source?: string | null
           cancellation_reason?: string | null
@@ -106,8 +247,9 @@ export type Database = {
           confirmed_at?: string | null
           created_at?: string | null
           duration_minutes?: number | null
-          equipment_ids?: string[] | null
+          equipment_id?: string | null
           id?: string
+          lead_id?: string | null
           notes?: string | null
           patient_id?: string | null
           price?: number | null
@@ -115,12 +257,33 @@ export type Database = {
           room_id?: string | null
           scheduled_date?: string
           status?: string | null
-          therapist_id?: string | null
-          treatment_id?: string | null
+          therapist_id?: string
+          treatment_id?: string
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "appointments_appointment_tag_id_fkey"
+            columns: ["appointment_tag_id"]
+            isOneToOne: false
+            referencedRelation: "appointment_tags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "appointments_patient_id_fkey"
             columns: ["patient_id"]
@@ -158,127 +321,61 @@ export type Database = {
           },
         ]
       }
-      business_clients: {
+      auth_failure_logs: {
         Row: {
-          address: string
-          city: string
-          company_name: string
-          country: string | null
-          created_at: string | null
-          email: string | null
+          attempted_at: string
+          attempted_email: string | null
+          failure_reason: string | null
           id: string
-          is_active: boolean | null
-          pec_email: string | null
-          phone: string | null
-          postal_code: string
-          province: string
-          sdi_code: string | null
-          tax_code: string
-          updated_at: string | null
-          user_id: string
-          vat_number: string | null
+          ip_address: string | null
+          user_agent: string | null
         }
         Insert: {
-          address: string
-          city: string
-          company_name: string
-          country?: string | null
-          created_at?: string | null
-          email?: string | null
+          attempted_at?: string
+          attempted_email?: string | null
+          failure_reason?: string | null
           id?: string
-          is_active?: boolean | null
-          pec_email?: string | null
-          phone?: string | null
-          postal_code: string
-          province: string
-          sdi_code?: string | null
-          tax_code: string
-          updated_at?: string | null
-          user_id: string
-          vat_number?: string | null
+          ip_address?: string | null
+          user_agent?: string | null
         }
         Update: {
-          address?: string
-          city?: string
-          company_name?: string
-          country?: string | null
-          created_at?: string | null
-          email?: string | null
+          attempted_at?: string
+          attempted_email?: string | null
+          failure_reason?: string | null
           id?: string
-          is_active?: boolean | null
-          pec_email?: string | null
-          phone?: string | null
-          postal_code?: string
-          province?: string
-          sdi_code?: string | null
-          tax_code?: string
-          updated_at?: string | null
-          user_id?: string
-          vat_number?: string | null
+          ip_address?: string | null
+          user_agent?: string | null
         }
         Relationships: []
       }
-      calendar_debug_logs: {
+      clinic_availability: {
         Row: {
           created_at: string
-          error_message: string | null
-          event_data: Json | null
-          event_type: string
+          day_of_week: number
+          end_time: string
           id: string
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          error_message?: string | null
-          event_data?: Json | null
-          event_type: string
-          id?: string
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          error_message?: string | null
-          event_data?: Json | null
-          event_type?: string
-          id?: string
-          user_id?: string | null
-        }
-        Relationships: []
-      }
-      calendar_integrations: {
-        Row: {
-          access_token: string | null
-          calendar_id: string
-          created_at: string
-          id: string
-          is_active: boolean | null
-          provider: string
-          refresh_token: string | null
-          token_expires_at: string | null
+          is_available: boolean
+          start_time: string
           updated_at: string
           user_id: string
         }
         Insert: {
-          access_token?: string | null
-          calendar_id: string
           created_at?: string
+          day_of_week: number
+          end_time: string
           id?: string
-          is_active?: boolean | null
-          provider: string
-          refresh_token?: string | null
-          token_expires_at?: string | null
+          is_available?: boolean
+          start_time: string
           updated_at?: string
           user_id: string
         }
         Update: {
-          access_token?: string | null
-          calendar_id?: string
           created_at?: string
+          day_of_week?: number
+          end_time?: string
           id?: string
-          is_active?: boolean | null
-          provider?: string
-          refresh_token?: string | null
-          token_expires_at?: string | null
+          is_available?: boolean
+          start_time?: string
           updated_at?: string
           user_id?: string
         }
@@ -286,79 +383,211 @@ export type Database = {
       }
       company_settings: {
         Row: {
-          address: string
-          booking_slug: string | null
-          city: string
-          company_name: string
+          address: string | null
+          apply_withholding_tax: boolean | null
+          city: string | null
+          civic_number: string | null
+          company_name: string | null
           country: string | null
           created_at: string | null
           email: string | null
+          entity_type: string | null
+          first_name: string | null
           id: string
           invoice_counter: number | null
+          is_agricultural: boolean | null
+          is_non_profit: boolean | null
+          is_occasional_performer: boolean | null
+          is_public_administration: boolean | null
+          is_tax_exempt: boolean | null
+          is_vat_liable: boolean | null
+          last_name: string | null
           pec_email: string | null
           phone: string | null
-          postal_code: string
-          province: string
+          postal_code: string | null
+          province: string | null
+          reminder_hours: number | null
+          reminder_message: string | null
           sdi_code: string | null
-          tax_code: string
+          tax_code: string | null
+          tax_regime: string | null
           ts_certificate_path: string | null
           ts_enabled: boolean | null
           ts_password_hash: string | null
           ts_transmitter_code: string | null
           ts_username: string | null
           updated_at: string | null
+          use_electronic_invoicing: boolean | null
           user_id: string
-          vat_number: string
+          vat_number: string | null
         }
         Insert: {
-          address: string
-          booking_slug?: string | null
-          city: string
-          company_name: string
+          address?: string | null
+          apply_withholding_tax?: boolean | null
+          city?: string | null
+          civic_number?: string | null
+          company_name?: string | null
           country?: string | null
           created_at?: string | null
           email?: string | null
+          entity_type?: string | null
+          first_name?: string | null
           id?: string
           invoice_counter?: number | null
+          is_agricultural?: boolean | null
+          is_non_profit?: boolean | null
+          is_occasional_performer?: boolean | null
+          is_public_administration?: boolean | null
+          is_tax_exempt?: boolean | null
+          is_vat_liable?: boolean | null
+          last_name?: string | null
           pec_email?: string | null
           phone?: string | null
-          postal_code: string
-          province: string
+          postal_code?: string | null
+          province?: string | null
+          reminder_hours?: number | null
+          reminder_message?: string | null
           sdi_code?: string | null
-          tax_code: string
+          tax_code?: string | null
+          tax_regime?: string | null
           ts_certificate_path?: string | null
           ts_enabled?: boolean | null
           ts_password_hash?: string | null
           ts_transmitter_code?: string | null
           ts_username?: string | null
           updated_at?: string | null
+          use_electronic_invoicing?: boolean | null
           user_id: string
-          vat_number: string
+          vat_number?: string | null
         }
         Update: {
-          address?: string
-          booking_slug?: string | null
-          city?: string
-          company_name?: string
+          address?: string | null
+          apply_withholding_tax?: boolean | null
+          city?: string | null
+          civic_number?: string | null
+          company_name?: string | null
           country?: string | null
           created_at?: string | null
           email?: string | null
+          entity_type?: string | null
+          first_name?: string | null
           id?: string
           invoice_counter?: number | null
+          is_agricultural?: boolean | null
+          is_non_profit?: boolean | null
+          is_occasional_performer?: boolean | null
+          is_public_administration?: boolean | null
+          is_tax_exempt?: boolean | null
+          is_vat_liable?: boolean | null
+          last_name?: string | null
           pec_email?: string | null
           phone?: string | null
-          postal_code?: string
-          province?: string
+          postal_code?: string | null
+          province?: string | null
+          reminder_hours?: number | null
+          reminder_message?: string | null
           sdi_code?: string | null
-          tax_code?: string
+          tax_code?: string | null
+          tax_regime?: string | null
           ts_certificate_path?: string | null
           ts_enabled?: boolean | null
           ts_password_hash?: string | null
           ts_transmitter_code?: string | null
           ts_username?: string | null
           updated_at?: string | null
+          use_electronic_invoicing?: boolean | null
           user_id?: string
-          vat_number?: string
+          vat_number?: string | null
+        }
+        Relationships: []
+      }
+      custom_sections: {
+        Row: {
+          created_at: string | null
+          group_key: string
+          id: string
+          section_key: string
+          section_name: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          group_key: string
+          id?: string
+          section_key: string
+          section_name: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          group_key?: string
+          id?: string
+          section_key?: string
+          section_name?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      deletion_logs: {
+        Row: {
+          action: string | null
+          created_at: string | null
+          error: string | null
+          id: string
+          result: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action?: string | null
+          created_at?: string | null
+          error?: string | null
+          id?: string
+          result?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string | null
+          created_at?: string | null
+          error?: string | null
+          id?: string
+          result?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      document_templates: {
+        Row: {
+          content: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          template_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          template_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          template_type?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -510,12 +739,10 @@ export type Database = {
           created_at: string
           description: string | null
           difficulty_level: string | null
-          duration_minutes: number | null
           id: string
           instructions: string | null
           name: string
-          repetitions: number | null
-          sets: number | null
+          therapist_id: string | null
           updated_at: string
           user_id: string
         }
@@ -524,12 +751,10 @@ export type Database = {
           created_at?: string
           description?: string | null
           difficulty_level?: string | null
-          duration_minutes?: number | null
           id?: string
           instructions?: string | null
           name: string
-          repetitions?: number | null
-          sets?: number | null
+          therapist_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -538,55 +763,19 @@ export type Database = {
           created_at?: string
           description?: string | null
           difficulty_level?: string | null
-          duration_minutes?: number | null
           id?: string
           instructions?: string | null
           name?: string
-          repetitions?: number | null
-          sets?: number | null
+          therapist_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
-      }
-      external_event_mappings: {
-        Row: {
-          appointment_id: string
-          created_at: string
-          external_event_id: string
-          id: string
-          integration_id: string
-          provider: string
-        }
-        Insert: {
-          appointment_id: string
-          created_at?: string
-          external_event_id: string
-          id?: string
-          integration_id: string
-          provider: string
-        }
-        Update: {
-          appointment_id?: string
-          created_at?: string
-          external_event_id?: string
-          id?: string
-          integration_id?: string
-          provider?: string
-        }
         Relationships: [
           {
-            foreignKeyName: "external_event_mappings_appointment_id_fkey"
-            columns: ["appointment_id"]
+            foreignKeyName: "exercises_therapist_id_fkey"
+            columns: ["therapist_id"]
             isOneToOne: false
-            referencedRelation: "appointments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "external_event_mappings_integration_id_fkey"
-            columns: ["integration_id"]
-            isOneToOne: false
-            referencedRelation: "calendar_integrations"
+            referencedRelation: "therapists"
             referencedColumns: ["id"]
           },
         ]
@@ -648,233 +837,175 @@ export type Database = {
         }
         Relationships: []
       }
-      instagram_connections: {
+      invoices: {
         Row: {
-          access_token: string
           created_at: string
+          description: string
+          document_type: string
           id: string
-          instagram_user_id: string
-          is_active: boolean | null
-          profile_data: Json | null
-          refresh_token: string | null
-          token_expires_at: string | null
+          invoice_date: string
+          invoice_number: string
+          natura: string | null
+          pdf_url: string | null
+          quantity: number
+          session_id: string | null
+          tax_rate: number
+          taxable_amount: number
+          total_amount: number
+          unit_price: number
           updated_at: string
           user_id: string
-          username: string
+          vat_amount: number
         }
         Insert: {
-          access_token: string
           created_at?: string
+          description: string
+          document_type: string
           id?: string
-          instagram_user_id: string
-          is_active?: boolean | null
-          profile_data?: Json | null
-          refresh_token?: string | null
-          token_expires_at?: string | null
+          invoice_date: string
+          invoice_number: string
+          natura?: string | null
+          pdf_url?: string | null
+          quantity?: number
+          session_id?: string | null
+          tax_rate?: number
+          taxable_amount: number
+          total_amount: number
+          unit_price: number
           updated_at?: string
           user_id: string
-          username: string
+          vat_amount: number
         }
         Update: {
-          access_token?: string
           created_at?: string
-          id?: string
-          instagram_user_id?: string
-          is_active?: boolean | null
-          profile_data?: Json | null
-          refresh_token?: string | null
-          token_expires_at?: string | null
-          updated_at?: string
-          user_id?: string
-          username?: string
-        }
-        Relationships: []
-      }
-      invoice_items: {
-        Row: {
-          appointment_id: string | null
-          created_at: string | null
-          description: string
-          id: string
-          invoice_id: string
-          quantity: number
-          tax_amount: number
-          tax_rate: number
-          total_amount: number
-          unit_price: number
-        }
-        Insert: {
-          appointment_id?: string | null
-          created_at?: string | null
-          description: string
-          id?: string
-          invoice_id: string
-          quantity?: number
-          tax_amount: number
-          tax_rate?: number
-          total_amount: number
-          unit_price: number
-        }
-        Update: {
-          appointment_id?: string | null
-          created_at?: string | null
           description?: string
+          document_type?: string
           id?: string
-          invoice_id?: string
+          invoice_date?: string
+          invoice_number?: string
+          natura?: string | null
+          pdf_url?: string | null
           quantity?: number
-          tax_amount?: number
+          session_id?: string | null
           tax_rate?: number
+          taxable_amount?: number
           total_amount?: number
           unit_price?: number
+          updated_at?: string
+          user_id?: string
+          vat_amount?: number
         }
         Relationships: [
           {
-            foreignKeyName: "invoice_items_appointment_id_fkey"
-            columns: ["appointment_id"]
+            foreignKeyName: "fk_invoices_session_id"
+            columns: ["session_id"]
             isOneToOne: false
-            referencedRelation: "appointments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoice_items_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
+            referencedRelation: "sessions"
             referencedColumns: ["id"]
           },
         ]
       }
-      invoice_templates: {
+      leads: {
         Row: {
-          created_at: string | null
-          description: string
+          address: string | null
+          birth_place: string | null
+          city: string | null
+          civic_number: string | null
+          codice_destinatario: string | null
+          country: string | null
+          created_at: string
+          date_of_birth: string | null
+          denominazione: string | null
+          email: string | null
+          first_name: string
+          fonte_acquisizione: string | null
           id: string
-          is_default: boolean | null
-          name: string
-          tax_rate: number
-          unit_price: number
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          description: string
-          id?: string
-          is_default?: boolean | null
-          name: string
-          tax_rate?: number
-          unit_price: number
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          description?: string
-          id?: string
-          is_default?: boolean | null
-          name?: string
-          tax_rate?: number
-          unit_price?: number
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      invoices: {
-        Row: {
-          business_client_id: string | null
-          client_type: string
-          created_at: string | null
-          due_date: string | null
-          health_card_data: Json | null
-          id: string
-          invoice_date: string
-          invoice_number: string
-          is_health_service: boolean | null
+          last_name: string
+          nationality: string | null
           notes: string | null
-          patient_id: string | null
-          payment_method: string | null
-          payment_terms: string | null
-          sdi_identifier: string | null
-          sent_to_sdi_at: string | null
-          status: string
-          subtotal: number
-          tax_amount: number
-          total_amount: number
-          ts_sent_at: string | null
-          ts_status: string | null
-          ts_transmission_id: string | null
-          updated_at: string | null
+          pec_destinatario: string | null
+          phone: string | null
+          piva: string | null
+          postal_code: string | null
+          province: string | null
+          referring_patient_id: string | null
+          tax_code: string | null
+          temperatura: string | null
+          therapist_id: string | null
+          updated_at: string
           user_id: string
-          xml_file_path: string | null
         }
         Insert: {
-          business_client_id?: string | null
-          client_type: string
-          created_at?: string | null
-          due_date?: string | null
-          health_card_data?: Json | null
+          address?: string | null
+          birth_place?: string | null
+          city?: string | null
+          civic_number?: string | null
+          codice_destinatario?: string | null
+          country?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          denominazione?: string | null
+          email?: string | null
+          first_name: string
+          fonte_acquisizione?: string | null
           id?: string
-          invoice_date: string
-          invoice_number: string
-          is_health_service?: boolean | null
+          last_name: string
+          nationality?: string | null
           notes?: string | null
-          patient_id?: string | null
-          payment_method?: string | null
-          payment_terms?: string | null
-          sdi_identifier?: string | null
-          sent_to_sdi_at?: string | null
-          status?: string
-          subtotal?: number
-          tax_amount?: number
-          total_amount?: number
-          ts_sent_at?: string | null
-          ts_status?: string | null
-          ts_transmission_id?: string | null
-          updated_at?: string | null
+          pec_destinatario?: string | null
+          phone?: string | null
+          piva?: string | null
+          postal_code?: string | null
+          province?: string | null
+          referring_patient_id?: string | null
+          tax_code?: string | null
+          temperatura?: string | null
+          therapist_id?: string | null
+          updated_at?: string
           user_id: string
-          xml_file_path?: string | null
         }
         Update: {
-          business_client_id?: string | null
-          client_type?: string
-          created_at?: string | null
-          due_date?: string | null
-          health_card_data?: Json | null
+          address?: string | null
+          birth_place?: string | null
+          city?: string | null
+          civic_number?: string | null
+          codice_destinatario?: string | null
+          country?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          denominazione?: string | null
+          email?: string | null
+          first_name?: string
+          fonte_acquisizione?: string | null
           id?: string
-          invoice_date?: string
-          invoice_number?: string
-          is_health_service?: boolean | null
+          last_name?: string
+          nationality?: string | null
           notes?: string | null
-          patient_id?: string | null
-          payment_method?: string | null
-          payment_terms?: string | null
-          sdi_identifier?: string | null
-          sent_to_sdi_at?: string | null
-          status?: string
-          subtotal?: number
-          tax_amount?: number
-          total_amount?: number
-          ts_sent_at?: string | null
-          ts_status?: string | null
-          ts_transmission_id?: string | null
-          updated_at?: string | null
+          pec_destinatario?: string | null
+          phone?: string | null
+          piva?: string | null
+          postal_code?: string | null
+          province?: string | null
+          referring_patient_id?: string | null
+          tax_code?: string | null
+          temperatura?: string | null
+          therapist_id?: string | null
+          updated_at?: string
           user_id?: string
-          xml_file_path?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "invoices_business_client_id_fkey"
-            columns: ["business_client_id"]
+            foreignKeyName: "leads_referring_patient_id_fkey"
+            columns: ["referring_patient_id"]
             isOneToOne: false
-            referencedRelation: "business_clients"
+            referencedRelation: "patients"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "invoices_patient_id_fkey"
-            columns: ["patient_id"]
+            foreignKeyName: "leads_therapist_id_fkey"
+            columns: ["therapist_id"]
             isOneToOne: false
-            referencedRelation: "patients"
+            referencedRelation: "therapists"
             referencedColumns: ["id"]
           },
         ]
@@ -909,43 +1040,44 @@ export type Database = {
         }
         Relationships: []
       }
-      patient_custom_fields: {
+      patient_documents: {
         Row: {
-          created_at: string | null
-          field_name: string
-          field_type: string | null
-          field_value: string | null
+          created_at: string
+          document_data: Json
+          document_type: string
+          generated_at: string
           id: string
-          patient_id: string | null
-          updated_at: string | null
+          patient_id: string
+          pdf_url: string | null
+          template_id: string | null
+          therapist_id: string | null
+          user_id: string
         }
         Insert: {
-          created_at?: string | null
-          field_name: string
-          field_type?: string | null
-          field_value?: string | null
+          created_at?: string
+          document_data?: Json
+          document_type?: string
+          generated_at?: string
           id?: string
-          patient_id?: string | null
-          updated_at?: string | null
+          patient_id: string
+          pdf_url?: string | null
+          template_id?: string | null
+          therapist_id?: string | null
+          user_id: string
         }
         Update: {
-          created_at?: string | null
-          field_name?: string
-          field_type?: string | null
-          field_value?: string | null
+          created_at?: string
+          document_data?: Json
+          document_type?: string
+          generated_at?: string
           id?: string
-          patient_id?: string | null
-          updated_at?: string | null
+          patient_id?: string
+          pdf_url?: string | null
+          template_id?: string | null
+          therapist_id?: string | null
+          user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "patient_custom_fields_patient_id_fkey"
-            columns: ["patient_id"]
-            isOneToOne: false
-            referencedRelation: "patients"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       patient_exercise_assignments: {
         Row: {
@@ -1067,6 +1199,50 @@ export type Database = {
           },
         ]
       }
+      patient_referti: {
+        Row: {
+          created_at: string
+          id: string
+          patient_id: string
+          referto_data: Json
+          session_id: string | null
+          template_id: string | null
+          therapist_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          patient_id: string
+          referto_data?: Json
+          session_id?: string | null
+          template_id?: string | null
+          therapist_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          patient_id?: string
+          referto_data?: Json
+          session_id?: string | null
+          template_id?: string | null
+          therapist_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_patient_referti_session_id"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       patient_tag_assignments: {
         Row: {
           created_at: string | null
@@ -1109,110 +1285,110 @@ export type Database = {
           created_at: string | null
           id: string
           name: string
+          user_id: string | null
         }
         Insert: {
           color?: string | null
           created_at?: string | null
           id?: string
           name: string
+          user_id?: string | null
         }
         Update: {
           color?: string | null
           created_at?: string | null
           id?: string
           name?: string
+          user_id?: string | null
         }
         Relationships: []
       }
       patients: {
         Row: {
-          acquisition_source: string | null
           address: string | null
           birth_place: string | null
           city: string | null
+          civic_number: string | null
+          codice_destinatario: string | null
           country: string | null
-          created_at: string | null
+          created_at: string
           date_of_birth: string | null
+          denominazione: string | null
           email: string | null
-          emergency_contact_name: string | null
-          emergency_contact_phone: string | null
-          exemption_code: string | null
           first_name: string
-          first_visit_date: string | null
-          gender: string | null
-          health_card_expiry: string | null
-          health_card_number: string | null
+          fonte_acquisizione: string | null
           id: string
           last_name: string
-          medical_condition: string | null
           nationality: string | null
           notes: string | null
+          pec_destinatario: string | null
           phone: string | null
+          piva: string | null
           postal_code: string | null
           province: string | null
           referring_patient_id: string | null
           tax_code: string | null
-          updated_at: string | null
+          temperatura: string
+          therapist_id: string | null
+          updated_at: string
           user_id: string
         }
         Insert: {
-          acquisition_source?: string | null
           address?: string | null
           birth_place?: string | null
           city?: string | null
+          civic_number?: string | null
+          codice_destinatario?: string | null
           country?: string | null
-          created_at?: string | null
+          created_at?: string
           date_of_birth?: string | null
+          denominazione?: string | null
           email?: string | null
-          emergency_contact_name?: string | null
-          emergency_contact_phone?: string | null
-          exemption_code?: string | null
           first_name: string
-          first_visit_date?: string | null
-          gender?: string | null
-          health_card_expiry?: string | null
-          health_card_number?: string | null
+          fonte_acquisizione?: string | null
           id?: string
           last_name: string
-          medical_condition?: string | null
           nationality?: string | null
           notes?: string | null
+          pec_destinatario?: string | null
           phone?: string | null
+          piva?: string | null
           postal_code?: string | null
           province?: string | null
           referring_patient_id?: string | null
           tax_code?: string | null
-          updated_at?: string | null
+          temperatura?: string
+          therapist_id?: string | null
+          updated_at?: string
           user_id: string
         }
         Update: {
-          acquisition_source?: string | null
           address?: string | null
           birth_place?: string | null
           city?: string | null
+          civic_number?: string | null
+          codice_destinatario?: string | null
           country?: string | null
-          created_at?: string | null
+          created_at?: string
           date_of_birth?: string | null
+          denominazione?: string | null
           email?: string | null
-          emergency_contact_name?: string | null
-          emergency_contact_phone?: string | null
-          exemption_code?: string | null
           first_name?: string
-          first_visit_date?: string | null
-          gender?: string | null
-          health_card_expiry?: string | null
-          health_card_number?: string | null
+          fonte_acquisizione?: string | null
           id?: string
           last_name?: string
-          medical_condition?: string | null
           nationality?: string | null
           notes?: string | null
+          pec_destinatario?: string | null
           phone?: string | null
+          piva?: string | null
           postal_code?: string | null
           province?: string | null
           referring_patient_id?: string | null
           tax_code?: string | null
-          updated_at?: string | null
+          temperatura?: string
+          therapist_id?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
@@ -1223,54 +1399,321 @@ export type Database = {
             referencedRelation: "patients"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "patients_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "therapists"
+            referencedColumns: ["id"]
+          },
         ]
+      }
+      pl_scenarios: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          name: string
+          period: string | null
+          results: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id?: string
+          name: string
+          period?: string | null
+          results: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          name?: string
+          period?: string | null
+          results?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
+          account_type: string | null
           created_at: string | null
           email: string | null
           first_name: string | null
-          gohighlevel_api_key: string | null
           id: string
+          is_active: boolean | null
           last_name: string | null
           organization_name: string | null
+          parent_account_id: string | null
           phone: string | null
           privacy_consent: boolean | null
           terms_consent: boolean | null
           updated_at: string | null
         }
         Insert: {
+          account_type?: string | null
           created_at?: string | null
           email?: string | null
           first_name?: string | null
-          gohighlevel_api_key?: string | null
           id: string
+          is_active?: boolean | null
           last_name?: string | null
           organization_name?: string | null
+          parent_account_id?: string | null
           phone?: string | null
           privacy_consent?: boolean | null
           terms_consent?: boolean | null
           updated_at?: string | null
         }
         Update: {
+          account_type?: string | null
           created_at?: string | null
           email?: string | null
           first_name?: string | null
-          gohighlevel_api_key?: string | null
           id?: string
+          is_active?: boolean | null
           last_name?: string | null
           organization_name?: string | null
+          parent_account_id?: string | null
           phone?: string | null
           privacy_consent?: boolean | null
           terms_consent?: boolean | null
           updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_parent_account_id_fkey"
+            columns: ["parent_account_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profitability_scenarios: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          name: string
+          period: string | null
+          results: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id?: string
+          name: string
+          period?: string | null
+          results: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          name?: string
+          period?: string | null
+          results?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      published_posts: {
+        Row: {
+          blotato_post_id: string | null
+          content: string
+          created_at: string | null
+          error_message: string | null
+          id: string
+          platforms: string[]
+          published_at: string | null
+          scheduled_for: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          blotato_post_id?: string | null
+          content: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          platforms: string[]
+          published_at?: string | null
+          scheduled_for?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          blotato_post_id?: string | null
+          content?: string
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          platforms?: string[]
+          published_at?: string | null
+          scheduled_for?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      referto_template_fields: {
+        Row: {
+          created_at: string | null
+          default_value: string | null
+          field_name: string
+          field_type: string
+          id: string
+          is_required: boolean | null
+          sequence_order: number
+          template_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          default_value?: string | null
+          field_name: string
+          field_type?: string
+          id?: string
+          is_required?: boolean | null
+          sequence_order?: number
+          template_id: string
+        }
+        Update: {
+          created_at?: string | null
+          default_value?: string | null
+          field_name?: string
+          field_type?: string
+          id?: string
+          is_required?: boolean | null
+          sequence_order?: number
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referto_template_fields_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "referto_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referto_templates: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          therapist_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          therapist_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          therapist_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referto_templates_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "therapists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roi_scenarios: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          name: string
+          results: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id?: string
+          name: string
+          results: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          name?: string
+          results?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      room_scenarios: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          name: string
+          period: string | null
+          results: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id?: string
+          name: string
+          period?: string | null
+          results: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          name?: string
+          period?: string | null
+          results?: Json
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
       rooms: {
         Row: {
           created_at: string | null
-          hourly_cost: number | null
           id: string
           name: string
           room_type: string | null
@@ -1279,7 +1722,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          hourly_cost?: number | null
           id?: string
           name: string
           room_type?: string | null
@@ -1288,11 +1730,73 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
-          hourly_cost?: number | null
           id?: string
           name?: string
           room_type?: string | null
           updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      security_access_logs: {
+        Row: {
+          accessed_at: string | null
+          auth_role: string | null
+          auth_uid: string | null
+          blocked: boolean | null
+          db_user: string | null
+          id: string
+          operation: string | null
+          table_name: string | null
+        }
+        Insert: {
+          accessed_at?: string | null
+          auth_role?: string | null
+          auth_uid?: string | null
+          blocked?: boolean | null
+          db_user?: string | null
+          id?: string
+          operation?: string | null
+          table_name?: string | null
+        }
+        Update: {
+          accessed_at?: string | null
+          auth_role?: string | null
+          auth_uid?: string | null
+          blocked?: boolean | null
+          db_user?: string | null
+          id?: string
+          operation?: string | null
+          table_name?: string | null
+        }
+        Relationships: []
+      }
+      security_logs: {
+        Row: {
+          action: string
+          details: Json | null
+          id: string
+          ip_address: unknown | null
+          timestamp: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          timestamp?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          timestamp?: string | null
+          user_agent?: string | null
           user_id?: string | null
         }
         Relationships: []
@@ -1303,7 +1807,7 @@ export type Database = {
           base_price: number
           created_at: string | null
           duration_minutes: number
-          equipment_ids: string[] | null
+          equipment_id: string | null
           final_price: number
           id: string
           is_first_session: boolean | null
@@ -1312,6 +1816,7 @@ export type Database = {
           room_id: string | null
           session_date: string
           therapist_id: string | null
+          treatment_id: string | null
           treatment_type: string | null
           updated_at: string | null
           user_id: string
@@ -1321,7 +1826,7 @@ export type Database = {
           base_price: number
           created_at?: string | null
           duration_minutes: number
-          equipment_ids?: string[] | null
+          equipment_id?: string | null
           final_price: number
           id?: string
           is_first_session?: boolean | null
@@ -1330,6 +1835,7 @@ export type Database = {
           room_id?: string | null
           session_date: string
           therapist_id?: string | null
+          treatment_id?: string | null
           treatment_type?: string | null
           updated_at?: string | null
           user_id: string
@@ -1339,7 +1845,7 @@ export type Database = {
           base_price?: number
           created_at?: string | null
           duration_minutes?: number
-          equipment_ids?: string[] | null
+          equipment_id?: string | null
           final_price?: number
           id?: string
           is_first_session?: boolean | null
@@ -1348,6 +1854,7 @@ export type Database = {
           room_id?: string | null
           session_date?: string
           therapist_id?: string | null
+          treatment_id?: string | null
           treatment_type?: string | null
           updated_at?: string | null
           user_id?: string
@@ -1358,6 +1865,13 @@ export type Database = {
             columns: ["appointment_id"]
             isOneToOne: false
             referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sessions_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
             referencedColumns: ["id"]
           },
           {
@@ -1381,75 +1895,60 @@ export type Database = {
             referencedRelation: "therapists"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "sessions_treatment_id_fkey"
+            columns: ["treatment_id"]
+            isOneToOne: false
+            referencedRelation: "treatments"
+            referencedColumns: ["id"]
+          },
         ]
       }
-      tessera_sanitaria_transmissions: {
+      therapist_accounts: {
         Row: {
-          acceptance_code: string | null
-          checksum: string | null
-          created_at: string
-          error_message: string | null
-          file_size: number | null
+          created_at: string | null
           id: string
-          invoice_id: string
-          last_retry_at: string | null
-          rejection_reason: string | null
-          response_data: Json | null
-          retry_count: number | null
-          sent_at: string | null
-          status: string
-          transmission_id: string
-          updated_at: string
-          user_id: string
-          validation_errors: Json | null
-          xml_content: string | null
+          mother_account_id: string
+          profile_id: string
+          therapist_id: string
+          updated_at: string | null
         }
         Insert: {
-          acceptance_code?: string | null
-          checksum?: string | null
-          created_at?: string
-          error_message?: string | null
-          file_size?: number | null
+          created_at?: string | null
           id?: string
-          invoice_id: string
-          last_retry_at?: string | null
-          rejection_reason?: string | null
-          response_data?: Json | null
-          retry_count?: number | null
-          sent_at?: string | null
-          status?: string
-          transmission_id: string
-          updated_at?: string
-          user_id: string
-          validation_errors?: Json | null
-          xml_content?: string | null
+          mother_account_id: string
+          profile_id: string
+          therapist_id: string
+          updated_at?: string | null
         }
         Update: {
-          acceptance_code?: string | null
-          checksum?: string | null
-          created_at?: string
-          error_message?: string | null
-          file_size?: number | null
+          created_at?: string | null
           id?: string
-          invoice_id?: string
-          last_retry_at?: string | null
-          rejection_reason?: string | null
-          response_data?: Json | null
-          retry_count?: number | null
-          sent_at?: string | null
-          status?: string
-          transmission_id?: string
-          updated_at?: string
-          user_id?: string
-          validation_errors?: Json | null
-          xml_content?: string | null
+          mother_account_id?: string
+          profile_id?: string
+          therapist_id?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "tessera_sanitaria_transmissions_invoice_id_fkey"
-            columns: ["invoice_id"]
+            foreignKeyName: "therapist_accounts_mother_account_id_fkey"
+            columns: ["mother_account_id"]
             isOneToOne: false
-            referencedRelation: "invoices"
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "therapist_accounts_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "therapist_accounts_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: true
+            referencedRelation: "therapists"
             referencedColumns: ["id"]
           },
         ]
@@ -1501,35 +2000,149 @@ export type Database = {
       therapists: {
         Row: {
           created_at: string | null
-          hourly_rate: number | null
           id: string
           name: string
           specialization: string | null
+          status: string
+          surname: string | null
           updated_at: string | null
           user_id: string | null
         }
         Insert: {
           created_at?: string | null
-          hourly_rate?: number | null
           id?: string
           name: string
           specialization?: string | null
+          status?: string
+          surname?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
         Update: {
           created_at?: string | null
-          hourly_rate?: number | null
           id?: string
           name?: string
           specialization?: string | null
+          status?: string
+          surname?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
         Relationships: []
       }
+      treatment_path_items: {
+        Row: {
+          created_at: string
+          id: string
+          is_required: boolean
+          path_id: string
+          sequence_order: number
+          sessions_count: number
+          treatment_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_required?: boolean
+          path_id: string
+          sequence_order: number
+          sessions_count?: number
+          treatment_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_required?: boolean
+          path_id?: string
+          sequence_order?: number
+          sessions_count?: number
+          treatment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treatment_path_items_path_id_fkey"
+            columns: ["path_id"]
+            isOneToOne: false
+            referencedRelation: "treatment_paths"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "treatment_path_items_treatment_id_fkey"
+            columns: ["treatment_id"]
+            isOneToOne: false
+            referencedRelation: "treatments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      treatment_paths: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration_unit: string | null
+          duration_value: number | null
+          final_price: number | null
+          id: string
+          is_active: boolean
+          name: string
+          price_type: string
+          session_price: number | null
+          target_outcomes: string | null
+          therapist_id: string | null
+          total_price: number | null
+          total_sessions: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration_unit?: string | null
+          duration_value?: number | null
+          final_price?: number | null
+          id?: string
+          is_active?: boolean
+          name: string
+          price_type?: string
+          session_price?: number | null
+          target_outcomes?: string | null
+          therapist_id?: string | null
+          total_price?: number | null
+          total_sessions?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration_unit?: string | null
+          duration_value?: number | null
+          final_price?: number | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          price_type?: string
+          session_price?: number | null
+          target_outcomes?: string | null
+          therapist_id?: string | null
+          total_price?: number | null
+          total_sessions?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treatment_paths_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "therapists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       treatments: {
         Row: {
+          cost: number | null
           created_at: string
           description: string | null
           duration_minutes: number
@@ -1537,10 +2150,12 @@ export type Database = {
           is_active: boolean
           name: string
           price: number
+          therapist_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          cost?: number | null
           created_at?: string
           description?: string | null
           duration_minutes?: number
@@ -1548,10 +2163,12 @@ export type Database = {
           is_active?: boolean
           name: string
           price?: number
+          therapist_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          cost?: number | null
           created_at?: string
           description?: string | null
           duration_minutes?: number
@@ -1559,158 +2176,131 @@ export type Database = {
           is_active?: boolean
           name?: string
           price?: number
+          therapist_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treatments_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "therapists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_settings: {
+        Row: {
+          cac_value: number | null
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cac_value?: number | null
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cac_value?: number | null
+          created_at?: string
+          id?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: []
-      }
-      ts_configurations: {
-        Row: {
-          api_endpoint: string
-          certificate_serial: string | null
-          created_at: string | null
-          environment: string
-          id: string
-          is_active: boolean | null
-          updated_at: string | null
-          user_id: string
-        }
-        Insert: {
-          api_endpoint: string
-          certificate_serial?: string | null
-          created_at?: string | null
-          environment?: string
-          id?: string
-          is_active?: boolean | null
-          updated_at?: string | null
-          user_id: string
-        }
-        Update: {
-          api_endpoint?: string
-          certificate_serial?: string | null
-          created_at?: string | null
-          environment?: string
-          id?: string
-          is_active?: boolean | null
-          updated_at?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      ts_status_logs: {
-        Row: {
-          created_at: string | null
-          id: string
-          message: string | null
-          response_data: Json | null
-          status: string
-          transmission_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          message?: string | null
-          response_data?: Json | null
-          status: string
-          transmission_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          message?: string | null
-          response_data?: Json | null
-          status?: string
-          transmission_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ts_status_logs_transmission_id_fkey"
-            columns: ["transmission_id"]
-            isOneToOne: false
-            referencedRelation: "tessera_sanitaria_transmissions"
-            referencedColumns: ["id"]
-          },
-        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      create_appointment_tag: {
+        Args: { p_color: string; p_name: string }
+        Returns: string
+      }
       delete_user_content: {
         Args: { p_content_id: string; p_user_id: string }
         Returns: undefined
       }
-      generate_booking_slug: {
-        Args: { company_name: string }
-        Returns: string
+      ensure_authenticated: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
-      get_next_invoice_number: {
-        Args: { p_user_id: string }
+      get_effective_user_id: {
+        Args: Record<PropertyKey, never>
         Returns: string
       }
       get_user_contents: {
         Args: { p_user_id: string }
         Returns: {
-          id: string
-          user_id: string
-          title: string
-          content_text: string
-          topic: string
           audience: string
+          content_text: string
+          created_at: string
+          engagement_stats: Json
+          id: string
+          images: Json
+          is_published: boolean
+          length: string
           platform: string
           post_type: string
-          tone: string
-          length: string
-          images: Json
-          engagement_stats: Json
-          is_published: boolean
           published_at: string
-          created_at: string
+          title: string
+          tone: string
+          topic: string
           updated_at: string
+          user_id: string
         }[]
       }
       get_user_instagram_connections: {
         Args: { p_user_id: string }
         Returns: {
+          created_at: string
           id: string
           instagram_user_id: string
-          username: string
-          profile_data: Json
           is_active: boolean
-          created_at: string
+          profile_data: Json
           updated_at: string
+          username: string
         }[]
       }
       insert_generated_content: {
         Args: {
-          p_user_id: string
-          p_title: string
-          p_content_text: string
-          p_topic: string
           p_audience?: string
+          p_content_text: string
+          p_images?: string
+          p_length?: string
           p_platform?: string
           p_post_type?: string
+          p_title: string
           p_tone?: string
-          p_length?: string
-          p_images?: string
+          p_topic: string
+          p_user_id: string
         }
         Returns: {
-          id: string
-          user_id: string
-          title: string
-          content_text: string
-          topic: string
           audience: string
-          platform: string
-          post_type: string
-          tone: string
-          length: string
+          content_text: string
+          created_at: string
+          id: string
           images: Json
           is_published: boolean
-          created_at: string
+          length: string
+          platform: string
+          post_type: string
+          title: string
+          tone: string
+          topic: string
           updated_at: string
+          user_id: string
         }[]
+      }
+      log_rls_violation: {
+        Args: { operation: string; table_name: string; user_id?: string }
+        Returns: undefined
       }
       mark_content_published: {
         Args: { p_content_id: string; p_user_id: string }
@@ -1718,15 +2308,19 @@ export type Database = {
       }
       upsert_instagram_connection: {
         Args: {
-          p_user_id: string
-          p_instagram_user_id: string
-          p_username: string
           p_access_token: string
+          p_instagram_user_id: string
+          p_profile_data?: Json
           p_refresh_token?: string
           p_token_expires_at?: string
-          p_profile_data?: Json
+          p_user_id: string
+          p_username: string
         }
         Returns: string
+      }
+      validate_healthcare_access: {
+        Args: { patient_id: string; requesting_user_id?: string }
+        Returns: boolean
       }
     }
     Enums: {
@@ -1738,21 +2332,25 @@ export type Database = {
   }
 }
 
-type DefaultSchema = Database[Extract<keyof Database, "public">]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
@@ -1770,14 +2368,16 @@ export type Tables<
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
@@ -1793,14 +2393,16 @@ export type TablesInsert<
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
@@ -1816,14 +2418,16 @@ export type TablesUpdate<
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
@@ -1831,14 +2435,16 @@ export type Enums<
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
