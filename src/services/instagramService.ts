@@ -102,11 +102,8 @@ export class InstagramService {
         return { data: null, error: { message: 'Utente non autenticato' } };
       }
 
-      const { data, error } = await supabase.rpc('get_user_instagram_connections', {
-        p_user_id: user.id
-      });
-
-      return { data, error };
+      // Instagram legacy - ritorna array vuoto dato che ora usiamo Blotato
+      return { data: [], error: null };
     } catch (error) {
       console.error('Errore caricamento connessioni Instagram:', error);
       return { data: null, error };
@@ -115,12 +112,9 @@ export class InstagramService {
 
   static async disconnectAccount(connectionId: string) {
     try {
-      const { error } = await supabase
-        .from('instagram_connections')
-        .update({ is_active: false })
-        .eq('id', connectionId);
-
-      return { error };
+      // Instagram legacy - ritorna successo dato che ora usiamo Blotato
+      console.log('Instagram disconnection legacy method called for:', connectionId);
+      return { error: null };
     } catch (error) {
       console.error('Errore disconnessione Instagram:', error);
       return { error };
