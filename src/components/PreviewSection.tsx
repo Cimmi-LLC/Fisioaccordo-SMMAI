@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Copy, Download, Sparkles, Upload, X } from "lucide-react";
 import CarouselImageManager from "@/components/CarouselImageManager";
+import TemplateLayoutEngine from "@/components/template/TemplateLayoutEngine";
 import { useToast } from "@/hooks/use-toast";
 
 interface CarouselSlide {
@@ -83,105 +84,33 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const renderSlideWithText = (slide: CarouselSlide, index: number) => {
-    // Estrai le parti principali del testo per il layout
-    const lines = slide.content.split('\n').filter(line => line.trim());
-    const mainTitle = lines[0] || '';
-    const subtitle = lines[1] || '';
-    const bodyText = lines.slice(2).join('\n') || '';
+  const renderSlideWithFisioaccordoTemplate = (slide: CarouselSlide, index: number) => {
+    let slideData;
     
-    // Diversi layout basati sul tipo di slide
-    const getSlideLayout = () => {
-      if (index === 0) {
-        // Prima slide - Layout accattivante per fermare lo scroll
-        return (
-          <div className="absolute inset-0 flex flex-col justify-center items-center text-center p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
-            <div className="bg-red-600 text-white px-3 py-1 rounded-full text-xs font-bold mb-2 animate-pulse">
-              🚨 ATTENZIONE
-            </div>
-            <h1 className="text-white text-lg font-black mb-2 leading-tight drop-shadow-lg">
-              {mainTitle.replace('🚨', '').trim()}
-            </h1>
-            <p className="text-yellow-300 text-sm font-semibold mb-3 drop-shadow-md">
-              {subtitle}
-            </p>
-            <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 py-2">
-              <p className="text-white text-xs font-medium">
-                👉 Swipe per la soluzione →
-              </p>
-            </div>
-          </div>
-        );
-      } else if (index === 1) {
-        // Seconda slide - Problema/Errore
-        return (
-          <div className="absolute inset-0 flex flex-col justify-end p-4 bg-gradient-to-t from-black/90 via-black/50 to-transparent">
-            <div className="bg-red-500/90 backdrop-blur-sm rounded-lg p-3 border-l-4 border-white">
-              <div className="flex items-center mb-2">
-                <span className="text-white text-lg">❌</span>
-                <h2 className="text-white text-sm font-bold ml-2">ERRORE COMUNE</h2>
-              </div>
-              <p className="text-white text-xs leading-relaxed">
-                {bodyText.substring(0, 120)}...
-              </p>
-            </div>
-          </div>
-        );
-      } else if (index === 2) {
-        // Terza slide - Soluzione
-        return (
-          <div className="absolute inset-0 flex flex-col justify-center p-4 bg-gradient-to-br from-green-600/80 via-black/60 to-black/80">
-            <div className="bg-white/95 backdrop-blur-sm rounded-lg p-3 shadow-xl">
-              <div className="flex items-center mb-2">
-                <span className="text-green-600 text-lg">✅</span>
-                <h2 className="text-green-800 text-sm font-bold ml-2">LA SOLUZIONE</h2>
-              </div>
-              <p className="text-gray-800 text-xs leading-relaxed font-medium">
-                3 passi per risolvere il problema
-              </p>
-              <div className="mt-2 space-y-1">
-                <div className="text-xs text-gray-700">1️⃣ Identifica la causa</div>
-                <div className="text-xs text-gray-700">2️⃣ Applica il protocollo</div>
-                <div className="text-xs text-gray-700">3️⃣ Mantieni i risultati</div>
-              </div>
-            </div>
-          </div>
-        );
-      } else if (index === 3) {
-        // Quarta slide - Risultati
-        return (
-          <div className="absolute inset-0 flex flex-col justify-between p-4 bg-gradient-to-t from-purple-900/90 via-purple-600/60 to-transparent">
-            <div className="bg-yellow-400 text-purple-900 px-2 py-1 rounded-full text-xs font-bold self-start">
-              🔥 RISULTATI GARANTITI
-            </div>
-            <div className="bg-white/95 backdrop-blur-sm rounded-lg p-3">
-              <h3 className="text-purple-900 text-sm font-bold mb-2">Cosa ottieni:</h3>
-              <div className="space-y-1">
-                <div className="text-xs text-purple-800">• Miglioramento in 7 giorni</div>
-                <div className="text-xs text-purple-800">• Dolore ridotto del 80%</div>
-                <div className="text-xs text-purple-800">• Movimento naturale</div>
-              </div>
-            </div>
-          </div>
-        );
-      } else {
-        // Ultima slide - Call to Action
-        return (
-          <div className="absolute inset-0 flex flex-col justify-center items-center p-4 bg-gradient-to-br from-orange-600/90 via-red-600/80 to-purple-900/90">
-            <div className="bg-white rounded-lg p-4 text-center shadow-2xl max-w-full">
-              <div className="text-2xl mb-2">🎯</div>
-              <h3 className="text-gray-900 text-sm font-bold mb-2">VUOI RISULTATI?</h3>
-              <div className="space-y-1 mb-3">
-                <div className="text-xs text-gray-700">📞 Consulenza GRATUITA</div>
-                <div className="text-xs text-gray-700">💬 Scrivici in DM</div>
-              </div>
-              <div className="bg-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold">
-                PRENOTA ORA
-              </div>
-            </div>
-          </div>
-        );
-      }
+    try {
+      // Prova a parsare il contenuto JSON
+      slideData = JSON.parse(slide.content);
+    } catch {
+      // Fallback per contenuto non JSON (formato vecchio)
+      const lines = slide.content.split('\n').filter(line => line.trim());
+      slideData = {
+        title: lines[0] || `Slide ${index + 1}`,
+        subtitle: lines[1] || '',
+        body: lines.slice(2).join('\n') || '',
+        footer: 'Studio Fisioterapico'
+      };
+    }
+
+    // Prepara i dati per il template Fisioaccordo
+    const templateData = {
+      title: slideData.title,
+      mainNumber: index === 0 ? '🚨' : index === 1 ? '❌' : index === 2 ? '✅' : index === 3 ? '🔥' : '🎯',
+      subtitle: slideData.subtitle,
+      body: slideData.body,
+      cta: index >= carouselSlides.length - 1 ? slideData.body : '',
+      footer: slideData.footer || 'Studio Fisioterapico',
+      imageUrl: slide.userImageUrl || slide.imageUrl,
+      backgroundColor: index === 0 ? '#dc2626' : index === 1 ? '#ef4444' : index === 2 ? '#16a34a' : index === 3 ? '#7c3aed' : '#ea580c'
     };
 
     return (
@@ -189,28 +118,17 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
         key={index}
         className="relative aspect-square rounded-lg overflow-hidden group border border-gray-600 bg-gray-800"
       >
-        {/* Immagine di sfondo */}
-        {slide.userImageUrl || slide.imageUrl ? (
-          <img 
-            src={slide.userImageUrl || slide.imageUrl} 
-            alt={`Slide ${index + 1}`}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              target.src = `https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400&h=400&fit=crop&crop=center`;
-            }}
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
-            Slide {index + 1}
-          </div>
-        )}
-        
-        {/* Overlay con testo stilizzato */}
-        {getSlideLayout()}
+        {/* Template Fisioaccordo */}
+        <TemplateLayoutEngine
+          template="fisioaccordo"
+          data={templateData}
+          width={400}
+          height={400}
+          className="w-full h-full"
+        />
         
         {/* Controlli hover */}
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
           <Button
             onClick={() => onImageEdit(slide.userImageUrl || slide.imageUrl || '', index)}
             size="sm"
@@ -249,7 +167,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
         </div>
         
         {/* Numero slide */}
-        <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full font-bold">
+        <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full font-bold z-10">
           {index + 1}
         </div>
       </div>
@@ -269,7 +187,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
               <div className="mb-4">
                 <h3 className="text-white font-semibold mb-3">Slide del Carosello con Testo</h3>
                 <div className="grid grid-cols-2 gap-3 mb-4">
-                  {carouselSlides.slice(0, 4).map((slide, index) => renderSlideWithText(slide, index))}
+                  {carouselSlides.slice(0, 4).map((slide, index) => renderSlideWithFisioaccordoTemplate(slide, index))}
                 </div>
                 
                 {carouselSlides.length > 4 && (
