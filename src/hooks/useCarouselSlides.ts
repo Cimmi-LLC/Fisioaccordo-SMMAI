@@ -14,7 +14,7 @@ interface FormData {
 }
 
 // Sistema di contenuti intelligenti basato su topic specifici
-const contentDatabase = useMemo(() => ({
+const contentDatabase = {
   'mal di schiena': {
     attention: {
       title: 'MAL DI SCHIENA',
@@ -150,7 +150,7 @@ const contentDatabase = useMemo(() => ({
       body: 'Accelera il tuo recupero oggi'
     }
   }
-}), []);
+};
 
 export const useCarouselSlides = (formData: FormData, user: any, basePhoto: string | null) => {
   const [carouselSlides, setCarouselSlides] = useState<CarouselSlide[]>([]);
@@ -213,7 +213,7 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
     
     // Default a mal di schiena se non trova match
     return contentDatabase['mal di schiena'];
-  }, [contentDatabase]);
+  }, []);
 
   const generateCarouselSlides = useCallback(() => {
     const numSlides = parseInt(formData.numSlides);
