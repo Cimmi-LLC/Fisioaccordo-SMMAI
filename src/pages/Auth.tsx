@@ -136,8 +136,9 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-gradient-to-br from-fisio/20 via-fisio/10 to-transparent -z-10" />
+      <div className="w-full max-w-md relative z-10">
         {/* Header con branding e logo */}
         <div className="text-center mb-8">
           <div className="flex justify-center items-center mb-4">
@@ -147,27 +148,27 @@ const Auth = () => {
               className="h-16 w-auto"
             />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">
-            FisioAccordo<span className="text-purple-300">(VIRAL)</span>ContentAI
+          <h1 className="text-3xl font-bold text-foreground mb-2">
+            FisioAccordo<span className="text-fisio">(VIRAL)</span>ContentAI
           </h1>
-          <p className="text-gray-300">
+          <p className="text-muted-foreground">
             Genera contenuti professionali per i tuoi social
           </p>
         </div>
 
-        <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
+        <Card className="bg-card/90 border-border backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="text-white text-center">
+            <CardTitle className="text-card-foreground text-center">
               Accedi alla Piattaforma
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="signin" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-gray-700">
-                <TabsTrigger value="signin" className="text-white data-[state=active]:bg-blue-600">
+              <TabsList className="grid w-full grid-cols-2 bg-muted">
+                <TabsTrigger value="signin" className="data-[state=active]:bg-fisio data-[state=active]:text-fisio-foreground">
                   Login
                 </TabsTrigger>
-                <TabsTrigger value="signup" className="text-white data-[state=active]:bg-blue-600">
+                <TabsTrigger value="signup" className="data-[state=active]:bg-fisio data-[state=active]:text-fisio-foreground">
                   Registrati
                 </TabsTrigger>
               </TabsList>
@@ -175,25 +176,25 @@ const Auth = () => {
               <TabsContent value="signin">
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div>
-                    <Label className="text-gray-300">Email</Label>
+                    <Label className="text-muted-foreground">Email</Label>
                     <Input
                       type="email"
                       name="email"
                       value={formData.email}
                       onChange={handleInputChange}
-                      className="bg-gray-700 border-gray-600 text-white"
+                      className="bg-muted border-border"
                       placeholder="la-tua-email@esempio.com"
                       required
                     />
                   </div>
                   <div>
-                    <Label className="text-gray-300">Password</Label>
+                    <Label className="text-muted-foreground">Password</Label>
                     <Input
                       type="password"
                       name="password"
                       value={formData.password}
                       onChange={handleInputChange}
-                      className="bg-gray-700 border-gray-600 text-white"
+                      className="bg-muted border-border"
                       placeholder="••••••••"
                       required
                     />
@@ -206,7 +207,7 @@ const Auth = () => {
                       checked={rememberMe}
                       onCheckedChange={(checked) => setRememberMe(checked as boolean)}
                     />
-                    <Label htmlFor="rememberMe" className="text-sm text-gray-300 cursor-pointer">
+                    <Label htmlFor="rememberMe" className="text-sm text-muted-foreground cursor-pointer">
                       🔒 Resta collegato
                     </Label>
                   </div>
@@ -214,7 +215,7 @@ const Auth = () => {
                   <Button 
                     type="submit" 
                     disabled={loading}
-                    className="w-full bg-blue-600 hover:bg-blue-700"
+                    className="w-full bg-fisio hover:bg-fisio/90 text-fisio-foreground"
                   >
                     {loading ? (
                       <>
@@ -232,77 +233,77 @@ const Auth = () => {
                 <form onSubmit={handleSignUp} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-gray-300">Nome</Label>
+                      <Label className="text-muted-foreground">Nome</Label>
                       <Input
                         type="text"
                         name="firstName"
                         value={formData.firstName}
                         onChange={handleInputChange}
-                        className="bg-gray-700 border-gray-600 text-white"
+                        className="bg-muted border-border"
                         placeholder="Mario"
                         required
                       />
                     </div>
                     <div>
-                      <Label className="text-gray-300">Cognome</Label>
+                      <Label className="text-muted-foreground">Cognome</Label>
                       <Input
                         type="text"
                         name="lastName"
                         value={formData.lastName}
                         onChange={handleInputChange}
-                        className="bg-gray-700 border-gray-600 text-white"
+                        className="bg-muted border-border"
                         placeholder="Rossi"
                         required
                       />
                     </div>
                   </div>
                   <div>
-                    <Label className="text-gray-300">Centro/Studio</Label>
+                    <Label className="text-muted-foreground">Centro/Studio</Label>
                     <Input
                       type="text"
                       name="clinicName"
                       value={formData.clinicName}
                       onChange={handleInputChange}
-                      className="bg-gray-700 border-gray-600 text-white"
+                      className="bg-muted border-border"
                       placeholder="Studio Fisioterapico XYZ"
                     />
                   </div>
                   <div>
-                    <Label className="text-gray-300">Email</Label>
+                    <Label className="text-muted-foreground">Email</Label>
                     <Input
                       type="email"
                       name="email"
                       value={formData.email}
                       onChange={handleInputChange}
-                      className="bg-gray-700 border-gray-600 text-white"
+                      className="bg-muted border-border"
                       placeholder="la-tua-email@esempio.com"
                       required
                     />
                   </div>
                   <div>
-                    <Label className="text-gray-300">Password</Label>
+                    <Label className="text-muted-foreground">Password</Label>
                     <Input
                       type="password"
                       name="password"
                       value={formData.password}
                       onChange={handleInputChange}
-                      className="bg-gray-700 border-gray-600 text-white"
+                      className="bg-muted border-border"
                       placeholder="••••••••"
                       required
                     />
                   </div>
                   
                   {/* Consensi e Privacy */}
-                  <div className="space-y-3 p-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                  <div className="space-y-3 p-4 bg-muted/50 rounded-lg border border-border">
                     <div className="flex items-start space-x-2">
                       <Checkbox 
                         id="terms" 
                         checked={agreedToTerms}
                         onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)}
                       />
-                      <Label htmlFor="terms" className="text-xs text-gray-300 leading-relaxed cursor-pointer">
-                        Accetto i <span className="text-blue-400 underline">Termini e Condizioni</span>, l'
-                        <span className="text-blue-400 underline">Informativa Privacy</span> e autorizzo 
+                      <Label htmlFor="terms" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
+                        Accetto i <span className="text-fisio underline">Termini e Condizioni</span>, l'
+                        <span className="text-fisio underline">Informativa Privacy</span> e autorizzo 
                         Cimmi LLC al trattamento dei miei dati personali per la fornitura del servizio, 
                         l'invio di comunicazioni commerciali e l'analisi statistica dei contenuti generati. 
                         Comprendo che i miei dati saranno trattati in conformità al GDPR e che posso 
@@ -314,7 +315,7 @@ const Auth = () => {
                   <Button 
                     type="submit" 
                     disabled={loading || !agreedToTerms}
-                    className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+                    className="w-full bg-fisio hover:bg-fisio/90 text-fisio-foreground disabled:opacity-50"
                   >
                     {loading ? (
                       <>
@@ -331,14 +332,14 @@ const Auth = () => {
           </CardContent>
         </Card>
 
-        <div className="text-center mt-6 text-gray-400 text-sm">
+        <div className="text-center mt-6 text-foreground/70 text-sm">
           <p>Crea contenuti professionali per Instagram, LinkedIn e Facebook</p>
           <p className="mt-2">✨ AI copywriting + immagini generate automaticamente</p>
         </div>
 
         {/* Disclaimer Copyright */}
-        <div className="mt-8 p-4 bg-gray-900/50 rounded-lg border border-gray-700">
-          <p className="text-xs text-gray-400 text-center leading-relaxed">
+        <div className="mt-8 p-4 bg-card/50 rounded-lg border border-border">
+          <p className="text-xs text-muted-foreground text-center leading-relaxed">
             © 2024 Cimmi LLC. Tutti i diritti riservati.<br/>
             FisioAccordo(VIRAL)ContentAI è proprietà esclusiva di Cimmi LLC.<br/>
             È vietata la copia, riproduzione o replica di questa piattaforma senza autorizzazione scritta.
