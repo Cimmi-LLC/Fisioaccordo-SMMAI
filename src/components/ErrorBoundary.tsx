@@ -53,26 +53,26 @@ class ErrorBoundary extends Component<Props, State> {
 
       return (
         <div className="min-h-[400px] flex items-center justify-center p-4">
-          <Card className="max-w-md w-full bg-gray-800/50 border-gray-700">
+          <Card className="max-w-md w-full bg-card/80 border-border">
             <CardHeader className="text-center">
-              <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-red-500/20 flex items-center justify-center">
-                <AlertTriangle className="h-6 w-6 text-red-400" />
+              <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-destructive/20 flex items-center justify-center">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
               </div>
-              <CardTitle className="text-white">
+              <CardTitle className="text-card-foreground">
                 Oops! Qualcosa è andato storto
               </CardTitle>
             </CardHeader>
             <CardContent className="text-center space-y-4">
-              <p className="text-gray-300 text-sm">
+              <p className="text-muted-foreground text-sm">
                 Si è verificato un errore imprevisto. Prova a ricaricare la sezione.
               </p>
               
               {process.env.NODE_ENV === 'development' && this.state.error && (
                 <details className="text-left">
-                  <summary className="text-xs text-gray-400 cursor-pointer mb-2">
+                  <summary className="text-xs text-muted-foreground cursor-pointer mb-2">
                     Debug Info (solo sviluppo)
                   </summary>
-                  <pre className="text-xs text-red-400 bg-gray-900/50 p-2 rounded overflow-auto max-h-32">
+                  <pre className="text-xs text-destructive bg-muted/50 p-2 rounded overflow-auto max-h-32">
                     {this.state.error.message}
                   </pre>
                 </details>
@@ -83,7 +83,6 @@ class ErrorBoundary extends Component<Props, State> {
                   onClick={this.handleReset}
                   variant="outline"
                   size="sm"
-                  className="text-white border-gray-600 hover:bg-gray-700"
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Riprova
@@ -91,7 +90,7 @@ class ErrorBoundary extends Component<Props, State> {
                 <Button
                   onClick={() => window.location.reload()}
                   size="sm"
-                  className="bg-purple-600 hover:bg-purple-700"
+                  variant="default"
                 >
                   Ricarica Pagina
                 </Button>
