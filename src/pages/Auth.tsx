@@ -137,7 +137,7 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gradient-to-br from-fisio/20 via-fisio/10 to-transparent -z-10" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent -z-10" />
       <div className="w-full max-w-md relative z-10">
         {/* Header con branding e logo */}
         <div className="text-center mb-8">

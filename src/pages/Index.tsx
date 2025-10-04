@@ -104,10 +104,10 @@ const Index = () => {
   // Loading state per auth
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center space-y-4 max-w-sm">
-          <Loader2 className="h-8 w-8 animate-spin text-white mx-auto" />
-          <p className="text-white/80 text-sm sm:text-base">Caricamento in corso...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+          <p className="text-muted-foreground text-sm sm:text-base">Caricamento in corso...</p>
         </div>
       </div>
     );
@@ -116,7 +116,7 @@ const Index = () => {
   // Image editor full screen
   if (selectedImageForEdit && editingSlideIndex !== null) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-2 sm:p-4">
+      <div className="min-h-screen bg-background p-2 sm:p-4">
         <LazyImageEditor
           imageUrl={selectedImageForEdit}
           onImageUpdate={handleImageUpdate}
@@ -130,7 +130,7 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900">
+    <div className="min-h-screen bg-background">
       <ErrorBoundary>
         <AppHeader
           user={user}
@@ -163,12 +163,12 @@ const Index = () => {
         </div>
 
         {/* Footer migliorato con responsività */}
-        <div className="mt-8 sm:mt-12 p-4 sm:p-6 bg-gray-900/70 backdrop-blur-sm rounded-lg border border-gray-700/50 shadow-enhanced">
+        <div className="mt-8 sm:mt-12 p-4 sm:p-6 bg-card/70 backdrop-blur-sm rounded-lg border border-border shadow-enhanced">
           <div className="text-center space-y-2">
-            <p className="text-xs text-gray-400 leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               © 2024 Cimmi LLC. Tutti i diritti riservati.
             </p>
-            <p className="text-xs text-gray-500 leading-relaxed max-w-2xl mx-auto">
+            <p className="text-xs text-muted-foreground/80 leading-relaxed max-w-2xl mx-auto">
               FisioAccordo(VIRAL)ContentAI è proprietà esclusiva di Cimmi LLC.
               È vietata la copia, riproduzione o replica di questa piattaforma senza autorizzazione scritta.
             </p>

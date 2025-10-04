@@ -116,7 +116,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
     return (
       <div 
         key={index}
-        className="relative aspect-square rounded-lg overflow-hidden group border border-gray-600 bg-gray-800"
+        className="relative aspect-square rounded-lg overflow-hidden group border border-border bg-card"
       >
         {/* Template Fisioaccordo */}
         <TemplateLayoutEngine
@@ -132,14 +132,14 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
           <Button
             onClick={() => onImageEdit(slide.userImageUrl || slide.imageUrl || '', index)}
             size="sm"
-            className="p-1 h-6 w-6 bg-blue-600 hover:bg-blue-700"
+            className="p-1 h-6 w-6 bg-primary hover:bg-primary/90"
           >
             ✏️
           </Button>
           <Button
             onClick={() => downloadImage(slide.userImageUrl || slide.imageUrl || '', index)}
             size="sm"
-            className="p-1 h-6 w-6 bg-green-600 hover:bg-green-700"
+            className="p-1 h-6 w-6 bg-fisio hover:bg-fisio/90"
           >
             <Download className="w-3 h-3" />
           </Button>
@@ -158,7 +158,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
           <Button
             asChild
             size="sm"
-            className="p-1 h-6 w-6 bg-purple-600 hover:bg-purple-700 cursor-pointer"
+            className="p-1 h-6 w-6 bg-accent hover:bg-accent/90 cursor-pointer"
           >
             <label htmlFor={`upload-${index}`}>
               <Upload className="w-3 h-3" />
@@ -167,7 +167,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
         </div>
         
         {/* Numero slide */}
-        <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full font-bold z-10">
+        <div className="absolute top-2 left-2 bg-background/70 text-foreground text-xs px-2 py-1 rounded-full font-bold z-10">
           {index + 1}
         </div>
       </div>
@@ -175,9 +175,9 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
   };
 
   return (
-    <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
+    <Card className="bg-card/50 border-border backdrop-blur-sm">
       <CardHeader>
-        <CardTitle className="text-white">Anteprima</CardTitle>
+        <CardTitle className="text-card-foreground">Anteprima</CardTitle>
       </CardHeader>
       <CardContent>
         {generatedContent ? (
@@ -185,13 +185,13 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
             {/* Anteprima slide del carosello con testo sovrapposto */}
             {carouselSlides.length > 0 && (
               <div className="mb-4">
-                <h3 className="text-white font-semibold mb-3">Slide del Carosello con Testo</h3>
+                <h3 className="text-card-foreground font-semibold mb-3">Slide del Carosello con Testo</h3>
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   {carouselSlides.slice(0, 4).map((slide, index) => renderSlideWithFisioaccordoTemplate(slide, index))}
                 </div>
                 
                 {carouselSlides.length > 4 && (
-                  <p className="text-gray-400 text-sm text-center">
+                  <p className="text-muted-foreground text-sm text-center">
                     +{carouselSlides.length - 4} altre slide
                   </p>
                 )}
@@ -200,24 +200,24 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
             
             {/* Hook applicato */}
             {appliedHook && (
-              <div className="bg-orange-600/20 border border-orange-500 rounded-lg p-3 mb-4">
+              <div className="bg-accent/20 border border-accent rounded-lg p-3 mb-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-orange-300 text-sm font-medium">Hook applicato:</span>
+                  <span className="text-accent-foreground text-sm font-medium">Hook applicato:</span>
                   <Button
                     onClick={onRemoveHook}
                     size="sm"
                     variant="ghost"
-                    className="text-orange-300 hover:text-orange-200 p-1 h-auto"
+                    className="text-accent-foreground hover:text-accent-foreground/80 p-1 h-auto"
                   >
                     <X className="w-4 h-4" />
                   </Button>
                 </div>
-                <p className="text-orange-100 text-sm mt-1">{appliedHook}</p>
+                <p className="text-accent-foreground text-sm mt-1">{appliedHook}</p>
               </div>
             )}
             
-            <div className="bg-gray-700/50 p-4 rounded-lg border border-gray-600">
-              <pre className="text-gray-300 whitespace-pre-wrap text-sm">
+            <div className="bg-muted/50 p-4 rounded-lg border border-border">
+              <pre className="text-foreground whitespace-pre-wrap text-sm">
                 {generatedContent}
               </pre>
             </div>
@@ -225,7 +225,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
             <div className="flex gap-2">
               <Button 
                 onClick={onSaveContent}
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="flex-1 bg-fisio hover:bg-fisio/90"
               >
                 <Download className="mr-2 h-4 w-4" />
                 Salva
@@ -233,7 +233,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
               <Button 
                 onClick={() => copyToClipboard(generatedContent)}
                 variant="outline"
-                className="flex-1 text-white border-gray-600 hover:bg-gray-700"
+                className="flex-1"
               >
                 <Copy className="mr-2 h-4 w-4" />
                 Copia
@@ -250,7 +250,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
             )}
           </div>
         ) : (
-          <div className="text-center py-12 text-gray-400">
+          <div className="text-center py-12 text-muted-foreground">
             <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>I tuoi contenuti generati appariranno qui</p>
           </div>
