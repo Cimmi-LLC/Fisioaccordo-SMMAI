@@ -16,84 +16,95 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 217 91% 60%; /* Blu vibrante #3B82F6 */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 258 90% 66%; /* Viola elettrico #8B5CF6 */
+    --secondary-foreground: 0 0% 100%;
 
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 160 84% 39%; /* Verde lime #10B981 */
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: 217 91% 60%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(258 90% 66%));
+    --gradient-accent: linear-gradient(135deg, hsl(258 90% 66%), hsl(217 91% 60%));
+    --gradient-success: linear-gradient(135deg, hsl(160 84% 39%), hsl(142 76% 36%));
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 4.8% 95.9%;
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 217 91% 60%;
 
     /* Fisioaccordo Design System */
-    --fisio-primary: 340 82% 52%; /* Rosa Fucsia #E91E63 */
+    --fisio-primary: 340 82% 52%;
     --fisio-primary-foreground: 0 0% 100%;
-    --fisio-secondary: 0 0% 20%; /* Nero/Grigio scuro */
+    --fisio-secondary: 0 0% 20%;
     --fisio-secondary-foreground: 0 0% 100%;
-    --fisio-accent: 0 0% 95%; /* Grigio chiaro */
+    --fisio-accent: 0 0% 95%;
     --fisio-accent-foreground: 0 0% 20%;
     --fisio-background: 0 0% 100%;
     --fisio-surface: 0 0% 98%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 222 47% 7%; /* Grigio scuro sofisticato #0F172A */
     --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 4.9%;
+    --card: 222 47% 11% / 0.7; /* Semi-trasparente per glassmorphism */
     --card-foreground: 210 40% 98%;
 
-    --popover: 0 0% 12%;
+    --popover: 222 47% 11%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 217 91% 60%; /* Blu vibrante */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 258 90% 66%; /* Viola elettrico */
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 217 32% 17%;
+    --muted-foreground: 215 20% 65%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 160 84% 39%; /* Verde lime */
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --border: 217 32% 20% / 0.5; /* Sottili e semi-trasparenti */
+    --input: 217 32% 17%;
+    --ring: 217 91% 60%;
+
+    /* Gradients dark mode */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(258 90% 66%));
+    --gradient-accent: linear-gradient(135deg, hsl(258 90% 66%), hsl(217 91% 60%));
+    --gradient-success: linear-gradient(135deg, hsl(160 84% 39%), hsl(142 76% 36%));
+    --gradient-bg: linear-gradient(180deg, hsl(222 47% 7%), hsl(222 47% 5%));
     
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-background: 222 47% 9%;
+    --sidebar-foreground: 240 5% 96%;
+    --sidebar-primary: 217 91% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 217 32% 17%;
+    --sidebar-accent-foreground: 240 5% 96%;
+    --sidebar-border: 217 32% 20%;
+    --sidebar-ring: 217 91% 60%;
 
     /* Fisioaccordo Design System - Dark Mode */
     --fisio-primary: 340 82% 52%;
@@ -102,8 +113,8 @@
     --fisio-secondary-foreground: 0 0% 10%;
     --fisio-accent: 0 0% 15%;
     --fisio-accent-foreground: 0 0% 90%;
-    --fisio-background: 240 10% 3.9%;
-    --fisio-surface: 240 10% 8%;
+    --fisio-background: 222 47% 7%;
+    --fisio-surface: 222 47% 11%;
   }
 }
 
@@ -126,18 +137,29 @@
   }
 }
 
-/* Utility classes per migliorare l'accessibilità */
+/* Utility classes moderne */
 @layer utilities {
   .focus-visible-enhanced {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2;
   }
   
   .backdrop-blur-enhanced {
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
   }
   
   .shadow-enhanced {
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 20px 40px -10px hsl(var(--primary) / 0.2), 0 0 60px -15px hsl(var(--primary) / 0.1);
+  }
+  
+  .glow-effect {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.3), 0 0 40px hsl(var(--primary) / 0.1);
+  }
+  
+  .gradient-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 }

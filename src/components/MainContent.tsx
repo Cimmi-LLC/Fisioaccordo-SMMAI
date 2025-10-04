@@ -141,20 +141,20 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-4 sm:py-8">
-      <div className="text-center mb-6 sm:mb-8">
-        <h2 className="text-2xl sm:text-4xl font-bold text-white mb-2 sm:mb-4">
-          Generatore di Post Social ✨
-        </h2>
-        <p className="text-lg sm:text-xl text-gray-300 px-4">
+      <div className="text-center mb-6 sm:mb-8 space-y-2">
+        <h1 className="text-3xl sm:text-5xl font-extrabold text-foreground mb-2 sm:mb-4 leading-tight">
+          <span className="gradient-text">Generatore di Post Social</span> ✨
+        </h1>
+        <p className="text-base sm:text-lg text-muted-foreground px-4 max-w-2xl mx-auto">
           Crea contenuti coinvolgenti per i tuoi social media con l'intelligenza artificiale
         </p>
       </div>
 
       {/* Progress indicator quando in loading */}
       {loadingState.isLoading && (
-        <div className="mb-6">
-          <Card className="bg-gray-800/50 border-gray-700">
-            <CardContent className="p-4">
+        <div className="mb-6 animate-fade-in">
+          <Card>
+            <CardContent className="p-6">
               <EnhancedProgress
                 value={loadingState.progress}
                 status={loadingState.status}
@@ -193,11 +193,11 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6 sm:gap-8">
-        <div>
+        <div className="space-y-4">
           {loadingState.isLoading ? (
-            <Card className="bg-gray-800/50 border-gray-700">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-white">Configurazione Post</CardTitle>
+                <CardTitle>Configurazione Post</CardTitle>
               </CardHeader>
               <CardContent>
                 <SkeletonLoader type="form" />
@@ -217,10 +217,10 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
               />
               
               {/* Pulsante per mostrare/nascondere il generatore viral */}
-              <div className="mt-4 text-center">
+              <div className="text-center">
                 <button
                   onClick={() => setShowViralGenerator(!showViralGenerator)}
-                  className="text-orange-400 hover:text-orange-300 underline text-sm"
+                  className="text-accent hover:text-accent/80 underline text-sm font-medium transition-colors"
                 >
                   {showViralGenerator ? '🔥 Nascondi Format Virali' : '🔥 Mostra Format Virali'}
                 </button>
@@ -231,9 +231,9 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
 
         <div>
           {loadingState.isLoading && !generatedContent ? (
-            <Card className="bg-gray-800/50 border-gray-700">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-white">Anteprima Contenuto</CardTitle>
+                <CardTitle>Anteprima Contenuto</CardTitle>
               </CardHeader>
               <CardContent>
                 <SkeletonLoader type="content" />
