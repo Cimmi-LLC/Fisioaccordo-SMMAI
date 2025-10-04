@@ -47,7 +47,6 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
   const [editingSlideIndex, setEditingSlideIndex] = useState<number | null>(null);
   const [showHookGenerator, setShowHookGenerator] = useState(false);
   const [hookTopic, setHookTopic] = useState('');
-  const [generatedHooks, setGeneratedHooks] = useState<string[]>([]);
   const [appliedHook, setAppliedHook] = useState<string>('');
   const [basePhoto, setBasePhoto] = useState<string | null>(null);
   const [showViralGenerator, setShowViralGenerator] = useState(false);
@@ -266,9 +265,10 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
         setShowHookGenerator={setShowHookGenerator}
         hookTopic={hookTopic}
         setHookTopic={setHookTopic}
-        generatedHooks={generatedHooks}
-        setGeneratedHooks={setGeneratedHooks}
         onApplyHook={hookManager.applyHookToContent}
+        audience={formData.audience}
+        tone={formData.tone}
+        platform={formData.platform}
       />
     </div>
   );
