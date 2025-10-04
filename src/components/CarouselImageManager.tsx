@@ -150,14 +150,14 @@ const CarouselImageManager: React.FC<CarouselImageManagerProps> = ({
   const currentImage = (slide: CarouselSlide) => slide.userImageUrl || slide.imageUrl;
 
   return (
-    <Card className="bg-gray-800/50 border-gray-700">
+    <Card className="backdrop-blur-enhanced">
       <CardHeader>
-        <CardTitle className="text-white flex items-center justify-between">
+        <CardTitle className="text-foreground flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Image className="w-5 h-5" />
+            <Image className="w-5 h-5 text-primary" />
             Gestione Immagini Carosello
           </div>
-          <Badge variant="outline" className="text-gray-300">
+          <Badge variant="outline">
             {slides.length}/{maxSlides} slide
           </Badge>
         </CardTitle>
@@ -169,7 +169,7 @@ const CarouselImageManager: React.FC<CarouselImageManagerProps> = ({
             onClick={addSlide}
             disabled={slides.length >= maxSlides}
             size="sm"
-            className="bg-green-600 hover:bg-green-700"
+            variant="default"
           >
             <Plus className="w-4 h-4 mr-1" />
             Aggiungi Slide
@@ -180,7 +180,7 @@ const CarouselImageManager: React.FC<CarouselImageManagerProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {slides.map((slide, index) => (
             <div key={index} className="relative group">
-              <div className="aspect-square bg-gray-700 rounded-lg overflow-hidden border-2 border-gray-600 hover:border-blue-500 transition-colors">
+              <div className="aspect-square bg-muted rounded-lg overflow-hidden border-2 border-border hover:border-primary transition-colors hover:shadow-enhanced">
                 {currentImage(slide) ? (
                   <img 
                     src={currentImage(slide)} 
@@ -189,7 +189,7 @@ const CarouselImageManager: React.FC<CarouselImageManagerProps> = ({
                     onClick={() => currentImage(slide) && onImageEdit(currentImage(slide)!, index)}
                   />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                  <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
                     <Image className="w-8 h-8 mb-2" />
                     <span className="text-xs text-center">Slide {index + 1}</span>
                   </div>
@@ -198,7 +198,7 @@ const CarouselImageManager: React.FC<CarouselImageManagerProps> = ({
 
               {/* Controlli overlay */}
               <div className="absolute top-2 left-2 right-2 flex justify-between opacity-0 group-hover:opacity-100 transition-opacity">
-                <Badge className="bg-black/50 text-white text-xs">
+                <Badge className="bg-primary/80 text-primary-foreground text-xs">
                   {index + 1}
                 </Badge>
                 {slides.length > 1 && (
@@ -225,7 +225,8 @@ const CarouselImageManager: React.FC<CarouselImageManagerProps> = ({
                 <Button
                   onClick={() => fileInputRefs.current[index]?.click()}
                   size="sm"
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 p-1 h-6 text-xs"
+                  variant="default"
+                  className="flex-1 p-1 h-6 text-xs"
                 >
                   <Upload className="w-3 h-3" />
                 </Button>
@@ -235,7 +236,8 @@ const CarouselImageManager: React.FC<CarouselImageManagerProps> = ({
                     <Button
                       onClick={() => setSelectedImageForDuplication(currentImage(slide)!)}
                       size="sm"
-                      className="bg-purple-600 hover:bg-purple-700 p-1 h-6"
+                      variant="secondary"
+                      className="p-1 h-6"
                     >
                       <Copy className="w-3 h-3" />
                     </Button>
@@ -258,7 +260,7 @@ const CarouselImageManager: React.FC<CarouselImageManagerProps> = ({
                     type="checkbox"
                     checked={specificSlides.includes(index)}
                     onChange={() => toggleSlideSelection(index)}
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded"
+                    className="w-4 h-4 accent-primary"
                   />
                 </div>
               )}
@@ -268,17 +270,17 @@ const CarouselImageManager: React.FC<CarouselImageManagerProps> = ({
 
         {/* Pannello duplicazione */}
         {selectedImageForDuplication && (
-          <Card className="bg-gray-700/50 border-gray-600">
+          <Card className="bg-muted/30 border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-white text-sm">Duplica Immagine</CardTitle>
+              <CardTitle className="text-foreground text-sm">Duplica Immagine</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
                 <Select value={duplicationTarget} onValueChange={setDuplicationTarget as any}>
-                  <SelectTrigger className="bg-gray-600 border-gray-500 text-white">
+                  <SelectTrigger className="bg-input border-border text-foreground">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-800 border-gray-600">
+                  <SelectContent className="bg-popover border-border">
                     <SelectItem value="all">Applica a tutte le slide</SelectItem>
                     <SelectItem value="specific">Applica a slide specifiche</SelectItem>
                   </SelectContent>
@@ -286,7 +288,7 @@ const CarouselImageManager: React.FC<CarouselImageManagerProps> = ({
               </div>
 
               {duplicationTarget === 'specific' && (
-                <div className="text-sm text-gray-300">
+                <div className="text-sm text-muted-foreground">
                   Seleziona le slide usando le checkbox sopra ({specificSlides.length} selezionate)
                 </div>
               )}
@@ -295,7 +297,8 @@ const CarouselImageManager: React.FC<CarouselImageManagerProps> = ({
                 <Button
                   onClick={duplicateImage}
                   disabled={duplicationTarget === 'specific' && specificSlides.length === 0}
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className="flex-1"
+                  variant="default"
                   size="sm"
                 >
                   <Copy className="w-4 h-4 mr-1" />

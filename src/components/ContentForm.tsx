@@ -59,35 +59,35 @@ const ContentForm: React.FC<ContentFormProps> = ({
   };
 
   return (
-    <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
+    <Card className="backdrop-blur-enhanced">
       <CardHeader>
-        <CardTitle className="text-white">
+        <CardTitle className="text-foreground">
           Crea il tuo contenuto
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* 1. Descrivi il tuo post */}
         <div>
-          <Label className="text-gray-300 text-lg font-medium">1. Descrivi il tuo post</Label>
+          <Label className="text-foreground text-lg font-medium">1. Descrivi il tuo post</Label>
           <Textarea
             value={formData.description}
             onChange={(e) => onInputChange('description', e.target.value)}
             placeholder="mal di schiena al pc"
-            className="bg-gray-700 border-gray-600 text-white mt-2 min-h-[100px]"
+            className="bg-input border-border text-foreground mt-2 min-h-[100px] focus:border-primary focus:ring-primary"
           />
         </div>
 
         {/* 2. Definisci la tua Audience */}
         <div>
-          <Label className="text-gray-300 text-lg font-medium flex items-center">
-            <User className="h-4 w-4 mr-2" />
+          <Label className="text-foreground text-lg font-medium flex items-center">
+            <User className="h-4 w-4 mr-2 text-primary" />
             2. Definisci la tua Audience (Opzionale)
           </Label>
           <Input
             value={formData.audience}
             onChange={(e) => onInputChange('audience', e.target.value)}
             placeholder="lavoratori al pc"
-            className="bg-gray-700 border-gray-600 text-white mt-2"
+            className="bg-input border-border text-foreground mt-2 focus:border-primary focus:ring-primary"
           />
         </div>
 
@@ -95,12 +95,12 @@ const ContentForm: React.FC<ContentFormProps> = ({
         <div className="grid grid-cols-2 gap-4">
           {/* Lunghezza */}
           <div>
-            <Label className="text-gray-300">Lunghezza</Label>
+            <Label className="text-foreground">Lunghezza</Label>
             <Select value={formData.length} onValueChange={(value) => onInputChange('length', value)}>
-              <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+              <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-gray-700 border-gray-600">
+              <SelectContent className="bg-popover border-border">
                 <SelectItem value="corto">Corto</SelectItem>
                 <SelectItem value="medio">Medio</SelectItem>
                 <SelectItem value="lungo">Lungo</SelectItem>
@@ -110,12 +110,12 @@ const ContentForm: React.FC<ContentFormProps> = ({
 
           {/* Tono */}
           <div>
-            <Label className="text-gray-300">Tono</Label>
+            <Label className="text-foreground">Tono</Label>
             <Select value={formData.tone} onValueChange={(value) => onInputChange('tone', value)}>
-              <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+              <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-gray-700 border-gray-600">
+              <SelectContent className="bg-popover border-border">
                 <SelectItem value="professionale">Professionale</SelectItem>
                 <SelectItem value="informale">Informale</SelectItem>
                 <SelectItem value="divertente">Divertente</SelectItem>
@@ -126,12 +126,12 @@ const ContentForm: React.FC<ContentFormProps> = ({
 
           {/* Piattaforma */}
           <div>
-            <Label className="text-gray-300">Piattaforma</Label>
+            <Label className="text-foreground">Piattaforma</Label>
             <Select value={formData.platform} onValueChange={(value) => onInputChange('platform', value)}>
-              <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+              <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-gray-700 border-gray-600">
+              <SelectContent className="bg-popover border-border">
                 <SelectItem value="instagram">Instagram</SelectItem>
                 <SelectItem value="linkedin">LinkedIn</SelectItem>
                 <SelectItem value="facebook">Facebook</SelectItem>
@@ -141,12 +141,12 @@ const ContentForm: React.FC<ContentFormProps> = ({
 
           {/* Tipo di Post */}
           <div>
-            <Label className="text-gray-300">Tipo di Post</Label>
+            <Label className="text-foreground">Tipo di Post</Label>
             <Select value={formData.postType} onValueChange={(value) => onInputChange('postType', value)}>
-              <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+              <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-gray-700 border-gray-600">
+              <SelectContent className="bg-popover border-border">
                 <SelectItem value="carosello">Carosello</SelectItem>
                 <SelectItem value="post-singolo">Post Singolo</SelectItem>
                 <SelectItem value="storia">Storia</SelectItem>
@@ -157,12 +157,12 @@ const ContentForm: React.FC<ContentFormProps> = ({
 
           {/* Numero Slide */}
           <div>
-            <Label className="text-gray-300">Numero Slide</Label>
+            <Label className="text-foreground">Numero Slide</Label>
             <Select value={formData.numSlides} onValueChange={(value) => onInputChange('numSlides', value)}>
-              <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+              <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-gray-700 border-gray-600">
+              <SelectContent className="bg-popover border-border">
                 <SelectItem value="3">3 Slide</SelectItem>
                 <SelectItem value="5">5 Slide</SelectItem>
                 <SelectItem value="7">7 Slide</SelectItem>
@@ -173,12 +173,12 @@ const ContentForm: React.FC<ContentFormProps> = ({
 
           {/* Numero Immagini */}
           <div>
-            <Label className="text-gray-300">Numero Immagini</Label>
+            <Label className="text-foreground">Numero Immagini</Label>
             <Select value={formData.numImages} onValueChange={(value) => onInputChange('numImages', value)}>
-              <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
+              <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-gray-700 border-gray-600">
+              <SelectContent className="bg-popover border-border">
                 <SelectItem value="1">1 Immagine</SelectItem>
                 <SelectItem value="2">2 Immagini</SelectItem>
                 <SelectItem value="3">3 Immagini</SelectItem>
@@ -204,10 +204,10 @@ const ContentForm: React.FC<ContentFormProps> = ({
 
         {/* Platform Selection */}
         <div className="space-y-3">
-          <Label className="text-gray-300 text-lg font-medium">Piattaforme di Pubblicazione</Label>
+          <Label className="text-foreground text-lg font-medium">Piattaforme di Pubblicazione</Label>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {supportedPlatforms.map((platform) => (
-              <div key={platform.id} className="flex items-center space-x-2 p-3 rounded-lg border border-gray-600 hover:bg-gray-700/50 transition-colors">
+              <div key={platform.id} className="flex items-center space-x-2 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
                 <Checkbox
                   id={platform.id}
                   checked={formData.selectedPlatforms?.includes(platform.id) || false}
@@ -215,7 +215,7 @@ const ContentForm: React.FC<ContentFormProps> = ({
                 />
                 <div className="flex items-center gap-2">
                   <span className="text-sm">{platform.icon}</span>
-                  <Label htmlFor={platform.id} className="text-xs font-medium cursor-pointer text-gray-300">
+                  <Label htmlFor={platform.id} className="text-xs font-medium cursor-pointer text-foreground">
                     {platform.name}
                   </Label>
                 </div>
@@ -238,14 +238,14 @@ const ContentForm: React.FC<ContentFormProps> = ({
 
         {/* Schedule Date */}
         <div className="space-y-2">
-          <Label htmlFor="scheduleDate" className="text-gray-300">Programma Pubblicazione (Opzionale)</Label>
+          <Label htmlFor="scheduleDate" className="text-foreground">Programma Pubblicazione (Opzionale)</Label>
           <Input
             id="scheduleDate"
             type="datetime-local"
             value={formData.scheduleDate || ''}
             onChange={(e) => onInputChange('scheduleDate', e.target.value)}
             min={new Date().toISOString().slice(0, 16)}
-            className="bg-gray-700 border-gray-600 text-white"
+            className="bg-input border-border text-foreground focus:border-primary focus:ring-primary"
           />
         </div>
 

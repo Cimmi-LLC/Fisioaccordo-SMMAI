@@ -82,19 +82,19 @@ const ViralFormatGenerator: React.FC<ViralFormatGeneratorProps> = ({
   };
 
   return (
-    <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-sm">
+    <Card className="backdrop-blur-enhanced">
       <CardHeader>
-        <CardTitle className="text-white flex items-center">
-          <TrendingUp className="h-6 w-6 mr-2 text-orange-400" />
+        <CardTitle className="text-foreground flex items-center">
+          <TrendingUp className="h-6 w-6 mr-2 text-accent" />
           🔥 Generatore Format Virali
         </CardTitle>
-        <p className="text-gray-300 text-sm">
+        <p className="text-muted-foreground text-sm">
           Scegli un formato testato per massimizzare engagement e conversioni
         </p>
       </CardHeader>
       <CardContent>
         {!topic.trim() && (
-          <div className="text-center py-6 text-yellow-400 border border-yellow-500/30 rounded-lg bg-yellow-500/10 mb-4">
+          <div className="text-center py-6 text-accent border border-accent/30 rounded-lg bg-accent/10 mb-4">
             <Sparkles className="h-8 w-8 mx-auto mb-2" />
             <p>Inserisci prima un topic nel form principale per usare i format virali</p>
           </div>
@@ -104,15 +104,15 @@ const ViralFormatGenerator: React.FC<ViralFormatGeneratorProps> = ({
           {viralFormats.map((format) => (
             <div
               key={format.id}
-              className={`p-4 rounded-lg border transition-all cursor-pointer hover:bg-gray-700/30 ${
+              className={`p-4 rounded-lg border transition-all cursor-pointer hover:bg-muted/30 ${
                 selectedFormat?.id === format.id 
-                  ? 'border-orange-500 bg-orange-500/10' 
-                  : 'border-gray-600'
+                  ? 'border-accent bg-accent/10 glow-effect' 
+                  : 'border-border'
               }`}
               onClick={() => !isGenerating && topic.trim() && handleFormatSelect(format)}
             >
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-white font-semibold flex items-center">
+                <h3 className="text-foreground font-semibold flex items-center">
                   {format.name}
                   <div className={`w-2 h-2 rounded-full ml-2 ${getEffectivenessColor(format.effectiveness)}`}></div>
                 </h3>
@@ -121,14 +121,14 @@ const ViralFormatGenerator: React.FC<ViralFormatGeneratorProps> = ({
                     {format.effectiveness}% efficacia
                   </Badge>
                   {selectedFormat?.id === format.id && isGenerating && (
-                    <Zap className="h-4 w-4 text-orange-400 animate-pulse" />
+                    <Zap className="h-4 w-4 text-accent animate-pulse" />
                   )}
                 </div>
               </div>
               
-              <p className="text-gray-300 text-sm mb-2">{format.description}</p>
+              <p className="text-muted-foreground text-sm mb-2">{format.description}</p>
               
-              <div className="bg-gray-900/50 p-2 rounded text-xs text-gray-400 mb-2">
+              <div className="bg-muted/30 p-2 rounded text-xs text-muted-foreground mb-2">
                 <strong>Esempio:</strong> {format.example}
               </div>
               
@@ -145,9 +145,9 @@ const ViralFormatGenerator: React.FC<ViralFormatGeneratorProps> = ({
 
         {generatedContent && selectedFormat && (
           <div className="space-y-4">
-            <div className="bg-gradient-to-r from-orange-600/20 to-red-600/20 border border-orange-500 rounded-lg p-4">
+            <div className="bg-gradient-to-r from-accent/20 to-primary/20 border border-accent rounded-lg p-4 glow-effect">
               <div className="flex items-center justify-between mb-3">
-                <h4 className="text-orange-300 font-semibold flex items-center">
+                <h4 className="text-accent font-semibold flex items-center">
                   <TrendingUp className="h-4 w-4 mr-2" />
                   {selectedFormat.name} Generato
                 </h4>
@@ -155,14 +155,14 @@ const ViralFormatGenerator: React.FC<ViralFormatGeneratorProps> = ({
                   onClick={() => copyToClipboard(generatedContent)}
                   size="sm"
                   variant="outline"
-                  className="text-orange-300 border-orange-500 hover:bg-orange-500/20"
+                  className="border-accent hover:bg-accent/20"
                 >
                   <Copy className="h-4 w-4 mr-1" />
                   Copia
                 </Button>
               </div>
               
-              <pre className="text-orange-100 whitespace-pre-wrap text-sm leading-relaxed">
+              <pre className="text-foreground whitespace-pre-wrap text-sm leading-relaxed">
                 {generatedContent}
               </pre>
             </div>
@@ -170,7 +170,8 @@ const ViralFormatGenerator: React.FC<ViralFormatGeneratorProps> = ({
             <div className="flex gap-2">
               <Button
                 onClick={() => onContentGenerated(generatedContent)}
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="flex-1"
+                variant="default"
               >
                 <Sparkles className="mr-2 h-4 w-4" />
                 Usa questo formato
@@ -181,7 +182,6 @@ const ViralFormatGenerator: React.FC<ViralFormatGeneratorProps> = ({
                   setGeneratedContent('');
                 }}
                 variant="outline"
-                className="text-white border-gray-600 hover:bg-gray-700"
               >
                 Prova altro formato
               </Button>

@@ -24,9 +24,9 @@ interface SavedContentsProps {
 const SavedContents: React.FC<SavedContentsProps> = ({ savedContents, isLoading = false }) => {
   if (isLoading) {
     return (
-      <Card className="mt-6 sm:mt-8 bg-gray-800/50 border-gray-700 backdrop-blur-sm">
+      <Card className="mt-6 sm:mt-8 backdrop-blur-enhanced">
         <CardHeader>
-          <CardTitle className="text-white">I Tuoi Contenuti Salvati</CardTitle>
+          <CardTitle className="text-foreground">I Tuoi Contenuti Salvati</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -62,22 +62,22 @@ const SavedContents: React.FC<SavedContentsProps> = ({ savedContents, isLoading 
 
   const getToneColor = (tone?: string) => {
     switch (tone?.toLowerCase()) {
-      case 'professionale': return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
-      case 'amichevole': return 'bg-green-500/20 text-green-300 border-green-500/30';
-      case 'energico': return 'bg-orange-500/20 text-orange-300 border-orange-500/30';
-      case 'educativo': return 'bg-purple-500/20 text-purple-300 border-purple-500/30';
-      default: return 'bg-gray-500/20 text-gray-300 border-gray-500/30';
+      case 'professionale': return 'bg-primary/20 text-primary border-primary/30';
+      case 'amichevole': return 'bg-accent/20 text-accent border-accent/30';
+      case 'energico': return 'bg-secondary/20 text-secondary border-secondary/30';
+      case 'educativo': return 'bg-primary/20 text-primary border-primary/30';
+      default: return 'bg-muted/20 text-muted-foreground border-border';
     }
   };
 
   return (
-    <Card className="mt-6 sm:mt-8 bg-gray-800/50 border-gray-700 backdrop-blur-sm">
+    <Card className="mt-6 sm:mt-8 backdrop-blur-enhanced">
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-white text-lg sm:text-xl">
+          <CardTitle className="text-foreground text-lg sm:text-xl">
             I Tuoi Contenuti Salvati
           </CardTitle>
-          <Badge variant="secondary" className="bg-gray-700 text-gray-300">
+          <Badge variant="secondary">
             {savedContents.length} contenuti
           </Badge>
         </div>
@@ -87,18 +87,18 @@ const SavedContents: React.FC<SavedContentsProps> = ({ savedContents, isLoading 
           {savedContents.map((content) => (
             <div 
               key={content.id} 
-              className="group bg-gray-700/50 p-4 rounded-lg border border-gray-600 hover:border-gray-500 transition-all duration-200 hover:bg-gray-700/70"
+              className="group bg-muted/20 p-4 rounded-lg border border-border hover:border-primary transition-all duration-200 hover:bg-muted/30 hover:shadow-enhanced"
             >
               {/* Header della card */}
               <div className="flex items-start justify-between mb-3">
-                <h3 className="text-white font-medium text-sm sm:text-base line-clamp-2 flex-1">
+                <h3 className="text-foreground font-medium text-sm sm:text-base line-clamp-2 flex-1">
                   {content.title}
                 </h3>
                 <div className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 w-8 p-0 text-gray-400 hover:text-red-400 hover:bg-red-500/10"
+                    className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -109,13 +109,13 @@ const SavedContents: React.FC<SavedContentsProps> = ({ savedContents, isLoading 
               <div className="flex flex-wrap items-center gap-2 mb-3">
                 <Badge 
                   variant="outline" 
-                  className="text-xs bg-gray-600/50 text-gray-300 border-gray-500"
+                  className="text-xs"
                 >
                   {getPlatformEmoji(content.platform)} {content.platform}
                 </Badge>
                 <Badge 
                   variant="outline" 
-                  className="text-xs bg-gray-600/50 text-gray-300 border-gray-500"
+                  className="text-xs"
                 >
                   {content.post_type}
                 </Badge>
@@ -130,13 +130,13 @@ const SavedContents: React.FC<SavedContentsProps> = ({ savedContents, isLoading 
               </div>
 
               {/* Preview del contenuto */}
-              <p className="text-gray-300 text-sm line-clamp-3 mb-4 leading-relaxed">
+              <p className="text-muted-foreground text-sm line-clamp-3 mb-4 leading-relaxed">
                 {content.content_text.substring(0, 120)}...
               </p>
 
               {/* Footer con data e azioni */}
-              <div className="flex items-center justify-between pt-3 border-t border-gray-600">
-                <div className="flex items-center text-xs text-gray-400">
+              <div className="flex items-center justify-between pt-3 border-t border-border">
+                <div className="flex items-center text-xs text-muted-foreground">
                   <Calendar className="h-3 w-3 mr-1" />
                   {formatDate(content.created_at)}
                 </div>
@@ -145,7 +145,7 @@ const SavedContents: React.FC<SavedContentsProps> = ({ savedContents, isLoading 
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 px-2 text-xs text-gray-400 hover:text-white hover:bg-gray-600"
+                    className="h-7 px-2 text-xs hover:text-primary"
                   >
                     <Eye className="h-3 w-3 mr-1" />
                     Vedi
@@ -153,7 +153,7 @@ const SavedContents: React.FC<SavedContentsProps> = ({ savedContents, isLoading 
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 px-2 text-xs text-gray-400 hover:text-white hover:bg-gray-600"
+                    className="h-7 px-2 text-xs hover:text-primary"
                   >
                     <Share2 className="h-3 w-3 mr-1" />
                     Condividi
@@ -166,8 +166,8 @@ const SavedContents: React.FC<SavedContentsProps> = ({ savedContents, isLoading 
 
         {/* Call to action se ci sono pochi contenuti */}
         {savedContents.length < 3 && (
-          <div className="mt-6 p-4 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-lg border border-purple-500/20">
-            <p className="text-purple-300 text-sm text-center">
+          <div className="mt-6 p-4 bg-gradient-to-r from-secondary/10 to-primary/10 rounded-lg border border-primary/20">
+            <p className="text-primary text-sm text-center">
               💡 <strong>Tip Pro:</strong> Crea almeno 5-10 contenuti per avere sempre materiale pronto da pubblicare!
             </p>
           </div>

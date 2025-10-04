@@ -63,14 +63,14 @@
   }
 
   .dark {
-    --background: 222 47% 7%; /* Grigio scuro sofisticato #0F172A */
-    --foreground: 210 40% 98%;
+    --background: 222 47% 7%; /* Blu scuro profondo */
+    --foreground: 0 0% 100%; /* Bianco puro */
 
-    --card: 222 47% 11% / 0.7; /* Semi-trasparente per glassmorphism */
-    --card-foreground: 210 40% 98%;
+    --card: 217 50% 12% / 0.7; /* Blu scuro semi-trasparente */
+    --card-foreground: 0 0% 100%;
 
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 217 50% 12%;
+    --popover-foreground: 0 0% 100%;
 
     --primary: 217 91% 60%; /* Blu vibrante */
     --primary-foreground: 0 0% 100%;
@@ -78,8 +78,8 @@
     --secondary: 258 90% 66%; /* Viola elettrico */
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 217 32% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 217 70% 25%; /* Blu intenso al posto del grigio */
+    --muted-foreground: 217 80% 80%; /* Blu chiaro luminoso */
 
     --accent: 160 84% 39%; /* Verde lime */
     --accent-foreground: 0 0% 100%;
@@ -87,8 +87,8 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 217 32% 20% / 0.5; /* Sottili e semi-trasparenti */
-    --input: 217 32% 17%;
+    --border: 217 70% 35% / 0.6; /* Blu con trasparenza */
+    --input: 217 60% 18%; /* Blu scuro per input */
     --ring: 217 91% 60%;
 
     /* Gradients dark mode */
