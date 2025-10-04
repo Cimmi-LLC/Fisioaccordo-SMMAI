@@ -28,12 +28,27 @@ class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
     
-    // Log error to console for debugging
+    // Detect specific error types
+    const isRadixSelectError = error.message.includes('Select.Item') || 
+                               error.message.includes('value prop');
+    const isFormControlError = error.message.includes('form') || 
+                               error.message.includes('input') ||
+                               error.message.includes('select');
+    
+    // Enhanced error logging
     console.error('Error details:', {
       message: error.message,
       stack: error.stack,
-      componentStack: errorInfo.componentStack
+      componentStack: errorInfo.componentStack,
+      errorType: isRadixSelectError ? 'Radix Select Error' : 
+                 isFormControlError ? 'Form Control Error' : 'Generic Error',
+      timestamp: new Date().toISOString()
     });
+
+    // Log specific guidance for common errors
+    if (isRadixSelectError) {
+      console.warn('💡 Fix: Ensure all <SelectItem> components have non-empty value props');
+    }
 
     // Call custom error handler
     if (this.props.onError) {
@@ -64,16 +79,26 @@ class ErrorBoundary extends Component<Props, State> {
             </CardHeader>
             <CardContent className="text-center space-y-4">
               <p className="text-muted-foreground text-sm">
-                Si è verificato un errore imprevisto. Prova a ricaricare la sezione.
+                {this.state.error?.message.includes('Select.Item') || this.state.error?.message.includes('value prop')
+                  ? 'Errore nel componente di selezione. Prova a ricaricare la pagina.'
+                  : 'Si è verificato un errore imprevisto. Prova a ricaricare la sezione.'}
               </p>
               
               {process.env.NODE_ENV === 'development' && this.state.error && (
                 <details className="text-left">
-                  <summary className="text-xs text-muted-foreground cursor-pointer mb-2">
-                    Debug Info (solo sviluppo)
+                  <summary className="text-xs text-muted-foreground cursor-pointer mb-2 hover:text-foreground transition-colors">
+                    🔍 Debug Info (solo sviluppo)
                   </summary>
-                  <pre className="text-xs text-destructive bg-muted/50 p-2 rounded overflow-auto max-h-32">
-                    {this.state.error.message}
+                  <pre className="text-xs text-destructive bg-muted/50 p-3 rounded overflow-auto max-h-40 border border-destructive/20">
+                    <strong>Error:</strong> {this.state.error.message}
+                    {this.state.error.stack && (
+                      <>
+                        {'\n\n'}
+                        <strong>Stack:</strong>
+                        {'\n'}
+                        {this.state.error.stack.split('\n').slice(0, 5).join('\n')}
+                      </>
+                    )}
                   </pre>
                 </details>
               )}
