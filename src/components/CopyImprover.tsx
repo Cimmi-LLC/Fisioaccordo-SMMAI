@@ -27,7 +27,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
   const [improvedCopy, setImprovedCopy] = useState('');
   const [analysis, setAnalysis] = useState<any>(null);
   const [selectedTemplates, setSelectedTemplates] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const { toast } = useToast();
 
   const handleAnalyzeCopy = () => {
@@ -183,8 +183,11 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
   // Safely get templates with enhanced error handling
   const getTemplatesWithErrorHandling = (category?: string) => {
     try {
-      console.log('Getting templates for category:', category);
-      const templates = CopyService.getTemplatesByCategory(category);
+      // Normalize category: 'all' or empty string -> undefined (show all)
+      const normalizedCategory = !category || category === 'all' ? undefined : category;
+      console.log('Getting templates for category:', normalizedCategory);
+      
+      const templates = CopyService.getTemplatesByCategory(normalizedCategory);
       console.log('Templates retrieved:', templates?.length || 0);
       
       if (!templates) {
