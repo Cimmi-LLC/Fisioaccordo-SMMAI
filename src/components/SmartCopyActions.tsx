@@ -15,12 +15,14 @@ interface SmartCopyActionsProps {
   generatedContent: string;
   carouselSlides: CarouselSlide[];
   onPublishDirect?: (platforms: string[]) => Promise<void>;
+  isGeneratingImages?: boolean;
 }
 
 const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
   generatedContent,
   carouselSlides,
-  onPublishDirect
+  onPublishDirect,
+  isGeneratingImages
 }) => {
   const { toast } = useToast();
   const [copiedText, setCopiedText] = useState(false);
@@ -114,10 +116,12 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
             <Button
               onClick={() => handleDirectPublish('instagram')}
               size="lg"
-              disabled={isPublishing !== null}
+              disabled={isPublishing !== null || isGeneratingImages}
               className="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white w-full"
             >
-              {isPublishing === 'instagram' ? (
+              {isGeneratingImages ? (
+                <span className="animate-pulse">⏳ Generazione immagini...</span>
+              ) : isPublishing === 'instagram' ? (
                 <span className="animate-pulse">Pubblicando...</span>
               ) : (
                 <>
