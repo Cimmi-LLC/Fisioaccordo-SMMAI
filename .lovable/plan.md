@@ -1,24 +1,23 @@
 
 
-## Aggiornamento App ID Meta
+## Fix scope + configurazione Instagram Business Login
 
-L'App ID attualmente nel codice (`1440410323636643`) non corrisponde a quello della tua app Meta (`1261520952551293`). Bisogna aggiornarlo in tutti i punti dove viene usato.
+### Problema
+Il codice richiede lo scope `instagram_content_publish`, ma nella tua app Meta il permesso si chiama `instagram_business_content_publish`. Questo causerebbe un errore OAuth.
 
-### Modifiche necessarie
+### Modifica necessaria
 
-1. **`src/services/metaService.ts`** - Aggiornare `META_APP_ID` da `1440410323636643` a `1261520952551293`
+**`src/services/metaService.ts`** (riga 24): Sostituire `instagram_content_publish` con `instagram_business_content_publish` nell'array degli scope OAuth.
 
-2. **`supabase/functions/meta-auth/index.ts`** - Aggiornare la variabile `appId` da `1440410323636643` a `1261520952551293`
+### Cosa fare nella dashboard Meta
 
-3. **`supabase/functions/instagram-auth/index.ts`** - Aggiornare `INSTAGRAM_APP_ID` da `1440410323636643` a `1261520952551293`
+1. **Sezione 3 (Webhook)**: Saltala, non serve per pubblicare contenuti
+2. **Sezione 4 (Instagram Business Login)**: Clicca "Configura" e aggiungi come redirect URI valido: `https://social-generator-fisioaccordo.lovable.app/auth/instagram/callback`
+3. Verifica che tutti i permessi siano attivi: `instagram_basic`, `instagram_business_content_publish`, `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`
 
 ### Dettagli tecnici
 
-Sono 3 file con una modifica semplice in ciascuno: sostituzione della stringa dell'App ID. Nessuna altra modifica necessaria.
-
-### Nota importante
-
-Dopo l'aggiornamento del codice, assicurati di aver configurato nella tua app Meta:
-- Il redirect URI: `https://social-generator-fisioaccordo.lovable.app/auth/instagram/callback`
-- I permessi: `instagram_basic`, `instagram_content_publish`, `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`
+Una sola modifica in `src/services/metaService.ts`, nell'array `scopes` del metodo `initiateAuth()`:
+- Da: `instagram_content_publish`
+- A: `instagram_business_content_publish`
 
