@@ -1,52 +1,31 @@
 
 
-## Fix Pubblicazione Instagram - Analisi Completa
+## Chiarimento e Miglioramento UX Pulsanti Pubblicazione
 
-### Problemi trovati
+### Limitazione tecnica importante
+Instagram e Facebook **non permettono** a nessun sito web esterno di aprire direttamente la schermata "Nuovo Post" con immagini e testo gia' inseriti. Questa e' una limitazione delle piattaforme stesse, non del nostro sistema. Nessuna app al mondo puo' farlo.
 
-Ho analizzato tutto il flusso e trovato **3 problemi critici**:
+### Cosa faremo
 
-**1. L'immagine non viene trovata**
-Il pulsante "Pubblica su X Piattaforme" usa solo `basePhoto` (la foto caricata nel form) come immagine. Se non hai caricato una foto base ma hai slide nel carosello con immagini, il sistema pensa che non ci siano immagini e **salta Instagram silenziosamente**.
+Ci sono **due modi** per pubblicare, e li rendiamo piu' chiari:
 
-**2. Il messaggio "Pubblicato!" appare anche se Instagram viene saltato**
-Quando manca l'immagine, il codice fa `continue` (salta Instagram) ma dopo il ciclo mostra comunque il toast "Pubblicato!" -- quindi sembra che abbia pubblicato quando in realta' non ha fatto nulla.
+**Modo 1 - Pubblicazione Diretta (automatica, via API)**
+I pulsanti viola "Pubblica su Instagram" e "Pubblica su Facebook" pubblicano direttamente il post sul tuo account collegato tramite le API di Meta. Non devi fare nulla: il post appare direttamente sul tuo profilo Instagram.
 
-**3. I pulsanti "Pubblica su Instagram/Facebook" nella preview NON pubblicano via API**
-I pulsanti in SmartCopyActions copiano il testo, scaricano le immagini e aprono il browser. Non chiamano la funzione di pubblicazione diretta via Meta API.
+**Modo 2 - Manuale (copia e incolla)**
+I pulsanti "Apri Instagram" / "Apri Facebook" copiano il testo, scaricano le immagini e aprono il sito. Poi devi manualmente creare il post.
 
-### Soluzione
-
-**File: `src/components/MainContent.tsx`**
-- Modificare `handlePublish` per usare anche le immagini delle carousel slides, non solo `basePhoto`
-- Aggiungere un contatore di pubblicazioni riuscite per mostrare il messaggio corretto
-- Mostrare un errore chiaro se nessuna piattaforma e' stata effettivamente pubblicata
+### Modifiche previste
 
 **File: `src/components/SmartCopyActions.tsx`**
-- Aggiungere un nuovo pulsante "Pubblica Direttamente su Instagram" che chiama la Meta API (separato dal pulsante copia+apri)
-- Questo pulsante usera' la connessione Meta esistente per pubblicare davvero il post
+
+1. Rendere i pulsanti di pubblicazione diretta (API) molto piu' prominenti e chiari, con icone e testo esplicito tipo "Pubblica Ora su Instagram (automatico)"
+2. Spostare i pulsanti manuali (Apri Instagram/Facebook) in una sezione separata e meno prominente, etichettata chiaramente come "Metodo manuale"
+3. Aggiungere una nota esplicativa che dice: "Il pulsante 'Pubblica Ora' pubblica automaticamente sul tuo profilo. I pulsanti sotto sono per chi preferisce copiare e incollare manualmente."
+4. Rimuovere i pulsanti "Apri Instagram" e "Apri Facebook" se la connessione Meta e' attiva (dato che il metodo diretto e' superiore), oppure nasconderli in un collapsible "Metodo manuale"
 
 ### Dettagli tecnici
 
-**MainContent.tsx - handlePublish:**
-```text
-Invece di:
-  const imageUrl = basePhoto || undefined;
-
-Fare:
-  const imageUrl = basePhoto 
-    || carouselSlides.find(s => s.userImageUrl || s.imageUrl)?.userImageUrl 
-    || carouselSlides.find(s => s.userImageUrl || s.imageUrl)?.imageUrl 
-    || undefined;
-
-Aggiungere contatore:
-  let publishedCount = 0;
-  // dopo ogni pubblicazione riuscita: publishedCount++;
-  // alla fine: se publishedCount === 0, mostrare errore
-```
-
-**SmartCopyActions.tsx:**
-- Ricevere `onPublishDirect` come prop opzionale
-- Aggiungere pulsante "Pubblica Direttamente" che chiama `onPublishDirect(['instagram'])`
-- Mantenere i pulsanti esistenti per il flusso copia+apri
-
+- Sezione primaria: pulsanti grandi e colorati per pubblicazione diretta API (solo se `onPublishDirect` e' presente)
+- Sezione secondaria collassabile: pulsanti outline per copia testo, scarica immagini, apri manualmente
+- Testo guida chiaro per l'utente non tecnico
