@@ -20,14 +20,12 @@ export class MetaService {
 
   static initiateAuth(): void {
     const scopes = [
-      'instagram_basic',
-      'instagram_business_content_publish',
-      'pages_show_list',
-      'pages_read_engagement',
-      'pages_manage_posts'
+      'instagram_business_basic',
+      'instagram_business_content_publish'
     ].join(',');
 
-    const authUrl = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${this.META_APP_ID}&redirect_uri=${encodeURIComponent(this.REDIRECT_URI)}&scope=${scopes}&response_type=code&state=meta_auth`;
+    // Instagram Business Login uses instagram.com OAuth, not facebook.com
+    const authUrl = `https://www.instagram.com/oauth/authorize?client_id=${this.META_APP_ID}&redirect_uri=${encodeURIComponent(this.REDIRECT_URI)}&scope=${scopes}&response_type=code&state=meta_auth&enable_fb_login=0`;
 
     const popup = window.open(
       authUrl,
