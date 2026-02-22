@@ -41,9 +41,10 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
 
       if (error || data?.error) {
         console.error('Error generating slides:', error || data?.error);
-        const fallbackSlides = createFallbackSlides(topic, numSlides, user, basePhoto);
-        setCarouselSlides(fallbackSlides);
-        return;
+      const fallbackSlides = createFallbackSlides(topic, numSlides, user, basePhoto);
+      setCarouselSlides(fallbackSlides);
+      generateImagesForSlides(fallbackSlides, topic);
+      return;
       }
 
       // For single posts, create 1 slide from the generated content
@@ -66,6 +67,7 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
           userImageUrl: basePhoto || undefined
         };
         setCarouselSlides([singleSlide]);
+        generateImagesForSlides([singleSlide], topic);
         return;
       }
 
@@ -93,6 +95,7 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
       console.error('Exception generating slides:', err);
       const fallbackSlides = createFallbackSlides(topic, numSlides, user, basePhoto);
       setCarouselSlides(fallbackSlides);
+      generateImagesForSlides(fallbackSlides, topic);
     }
   }, [formData.numSlides, formData.description, formData.postType, user, basePhoto]);
 
