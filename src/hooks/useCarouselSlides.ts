@@ -137,6 +137,7 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
 function createFallbackSlides(topic: string, numSlides: number, user: any, basePhoto: string | null): CarouselSlide[] {
   const slideTypes = ['attention', 'problem', 'solution', 'results', 'cta'];
   const slides: CarouselSlide[] = [];
+  const clinicName = user?.user_metadata?.clinic_name || 'Studio Fisioterapico';
 
   for (let i = 0; i < numSlides && i < slideTypes.length; i++) {
     slides.push({
@@ -145,7 +146,11 @@ function createFallbackSlides(topic: string, numSlides: number, user: any, baseP
         title: i === 0 ? topic.toUpperCase() : `PUNTO ${i}`,
         subtitle: i === 0 ? 'Scopri di più' : '',
         body: `Contenuto su ${topic}`,
-        ...(i === numSlides - 1 && { footer: user?.user_metadata?.clinic_name || 'Studio Fisioterapico' })
+        number: i === 0 ? '' : `${i}`,
+        cta: i === numSlides - 1 ? 'Scopri di più →' : '',
+        banner: i > 0 && i < numSlides - 1 ? 'Swipe →' : '',
+        footer: clinicName,
+        logo: clinicName,
       }),
       imageUrl: undefined,
       userImageUrl: basePhoto && i === 0 ? basePhoto : undefined
