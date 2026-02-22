@@ -1,24 +1,23 @@
 
 
-## Fix: Usare l'ID App Instagram corretto
+## Aggiornamento App Secret Instagram
 
 ### Problema
-Il codice usa l'App ID Facebook (`3382844873466520`) per l'OAuth Instagram, ma serve l'**ID app Instagram** (`1685995206180695`) visibile nella dashboard.
+L'`INSTAGRAM_APP_SECRET` salvato nel progetto potrebbe essere quello della vecchia configurazione. Va aggiornato con la chiave segreta visibile nella dashboard: `faf444aeb17a3119a0d9c46b44f20911`.
 
-### Modifiche al codice
+### Azioni
 
-#### 1. `src/services/metaService.ts` (riga 18)
-- Cambiare `META_APP_ID` da `'3382844873466520'` a `'1685995206180695'`
+1. **Aggiornare il secret `INSTAGRAM_APP_SECRET`** con il valore `faf444aeb17a3119a0d9c46b44f20911`
+2. **Deploy della edge function `meta-auth`** per assicurarsi che usi il nuovo secret
 
-#### 2. `supabase/functions/meta-auth/index.ts` (riga 26)
-- Cambiare `appId` da `'3382844873466520'` a `'1685995206180695'`
+### Azione manuale richiesta (dashboard Meta)
+Nella stessa pagina dello screenshot, scorri fino alla **sezione 3 - "Configura Instagram Business Login"** e assicurati che il Redirect URI sia configurato:
+- `https://social-generator-fisioaccordo.lovable.app/auth/instagram/callback`
 
-### Azione manuale (dashboard Meta)
-Nella pagina che hai aperto, scorri in basso fino a **"3. Configura Instagram Business Login"**:
-1. Trova il campo **"URI di reindirizzamento OAuth validi"**
-2. Aggiungi: `https://social-generator-fisioaccordo.lovable.app/auth/instagram/callback`
-3. Salva
+Senza questo redirect URI, Instagram rifiutera' la richiesta di autenticazione.
 
-### Dettagli tecnici
-L'endpoint `https://www.instagram.com/oauth/authorize` richiede il `client_id` uguale all'**Instagram App ID**, non all'ID dell'app Facebook. Lo stesso vale per lo scambio del token in `https://api.instagram.com/oauth/access_token`.
+### Dopo l'approvazione
+- Aggiornamento del secret
+- Deploy della edge function
+- Test della connessione
 
