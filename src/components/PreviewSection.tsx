@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Copy, Download, Loader2, Sparkles, Upload, X } from "lucide-react";
 import CarouselImageManager from "@/components/CarouselImageManager";
 import SmartCopyActions from "@/components/SmartCopyActions";
+import FeedbackWidget from "@/components/FeedbackWidget";
+import ImageFeedbackWidget from "@/components/ImageFeedbackWidget";
 import { useToast } from "@/hooks/use-toast";
 import { DEFAULT_TEMPLATES, generateSlideLayers, type DesignTemplate, type DesignTemplateLayer } from "@/data/defaultTemplates";
 
@@ -301,6 +303,12 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
             <div className="bg-muted/50 p-4 rounded-lg border border-border">
               <pre className="text-foreground whitespace-pre-wrap text-sm">{generatedContent}</pre>
             </div>
+
+            <FeedbackWidget generatedContent={generatedContent} />
+
+            {carouselSlides.length > 0 && !isGeneratingImages && (
+              <ImageFeedbackWidget imageContext={generatedContent.substring(0, 150)} />
+            )}
 
             <div className="flex gap-2">
               <Button onClick={onSaveContent} className="flex-1 bg-fisio hover:bg-fisio/90">

@@ -274,16 +274,6 @@ const ContentForm: React.FC<ContentFormProps> = ({
           )}
         </Button>
 
-        {/* Publish Button */}
-        {onPublish && formData.selectedPlatforms?.length > 0 && (
-          <Button 
-            onClick={() => onPublish(formData.selectedPlatforms)}
-            variant="outline"
-            className="w-full border-purple-600 text-purple-400 hover:bg-purple-600 hover:text-white transition-colors"
-          >
-            📤 Pubblica su {formData.selectedPlatforms.length} Piattaform{formData.selectedPlatforms.length > 1 ? 'e' : 'a'}
-          </Button>
-        )}
       </CardContent>
     </Card>
   );
