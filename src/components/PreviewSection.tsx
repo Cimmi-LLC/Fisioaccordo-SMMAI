@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Copy, Download, Sparkles, Upload, X } from "lucide-react";
+import { Copy, Download, Loader2, Sparkles, Upload, X } from "lucide-react";
 import CarouselImageManager from "@/components/CarouselImageManager";
 import SmartCopyActions from "@/components/SmartCopyActions";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +33,7 @@ interface PreviewSectionProps {
   onSaveContent: () => void;
   canvaTemplate?: CanvaTemplateData | null;
   onPublishDirect?: (platforms: string[]) => Promise<void>;
+  isGeneratingImages?: boolean;
 }
 
 const PreviewSection: React.FC<PreviewSectionProps> = ({
@@ -44,7 +45,8 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
   onImageEdit,
   onSaveContent,
   canvaTemplate,
-  onPublishDirect
+  onPublishDirect,
+  isGeneratingImages
 }) => {
   const { toast } = useToast();
 
@@ -249,6 +251,12 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
             {carouselSlides.length > 0 && (
               <div className="mb-4">
                 <h3 className="text-card-foreground font-semibold mb-3">Slide del Carosello</h3>
+                {isGeneratingImages && (
+                  <div className="flex items-center gap-2 mb-3 p-2 rounded-lg bg-accent/20 border border-accent/30 text-accent-foreground text-sm animate-pulse">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Creazione immagini in corso...</span>
+                  </div>
+                )}
                 <div className={`grid gap-3 mb-4 ${carouselSlides.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : 'grid-cols-2 md:grid-cols-3'}`}>
                   {carouselSlides.map((slide, index) => renderSlide(slide, index))}
                 </div>
