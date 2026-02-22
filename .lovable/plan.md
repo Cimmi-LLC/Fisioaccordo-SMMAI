@@ -1,124 +1,274 @@
 
 
-# Analisi Completa e Piano di Modernizzazione
+# Piano di Modernizzazione Completo
 
-## Problemi Critici Trovati
-
-### 1. SICUREZZA - API Keys Esposte nel Codice (URGENTE)
-- **OpenAI API key** hardcoded in `src/services/openaiService.ts` (linea 259): `sk-proj-VKMDYp...`
-- **Runware API key** hardcoded in `src/services/runwareService.ts` (linea 7): `IldlzHOy...`
-- Chiunque apra il browser DevTools puo' rubare queste chiavi e usarle a tue spese
-
-**Fix**: Spostare TUTTA la logica AI in Supabase Edge Functions che usano `Deno.env.get()` per le chiavi, come gia' fatto per `generate-hooks`. Il frontend non deve MAI contenere API keys.
+Questo piano trasforma l'app in un sistema intelligente che impara da ogni utente, usa le loro foto, analizza i trend virali e migliora continuamente.
 
 ---
 
-### 2. IMMAGINI - Perche' Fanno Schifo
+## Cosa Viene Costruito
 
-**Problema attuale**: Le immagini del carousel sono foto stock generiche da Unsplash hardcoded in `useCarouselSlides.ts` (linee 163-191). Stesse 5 foto riciclate per ogni topic. Nessuna generazione AI delle immagini.
-
-**Il servizio Runware** (generazione AI) esiste ma NON viene mai usato per i carousel. Usa un modello vecchio (`civitai:618692@691639`) e connessione WebSocket complessa.
-
-**Fix**:
-- Creare una edge function `generate-carousel-images` che usa il Lovable AI Gateway (`google/gemini-2.5-flash-image`) per generare immagini personalizzate per ogni slide
-- Eliminare le URL Unsplash hardcoded
-- Generare immagini basate sul contenuto effettivo di ogni slide (titolo, body, tema)
-- Eliminare `runwareService.ts` (obsoleto) e la chiamata diretta OpenAI per immagini
+1. **Libreria foto personale** - Ogni utente carica le sue foto e l'AI le usa nei post
+2. **Memoria AI per utente** - Il sistema ricorda correzioni, preferenze, stile, brand e migliora ogni volta
+3. **Analisi post virali** - Analizza reel, caroselli, video virali e trova i pattern comuni
+4. **Trend del momento** - Cerca e consiglia i trend attuali per il settore dell'utente
 
 ---
 
-### 3. COPY - Perche' Fa Schifo
+## Fase 1: Database - Nuove Tabelle
 
-**Problema attuale**: Il sistema di copy ha 3 strati sovrapposti e confusi:
+### Tabella `user_photos`
+Foto caricate dall'utente, organizzate per categoria, riutilizzabili nei post.
 
-1. **`generator.ts`** (linee 64-98): Genera copy con template HARDCODED identici per ogni topic. Stesse frasi fisse: "Ogni giorno vedo persone che lottano...", "Solo 5 posti disponibili questa settimana!"
-2. **`fallbackGenerator.ts`**: Altro template hardcoded quasi identico
-3. **`intelligentCopyService.ts`**: Chiama OpenAI direttamente dal browser (con API key esposta!) per generare copy
+```text
+user_photos
+- id (uuid, PK)
+- user_id (uuid, NOT NULL)
+- storage_path (text) -- percorso nel bucket Supabase Storage
+- public_url (text) -- URL pubblico dell'immagine
+- filename (text)
+- category (text) -- es: "logo", "team", "clinica", "trattamento", "prodotto"
+- tags (text[]) -- tag liberi per ricerca
+- created_at (timestamptz)
 
-Il risultato e' che il copy e' sempre uguale, generico, pieno di emoji casuali e frasi fatte tipo "87% delle persone commette questo errore".
+RLS: user_id = auth.uid()
+```
 
-**Fix**:
-- Creare una edge function `generate-content` che usa il Lovable AI Gateway per generare copy veramente personalizzato
-- Eliminare tutti i template hardcoded (generator.ts, fallbackGenerator.ts)
-- Un unico prompt AI ben costruito che riceve topic, audience, tone, platform e genera copy unico ogni volta
-- Eliminare `openaiService.ts` (chiamate dirette dal browser)
+### Tabella `user_ai_memory`
+Memoria persistente dell'AI per ogni utente: correzioni, preferenze, stile.
+
+```text
+user_ai_memory
+- id (uuid, PK)
+- user_id (uuid, NOT NULL)
+- memory_type (text) -- "correction", "preference", "style", "brand_voice", "feedback"
+- content (text) -- descrizione della memoria
+- context (text) -- in che contesto e' stata acquisita
+- importance (int, default 5) -- 1-10, priorita' nel prompt
+- created_at (timestamptz)
+- updated_at (timestamptz)
+
+RLS: user_id = auth.uid()
+```
+
+### Tabella `viral_analysis`
+Pattern trovati dall'analisi di post virali.
+
+```text
+viral_analysis
+- id (uuid, PK)
+- user_id (uuid, NOT NULL)
+- post_url (text) -- URL del post analizzato
+- platform (text) -- instagram, tiktok, linkedin, ecc
+- post_type (text) -- reel, carosello, foto, video
+- patterns (jsonb) -- pattern trovati (hook, struttura, CTA, ecc)
+- engagement_data (jsonb) -- like, commenti, condivisioni
+- analysis_text (text) -- analisi AI completa
+- created_at (timestamptz)
+
+RLS: user_id = auth.uid()
+```
+
+### Tabella `trending_topics`
+Trend del momento trovati dall'AI.
+
+```text
+trending_topics
+- id (uuid, PK)
+- user_id (uuid, NOT NULL)
+- topic (text)
+- category (text) -- settore/nicchia
+- trend_score (int) -- 1-100
+- source (text) -- dove e' stato trovato
+- suggested_content (text) -- idea di contenuto suggerita
+- expires_at (timestamptz) -- i trend scadono
+- created_at (timestamptz)
+
+RLS: user_id = auth.uid()
+```
+
+### Storage Bucket
+Creare bucket `user-photos` (pubblico) per le foto degli utenti.
 
 ---
 
-### 4. ARCHITETTURA - Cosa E' Vecchio
+## Fase 2: Storage - Upload Foto Utente
 
-| Problema | Dove | Fix |
-|----------|------|-----|
-| Chiamate API dal browser con chiavi esposte | `openaiService.ts`, `runwareService.ts` | Tutto via Edge Functions |
-| Copy generation locale con template fissi | `src/services/copy/*` (8+ file) | Una edge function AI |
-| `useCarouselSlides` con content database hardcoded | 153 righe di testo statico | Generazione AI dinamica |
-| `contentDatabase` con solo 5 topic fissi | `useCarouselSlides.ts` | Qualsiasi topic via AI |
-| WebSocket Runware complesso e inutilizzato | `runwareService.ts` | Sostituire con Lovable AI Gateway |
-| Nessuna validazione input lato server | Ovunque | Edge functions con validazione |
+### Bucket `user-photos`
+- Bucket pubblico per le foto caricate dagli utenti
+- RLS: ogni utente puo' solo caricare/eliminare nella sua cartella (`user_id/`)
+- Supporto formati: JPG, PNG, WebP
+- Limite: 10MB per file
+
+### Componente `PhotoLibrary`
+- Griglia di foto caricate dall'utente
+- Upload drag & drop
+- Categorizzazione (logo, team, clinica, trattamento)
+- Tag liberi per ricerca
+- Selezione foto per inserirle nei post
+- Anteprima e eliminazione
 
 ---
 
-## Piano di Implementazione (5 Fasi)
+## Fase 3: Edge Function `analyze-viral-post`
 
-### Fase 1: Sicurezza - Rimuovere API Keys
-- Eliminare `defaultOpenAIService` con API key hardcoded
-- Eliminare `defaultRunwareService` con API key hardcoded
-- Salvare le chiavi come Secrets nel progetto (se servono ancora)
+Nuova edge function che analizza un post virale dato il suo URL o testo.
 
-### Fase 2: Edge Function `generate-content`
-- Nuova edge function che usa `ai.gateway.lovable.dev` per generare copy personalizzato
-- Prompt professionale con topic, audience, platform, tone
-- Sostituisce: `openaiService.ts`, `intelligentCopyService.ts`, `generator.ts`, `fallbackGenerator.ts`, `copyBuilder.ts`
+```text
+POST /analyze-viral-post
+Input: { url?: string, text?: string, platform: string, postType: string }
+Output: {
+  patterns: {
+    hook_type: string,
+    structure: string[],
+    cta_style: string,
+    emotional_triggers: string[],
+    formatting: string[],
+    hashtag_strategy: string
+  },
+  analysis: string,
+  score: number,
+  takeaways: string[]
+}
+```
 
-### Fase 3: Edge Function `generate-carousel-images`
-- Genera immagini AI per ogni slide del carousel usando `google/gemini-2.5-flash-image`
-- Input: tema slide, testo, stile visuale
-- Output: immagini base64 salvate o URL
-- Sostituisce: `runwareService.ts`, immagini Unsplash hardcoded
+Usa il Lovable AI Gateway per analizzare il contenuto e trovare:
+- Tipo di hook (domanda, statistica, provocazione, storia)
+- Struttura narrativa (problema-soluzione, lista, storia, tutorial)
+- Trigger emotivi usati
+- Stile CTA
+- Pattern di formattazione (emoji, spazi, lunghezza frasi)
 
-### Fase 4: Refactor `useCarouselSlides`
-- Eliminare `contentDatabase` hardcoded (153 righe di testo statico)
-- Generare contenuto slide dinamicamente dall'AI (usando la edge function di Fase 2)
-- Supportare QUALSIASI topic, non solo i 5 hardcoded
+---
 
-### Fase 5: Pulizia Architettura
-- Eliminare file obsoleti: `openaiService.ts`, `runwareService.ts`, `fallbackGenerator.ts`
-- Semplificare `src/services/copy/` (da 8+ file a 2-3)
-- Aggiornare `useContentGeneration.ts` per usare le nuove edge functions
+## Fase 4: Edge Function `find-trends`
+
+Nuova edge function che trova i trend del momento per il settore dell'utente.
+
+```text
+POST /find-trends
+Input: { niche: string, platform: string }
+Output: {
+  trends: [{
+    topic: string,
+    trend_score: number,
+    why_trending: string,
+    content_idea: string,
+    suggested_format: string
+  }]
+}
+```
+
+L'AI genera trend basandosi su:
+- La nicchia dell'utente (fisioterapia, benessere, ecc)
+- La piattaforma target
+- Stagionalita' e eventi attuali
+- Pattern virali recenti
+
+---
+
+## Fase 5: Memoria AI - Sistema di Apprendimento
+
+### Come Funziona
+
+1. **Dopo ogni generazione**: l'utente puo' dare feedback (thumbs up/down + commento)
+2. **Correzioni manuali**: quando l'utente modifica il copy, il sistema salva la differenza come "correzione"
+3. **Preferenze esplicite**: l'utente puo' impostare regole (es: "non usare mai emoji cuore", "firma sempre con il nome della clinica")
+4. **Brand voice**: l'utente descrive il suo tono, valori, parole chiave del brand
+
+### Come Viene Usato
+
+Prima di ogni generazione, la edge function `generate-content` viene aggiornata per:
+1. Caricare le ultime 20 memorie dell'utente (ordinate per importanza)
+2. Includerle nel system prompt come contesto
+3. L'AI genera contenuto che rispetta tutte le correzioni e preferenze passate
+
+```text
+Esempio di prompt arricchito:
+
+"L'utente ha le seguenti preferenze memorizzate:
+- [CORREZIONE] Non usare la parola 'semplicemente', preferisce 'concretamente'
+- [STILE] Tono autorevole ma amichevole, mai troppo formale
+- [BRAND] Studio FisioLife, specializzato in riabilitazione sportiva
+- [FEEDBACK] L'utente ha preferito hook con domande dirette rispetto a statistiche
+..."
+```
+
+### Componente `AIMemoryPanel`
+- Sezione nelle impostazioni dove l'utente vede cosa l'AI ha memorizzato
+- Puo' aggiungere/modificare/eliminare memorie
+- Puo' impostare brand voice e preferenze
+- Mostra statistiche: quante correzioni, quanti feedback
+
+---
+
+## Fase 6: Aggiornamento `generate-content`
+
+La edge function viene aggiornata per:
+1. Ricevere `user_id` e caricare le memorie dal database
+2. Ricevere `user_photos` (URL delle foto selezionate dall'utente)
+3. Includere le memorie nel prompt AI
+4. Restituire anche suggerimenti su quali foto usare per ogni slide
+
+---
+
+## Fase 7: UI - Nuove Sezioni
+
+### Tab "Le Mie Foto"
+- Griglia foto con upload
+- Filtri per categoria
+- Selezione multipla per i post
+
+### Tab "Analisi Virali"
+- Campo per incollare URL/testo di un post virale
+- Risultato analisi con pattern trovati
+- Storico delle analisi fatte
+- Pattern piu' comuni tra tutti i post analizzati
+
+### Tab "Trend"
+- Lista trend del momento per la nicchia dell'utente
+- Score di viralita' per ogni trend
+- Pulsante "Genera post su questo trend" (pre-compila il form)
+
+### Pannello "Memoria AI"
+- Mostra cosa l'AI ricorda dell'utente
+- Aggiungi preferenze e regole
+- Imposta brand voice
+- Feedback post-generazione (pollice su/giu + nota)
+
+---
+
+## Ordine di Implementazione
+
+1. Migration database (4 tabelle + bucket storage)
+2. Componente `PhotoLibrary` + upload su Supabase Storage
+3. Sistema memoria AI (tabella + componente `AIMemoryPanel`)
+4. Aggiornamento edge function `generate-content` con memorie + foto utente
+5. Edge function `analyze-viral-post` + UI analisi
+6. Edge function `find-trends` + UI trend
+7. Feedback post-generazione (salva correzioni automatiche)
+8. Test end-to-end completo
 
 ---
 
 ## Dettagli Tecnici
 
-### Edge Function `generate-content` (Fase 2)
-```text
-Endpoint: POST /generate-content
-Input: { topic, audience, platform, tone, postType, numSlides }
-Output: { content: string, slides: Array<{title, subtitle, body, cta}> }
-Usa: ai.gateway.lovable.dev con LOVABLE_API_KEY
-Modello: google/gemini-2.5-flash
-```
+### File Nuovi
+- `src/components/PhotoLibrary.tsx` - Gestione foto utente
+- `src/components/AIMemoryPanel.tsx` - Gestione memoria AI
+- `src/components/ViralAnalyzer.tsx` - Analisi post virali
+- `src/components/TrendExplorer.tsx` - Esplorazione trend
+- `src/components/FeedbackWidget.tsx` - Feedback post-generazione
+- `src/hooks/useUserPhotos.ts` - Hook per foto utente
+- `src/hooks/useAIMemory.ts` - Hook per memoria AI
+- `src/hooks/useViralAnalysis.ts` - Hook per analisi virali
+- `src/hooks/useTrends.ts` - Hook per trend
+- `supabase/functions/analyze-viral-post/index.ts` - Edge function analisi
+- `supabase/functions/find-trends/index.ts` - Edge function trend
 
-### Edge Function `generate-carousel-images` (Fase 3)
-```text
-Endpoint: POST /generate-carousel-images
-Input: { slides: Array<{title, body, theme}>, style: string }
-Output: { images: Array<{url: string}> }
-Usa: ai.gateway.lovable.dev con google/gemini-2.5-flash-image
-Le immagini base64 vengono salvate in Supabase Storage
-```
-
-### File da Eliminare
-- `src/services/openaiService.ts`
-- `src/services/runwareService.ts`
-- `src/services/copy/fallbackGenerator.ts`
-- `src/services/copy/copyBuilder.ts`
-- `src/services/copy/variableExtraction.ts`
-- `src/services/copy/templateSelection.ts`
-- `src/services/copy/audienceAnalysis.ts`
-
-### File da Semplificare
-- `src/services/intelligentCopyService.ts` - diventa un wrapper per la edge function
-- `src/hooks/useCarouselSlides.ts` - elimina contentDatabase, usa AI
-- `src/hooks/useContentGeneration.ts` - chiama edge function invece di servizio locale
+### File Modificati
+- `supabase/functions/generate-content/index.ts` - Aggiunta memorie + foto
+- `src/components/MainContent.tsx` - Nuove tab/sezioni
+- `src/pages/Index.tsx` - Navigazione aggiornata
+- `supabase/config.toml` - Nuove edge functions
 
