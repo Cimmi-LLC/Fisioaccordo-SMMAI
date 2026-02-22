@@ -15,7 +15,7 @@ export interface MetaConnectionData {
 }
 
 export class MetaService {
-  private static readonly META_APP_ID = '1261520952551293';
+  private static readonly META_APP_ID = '3382844873466520';
   private static readonly REDIRECT_URI = 'https://social-generator-fisioaccordo.lovable.app/auth/instagram/callback';
 
   static initiateAuth(): void {
