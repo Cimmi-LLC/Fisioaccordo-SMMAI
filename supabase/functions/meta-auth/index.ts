@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    const appId = '3382844873466520'
+    const appId = '1685995206180695'
     const appSecret = Deno.env.get('INSTAGRAM_APP_SECRET')
 
     if (!appSecret) {
