@@ -121,7 +121,10 @@ export class MetaService {
         }
       });
 
-      if (response.error) throw new Error(response.error.message);
+      if (response.error) {
+        const realError = response.data?.error || response.error.message;
+        throw new Error(realError);
+      }
       if (!response.data?.success) throw new Error(response.data?.error || 'Errore pubblicazione');
 
       return { success: true };
@@ -142,7 +145,10 @@ export class MetaService {
         }
       });
 
-      if (response.error) throw new Error(response.error.message);
+      if (response.error) {
+        const realError = response.data?.error || response.error.message;
+        throw new Error(realError);
+      }
       if (!response.data?.success) throw new Error(response.data?.error || 'Errore pubblicazione');
 
       return { success: true };

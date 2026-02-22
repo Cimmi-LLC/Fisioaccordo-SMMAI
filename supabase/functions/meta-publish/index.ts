@@ -2,7 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
 Deno.serve(async (req) => {
@@ -11,7 +11,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { connection_id, platform, content, image_url, carousel_urls } = await req.json()
+    const body = await req.json()
+    const { connection_id, platform, content, image_url, carousel_urls } = body
+    console.log('meta-publish request:', JSON.stringify({ connection_id, platform, has_image: !!image_url, carousel_count: carousel_urls?.length }))
 
     if (!connection_id || !platform || !content) {
       return new Response(
@@ -80,7 +82,7 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Meta publish error:', error)
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: error.message || 'Errore sconosciuto' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
