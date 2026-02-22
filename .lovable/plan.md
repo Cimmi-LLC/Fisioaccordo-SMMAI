@@ -1,14 +1,35 @@
 
 
-## Salvataggio INSTAGRAM_APP_SECRET
+## Aggiornamento UI: Unificare e correggere i componenti di connessione Instagram
 
-### Azione
-Salvare il valore `766feebad49b035474c3ba05fa4c4612` come secret Supabase con nome `INSTAGRAM_APP_SECRET`.
+### Problema attuale
+La pagina mostra **due sezioni di connessione separate**:
+1. "Connessione Social" (MetaConnection) - con testo "Collega con Facebook" e requisiti Facebook
+2. "Collega il tuo Account Instagram Business" (InstagramConnection) - vecchio componente
 
-Questo secret viene usato dalla edge function `meta-auth` per lo scambio del codice OAuth con il token di accesso Instagram.
+Entrambi sono obsoleti rispetto al nuovo flusso OAuth Instagram Platform API.
 
-### Dopo il salvataggio
-1. Pubblica ("Publish") il progetto per portare live tutte le modifiche (App ID, scope, edge functions)
-2. Vai nella dashboard Meta > Sezione 4 "Instagram Business Login" e aggiungi il redirect URI: `https://social-generator-fisioaccordo.lovable.app/auth/instagram/callback`
-3. Testa la connessione Instagram dall'app
+### Modifiche
 
+#### 1. Aggiornare `MetaConnection.tsx` - Testi e icone corretti
+- Cambiare il bottone da "Collega con Facebook" a "Collega Instagram Business"
+- Sostituire icona Facebook con icona Instagram (rosa/viola)
+- Aggiornare la descrizione: rimuovere riferimenti a Facebook
+- Aggiornare i requisiti: solo "Account Instagram Business o Creator" (la pagina Facebook non serve piu con la nuova API)
+- Cambiare il gradiente del bottone da blu (Facebook) a rosa/viola (Instagram)
+
+#### 2. Rimuovere `InstagramConnection` dalla pagina
+- In `Index.tsx`: rimuovere il componente `InstagramConnection` che e duplicato e usa il vecchio servizio
+- Tenere solo `MetaConnection` come unico punto di connessione
+
+### Dettagli tecnici
+
+**`src/components/MetaConnection.tsx`**:
+- Riga 5: rimuovere import `Facebook`, tenere `Instagram`
+- Riga 111: cambiare descrizione in "Collega il tuo account Instagram Business per pubblicare direttamente."
+- Righe 114-125: cambiare bottone - gradiente rosa/viola, icona Instagram, testo "Collega Instagram Business"
+- Righe 127-134: aggiornare requisiti - solo "Account Instagram Business o Creator"
+- Righe 84-88: rimuovere sezione Facebook page name (non applicabile)
+
+**`src/pages/Index.tsx`**:
+- Rimuovere import e rendering di `InstagramConnection`
