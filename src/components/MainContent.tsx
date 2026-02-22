@@ -102,15 +102,22 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
       const connection = connections[0];
       if (!connection) throw new Error('Nessuna connessione attiva');
 
-      const imageUrl = basePhoto || undefined;
+      // Use basePhoto first, then fall back to carousel slide images
+      const imageUrl = basePhoto
+        || carouselSlides.find(s => s.userImageUrl)?.userImageUrl
+        || carouselSlides.find(s => s.imageUrl)?.imageUrl
+        || undefined;
+
+      let publishedCount = 0;
+      const errors: string[] = [];
 
       for (const platform of platforms) {
         if (platform === 'facebook') {
           const result = await MetaService.publishToFacebook(connection.id, generatedContent, imageUrl);
-          if (!result.success) throw new Error(result.error);
+          if (result.success) { publishedCount++; } else { errors.push(`Facebook: ${result.error}`); }
         } else if (platform === 'instagram') {
           if (!imageUrl) {
-            toast({ title: "⚠️ Instagram richiede un'immagine", description: "Carica una foto per pubblicare su Instagram", variant: "destructive" });
+            errors.push("Instagram richiede almeno un'immagine. Carica una foto o genera le slide.");
             continue;
           }
           const carouselUrls = carouselSlides
@@ -121,11 +128,15 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
             connection.id, generatedContent, imageUrl,
             carouselUrls.length > 1 ? carouselUrls : undefined
           );
-          if (!result.success) throw new Error(result.error);
+          if (result.success) { publishedCount++; } else { errors.push(`Instagram: ${result.error}`); }
         }
       }
 
-      toast({ title: "🎉 Pubblicato!", description: `Contenuto pubblicato su ${platforms.length} piattaform${platforms.length > 1 ? 'e' : 'a'}` });
+      if (publishedCount > 0) {
+        toast({ title: "🎉 Pubblicato!", description: `Contenuto pubblicato su ${publishedCount} piattaform${publishedCount > 1 ? 'e' : 'a'}` });
+      } else if (errors.length > 0) {
+        toast({ title: "❌ Pubblicazione fallita", description: errors.join(' | '), variant: "destructive" });
+      }
     } catch (error) {
       toast({ title: "❌ Errore Pubblicazione", description: error instanceof Error ? error.message : 'Errore sconosciuto', variant: "destructive" });
     }
@@ -211,6 +222,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
                     onImageEdit={imageManager.handleImageEdit}
                     onSaveContent={handleSaveContent}
                     canvaTemplate={formData.canvaTemplate}
+                    onPublishDirect={handlePublish}
                   />
                   {generatedContent && <div className="mt-3"><FeedbackWidget generatedContent={generatedContent} /></div>}
                 </>

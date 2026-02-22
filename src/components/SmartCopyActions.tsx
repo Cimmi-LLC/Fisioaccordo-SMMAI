@@ -13,14 +13,17 @@ interface CarouselSlide {
 interface SmartCopyActionsProps {
   generatedContent: string;
   carouselSlides: CarouselSlide[];
+  onPublishDirect?: (platforms: string[]) => Promise<void>;
 }
 
 const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
   generatedContent,
-  carouselSlides
+  carouselSlides,
+  onPublishDirect
 }) => {
   const { toast } = useToast();
   const [copiedText, setCopiedText] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const handleCopyText = async () => {
     try {
@@ -122,12 +125,45 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
     window.open('https://www.facebook.com/', '_blank');
   };
 
+  const handleDirectPublish = async (platforms: string[]) => {
+    if (!onPublishDirect) return;
+    setIsPublishing(true);
+    try {
+      await onPublishDirect(platforms);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   const hasImages = carouselSlides.some(s => s.userImageUrl || s.imageUrl);
 
   return (
     <div className="bg-muted/30 border border-border rounded-lg p-4 space-y-3">
       <h4 className="text-sm font-semibold text-foreground">📲 Pubblica il tuo contenuto</h4>
       
+      {onPublishDirect && (
+        <div className="grid grid-cols-2 gap-2 pb-2 border-b border-border">
+          <Button
+            onClick={() => handleDirectPublish(['instagram'])}
+            variant="default"
+            size="sm"
+            disabled={isPublishing}
+          >
+            {isPublishing ? "Pubblicando..." : "📸 Pubblica su Instagram"}
+          </Button>
+          <Button
+            onClick={() => handleDirectPublish(['facebook'])}
+            variant="default"
+            size="sm"
+            disabled={isPublishing}
+          >
+            {isPublishing ? "Pubblicando..." : "📘 Pubblica su Facebook"}
+          </Button>
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground font-medium">Oppure copia e incolla manualmente:</p>
+
       <div className="grid grid-cols-2 gap-2">
         <Button
           onClick={handleCopyText}
@@ -148,17 +184,17 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
 
         <Button onClick={handleOpenInstagram} variant="outline" size="sm">
           <ExternalLink className="mr-1.5 h-4 w-4" />
-          Pubblica su Instagram
+          Apri Instagram
         </Button>
 
         <Button onClick={handleOpenFacebook} variant="outline" size="sm">
           <ExternalLink className="mr-1.5 h-4 w-4" />
-          Pubblica su Facebook
+          Apri Facebook
         </Button>
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Copia il testo, scarica le immagini e incolla tutto nel tuo post social preferito.
+        Usa i pulsanti viola per pubblicare direttamente via API, oppure copia e incolla manualmente.
       </p>
     </div>
   );
