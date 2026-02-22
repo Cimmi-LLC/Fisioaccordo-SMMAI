@@ -1,166 +1,102 @@
 
 
-# Pubblicazione Social: Copia Smart + Meta API Diretta
+# Integrazione Template Canva + Connessione Canva Utenti
 
-## Panoramica
+## Il Problema Attuale
 
-Due sistemi di pubblicazione che funzionano in parallelo:
+I template attuali (FisioaccordoTemplate, BusinessTemplate, ecc.) sono componenti React con CSS basico -- colori piatti, niente texture, niente design professionale. Le immagini generate dall'AI con Gemini sono inconsistenti e spesso brutte.
 
-1. **Copia & Incolla Smart** (funziona subito, per tutti) - L'utente genera il contenuto, clicca un pulsante, testo copiato + immagini scaricate. Zero configurazione.
-2. **Meta API Diretta** (per chi ha Instagram Business) - L'utente clicca "Collega con Facebook", fa login, autorizza, e da quel momento pubblica direttamente dall'app.
+## La Soluzione
 
-## Cosa serve da te (una volta sola)
+### Parte 1: I Tuoi Template Pre-caricati (per tutti gli utenti)
 
-Prima di implementare la parte Meta API, devi:
-1. Creare una Meta App su [developers.facebook.com](https://developers.facebook.com)
-2. Aggiungere il prodotto "Facebook Login for Business"
-3. Configurare i permessi: `instagram_basic`, `instagram_content_publish`, `pages_show_list`, `pages_read_engagement`, `pages_manage_posts`
-4. Aggiungere il Redirect URI: `https://social-generator-fisioaccordo.lovable.app/auth/instagram/callback`
-5. Darmi l'App Secret (lo salvo nei secrets Supabase in modo sicuro)
+**Come funziona:**
+1. Tu esporti da Canva i tuoi template come PNG vuoti a 1080x1080 (solo sfondo, layout grafico, decorazioni -- SENZA testo)
+2. Li carichi qui in chat
+3. Li salvo nel bucket Supabase `user-photos` (pubblico)
+4. L'app li usa come sfondo e ci sovrappone il testo generato dall'AI con posizionamento professionale
 
-I tuoi utenti non dovranno fare NIENTE di tutto questo. Vedranno solo "Collega con Facebook" e cliccano.
+**Database -- nuova tabella `canva_templates`:**
+- `id` (uuid)
+- `name` (text) -- es. "Fisioaccordo Rosa", "Business Blu"
+- `description` (text)
+- `category` (text) -- es. "healthcare", "business", "minimal"
+- `background_url` (text) -- URL dell'immagine PNG nel bucket
+- `text_zones` (jsonb) -- zone dove posizionare il testo (top, center, bottom, etc.)
+- `text_color` (text) -- colore testo consigliato (bianco, nero, etc.)
+- `is_default` (boolean) -- template pre-caricati dal proprietario
+- `user_id` (uuid, nullable) -- null = template globale, uuid = template utente
+- `created_at` (timestamptz)
 
----
+**Nuovo componente `CanvaTemplateSelector.tsx`:**
+- Griglia visuale con miniature dei template (non piu un dropdown triste)
+- Ogni template mostra l'anteprima reale dello sfondo
+- Click per selezionare, bordo evidenziato sul selezionato
+- Sezione "I miei template" se l'utente ha Canva collegato
 
-## Step 1: Copia & Incolla Smart (nessun prerequisito)
+**Modifica al rendering delle slide:**
+- Invece di usare i componenti React (FisioaccordoTemplate, etc.), le slide usano l'immagine PNG come sfondo
+- Il testo viene posizionato sopra con CSS absolute positioning
+- Le `text_zones` definiscono dove va il titolo, il body, il CTA, il footer
+- Risultato: slide con aspetto professionale identico a Canva
 
-### Nuovo componente `SmartCopyActions.tsx`
-Bottoni che appaiono sotto il contenuto generato:
-- **"Copia Testo"**: copia il testo negli appunti con `navigator.clipboard.writeText()`
-- **"Scarica Immagini"**: scarica le immagini del carosello come file ZIP o singolarmente
-- **"Apri Instagram"**: apre `instagram.com` in una nuova tab (su mobile apre l'app)
-- **"Apri Facebook"**: apre la pagina di creazione post Facebook
+### Parte 2: Connessione Canva per gli Utenti (opzionale)
 
-Feedback visivo: il bottone diventa verde con checkmark dopo la copia.
+**Canva Connect API** permette agli utenti di:
+- Fare login con il proprio account Canva
+- Importare i propri template come immagini di sfondo
+- I template importati vengono salvati nella stessa tabella `canva_templates` con il loro `user_id`
 
-### Modifica `PreviewSection.tsx`
-Aggiungere il componente `SmartCopyActions` sotto l'anteprima del contenuto generato, sempre visibile.
+**Prerequisiti per Canva API:**
+- Creare una Canva App su [canva.com/developers](https://www.canva.com/developers)
+- Ottenere Client ID e Client Secret
+- Configurare il redirect URI
 
----
+**Edge function `canva-auth`:**
+- Scambia il codice OAuth per access token
+- Recupera i design dell'utente via Canva API
+- Salva la connessione
 
-## Step 2: Database - Tabella `meta_connections`
+**Edge function `canva-import`:**
+- Riceve l'ID di un design Canva
+- Lo esporta come PNG via Canva Export API
+- Lo salva nel bucket Supabase
+- Crea record in `canva_templates`
 
-Nuova tabella per salvare le connessioni Meta degli utenti:
-
-- `id` (uuid, PK)
-- `user_id` (uuid, NOT NULL)
-- `facebook_user_id` (text)
-- `page_id` (text)
-- `page_name` (text)
-- `page_access_token` (text) - token per pubblicare
-- `instagram_business_id` (text, nullable)
-- `instagram_username` (text, nullable)
-- `token_expires_at` (timestamptz) - scadenza token long-lived
-- `is_active` (boolean, default true)
-- `created_at`, `updated_at` (timestamptz)
-
-RLS: ogni utente vede/gestisce solo le proprie connessioni.
-
----
-
-## Step 3: Edge Function `meta-auth` (riscrittura di `instagram-auth`)
-
-Corregge il bug critico della fetch (oggetto + stringa concatenati) e aggiunge:
-
-1. Riceve codice OAuth da Facebook
-2. Scambia per short-lived token (fix del bug fetch)
-3. Converte in long-lived token (60 giorni) via `GET /oauth/access_token?grant_type=fb_exchange_token`
-4. Trova pagine Facebook e account Instagram Business collegati
-5. Salva tutto in `meta_connections`
-
----
-
-## Step 4: Edge Function `meta-publish` (nuova)
-
-Gestisce la pubblicazione su entrambe le piattaforme:
-
-**Facebook Page:**
-- Testo: `POST /{page_id}/feed` con `message`
-- Con immagine: `POST /{page_id}/photos` con `url` + `caption`
-
-**Instagram Business:**
-- Step 1: Crea media container via `POST /{ig_id}/media` con `caption` + `image_url`
-- Step 2: Pubblica via `POST /{ig_id}/media_publish` con `creation_id`
-- Carousel: crea N container figli, poi container padre con `children[]`
-
-L'immagine deve essere un URL pubblico: useremo le immagini gia nel bucket `user-photos` che e' pubblico.
+**Componente `CanvaConnection.tsx`:**
+- Pulsante "Collega Canva" per gli utenti
+- Lista dei design importabili
+- Pulsante "Importa come template" per ogni design
 
 ---
 
-## Step 5: Servizio Frontend `metaService.ts`
+## Dettagli Tecnici
 
-Sostituisce `instagramService.ts` e le parti mock di `blotatoService.ts`:
+### File da creare:
+- `src/components/CanvaTemplateSelector.tsx` -- griglia visuale template
+- `src/components/CanvaConnection.tsx` -- collegamento account Canva utente
+- `src/services/canvaService.ts` -- servizio frontend Canva API
+- `supabase/functions/canva-auth/index.ts` -- OAuth Canva
+- `supabase/functions/canva-import/index.ts` -- importa design come PNG
 
-- `initiateAuth()` - Apre popup OAuth Facebook
-- `exchangeCodeForToken(code)` - Chiama `meta-auth`
-- `getConnections()` - Legge da `meta_connections`
-- `disconnect(id)` - Disattiva connessione
-- `publishToFacebook(connectionId, content, imageUrl?)` - Chiama `meta-publish`
-- `publishToInstagram(connectionId, caption, imageUrl)` - Chiama `meta-publish`
-- `isConnected()` - Verifica se ha connessione attiva
+### File da modificare:
+- `src/components/ContentForm.tsx` -- sostituire `VisualTemplateSelector` con `CanvaTemplateSelector`
+- `src/components/PreviewSection.tsx` -- rendering slide con sfondo PNG invece di componenti React
+- `src/components/template/TemplateLayoutEngine.tsx` -- supporto template basati su immagine
+- `supabase/config.toml` -- registrare nuove edge functions
 
----
-
-## Step 6: Componente `MetaConnection.tsx`
-
-Sostituisce `InstagramConnection.tsx` e `BlotatoConnection.tsx`:
-
-**Stato non collegato:**
-- Pulsante grande "Collega con Facebook" (gradiente blu)
-- Sotto: "Collega il tuo Instagram Business e la tua Pagina Facebook per pubblicare direttamente"
-- Se non ha Business: guida passo-passo per convertire (3 step con screenshot)
-
-**Stato collegato:**
-- Mostra: nome pagina Facebook, username Instagram, follower count
-- Badge verde "Collegato"
-- Pulsante "Scollega"
+### Migrazione database:
+- Creare tabella `canva_templates` con RLS
+- Creare bucket storage dedicato (o usare `user-photos` esistente)
 
 ---
 
-## Step 7: Aggiornare il flusso pubblicazione
+## Prossimo Step Immediato
 
-### `MainContent.tsx`
-- Sostituire `BlotatoService` con `metaService`
-- `handlePublish`: se Meta collegato --> pubblica via API, altrimenti --> mostra SmartCopy
+Per iniziare, ho bisogno che tu:
+1. **Esporti da Canva 3-5 template vuoti** (solo sfondo/layout, senza testo) a 1080x1080 PNG
+2. **Li carichi qui in chat**
 
-### `ContentForm.tsx`
-- Semplificare la sezione piattaforme: mostrare solo Instagram e Facebook (le piattaforme realmente supportate)
-- Se Meta non collegato: il bottone dice "Copia per pubblicare" invece di "Pubblica"
+Una volta che li ho, creo tutto il sistema e le slide avranno un aspetto professionale da subito.
 
-### `PreviewSection.tsx`
-- Aggiungere `SmartCopyActions` sempre visibile dopo il contenuto generato
-
----
-
-## Step 8: Aggiornare routing e callback
-
-### `InstagramCallback.tsx`
-- Aggiornare per usare `metaService` invece di `InstagramService`
-
-### `App.tsx`
-- La route `/auth/instagram/callback` resta invariata
-
----
-
-## Riepilogo file da creare/modificare
-
-**Nuovi file:**
-- `src/components/SmartCopyActions.tsx`
-- `src/components/MetaConnection.tsx`
-- `src/services/metaService.ts`
-- `supabase/functions/meta-auth/index.ts`
-- `supabase/functions/meta-publish/index.ts`
-
-**File da modificare:**
-- `src/components/MainContent.tsx` - usa metaService
-- `src/components/ContentForm.tsx` - semplifica piattaforme
-- `src/components/PreviewSection.tsx` - aggiunge SmartCopyActions
-- `src/pages/InstagramCallback.tsx` - usa metaService
-- `supabase/config.toml` - aggiunge meta-auth e meta-publish
-
-**File da rimuovere (opzionale, dopo test):**
-- `src/services/instagramService.ts`
-- `src/components/InstagramConnection.tsx`
-- `src/services/blotatoService.ts`
-- `src/components/BlotatoConnection.tsx`
-
+Per la parte Canva API degli utenti, serviranno le credenziali della Canva App (Client ID e Secret) -- ma questo lo facciamo in un secondo momento.
