@@ -1,6 +1,7 @@
 
 import { useState, useCallback } from 'react';
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface CarouselSlide {
   type: string;
@@ -18,6 +19,7 @@ interface FormData {
 export const useCarouselSlides = (formData: FormData, user: any, basePhoto: string | null) => {
   const [carouselSlides, setCarouselSlides] = useState<CarouselSlide[]>([]);
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
+  const { toast } = useToast();
 
   const generateCarouselSlides = useCallback(async () => {
     setIsGeneratingImages(true);
@@ -26,7 +28,10 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
     const numSlides = isSinglePost ? 1 : parseInt(formData.numSlides);
     const topic = formData.description;
 
-    if (!topic.trim()) return;
+    if (!topic.trim()) {
+      setIsGeneratingImages(false);
+      return;
+    }
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-content', {
@@ -42,13 +47,12 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
 
       if (error || data?.error) {
         console.error('Error generating slides:', error || data?.error);
-      const fallbackSlides = createFallbackSlides(topic, numSlides, user, basePhoto);
-      setCarouselSlides(fallbackSlides);
-      generateImagesForSlides(fallbackSlides, topic);
-      return;
+        const fallbackSlides = createFallbackSlides(topic, numSlides, user, basePhoto);
+        setCarouselSlides(fallbackSlides);
+        generateImagesForSlides(fallbackSlides, topic);
+        return;
       }
 
-      // For single posts, create 1 slide from the generated content
       if (isSinglePost) {
         const content = data?.content || topic;
         const lines = content.split('\n').filter((l: string) => l.trim());
@@ -136,24 +140,50 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
         body: { slides: slideData, style: 'modern, clean, professional healthcare', format: imageFormat, imagePreferences }
       });
 
-      if (!error && data?.images) {
+      if (error) {
+        console.error('Error calling generate-carousel-images:', error);
+        toast({ title: "Errore generazione immagini", description: "Non è stato possibile generare le immagini. Riprova.", variant: "destructive" });
+        setIsGeneratingImages(false);
+        return;
+      }
+
+      if (data?.images) {
+        const successCount = data.images.filter((img: any) => img.url).length;
+        const totalCount = data.images.length;
+
         setCarouselSlides(prev => prev.map((slide, i) => ({
           ...slide,
           imageUrl: data.images[i]?.url || slide.imageUrl
         })));
+
+        if (successCount === 0) {
+          toast({ title: "Immagini non generate", description: "Riprova tra qualche secondo", variant: "destructive" });
+        } else if (successCount < totalCount) {
+          toast({ title: `${successCount}/${totalCount} immagini generate`, description: "Alcune immagini non sono state create. Usa 'Rigenera Immagini' per riprovare." });
+        }
       }
     } catch (err) {
       console.error('Error generating images:', err);
+      toast({ title: "Errore generazione immagini", description: "Si è verificato un errore. Riprova.", variant: "destructive" });
     } finally {
       setIsGeneratingImages(false);
     }
   };
 
+  const regenerateImages = useCallback(async () => {
+    if (carouselSlides.length === 0) return;
+    const topic = formData.description;
+    if (!topic.trim()) return;
+    toast({ title: "Rigenerazione immagini...", description: "Creazione immagini in corso" });
+    await generateImagesForSlides(carouselSlides, topic);
+  }, [carouselSlides, formData.description, formData.postType]);
+
   return {
     carouselSlides,
     setCarouselSlides,
     generateCarouselSlides,
-    isGeneratingImages
+    isGeneratingImages,
+    regenerateImages
   };
 };
 
