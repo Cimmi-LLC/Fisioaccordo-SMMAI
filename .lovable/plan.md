@@ -1,41 +1,76 @@
 
+## Fix: Immagini reali per tutti i tipi di post (singolo, storia, reel)
 
-## Fix: Pubblicazione Instagram fallita (non-2xx status code)
+### Problema attuale
+Quando generi un "Post Singolo", "Storia" o "Reel", il sistema genera la slide e chiama `generateImagesForSlides`, ma:
 
-### Problema
-L'errore "Edge Function returned a non-2xx status code" nasconde il vero problema. Ci sono due cause:
-
-1. **CORS headers incompleti**: Il client Supabase invia header extra (`x-supabase-client-platform`, ecc.) che la funzione `meta-publish` non accetta. Questo puo' bloccare la richiesta.
-2. **Gestione errori opaca**: Quando la funzione restituisce un errore (es. token scaduto, immagine non raggiungibile), il messaggio reale viene perso e l'utente vede solo "non-2xx status code".
+1. L'etichetta dice "Slide del Carosello" anche per un singolo post -- confonde l'utente
+2. Il formato immagine e' sempre 1080x1080 (quadrato) anche per Storie e Reel che richiedono 1080x1920 (verticale 9:16)
+3. L'indicatore di caricamento "Creazione immagini in corso..." non e' abbastanza visibile per post singoli
 
 ### Soluzione
 
-**File: `supabase/functions/meta-publish/index.ts`**
+**File: `src/components/PreviewSection.tsx`**
 
-- Aggiornare i CORS headers per includere tutti gli header inviati dal client Supabase (stessa configurazione usata in `generate-carousel-images`)
-- Aggiungere logging (`console.log`/`console.error`) per tracciare richieste e risposte Instagram, cosi' da poter debuggare errori futuri nei log
+- Cambiare il titolo della sezione slide in base al tipo di post:
+  - Carosello: "Slide del Carosello"
+  - Post Singolo: "Immagine del Post"
+  - Storia: "Immagine della Storia"
+  - Reel: "Immagine del Reel"
+- Passare `postType` come nuova prop al componente
 
-CORS headers aggiornati:
+**File: `src/components/MainContent.tsx`**
+
+- Passare `formData.postType` a `PreviewSection` come nuova prop
+
+**File: `supabase/functions/generate-carousel-images/index.ts`**
+
+- Accettare un parametro `format` nel body della richiesta (`square` | `vertical`)
+- Per Storie e Reel, generare immagini 1080x1920 (9:16 verticale)
+- Per Post e Carosello, mantenere 1080x1080 (1:1 quadrato)
+- Aggiornare il prompt per specificare il formato corretto
+
+**File: `src/hooks/useCarouselSlides.ts`**
+
+- Passare il formato corretto a `generate-carousel-images`:
+  - `post-singolo` e `carosello`: format `square`
+  - `storia` e `reel`: format `vertical`
+
+### Dettagli tecnici
+
+**PreviewSection.tsx -- titolo dinamico:**
 ```text
-"Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version"
+// Nuova prop
+postType?: string;
+
+// Titolo dinamico
+const sectionTitle = {
+  'post-singolo': 'Immagine del Post',
+  'storia': 'Immagine della Storia',
+  'reel': 'Immagine del Reel',
+}[postType] || 'Slide del Carosello';
 ```
 
-**File: `src/services/metaService.ts`**
-
-- Migliorare la gestione errori in `publishToInstagram`: quando `response.error` esiste MA `response.data` contiene dettagli, usare il messaggio da `response.data.error` invece del generico "non-2xx"
-- Questo mostra all'utente il vero errore (es. "Token scaduto", "Immagine non raggiungibile")
-
-Codice aggiornato:
+**useCarouselSlides.ts -- formato immagine:**
 ```text
-if (response.error) {
-  // Il data potrebbe contenere il messaggio di errore reale
-  const realError = response.data?.error || response.error.message;
-  throw new Error(realError);
-}
+const imageFormat = ['storia', 'reel'].includes(postType) ? 'vertical' : 'square';
+
+// Passare a generate-carousel-images
+body: { slides: slideData, style: '...', format: imageFormat }
+```
+
+**generate-carousel-images/index.ts -- prompt con formato:**
+```text
+const { slides, style, format } = await req.json();
+const isVertical = format === 'vertical';
+const dimensions = isVertical ? '1080x1920, vertical 9:16 format' : '1080x1080, square format';
+
+// Nel prompt:
+`Create a professional social media image (${dimensions}).`
 ```
 
 ### Risultato
-- Le richieste non vengono piu' bloccate dal CORS
-- In caso di errore, l'utente vede il messaggio reale da Instagram (es. "Token scaduto") invece di "non-2xx status code"
-- I log della funzione mostrano dettagli utili per il debug
-
+- Ogni tipo di post mostra il titolo corretto ("Immagine del Post", "Immagine della Storia", ecc.)
+- Le immagini per Storie e Reel vengono generate in formato verticale 9:16
+- L'utente vede chiaramente che l'immagine e' in fase di creazione per qualsiasi tipo di post
+- Le immagini sono reali (generate dall'AI e salvate su Storage) per tutti i formati
