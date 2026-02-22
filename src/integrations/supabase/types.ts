@@ -118,6 +118,42 @@ export type Database = {
           },
         ]
       }
+      appointment_equipment: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          equipment_id: string
+          id: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          equipment_id: string
+          id?: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          equipment_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_equipment_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_equipment_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointment_status_changes: {
         Row: {
           appointment_id: string | null
@@ -200,6 +236,7 @@ export type Database = {
           created_at: string | null
           duration_minutes: number | null
           equipment_id: string | null
+          google_event_id: string | null
           id: string
           lead_id: string | null
           notes: string | null
@@ -211,6 +248,7 @@ export type Database = {
           status: string | null
           therapist_id: string
           treatment_id: string
+          treatment_path_session_id: string | null
           updated_at: string | null
           user_id: string
         }
@@ -224,6 +262,7 @@ export type Database = {
           created_at?: string | null
           duration_minutes?: number | null
           equipment_id?: string | null
+          google_event_id?: string | null
           id?: string
           lead_id?: string | null
           notes?: string | null
@@ -235,6 +274,7 @@ export type Database = {
           status?: string | null
           therapist_id: string
           treatment_id: string
+          treatment_path_session_id?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -248,6 +288,7 @@ export type Database = {
           created_at?: string | null
           duration_minutes?: number | null
           equipment_id?: string | null
+          google_event_id?: string | null
           id?: string
           lead_id?: string | null
           notes?: string | null
@@ -259,6 +300,7 @@ export type Database = {
           status?: string | null
           therapist_id?: string
           treatment_id?: string
+          treatment_path_session_id?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -345,6 +387,45 @@ export type Database = {
           id?: string
           ip_address?: string | null
           user_agent?: string | null
+        }
+        Relationships: []
+      }
+      calendar_sync_events: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          error_message: string | null
+          google_calendar_id: string
+          google_event_id: string
+          id: string
+          last_synced_at: string
+          sync_status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          error_message?: string | null
+          google_calendar_id?: string
+          google_event_id: string
+          id?: string
+          last_synced_at?: string
+          sync_status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          error_message?: string | null
+          google_calendar_id?: string
+          google_event_id?: string
+          id?: string
+          last_synced_at?: string
+          sync_status?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -501,6 +582,77 @@ export type Database = {
         }
         Relationships: []
       }
+      crm_pipeline_stages: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          id: string
+          name: string
+          position: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          position: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          position?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      custom_forms: {
+        Row: {
+          created_at: string
+          form_data: Json
+          id: string
+          name: string
+          patient_id: string
+          template_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          form_data?: Json
+          id?: string
+          name: string
+          patient_id: string
+          template_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          form_data?: Json
+          id?: string
+          name?: string
+          patient_id?: string
+          template_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_forms_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_sections: {
         Row: {
           created_at: string | null
@@ -566,6 +718,7 @@ export type Database = {
           is_active: boolean
           name: string
           template_type: string
+          therapist_id: string | null
           updated_at: string
           user_id: string
         }
@@ -576,6 +729,7 @@ export type Database = {
           is_active?: boolean
           name: string
           template_type?: string
+          therapist_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -586,10 +740,19 @@ export type Database = {
           is_active?: boolean
           name?: string
           template_type?: string
+          therapist_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "document_templates_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "therapists"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       equipment: {
         Row: {
@@ -599,7 +762,6 @@ export type Database = {
           id: string
           maintenance_cost_monthly: number | null
           name: string
-          room_id: string | null
           updated_at: string | null
           user_id: string | null
         }
@@ -610,7 +772,6 @@ export type Database = {
           id?: string
           maintenance_cost_monthly?: number | null
           name: string
-          room_id?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -621,19 +782,10 @@ export type Database = {
           id?: string
           maintenance_cost_monthly?: number | null
           name?: string
-          room_id?: string | null
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "equipment_room_id_fkey"
-            columns: ["room_id"]
-            isOneToOne: false
-            referencedRelation: "rooms"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       exercise_completions: {
         Row: {
@@ -683,61 +835,10 @@ export type Database = {
           },
         ]
       }
-      exercise_materials: {
-        Row: {
-          created_at: string
-          description: string | null
-          exercise_id: string
-          external_url: string | null
-          file_name: string | null
-          file_size: number | null
-          file_url: string | null
-          id: string
-          material_type: string
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          exercise_id: string
-          external_url?: string | null
-          file_name?: string | null
-          file_size?: number | null
-          file_url?: string | null
-          id?: string
-          material_type: string
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          exercise_id?: string
-          external_url?: string | null
-          file_name?: string | null
-          file_size?: number | null
-          file_url?: string | null
-          id?: string
-          material_type?: string
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "fk_exercise_materials_exercise"
-            columns: ["exercise_id"]
-            isOneToOne: false
-            referencedRelation: "exercises"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       exercises: {
         Row: {
           body_part: string | null
           created_at: string
-          description: string | null
           difficulty_level: string | null
           id: string
           instructions: string | null
@@ -749,7 +850,6 @@ export type Database = {
         Insert: {
           body_part?: string | null
           created_at?: string
-          description?: string | null
           difficulty_level?: string | null
           id?: string
           instructions?: string | null
@@ -761,7 +861,6 @@ export type Database = {
         Update: {
           body_part?: string | null
           created_at?: string
-          description?: string | null
           difficulty_level?: string | null
           id?: string
           instructions?: string | null
@@ -837,6 +936,164 @@ export type Database = {
         }
         Relationships: []
       }
+      ghl_sync_logs: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          event_type: string
+          ghl_id: string
+          id: string
+          local_id: string | null
+          local_table: string | null
+          payload: Json | null
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          event_type: string
+          ghl_id: string
+          id?: string
+          local_id?: string | null
+          local_table?: string | null
+          payload?: Json | null
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          event_type?: string
+          ghl_id?: string
+          id?: string
+          local_id?: string | null
+          local_table?: string | null
+          payload?: Json | null
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ghl_webhook_config: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          location_id: string | null
+          updated_at: string | null
+          user_id: string
+          webhook_secret: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          location_id?: string | null
+          updated_at?: string | null
+          user_id: string
+          webhook_secret?: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          location_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+          webhook_secret?: string
+        }
+        Relationships: []
+      }
+      google_calendar_connections: {
+        Row: {
+          access_token: string
+          calendar_id: string | null
+          calendar_name: string | null
+          created_at: string
+          email: string
+          google_user_id: string
+          id: string
+          is_active: boolean
+          refresh_token: string | null
+          token_expires_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          calendar_id?: string | null
+          calendar_name?: string | null
+          created_at?: string
+          email: string
+          google_user_id: string
+          id?: string
+          is_active?: boolean
+          refresh_token?: string | null
+          token_expires_at: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          calendar_id?: string | null
+          calendar_name?: string | null
+          created_at?: string
+          email?: string
+          google_user_id?: string
+          id?: string
+          is_active?: boolean
+          refresh_token?: string | null
+          token_expires_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      invoice_templates: {
+        Row: {
+          content: Json
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          template_type: string
+          therapist_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          template_type?: string
+          therapist_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: Json
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          template_type?: string
+          therapist_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_templates_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "therapists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           created_at: string
@@ -845,12 +1102,15 @@ export type Database = {
           id: string
           invoice_date: string
           invoice_number: string
+          invoice_version: string
           natura: string | null
           pdf_url: string | null
           quantity: number
           session_id: string | null
           tax_rate: number
           taxable_amount: number
+          template_content: Json | null
+          template_id: string | null
           total_amount: number
           unit_price: number
           updated_at: string
@@ -864,12 +1124,15 @@ export type Database = {
           id?: string
           invoice_date: string
           invoice_number: string
+          invoice_version?: string
           natura?: string | null
           pdf_url?: string | null
           quantity?: number
           session_id?: string | null
           tax_rate?: number
           taxable_amount: number
+          template_content?: Json | null
+          template_id?: string | null
           total_amount: number
           unit_price: number
           updated_at?: string
@@ -883,12 +1146,15 @@ export type Database = {
           id?: string
           invoice_date?: string
           invoice_number?: string
+          invoice_version?: string
           natura?: string | null
           pdf_url?: string | null
           quantity?: number
           session_id?: string | null
           tax_rate?: number
           taxable_amount?: number
+          template_content?: Json | null
+          template_id?: string | null
           total_amount?: number
           unit_price?: number
           updated_at?: string
@@ -905,6 +1171,133 @@ export type Database = {
           },
         ]
       }
+      lead_activities: {
+        Row: {
+          activity_type: string
+          channel: string | null
+          created_at: string | null
+          duration_minutes: number | null
+          id: string
+          lead_id: string | null
+          notes: string | null
+          outcome: string | null
+          performed_by: string | null
+          user_id: string
+        }
+        Insert: {
+          activity_type: string
+          channel?: string | null
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          lead_id?: string | null
+          notes?: string | null
+          outcome?: string | null
+          performed_by?: string | null
+          user_id: string
+        }
+        Update: {
+          activity_type?: string
+          channel?: string | null
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          lead_id?: string | null
+          notes?: string | null
+          outcome?: string | null
+          performed_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_activities_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_activities_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "therapists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_tasks: {
+        Row: {
+          assigned_to: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string | null
+          description: string | null
+          due_date: string | null
+          id: string
+          lead_id: string | null
+          priority: string | null
+          status: string | null
+          task_type: string
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          lead_id?: string | null
+          priority?: string | null
+          status?: string | null
+          task_type: string
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          lead_id?: string | null
+          priority?: string | null
+          status?: string | null
+          task_type?: string
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "therapists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_tasks_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_tasks_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           address: string | null
@@ -912,22 +1305,34 @@ export type Database = {
           city: string | null
           civic_number: string | null
           codice_destinatario: string | null
+          contacted_by: string | null
           country: string | null
           created_at: string
           date_of_birth: string | null
           denominazione: string | null
           email: string | null
+          estimated_value: number | null
+          first_contact_at: string | null
           first_name: string
           fonte_acquisizione: string | null
+          ghl_contact_id: string | null
+          ghl_opportunity_id: string | null
+          ghl_synced_at: string | null
           id: string
+          last_contact_at: string | null
           last_name: string
           nationality: string | null
+          next_followup_date: string | null
           notes: string | null
           pec_destinatario: string | null
           phone: string | null
+          pipeline_stage: string | null
           piva: string | null
           postal_code: string | null
+          preferred_contact_method: string | null
+          prima_visita: string | null
           province: string | null
+          rappresentante_legale: string | null
           referring_patient_id: string | null
           tax_code: string | null
           temperatura: string | null
@@ -941,22 +1346,34 @@ export type Database = {
           city?: string | null
           civic_number?: string | null
           codice_destinatario?: string | null
+          contacted_by?: string | null
           country?: string | null
           created_at?: string
           date_of_birth?: string | null
           denominazione?: string | null
           email?: string | null
+          estimated_value?: number | null
+          first_contact_at?: string | null
           first_name: string
           fonte_acquisizione?: string | null
+          ghl_contact_id?: string | null
+          ghl_opportunity_id?: string | null
+          ghl_synced_at?: string | null
           id?: string
+          last_contact_at?: string | null
           last_name: string
           nationality?: string | null
+          next_followup_date?: string | null
           notes?: string | null
           pec_destinatario?: string | null
           phone?: string | null
+          pipeline_stage?: string | null
           piva?: string | null
           postal_code?: string | null
+          preferred_contact_method?: string | null
+          prima_visita?: string | null
           province?: string | null
+          rappresentante_legale?: string | null
           referring_patient_id?: string | null
           tax_code?: string | null
           temperatura?: string | null
@@ -970,22 +1387,34 @@ export type Database = {
           city?: string | null
           civic_number?: string | null
           codice_destinatario?: string | null
+          contacted_by?: string | null
           country?: string | null
           created_at?: string
           date_of_birth?: string | null
           denominazione?: string | null
           email?: string | null
+          estimated_value?: number | null
+          first_contact_at?: string | null
           first_name?: string
           fonte_acquisizione?: string | null
+          ghl_contact_id?: string | null
+          ghl_opportunity_id?: string | null
+          ghl_synced_at?: string | null
           id?: string
+          last_contact_at?: string | null
           last_name?: string
           nationality?: string | null
+          next_followup_date?: string | null
           notes?: string | null
           pec_destinatario?: string | null
           phone?: string | null
+          pipeline_stage?: string | null
           piva?: string | null
           postal_code?: string | null
+          preferred_contact_method?: string | null
+          prima_visita?: string | null
           province?: string | null
+          rappresentante_legale?: string | null
           referring_patient_id?: string | null
           tax_code?: string | null
           temperatura?: string | null
@@ -994,6 +1423,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "leads_contacted_by_fkey"
+            columns: ["contacted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "leads_referring_patient_id_fkey"
             columns: ["referring_patient_id"]
@@ -1037,6 +1473,51 @@ export type Database = {
           id?: string
           source?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      organization_chart: {
+        Row: {
+          children_node_ids: string[] | null
+          cognome: string
+          color: string | null
+          created_at: string
+          id: string
+          level: number
+          name: string
+          node_id: string
+          parent_node_id: string | null
+          role: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          children_node_ids?: string[] | null
+          cognome?: string
+          color?: string | null
+          created_at?: string
+          id?: string
+          level?: number
+          name: string
+          node_id: string
+          parent_node_id?: string | null
+          role: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          children_node_ids?: string[] | null
+          cognome?: string
+          color?: string | null
+          created_at?: string
+          id?: string
+          level?: number
+          name?: string
+          node_id?: string
+          parent_node_id?: string | null
+          role?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -1084,42 +1565,51 @@ export type Database = {
           assigned_at: string
           assigned_by: string | null
           created_at: string
+          duration_unit: string | null
+          duration_value: number | null
           exercise_id: string
-          frequency_type: string | null
           id: string
           is_active: boolean | null
           notes: string | null
           patient_id: string
+          pause_duration_minutes: number | null
+          pause_duration_unit: string | null
+          series_count: number | null
           target_duration_minutes: number | null
-          target_frequency_per_week: number | null
           updated_at: string
         }
         Insert: {
           assigned_at?: string
           assigned_by?: string | null
           created_at?: string
+          duration_unit?: string | null
+          duration_value?: number | null
           exercise_id: string
-          frequency_type?: string | null
           id?: string
           is_active?: boolean | null
           notes?: string | null
           patient_id: string
+          pause_duration_minutes?: number | null
+          pause_duration_unit?: string | null
+          series_count?: number | null
           target_duration_minutes?: number | null
-          target_frequency_per_week?: number | null
           updated_at?: string
         }
         Update: {
           assigned_at?: string
           assigned_by?: string | null
           created_at?: string
+          duration_unit?: string | null
+          duration_value?: number | null
           exercise_id?: string
-          frequency_type?: string | null
           id?: string
           is_active?: boolean | null
           notes?: string | null
           patient_id?: string
+          pause_duration_minutes?: number | null
+          pause_duration_unit?: string | null
+          series_count?: number | null
           target_duration_minutes?: number | null
-          target_frequency_per_week?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -1199,10 +1689,75 @@ export type Database = {
           },
         ]
       }
+      patient_path_assignments: {
+        Row: {
+          assigned_at: string
+          created_at: string
+          end_date: string | null
+          id: string
+          patient_id: string
+          start_date: string | null
+          status: string
+          therapist_id: string | null
+          treatment_path_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          patient_id: string
+          start_date?: string | null
+          status?: string
+          therapist_id?: string | null
+          treatment_path_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          patient_id?: string
+          start_date?: string | null
+          status?: string
+          therapist_id?: string | null
+          treatment_path_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_patient_path_assignments_patient_id"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_patient_path_assignments_treatment_path_id"
+            columns: ["treatment_path_id"]
+            isOneToOne: false
+            referencedRelation: "treatment_paths"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patient_path_assignments_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "therapists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       patient_referti: {
         Row: {
           created_at: string
           id: string
+          is_visible_to_all: boolean | null
           patient_id: string
           referto_data: Json
           session_id: string | null
@@ -1214,6 +1769,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_visible_to_all?: boolean | null
           patient_id: string
           referto_data?: Json
           session_id?: string | null
@@ -1225,6 +1781,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_visible_to_all?: boolean | null
           patient_id?: string
           referto_data?: Json
           session_id?: string | null
@@ -1325,7 +1882,9 @@ export type Database = {
           phone: string | null
           piva: string | null
           postal_code: string | null
+          prima_visita: string | null
           province: string | null
+          rappresentante_legale: string | null
           referring_patient_id: string | null
           tax_code: string | null
           temperatura: string
@@ -1354,7 +1913,9 @@ export type Database = {
           phone?: string | null
           piva?: string | null
           postal_code?: string | null
+          prima_visita?: string | null
           province?: string | null
+          rappresentante_legale?: string | null
           referring_patient_id?: string | null
           tax_code?: string | null
           temperatura?: string
@@ -1383,7 +1944,9 @@ export type Database = {
           phone?: string | null
           piva?: string | null
           postal_code?: string | null
+          prima_visita?: string | null
           province?: string | null
+          rappresentante_legale?: string | null
           referring_patient_id?: string | null
           tax_code?: string | null
           temperatura?: string
@@ -1776,7 +2339,7 @@ export type Database = {
           action: string
           details: Json | null
           id: string
-          ip_address: unknown | null
+          ip_address: unknown
           timestamp: string | null
           user_agent: string | null
           user_id: string | null
@@ -1785,7 +2348,7 @@ export type Database = {
           action: string
           details?: Json | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           timestamp?: string | null
           user_agent?: string | null
           user_id?: string | null
@@ -1794,7 +2357,7 @@ export type Database = {
           action?: string
           details?: Json | null
           id?: string
-          ip_address?: unknown | null
+          ip_address?: unknown
           timestamp?: string | null
           user_agent?: string | null
           user_id?: string | null
@@ -1997,6 +2560,41 @@ export type Database = {
           },
         ]
       }
+      therapist_referti_visibility: {
+        Row: {
+          can_view_all_referti: boolean
+          created_at: string
+          id: string
+          mother_account_id: string
+          therapist_account_id: string
+          updated_at: string
+        }
+        Insert: {
+          can_view_all_referti?: boolean
+          created_at?: string
+          id?: string
+          mother_account_id: string
+          therapist_account_id: string
+          updated_at?: string
+        }
+        Update: {
+          can_view_all_referti?: boolean
+          created_at?: string
+          id?: string
+          mother_account_id?: string
+          therapist_account_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "therapist_referti_visibility_therapist_account_id_fkey"
+            columns: ["therapist_account_id"]
+            isOneToOne: false
+            referencedRelation: "therapist_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       therapists: {
         Row: {
           created_at: string | null
@@ -2085,6 +2683,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          price_per_session: number | null
           price_type: string
           session_price: number | null
           target_outcomes: string | null
@@ -2103,6 +2702,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          price_per_session?: number | null
           price_type?: string
           session_price?: number | null
           target_outcomes?: string | null
@@ -2121,6 +2721,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          price_per_session?: number | null
           price_type?: string
           session_price?: number | null
           target_outcomes?: string | null
@@ -2192,22 +2793,64 @@ export type Database = {
       }
       user_settings: {
         Row: {
+          allow_therapist_calendar: boolean | null
+          allow_therapist_dashboard: boolean | null
+          allow_therapist_exercises: boolean | null
+          allow_therapist_fatturazione: boolean | null
+          allow_therapist_fatturazione_v2: boolean | null
+          allow_therapist_leads: boolean | null
+          allow_therapist_paths: boolean | null
+          allow_therapist_patients: boolean | null
+          allow_therapist_referti: boolean | null
+          allow_therapist_treatments: boolean | null
           cac_value: number | null
           created_at: string
+          enable_appointment_conflicts_filter: boolean | null
+          enable_clinic_availability_filter: boolean | null
+          enable_google_calendar_import: boolean | null
+          enable_therapist_availability_filter: boolean | null
           id: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          allow_therapist_calendar?: boolean | null
+          allow_therapist_dashboard?: boolean | null
+          allow_therapist_exercises?: boolean | null
+          allow_therapist_fatturazione?: boolean | null
+          allow_therapist_fatturazione_v2?: boolean | null
+          allow_therapist_leads?: boolean | null
+          allow_therapist_paths?: boolean | null
+          allow_therapist_patients?: boolean | null
+          allow_therapist_referti?: boolean | null
+          allow_therapist_treatments?: boolean | null
           cac_value?: number | null
           created_at?: string
+          enable_appointment_conflicts_filter?: boolean | null
+          enable_clinic_availability_filter?: boolean | null
+          enable_google_calendar_import?: boolean | null
+          enable_therapist_availability_filter?: boolean | null
           id?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          allow_therapist_calendar?: boolean | null
+          allow_therapist_dashboard?: boolean | null
+          allow_therapist_exercises?: boolean | null
+          allow_therapist_fatturazione?: boolean | null
+          allow_therapist_fatturazione_v2?: boolean | null
+          allow_therapist_leads?: boolean | null
+          allow_therapist_paths?: boolean | null
+          allow_therapist_patients?: boolean | null
+          allow_therapist_referti?: boolean | null
+          allow_therapist_treatments?: boolean | null
           cac_value?: number | null
           created_at?: string
+          enable_appointment_conflicts_filter?: boolean | null
+          enable_clinic_availability_filter?: boolean | null
+          enable_google_calendar_import?: boolean | null
+          enable_therapist_availability_filter?: boolean | null
           id?: string
           updated_at?: string
           user_id?: string
@@ -2227,14 +2870,8 @@ export type Database = {
         Args: { p_content_id: string; p_user_id: string }
         Returns: undefined
       }
-      ensure_authenticated: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      get_effective_user_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
+      ensure_authenticated: { Args: never; Returns: boolean }
+      get_effective_user_id: { Args: never; Returns: string }
       get_user_contents: {
         Args: { p_user_id: string }
         Returns: {

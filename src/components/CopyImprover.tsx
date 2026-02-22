@@ -60,7 +60,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
     }
   };
 
-  const handleImproveCopy = () => {
+  const handleImproveCopy = async () => {
     console.log('🎯 handleImproveCopy called');
     console.log('Original copy:', originalCopy.substring(0, 100));
     console.log('Selected templates:', selectedTemplates);
@@ -76,7 +76,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
 
     try {
       console.log('🚀 Starting copy improvement...');
-      const improved = CopyService.generateImprovedCopy(originalCopy, selectedTemplates);
+      const improved = await CopyService.generateImprovedCopy(originalCopy, selectedTemplates);
       console.log('✅ Improved copy generated:', improved.substring(0, 100));
       
       if (improved && improved !== originalCopy) {
