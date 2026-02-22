@@ -134,7 +134,28 @@ async function publishCarousel(igId: string, token: string, caption: string, url
   return await publishContainer(igId, token, containerData.id)
 }
 
+async function waitForMediaReady(containerId: string, token: string, maxAttempts = 30, delayMs = 2000): Promise<{ ready: boolean; error?: string }> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const res = await fetch(`https://graph.instagram.com/v21.0/${containerId}?fields=status_code&access_token=${token}`)
+    const data = await res.json()
+    console.log(`Polling attempt ${i + 1}: status_code = ${data.status_code}`)
+
+    if (data.status_code === 'FINISHED') return { ready: true }
+    if (data.status_code === 'ERROR') return { ready: false, error: data.status || 'Media processing failed' }
+    if (data.error) return { ready: false, error: data.error.message }
+
+    await new Promise(r => setTimeout(r, delayMs))
+  }
+  return { ready: false, error: 'Timeout: Instagram non ha finito di elaborare il media entro 60 secondi' }
+}
+
 async function publishContainer(igId: string, token: string, creationId: string) {
+  // Wait for media to be ready
+  const status = await waitForMediaReady(creationId, token)
+  if (!status.ready) {
+    return errorResponse(status.error || 'Media not ready')
+  }
+
   const publishRes = await fetch(`https://graph.instagram.com/v21.0/${igId}/media_publish`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
