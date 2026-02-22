@@ -1,76 +1,56 @@
 
-## Fix: Immagini reali per tutti i tipi di post (singolo, storia, reel)
 
-### Problema attuale
-Quando generi un "Post Singolo", "Storia" o "Reel", il sistema genera la slide e chiama `generateImagesForSlides`, ma:
+## Fix: Indicatore di caricamento immagini sempre visibile
 
-1. L'etichetta dice "Slide del Carosello" anche per un singolo post -- confonde l'utente
-2. Il formato immagine e' sempre 1080x1080 (quadrato) anche per Storie e Reel che richiedono 1080x1920 (verticale 9:16)
-3. L'indicatore di caricamento "Creazione immagini in corso..." non e' abbastanza visibile per post singoli
+### Problema
+L'indicatore "Creazione immagini in corso..." e' dentro il blocco `carouselSlides.length > 0` in `PreviewSection.tsx`. Questo significa che:
+- Quando `generateCarouselSlides` sta ancora creando le slide (prima di `setCarouselSlides`), non c'e' nessun feedback visivo
+- Anche quando le slide sono in fase di creazione immagini, se per qualche motivo `carouselSlides` e' vuoto, l'indicatore non appare
 
 ### Soluzione
 
 **File: `src/components/PreviewSection.tsx`**
 
-- Cambiare il titolo della sezione slide in base al tipo di post:
-  - Carosello: "Slide del Carosello"
-  - Post Singolo: "Immagine del Post"
-  - Storia: "Immagine della Storia"
-  - Reel: "Immagine del Reel"
-- Passare `postType` come nuova prop al componente
+Spostare l'indicatore di caricamento FUORI dal blocco `carouselSlides.length > 0`, cosi' che venga mostrato ogni volta che `isGeneratingImages` e' `true`, indipendentemente dallo stato delle slide.
 
-**File: `src/components/MainContent.tsx`**
-
-- Passare `formData.postType` a `PreviewSection` come nuova prop
-
-**File: `supabase/functions/generate-carousel-images/index.ts`**
-
-- Accettare un parametro `format` nel body della richiesta (`square` | `vertical`)
-- Per Storie e Reel, generare immagini 1080x1920 (9:16 verticale)
-- Per Post e Carosello, mantenere 1080x1080 (1:1 quadrato)
-- Aggiornare il prompt per specificare il formato corretto
-
-**File: `src/hooks/useCarouselSlides.ts`**
-
-- Passare il formato corretto a `generate-carousel-images`:
-  - `post-singolo` e `carosello`: format `square`
-  - `storia` e `reel`: format `vertical`
-
-### Dettagli tecnici
-
-**PreviewSection.tsx -- titolo dinamico:**
+Prima (codice attuale):
 ```text
-// Nuova prop
-postType?: string;
-
-// Titolo dinamico
-const sectionTitle = {
-  'post-singolo': 'Immagine del Post',
-  'storia': 'Immagine della Storia',
-  'reel': 'Immagine del Reel',
-}[postType] || 'Slide del Carosello';
+{carouselSlides.length > 0 && (
+  <div className="mb-4">
+    <h3>...</h3>
+    {isGeneratingImages && (
+      <div>Creazione immagini in corso...</div>
+    )}
+    <div className="grid ...">
+      {carouselSlides.map(...)}
+    </div>
+  </div>
+)}
 ```
 
-**useCarouselSlides.ts -- formato immagine:**
+Dopo (fix):
 ```text
-const imageFormat = ['storia', 'reel'].includes(postType) ? 'vertical' : 'square';
-
-// Passare a generate-carousel-images
-body: { slides: slideData, style: '...', format: imageFormat }
+{isGeneratingImages && carouselSlides.length === 0 && (
+  <div className="mb-4">
+    <h3>{titolo dinamico}</h3>
+    <div>Creazione immagini in corso...</div>
+  </div>
+)}
+{carouselSlides.length > 0 && (
+  <div className="mb-4">
+    <h3>...</h3>
+    {isGeneratingImages && (
+      <div>Creazione immagini in corso...</div>
+    )}
+    <div className="grid ...">
+      {carouselSlides.map(...)}
+    </div>
+  </div>
+)}
 ```
 
-**generate-carousel-images/index.ts -- prompt con formato:**
-```text
-const { slides, style, format } = await req.json();
-const isVertical = format === 'vertical';
-const dimensions = isVertical ? '1080x1920, vertical 9:16 format' : '1080x1080, square format';
+In questo modo:
+- Se le slide non sono ancora state create ma le immagini sono in generazione, l'utente vede "Creazione immagini in corso..."
+- Se le slide esistono e le immagini sono in generazione, l'indicatore appare sopra le slide come prima
+- L'indicatore usa il titolo dinamico corretto (Immagine del Post, della Storia, ecc.)
 
-// Nel prompt:
-`Create a professional social media image (${dimensions}).`
-```
-
-### Risultato
-- Ogni tipo di post mostra il titolo corretto ("Immagine del Post", "Immagine della Storia", ecc.)
-- Le immagini per Storie e Reel vengono generate in formato verticale 9:16
-- L'utente vede chiaramente che l'immagine e' in fase di creazione per qualsiasi tipo di post
-- Le immagini sono reali (generate dall'AI e salvate su Storage) per tutti i formati
