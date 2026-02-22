@@ -34,6 +34,7 @@ interface PreviewSectionProps {
   canvaTemplate?: CanvaTemplateData | null;
   onPublishDirect?: (platforms: string[]) => Promise<void>;
   isGeneratingImages?: boolean;
+  postType?: string;
 }
 
 const PreviewSection: React.FC<PreviewSectionProps> = ({
@@ -46,7 +47,8 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
   onSaveContent,
   canvaTemplate,
   onPublishDirect,
-  isGeneratingImages
+  isGeneratingImages,
+  postType
 }) => {
   const { toast } = useToast();
 
@@ -250,7 +252,13 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
           <div className="space-y-4">
             {carouselSlides.length > 0 && (
               <div className="mb-4">
-                <h3 className="text-card-foreground font-semibold mb-3">Slide del Carosello</h3>
+                <h3 className="text-card-foreground font-semibold mb-3">
+                  {{
+                    'post-singolo': 'Immagine del Post',
+                    'storia': 'Immagine della Storia',
+                    'reel': 'Immagine del Reel',
+                  }[postType || ''] || 'Slide del Carosello'}
+                </h3>
                 {isGeneratingImages && (
                   <div className="flex items-center gap-2 mb-3 p-2 rounded-lg bg-accent/20 border border-accent/30 text-accent-foreground text-sm animate-pulse">
                     <Loader2 className="h-4 w-4 animate-spin" />

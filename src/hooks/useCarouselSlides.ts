@@ -101,6 +101,8 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
 
   const generateImagesForSlides = async (slides: CarouselSlide[], topic: string) => {
     setIsGeneratingImages(true);
+    const postType = formData.postType || 'carosello';
+    const imageFormat = ['storia', 'reel'].includes(postType) ? 'vertical' : 'square';
     try {
       const slideData = slides.map(slide => {
         let parsed;
@@ -113,7 +115,7 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
       });
 
       const { data, error } = await supabase.functions.invoke('generate-carousel-images', {
-        body: { slides: slideData, style: 'modern, clean, professional healthcare' }
+        body: { slides: slideData, style: 'modern, clean, professional healthcare', format: imageFormat }
       });
 
       if (!error && data?.images) {
