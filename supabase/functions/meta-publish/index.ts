@@ -20,7 +20,6 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Get connection from database
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -39,26 +38,44 @@ Deno.serve(async (req) => {
       )
     }
 
-    const pageAccessToken = connection.page_access_token
-    const pageId = connection.page_id
+    const accessToken = connection.page_access_token // This is the IG long-lived token
     const igId = connection.instagram_business_id
 
     if (platform === 'facebook') {
-      return await publishToFacebook(pageId, pageAccessToken, content, image_url)
-    } else if (platform === 'instagram') {
-      if (!igId) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Nessun account Instagram Business collegato a questa pagina' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-      return await publishToInstagram(igId, pageAccessToken, content, image_url, carousel_urls)
+      return new Response(
+        JSON.stringify({ success: false, error: 'La pubblicazione su Facebook non è supportata con Instagram Business Login. Usa la funzione copia/incolla per Facebook.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    return new Response(
-      JSON.stringify({ success: false, error: 'Piattaforma non supportata' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    if (platform !== 'instagram') {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Piattaforma non supportata' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (!igId) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Nessun account Instagram collegato' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Carousel post
+    if (carousel_urls && carousel_urls.length > 1) {
+      return await publishCarousel(igId, accessToken, content, carousel_urls)
+    }
+
+    // Single image post
+    if (!image_url) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Instagram richiede almeno un\'immagine' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    return await publishSingleImage(igId, accessToken, content, image_url)
 
   } catch (error) {
     console.error('Meta publish error:', error)
@@ -69,105 +86,9 @@ Deno.serve(async (req) => {
   }
 })
 
-async function publishToFacebook(pageId: string, token: string, message: string, imageUrl?: string) {
-  let result
-
-  if (imageUrl) {
-    const res = await fetch(`https://graph.facebook.com/v21.0/${pageId}/photos`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: imageUrl, caption: message, access_token: token })
-    })
-    result = await res.json()
-  } else {
-    const res = await fetch(`https://graph.facebook.com/v21.0/${pageId}/feed`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, access_token: token })
-    })
-    result = await res.json()
-  }
-
-  if (result.error) {
-    return new Response(
-      JSON.stringify({ success: false, error: result.error.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-  }
-
-  return new Response(
-    JSON.stringify({ success: true, post_id: result.id || result.post_id }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  )
-}
-
-async function publishToInstagram(igId: string, token: string, caption: string, imageUrl?: string, carouselUrls?: string[]) {
-  // Carousel
-  if (carouselUrls && carouselUrls.length > 1) {
-    const childIds: string[] = []
-
-    for (const url of carouselUrls) {
-      const res = await fetch(`https://graph.facebook.com/v21.0/${igId}/media`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image_url: url, is_carousel_item: true, access_token: token })
-      })
-      const data = await res.json()
-      if (data.error) {
-        return new Response(
-          JSON.stringify({ success: false, error: `Errore carousel item: ${data.error.message}` }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-      childIds.push(data.id)
-    }
-
-    // Create carousel container
-    const containerRes = await fetch(`https://graph.facebook.com/v21.0/${igId}/media`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ media_type: 'CAROUSEL', children: childIds, caption, access_token: token })
-    })
-    const containerData = await containerRes.json()
-
-    if (containerData.error) {
-      return new Response(
-        JSON.stringify({ success: false, error: containerData.error.message }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Publish
-    const publishRes = await fetch(`https://graph.facebook.com/v21.0/${igId}/media_publish`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ creation_id: containerData.id, access_token: token })
-    })
-    const publishData = await publishRes.json()
-
-    if (publishData.error) {
-      return new Response(
-        JSON.stringify({ success: false, error: publishData.error.message }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    return new Response(
-      JSON.stringify({ success: true, post_id: publishData.id }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-  }
-
-  // Single image
-  if (!imageUrl) {
-    return new Response(
-      JSON.stringify({ success: false, error: 'Instagram richiede almeno un\'immagine' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
-  }
-
-  // Step 1: Create media container
-  const containerRes = await fetch(`https://graph.facebook.com/v21.0/${igId}/media`, {
+async function publishSingleImage(igId: string, token: string, caption: string, imageUrl: string) {
+  // Step 1: Create media container via graph.instagram.com
+  const containerRes = await fetch(`https://graph.instagram.com/v21.0/${igId}/media`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ image_url: imageUrl, caption, access_token: token })
@@ -175,29 +96,65 @@ async function publishToInstagram(igId: string, token: string, caption: string, 
   const containerData = await containerRes.json()
 
   if (containerData.error) {
-    return new Response(
-      JSON.stringify({ success: false, error: containerData.error.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return errorResponse(containerData.error.message)
   }
 
   // Step 2: Publish
-  const publishRes = await fetch(`https://graph.facebook.com/v21.0/${igId}/media_publish`, {
+  return await publishContainer(igId, token, containerData.id)
+}
+
+async function publishCarousel(igId: string, token: string, caption: string, urls: string[]) {
+  const childIds: string[] = []
+
+  for (const url of urls) {
+    const res = await fetch(`https://graph.instagram.com/v21.0/${igId}/media`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image_url: url, is_carousel_item: true, access_token: token })
+    })
+    const data = await res.json()
+    if (data.error) {
+      return errorResponse(`Errore carousel item: ${data.error.message}`)
+    }
+    childIds.push(data.id)
+  }
+
+  // Create carousel container
+  const containerRes = await fetch(`https://graph.instagram.com/v21.0/${igId}/media`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ creation_id: containerData.id, access_token: token })
+    body: JSON.stringify({ media_type: 'CAROUSEL', children: childIds, caption, access_token: token })
+  })
+  const containerData = await containerRes.json()
+
+  if (containerData.error) {
+    return errorResponse(containerData.error.message)
+  }
+
+  return await publishContainer(igId, token, containerData.id)
+}
+
+async function publishContainer(igId: string, token: string, creationId: string) {
+  const publishRes = await fetch(`https://graph.instagram.com/v21.0/${igId}/media_publish`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ creation_id: creationId, access_token: token })
   })
   const publishData = await publishRes.json()
 
   if (publishData.error) {
-    return new Response(
-      JSON.stringify({ success: false, error: publishData.error.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return errorResponse(publishData.error.message)
   }
 
   return new Response(
     JSON.stringify({ success: true, post_id: publishData.id }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  )
+}
+
+function errorResponse(message: string, status = 400) {
+  return new Response(
+    JSON.stringify({ success: false, error: message }),
+    { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
 }

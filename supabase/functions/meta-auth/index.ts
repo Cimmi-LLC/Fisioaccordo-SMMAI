@@ -30,26 +30,35 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Step 1: Exchange code for short-lived token
-    const tokenUrl = `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${appId}&redirect_uri=${encodeURIComponent(redirect_uri)}&client_secret=${appSecret}&code=${code}`
-    
-    const tokenRes = await fetch(tokenUrl)
+    // Step 1: Exchange code for short-lived token via Instagram API
+    const tokenRes = await fetch('https://api.instagram.com/oauth/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: appId,
+        client_secret: appSecret,
+        grant_type: 'authorization_code',
+        redirect_uri: redirect_uri,
+        code: code,
+      }),
+    })
     const tokenData = await tokenRes.json()
 
-    if (tokenData.error) {
-      console.error('Token exchange error:', tokenData.error)
+    if (tokenData.error_type || tokenData.error_message) {
+      console.error('Token exchange error:', tokenData)
       return new Response(
-        JSON.stringify({ success: false, error: tokenData.error.message }),
+        JSON.stringify({ success: false, error: tokenData.error_message || 'Errore scambio token' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     const shortLivedToken = tokenData.access_token
+    const instagramUserId = tokenData.user_id?.toString()
 
     // Step 2: Exchange for long-lived token (60 days)
-    const longLivedUrl = `https://graph.facebook.com/v21.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${appId}&client_secret=${appSecret}&fb_exchange_token=${shortLivedToken}`
-    
-    const longLivedRes = await fetch(longLivedUrl)
+    const longLivedRes = await fetch(
+      `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${appSecret}&access_token=${shortLivedToken}`
+    )
     const longLivedData = await longLivedRes.json()
 
     if (longLivedData.error) {
@@ -61,50 +70,27 @@ Deno.serve(async (req) => {
     }
 
     const longLivedToken = longLivedData.access_token
-    const expiresIn = longLivedData.expires_in || 5184000 // 60 days default
+    const expiresIn = longLivedData.expires_in || 5184000
     const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString()
 
-    // Step 3: Get Facebook user info
-    const meRes = await fetch(`https://graph.facebook.com/v21.0/me?access_token=${longLivedToken}`)
-    const meData = await meRes.json()
-    const facebookUserId = meData.id
+    // Step 3: Get Instagram user profile
+    const profileRes = await fetch(
+      `https://graph.instagram.com/v21.0/me?fields=user_id,username,account_type,name&access_token=${longLivedToken}`
+    )
+    const profileData = await profileRes.json()
 
-    // Step 4: Get pages
-    const pagesRes = await fetch(`https://graph.facebook.com/v21.0/me/accounts?access_token=${longLivedToken}`)
-    const pagesData = await pagesRes.json()
-
-    if (!pagesData.data || pagesData.data.length === 0) {
+    if (profileData.error) {
+      console.error('Profile fetch error:', profileData.error)
       return new Response(
-        JSON.stringify({ success: false, error: 'Nessuna pagina Facebook trovata. Assicurati di essere admin di almeno una pagina.' }),
+        JSON.stringify({ success: false, error: profileData.error.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const page = pagesData.data[0]
-    const pageId = page.id
-    const pageName = page.name
-    const pageAccessToken = page.access_token
+    const igUsername = profileData.username || null
+    const igBusinessId = instagramUserId || profileData.user_id?.toString() || profileData.id
 
-    // Step 5: Get Instagram Business account linked to page
-    let instagramBusinessId = null
-    let instagramUsername = null
-
-    try {
-      const igRes = await fetch(`https://graph.facebook.com/v21.0/${pageId}?fields=instagram_business_account&access_token=${pageAccessToken}`)
-      const igData = await igRes.json()
-
-      if (igData.instagram_business_account) {
-        instagramBusinessId = igData.instagram_business_account.id
-
-        const igProfileRes = await fetch(`https://graph.facebook.com/v21.0/${instagramBusinessId}?fields=username&access_token=${pageAccessToken}`)
-        const igProfileData = await igProfileRes.json()
-        instagramUsername = igProfileData.username || null
-      }
-    } catch (e) {
-      console.log('Instagram Business account not found, continuing with Facebook only:', e)
-    }
-
-    // Step 6: Save to database
+    // Step 4: Save to database
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -115,17 +101,17 @@ Deno.serve(async (req) => {
       .update({ is_active: false })
       .eq('user_id', user_id)
 
-    // Insert new connection
+    // Insert new connection (using instagram fields, no Facebook page needed)
     const { error: insertError } = await supabase
       .from('meta_connections')
       .insert({
         user_id,
-        facebook_user_id: facebookUserId,
-        page_id: pageId,
-        page_name: pageName,
-        page_access_token: pageAccessToken,
-        instagram_business_id: instagramBusinessId,
-        instagram_username: instagramUsername,
+        facebook_user_id: null,
+        page_id: null,
+        page_name: null,
+        page_access_token: longLivedToken, // Store the IG long-lived token here
+        instagram_business_id: igBusinessId,
+        instagram_username: igUsername,
         token_expires_at: tokenExpiresAt,
         is_active: true
       })
@@ -141,8 +127,8 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        page_name: pageName,
-        instagram_username: instagramUsername
+        instagram_username: igUsername,
+        account_type: profileData.account_type
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
