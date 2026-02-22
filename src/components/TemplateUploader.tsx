@@ -128,9 +128,15 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ open, onOpenChange,
 
   const handleFilesSelected = useCallback((files: FileList | null) => {
     if (!files) return;
-    const imgFiles = Array.from(files).filter(f => f.type === 'image/png' || f.type === 'image/jpeg' || f.type === 'image/webp');
+    const isAccepted = (f: File) => {
+      if (f.type.startsWith('image/')) return true;
+      if (f.type === 'application/pdf') return true;
+      const ext = f.name.toLowerCase().split('.').pop();
+      return ['heic', 'heif', 'svg'].includes(ext || '');
+    };
+    const imgFiles = Array.from(files).filter(isAccepted);
     if (imgFiles.length === 0) {
-      toast({ title: "Nessuna immagine trovata", description: "Seleziona file PNG, JPG o WebP", variant: "destructive" });
+      toast({ title: "Nessun file supportato", description: "Formati accettati: PNG, JPG, WebP, SVG, HEIC, PDF, BMP, TIFF", variant: "destructive" });
       return;
     }
     const newPending: PendingFile[] = imgFiles.map(file => ({
@@ -221,9 +227,10 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ open, onOpenChange,
         const ext = pf.file.name.split('.').pop() || 'png';
         const filePath = `${user.id}/templates/${Date.now()}-${i}.${ext}`;
 
+        const contentType = pf.file.type || (/\.heic$/i.test(pf.file.name) ? 'image/heic' : /\.heif$/i.test(pf.file.name) ? 'image/heif' : 'application/octet-stream');
         const { error: uploadError } = await supabase.storage
           .from('user-photos')
-          .upload(filePath, pf.file, { contentType: pf.file.type });
+          .upload(filePath, pf.file, { contentType });
         if (uploadError) throw uploadError;
 
         const { data: urlData } = supabase.storage.from('user-photos').getPublicUrl(filePath);
@@ -273,8 +280,8 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ open, onOpenChange,
 
         {/* Upload buttons */}
         <div className="flex gap-3">
-          <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" multiple className="hidden" onChange={e => handleFilesSelected(e.target.files)} />
-          <input ref={folderInputRef} type="file" accept="image/png,image/jpeg,image/webp" multiple className="hidden" {...{ webkitdirectory: '', directory: '' } as any} onChange={e => handleFilesSelected(e.target.files)} />
+          <input ref={fileInputRef} type="file" accept="image/*,.svg,.pdf,.heic,.heif" multiple className="hidden" onChange={e => handleFilesSelected(e.target.files)} />
+          <input ref={folderInputRef} type="file" accept="image/*,.svg,.pdf,.heic,.heif" multiple className="hidden" {...{ webkitdirectory: '', directory: '' } as any} onChange={e => handleFilesSelected(e.target.files)} />
           <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="flex-1">
             <Upload className="mr-2 h-4 w-4" /> File singoli
           </Button>
