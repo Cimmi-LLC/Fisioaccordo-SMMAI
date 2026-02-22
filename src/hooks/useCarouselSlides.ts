@@ -12,6 +12,7 @@ interface CarouselSlide {
 interface FormData {
   numSlides: string;
   description: string;
+  postType?: string;
 }
 
 export const useCarouselSlides = (formData: FormData, user: any, basePhoto: string | null) => {
@@ -19,29 +20,52 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
 
   const generateCarouselSlides = useCallback(async () => {
-    const numSlides = parseInt(formData.numSlides);
+    const postType = formData.postType || 'carosello';
+    const isSinglePost = ['post-singolo', 'storia', 'reel'].includes(postType);
+    const numSlides = isSinglePost ? 1 : parseInt(formData.numSlides);
     const topic = formData.description;
 
     if (!topic.trim()) return;
 
     try {
-      // Generate content via edge function
       const { data, error } = await supabase.functions.invoke('generate-content', {
         body: {
           topic,
           audience: '',
           platform: 'instagram',
           tone: 'professionale',
-          postType: 'carosello',
+          postType,
           numSlides
         }
       });
 
       if (error || data?.error) {
         console.error('Error generating slides:', error || data?.error);
-        // Fallback: create basic slides
         const fallbackSlides = createFallbackSlides(topic, numSlides, user, basePhoto);
         setCarouselSlides(fallbackSlides);
+        return;
+      }
+
+      // For single posts, create 1 slide from the generated content
+      if (isSinglePost) {
+        const content = data?.content || topic;
+        const lines = content.split('\n').filter((l: string) => l.trim());
+        const singleSlide: CarouselSlide = {
+          type: 'attention',
+          content: JSON.stringify({
+            title: lines[0] || topic.toUpperCase(),
+            subtitle: lines[1] || '',
+            body: lines.slice(2, 5).join('\n') || content.substring(0, 200),
+            number: '',
+            cta: '',
+            banner: '',
+            logo: user?.user_metadata?.clinic_name || 'Studio Fisioterapico',
+            footer: user?.user_metadata?.clinic_name || 'Studio Fisioterapico',
+          }),
+          imageUrl: undefined,
+          userImageUrl: basePhoto || undefined
+        };
+        setCarouselSlides([singleSlide]);
         return;
       }
 
@@ -64,15 +88,13 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
       );
 
       setCarouselSlides(aiSlides);
-
-      // Generate images in background
       generateImagesForSlides(aiSlides, topic);
     } catch (err) {
       console.error('Exception generating slides:', err);
       const fallbackSlides = createFallbackSlides(topic, numSlides, user, basePhoto);
       setCarouselSlides(fallbackSlides);
     }
-  }, [formData.numSlides, formData.description, user, basePhoto]);
+  }, [formData.numSlides, formData.description, formData.postType, user, basePhoto]);
 
   const generateImagesForSlides = async (slides: CarouselSlide[], topic: string) => {
     setIsGeneratingImages(true);
