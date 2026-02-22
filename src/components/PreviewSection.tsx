@@ -288,7 +288,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
               </Button>
             </div>
 
-            <SmartCopyActions generatedContent={generatedContent} carouselSlides={carouselSlides} onPublishDirect={onPublishDirect} />
+            <SmartCopyActions generatedContent={generatedContent} carouselSlides={carouselSlides} onPublishDirect={onPublishDirect} isGeneratingImages={isGeneratingImages} />
 
             {carouselSlides.length > 0 && (
               <CarouselImageManager slides={carouselSlides} onSlidesUpdate={setCarouselSlides} onImageEdit={onImageEdit} />

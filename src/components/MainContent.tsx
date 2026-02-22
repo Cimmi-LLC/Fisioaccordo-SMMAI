@@ -91,6 +91,10 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
       toast({ title: "❌ Errore", description: "Genera prima un contenuto da pubblicare", variant: "destructive" });
       return;
     }
+    if (isGeneratingImages) {
+      toast({ title: "⏳ Attendi", description: "Le immagini sono ancora in fase di creazione. Riprova tra qualche secondo." });
+      return;
+    }
     try {
       const isMetaConnected = await MetaService.isConnected();
       if (!isMetaConnected) {
@@ -108,6 +112,9 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
         || carouselSlides.find(s => s.imageUrl)?.imageUrl
         || undefined;
 
+      // Fallback: if no image found but slides exist, show clearer error
+
+
       let publishedCount = 0;
       const errors: string[] = [];
 
@@ -117,7 +124,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
           if (result.success) { publishedCount++; } else { errors.push(`Facebook: ${result.error}`); }
         } else if (platform === 'instagram') {
           if (!imageUrl) {
-            errors.push("Instagram richiede almeno un'immagine. Carica una foto o genera le slide.");
+            errors.push("La generazione immagini non è riuscita. Carica una foto manualmente o riprova a generare il contenuto.");
             continue;
           }
           const carouselUrls = carouselSlides
