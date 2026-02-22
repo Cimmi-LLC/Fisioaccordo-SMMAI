@@ -15,6 +15,14 @@ interface CarouselSlide {
   userImageUrl?: string;
 }
 
+interface CanvaTemplateData {
+  id: string;
+  background_url: string;
+  text_zones: any;
+  text_color: string;
+  name: string;
+}
+
 interface PreviewSectionProps {
   generatedContent: string;
   carouselSlides: CarouselSlide[];
@@ -23,6 +31,7 @@ interface PreviewSectionProps {
   onRemoveHook: () => void;
   onImageEdit: (imageUrl: string, slideIndex: number) => void;
   onSaveContent: () => void;
+  canvaTemplate?: CanvaTemplateData | null;
 }
 
 const PreviewSection: React.FC<PreviewSectionProps> = ({
@@ -32,7 +41,8 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
   appliedHook,
   onRemoveHook,
   onImageEdit,
-  onSaveContent
+  onSaveContent,
+  canvaTemplate
 }) => {
   const { toast } = useToast();
 
@@ -85,14 +95,12 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const renderSlideWithFisioaccordoTemplate = (slide: CarouselSlide, index: number) => {
+  const renderSlideWithTemplate = (slide: CarouselSlide, index: number) => {
     let slideData;
     
     try {
-      // Prova a parsare il contenuto JSON
       slideData = JSON.parse(slide.content);
     } catch {
-      // Fallback per contenuto non JSON (formato vecchio)
       const lines = slide.content.split('\n').filter(line => line.trim());
       slideData = {
         title: lines[0] || `Slide ${index + 1}`,
@@ -102,7 +110,65 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
       };
     }
 
-    // Prepara i dati per il template Fisioaccordo
+    // If we have a Canva template, render with PNG background
+    if (canvaTemplate) {
+      return (
+        <div
+          key={index}
+          className="relative aspect-square rounded-lg overflow-hidden group border border-border"
+        >
+          {/* Canva template background */}
+          <img
+            src={canvaTemplate.background_url}
+            alt={canvaTemplate.name}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          
+          {/* Text overlay */}
+          <div className="absolute inset-0 flex flex-col justify-between p-4" style={{ color: canvaTemplate.text_color }}>
+            {/* Top zone - Title */}
+            <div className="text-center pt-2">
+              {slideData.title && (
+                <h3 className="font-bold text-sm leading-tight drop-shadow-lg" style={{ color: canvaTemplate.text_color }}>
+                  {slideData.title}
+                </h3>
+              )}
+            </div>
+
+            {/* Center zone - Body */}
+            <div className="flex-1 flex items-center justify-center px-2">
+              {slideData.body && (
+                <p className="text-xs text-center leading-relaxed drop-shadow-md" style={{ color: canvaTemplate.text_color }}>
+                  {slideData.body}
+                </p>
+              )}
+            </div>
+
+            {/* Bottom zone - CTA / Footer */}
+            <div className="text-center pb-2">
+              {slideData.footer && (
+                <p className="text-[10px] opacity-80 drop-shadow-sm" style={{ color: canvaTemplate.text_color }}>
+                  {slideData.footer}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Hover controls */}
+          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
+            <Button onClick={() => onImageEdit(slide.userImageUrl || slide.imageUrl || '', index)} size="sm" className="p-1 h-6 w-6 bg-primary hover:bg-primary/90">✏️</Button>
+            <Button onClick={() => downloadImage(slide.userImageUrl || slide.imageUrl || '', index)} size="sm" className="p-1 h-6 w-6 bg-accent hover:bg-accent/90"><Download className="w-3 h-3" /></Button>
+            <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadImageToSlide(index, file); }} className="hidden" id={`upload-${index}`} />
+            <Button asChild size="sm" className="p-1 h-6 w-6 bg-secondary hover:bg-secondary/90 cursor-pointer"><label htmlFor={`upload-${index}`}><Upload className="w-3 h-3" /></label></Button>
+          </div>
+          
+          {/* Slide number */}
+          <div className="absolute top-2 left-2 bg-background/70 text-foreground text-xs px-2 py-1 rounded-full font-bold z-10">{index + 1}</div>
+        </div>
+      );
+    }
+
+    // Fallback: use old TemplateLayoutEngine
     const templateData = {
       title: slideData.title,
       mainNumber: index === 0 ? '🚨' : index === 1 ? '❌' : index === 2 ? '✅' : index === 3 ? '🔥' : '🎯',
@@ -115,62 +181,15 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
     };
 
     return (
-      <div 
-        key={index}
-        className="relative aspect-square rounded-lg overflow-hidden group border border-border bg-card"
-      >
-        {/* Template Fisioaccordo */}
-        <TemplateLayoutEngine
-          template="fisioaccordo"
-          data={templateData}
-          width={400}
-          height={400}
-          className="w-full h-full"
-        />
-        
-        {/* Controlli hover */}
+      <div key={index} className="relative aspect-square rounded-lg overflow-hidden group border border-border bg-card">
+        <TemplateLayoutEngine template="fisioaccordo" data={templateData} width={400} height={400} className="w-full h-full" />
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
-          <Button
-            onClick={() => onImageEdit(slide.userImageUrl || slide.imageUrl || '', index)}
-            size="sm"
-            className="p-1 h-6 w-6 bg-primary hover:bg-primary/90"
-          >
-            ✏️
-          </Button>
-          <Button
-            onClick={() => downloadImage(slide.userImageUrl || slide.imageUrl || '', index)}
-            size="sm"
-            className="p-1 h-6 w-6 bg-fisio hover:bg-fisio/90"
-          >
-            <Download className="w-3 h-3" />
-          </Button>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                uploadImageToSlide(index, file);
-              }
-            }}
-            className="hidden"
-            id={`upload-${index}`}
-          />
-          <Button
-            asChild
-            size="sm"
-            className="p-1 h-6 w-6 bg-accent hover:bg-accent/90 cursor-pointer"
-          >
-            <label htmlFor={`upload-${index}`}>
-              <Upload className="w-3 h-3" />
-            </label>
-          </Button>
+          <Button onClick={() => onImageEdit(slide.userImageUrl || slide.imageUrl || '', index)} size="sm" className="p-1 h-6 w-6 bg-primary hover:bg-primary/90">✏️</Button>
+          <Button onClick={() => downloadImage(slide.userImageUrl || slide.imageUrl || '', index)} size="sm" className="p-1 h-6 w-6 bg-accent hover:bg-accent/90"><Download className="w-3 h-3" /></Button>
+          <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadImageToSlide(index, file); }} className="hidden" id={`upload-${index}`} />
+          <Button asChild size="sm" className="p-1 h-6 w-6 bg-secondary hover:bg-secondary/90 cursor-pointer"><label htmlFor={`upload-${index}`}><Upload className="w-3 h-3" /></label></Button>
         </div>
-        
-        {/* Numero slide */}
-        <div className="absolute top-2 left-2 bg-background/70 text-foreground text-xs px-2 py-1 rounded-full font-bold z-10">
-          {index + 1}
-        </div>
+        <div className="absolute top-2 left-2 bg-background/70 text-foreground text-xs px-2 py-1 rounded-full font-bold z-10">{index + 1}</div>
       </div>
     );
   };
@@ -188,7 +207,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
               <div className="mb-4">
                 <h3 className="text-card-foreground font-semibold mb-3">Slide del Carosello con Testo</h3>
                 <div className="grid grid-cols-2 gap-3 mb-4">
-                  {carouselSlides.slice(0, 4).map((slide, index) => renderSlideWithFisioaccordoTemplate(slide, index))}
+                  {carouselSlides.slice(0, 4).map((slide, index) => renderSlideWithTemplate(slide, index))}
                 </div>
                 
                 {carouselSlides.length > 4 && (

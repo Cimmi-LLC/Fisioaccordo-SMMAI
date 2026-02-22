@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Sparkles, User } from "lucide-react";
 import PhotoUpload from './PhotoUpload';
-import VisualTemplateSelector, { VisualTemplate } from './template/VisualTemplateSelector';
+import CanvaTemplateSelector, { CanvaTemplate } from './CanvaTemplateSelector';
 import { BlotatoService } from '@/services/blotatoService';
 
 interface FormData {
@@ -21,7 +21,8 @@ interface FormData {
   postType: string;
   numSlides: string;
   numImages: string;
-  visualTemplate: VisualTemplate;
+  visualTemplate: string;
+  canvaTemplate?: CanvaTemplate | null;
   selectedPlatforms?: string[];
   scheduleDate?: string;
 }
@@ -189,10 +190,15 @@ const ContentForm: React.FC<ContentFormProps> = ({
           </div>
         </div>
 
-        {/* Stile Visivo */}
-        <VisualTemplateSelector
-          value={formData.visualTemplate}
-          onChange={(template) => onInputChange('visualTemplate', template)}
+        {/* Template Canva */}
+        <CanvaTemplateSelector
+          value={formData.visualTemplate === 'default' ? null : formData.visualTemplate}
+          onChange={(templateId, template) => {
+            onInputChange('visualTemplate', templateId || 'default');
+            if (template) {
+              onInputChange('canvaTemplate', template as any);
+            }
+          }}
         />
 
         {/* Upload foto base */}
