@@ -1,35 +1,25 @@
 
 
-## Fix Pubblicazione Instagram - Aggiunta Polling Status
+## Miglioramento Pulsanti "Apri Instagram" e "Apri Facebook"
 
-### Problema riscontrato
-Ho testato la edge function `meta-publish` direttamente e ho ricevuto l'errore: **"Media ID is not available"**. 
+### Limitazione tecnica
+Instagram e Facebook **non permettono** di aprire direttamente la schermata di creazione post con testo e immagini pre-compilati da un sito web esterno. Nessuna app o sito puo' farlo - e' una limitazione delle piattaforme stesse.
 
-Questo succede perche' Instagram ha bisogno di tempo per elaborare l'immagine caricata. La funzione attuale crea il media container e prova a pubblicarlo immediatamente, ma Instagram non ha ancora finito di processare l'immagine.
+### Soluzione pratica
+Quando clicchi "Apri Instagram" o "Apri Facebook", il sistema fara' **automaticamente tutto in sequenza**:
 
-### Soluzione
-Aggiungere un meccanismo di **polling** nella funzione `publishContainer` che:
-1. Crea il media container (gia' implementato)
-2. Controlla periodicamente lo stato del container con `GET /{container-id}?fields=status_code`
-3. Aspetta finche' lo status diventa `FINISHED`
-4. Solo allora pubblica il container
+1. **Copia il testo negli appunti** (pronto per incollare)
+2. **Scarica tutte le immagini** del carosello sul dispositivo
+3. **Apre Instagram/Facebook**
+
+Cosi' devi solo: aprire "Nuovo Post" > selezionare le immagini scaricate > incollare il testo.
 
 ### Dettagli tecnici
 
-**File da modificare:** `supabase/functions/meta-publish/index.ts`
+**File da modificare:** `src/components/SmartCopyActions.tsx`
 
-Nella funzione `publishContainer`, prima di chiamare `media_publish`, aggiungere:
+- Modificare `handleOpenInstagram`: prima copia il testo, poi scarica le immagini, poi apre Instagram
+- Modificare `handleOpenFacebook`: prima copia il testo, poi apre Facebook
+- Aggiungere feedback toast che spiega cosa e' stato fatto ("Testo copiato e immagini scaricate! Ora incolla e seleziona le foto")
+- Rinominare i pulsanti per essere piu' chiari: "Pubblica su Instagram" e "Pubblica su Facebook"
 
-```text
-Ciclo di polling (max 30 tentativi, 2 secondi tra uno e l'altro = max ~60 secondi):
-  1. GET graph.instagram.com/v21.0/{creationId}?fields=status_code&access_token={token}
-  2. Se status_code == "FINISHED" -> procedi con publish
-  3. Se status_code == "ERROR" -> ritorna errore
-  4. Se status_code == "IN_PROGRESS" -> aspetta 2 secondi e riprova
-  5. Se raggiunto il limite -> ritorna errore timeout
-```
-
-Stessa logica per i carousel items nella funzione `publishCarousel`.
-
-### Risultato atteso
-I post verranno pubblicati correttamente su Instagram, con un'attesa automatica di pochi secondi per permettere a Instagram di elaborare le immagini.
