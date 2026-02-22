@@ -85,5 +85,14 @@ export const useAIMemory = () => {
     );
   }, [addMemory]);
 
-  return { memories, loading, addMemory, deleteMemory, updateMemory, addFeedback, addCorrection, refetch: fetchMemories };
+  const addImageFeedback = useCallback(async (isPositive: boolean, comment: string, imageContext: string) => {
+    return addMemory(
+      'image_feedback',
+      `${isPositive ? '👍 POSITIVO' : '👎 NEGATIVO'}: ${comment}`,
+      `Contesto immagine: ${imageContext.substring(0, 200)}`,
+      isPositive ? 6 : 8
+    );
+  }, [addMemory]);
+
+  return { memories, loading, addMemory, deleteMemory, updateMemory, addFeedback, addCorrection, addImageFeedback, refetch: fetchMemories };
 };

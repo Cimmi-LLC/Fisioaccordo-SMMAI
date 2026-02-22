@@ -103,6 +103,23 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
     setIsGeneratingImages(true);
     const postType = formData.postType || 'carosello';
     const imageFormat = ['storia', 'reel'].includes(postType) ? 'vertical' : 'square';
+    
+    // Load image feedback memories
+    let imagePreferences = '';
+    try {
+      const { data: memories } = await supabase
+        .from('user_ai_memory')
+        .select('content')
+        .eq('memory_type', 'image_feedback' as any)
+        .order('importance', { ascending: false })
+        .limit(10);
+      if (memories && memories.length > 0) {
+        imagePreferences = memories.map((m: any) => m.content).join('; ');
+      }
+    } catch (err) {
+      console.error('Error loading image preferences:', err);
+    }
+
     try {
       const slideData = slides.map(slide => {
         let parsed;
@@ -115,7 +132,7 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
       });
 
       const { data, error } = await supabase.functions.invoke('generate-carousel-images', {
-        body: { slides: slideData, style: 'modern, clean, professional healthcare', format: imageFormat }
+        body: { slides: slideData, style: 'modern, clean, professional healthcare', format: imageFormat, imagePreferences }
       });
 
       if (!error && data?.images) {

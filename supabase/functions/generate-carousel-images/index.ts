@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { slides, style, format } = await req.json();
+    const { slides, style, format, imagePreferences } = await req.json();
 
     if (!slides || !Array.isArray(slides) || slides.length === 0) {
       return new Response(JSON.stringify({ error: "slides array is required" }), {
@@ -37,11 +37,12 @@ serve(async (req) => {
 
     // Generate images for each slide
     const imagePromises = slides.map(async (slide: { title: string; body: string; theme?: string }, index: number) => {
+      const preferencesBlock = imagePreferences ? `\nUser preferences from past feedback: ${imagePreferences}\nPlease follow these preferences closely.` : '';
       const prompt = `Create a professional social media image (${dimensions}).
 Theme: ${slide.theme || slide.title}
 Context: ${slide.body?.substring(0, 100) || slide.title}
 Style: ${visualStyle}
-Requirements: Clean background, bold typography-friendly layout, vibrant colors, Instagram-optimized, no text on image, abstract/conceptual visual that represents the topic.
+Requirements: Clean background, bold typography-friendly layout, vibrant colors, Instagram-optimized, no text on image, abstract/conceptual visual that represents the topic.${preferencesBlock}
 Slide ${index + 1} of ${slides.length}.`;
 
       try {
