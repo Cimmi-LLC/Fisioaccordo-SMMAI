@@ -32,6 +32,21 @@ export interface TemplateLayer {
   lineHeight?: number;
   letterSpacing?: number;
   opacity?: number;
+  defaultText?: string;
+}
+
+interface TemplateBackground {
+  type: 'solid' | 'gradient' | 'photo';
+  value: string;
+}
+
+interface TemplatePhotoZone {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  opacity: number;
+  objectFit: string;
 }
 
 const LAYER_TYPES = [
@@ -78,6 +93,9 @@ interface PendingFile {
   name: string;
   status: 'pending' | 'uploading' | 'done' | 'error';
   layers: TemplateLayer[];
+  background: TemplateBackground;
+  photoZone: TemplatePhotoZone;
+  overlayColor: string;
 }
 
 interface TemplateUploaderProps {
@@ -121,6 +139,9 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ open, onOpenChange,
       name: file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' '),
       status: 'pending' as const,
       layers: [],
+      background: { type: 'solid' as const, value: '#1a1a2e' },
+      photoZone: { x: 0, y: 0, width: 100, height: 100, opacity: 0.25, objectFit: 'cover' },
+      overlayColor: 'rgba(0,0,0,0.35)',
     }));
     setPendingFiles(prev => [...prev, ...newPending]);
   }, [toast]);
@@ -212,8 +233,13 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ open, onOpenChange,
           .insert([{
             name: pf.name || `Template ${i + 1}`,
             category,
-            background_url: urlData.publicUrl,
-            text_zones: { layers: pf.layers } as any,
+            background_url: urlData.publicUrl, // kept as reference image only
+            text_zones: {
+              background: pf.background,
+              photoZone: pf.photoZone,
+              overlayColor: pf.overlayColor,
+              layers: pf.layers,
+            } as any,
             text_color: textColor,
             is_default: makeDefault && isMotherAccount,
             user_id: makeDefault && isMotherAccount ? null : user.id,
@@ -343,8 +369,65 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ open, onOpenChange,
               )}
             </div>
 
-            {/* Right: Layer editor */}
+            {/* Right: Settings + Layer editor */}
             <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+              {/* Background settings */}
+              <Collapsible defaultOpen>
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <CollapsibleTrigger className="flex items-center gap-2 w-full p-2 hover:bg-muted/50 text-left">
+                    <span className="text-xs">🎨</span>
+                    <span className="text-xs font-medium flex-1">Sfondo & Overlay</span>
+                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="p-2 pt-0 space-y-2 border-t border-border">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">Tipo sfondo</Label>
+                          <Select value={activePf.background.type} onValueChange={v => {
+                            setPendingFiles(prev => prev.map((pf, i) => i === activeFileIndex ? { ...pf, background: { ...pf.background, type: v as any } } : pf));
+                          }}>
+                            <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="solid">Colore solido</SelectItem>
+                              <SelectItem value="gradient">Gradiente</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">
+                            {activePf.background.type === 'gradient' ? 'CSS Gradient' : 'Colore'}
+                          </Label>
+                          {activePf.background.type === 'solid' ? (
+                            <Input type="color" value={activePf.background.value} onChange={e => {
+                              setPendingFiles(prev => prev.map((pf, i) => i === activeFileIndex ? { ...pf, background: { ...pf.background, value: e.target.value } } : pf));
+                            }} className="h-7 w-full p-0 border-0 cursor-pointer" />
+                          ) : (
+                            <Input value={activePf.background.value} onChange={e => {
+                              setPendingFiles(prev => prev.map((pf, i) => i === activeFileIndex ? { ...pf, background: { ...pf.background, value: e.target.value } } : pf));
+                            }} className="h-7 text-xs" placeholder="linear-gradient(135deg, #0f0f0f, #1a1a2e)" />
+                          )}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">Opacità foto ({Math.round(activePf.photoZone.opacity * 100)}%)</Label>
+                          <Slider value={[activePf.photoZone.opacity * 100]} min={0} max={100} step={5} onValueChange={([v]) => {
+                            setPendingFiles(prev => prev.map((pf, i) => i === activeFileIndex ? { ...pf, photoZone: { ...pf.photoZone, opacity: v / 100 } } : pf));
+                          }} />
+                        </div>
+                        <div>
+                          <Label className="text-[10px] text-muted-foreground">Overlay colore</Label>
+                          <Input value={activePf.overlayColor} onChange={e => {
+                            setPendingFiles(prev => prev.map((pf, i) => i === activeFileIndex ? { ...pf, overlayColor: e.target.value } : pf));
+                          }} className="h-7 text-xs" placeholder="rgba(0,0,0,0.35)" />
+                        </div>
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
+
               <div className="flex items-center justify-between">
                 <Label className="font-semibold">Livelli ({activePf.layers.length})</Label>
                 <Select onValueChange={(v) => addLayer(v as TemplateLayer['type'])}>
@@ -496,6 +579,17 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ open, onOpenChange,
                                 </div>
                               </div>
                             )}
+
+                            {/* Default Text (static text) */}
+                            <div>
+                              <Label className="text-[10px] text-muted-foreground">Testo fisso (non sostituito dall'AI)</Label>
+                              <Input
+                                value={(layer as any).defaultText || ''}
+                                onChange={e => updateLayer(li, 'defaultText', e.target.value || undefined)}
+                                className="h-7 text-xs"
+                                placeholder="Es: ASSUMIAMO, By partnering with..."
+                              />
+                            </div>
                           </>
                         )}
                       </div>
