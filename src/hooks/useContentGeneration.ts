@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useGlobalLoading } from "@/contexts/GlobalLoadingContext";
 import { useContentCache } from "@/contexts/ContentCacheContext";
 import { contentService } from "@/services/contentService";
-import { IntelligentCopyService } from "@/services/intelligentCopyService";
+import { supabase } from "@/integrations/supabase/client";
 
 interface FormData {
   description: string;
@@ -33,7 +33,7 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
       return;
     }
 
-    // Controlla cache
+    // Check cache
     const cacheKey = `${formData.description}-${formData.platform}-${formData.tone}`;
     const cached = getCachedContent(cacheKey);
     
@@ -48,30 +48,35 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
 
     try {
       loadingState.startLoading('🚀 Generazione contenuto AI in corso...');
-      
-      // Simulazione di progress realistico
-      loadingState.updateProgress(20, '🧠 Analisi semantica del topic...');
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      loadingState.updateProgress(50, '✍️ Generazione copy personalizzato...');
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      loadingState.updateProgress(30, '🧠 AI sta analizzando il topic...');
+
+      const { data, error } = await supabase.functions.invoke('generate-content', {
+        body: {
+          topic: formData.description,
+          audience: formData.audience,
+          platform: formData.platform,
+          tone: formData.tone,
+          postType: formData.postType,
+          numSlides: formData.numSlides
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Errore nella chiamata AI');
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      const personalizedContent = data?.content || '';
       
       loadingState.updateProgress(80, '🎨 Ottimizzazione per viralità...');
-      await new Promise(resolve => setTimeout(resolve, 600));
-      
-      // Usa il nuovo servizio intelligente invece del mock
-      const personalizedContent = await IntelligentCopyService.generatePersonalizedCopy(
-        formData.description,
-        formData.audience,
-        formData.platform,
-        formData.tone,
-        user
-      );
 
       setGeneratedContent(personalizedContent);
       generateCarouselSlides();
       
-      // Cache il contenuto
+      // Cache the content
       cacheContent(cacheKey, personalizedContent, [], formData);
       
       loadingState.finishLoading(true, '🎉 Copy personalizzato generato!');
@@ -81,17 +86,18 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
         description: "Contenuto 100% personalizzato basato sul tuo topic specifico"
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Errore durante la generazione:', error);
       loadingState.finishLoading(false, '❌ Errore durante la generazione');
       
+      const message = error?.message || 'Errore durante la generazione del contenuto. Riprova.';
       toast({
         title: "❌ Errore",
-        description: "Errore durante la generazione del contenuto. Riprova.",
+        description: message,
         variant: "destructive"
       });
     }
-  }, [formData, toast, loadingState, getCachedContent, cacheContent, generateCarouselSlides, user]);
+  }, [formData, toast, loadingState, getCachedContent, cacheContent, generateCarouselSlides]);
 
   const saveContent = async (carouselSlides: any[]) => {
     if (!generatedContent) return;

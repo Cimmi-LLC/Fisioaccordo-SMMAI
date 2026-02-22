@@ -24,9 +24,9 @@ export class CopyService {
     }
   }
 
-  static generateImprovedCopy(originalText: string, selectedTemplates: string[] = []): string {
+  static async generateImprovedCopy(originalText: string, selectedTemplates: string[] = []): Promise<string> {
     try {
-      return generateFromModule(originalText, selectedTemplates);
+      return await generateFromModule(originalText, selectedTemplates);
     } catch (error) {
       console.error('Error generating improved copy:', error);
       return originalText;

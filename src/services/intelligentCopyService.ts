@@ -1,5 +1,5 @@
 
-import { defaultOpenAIService } from './openaiService';
+import { supabase } from "@/integrations/supabase/client";
 
 export interface TopicAnalysis {
   type: 'problem' | 'solution' | 'general';
@@ -23,7 +23,6 @@ export class IntelligentCopyService {
   static analyzeTopicSemantics(topic: string): TopicAnalysis {
     const lowerTopic = topic.toLowerCase();
     
-    // Analisi tipo (problema vs soluzione)
     const problemKeywords = ['dolore', 'problema', 'male', 'difficoltà', 'stress', 'ansia', 'disturbo', 'patologia', 'sintomo'];
     const solutionKeywords = ['benefici', 'vantaggi', 'soluzione', 'trattamento', 'terapia', 'cura', 'miglioramento', 'risultati'];
     
@@ -34,7 +33,6 @@ export class IntelligentCopyService {
     if (isProblem) type = 'problem';
     else if (isSolution) type = 'solution';
     
-    // Analisi categoria
     const healthKeywords = ['fisio', 'terapia', 'dolore', 'riabilitazione', 'salute', 'benessere', 'muscolare'];
     const businessKeywords = ['business', 'vendita', 'marketing', 'successo', 'guadagno', 'profitto'];
     
@@ -42,7 +40,6 @@ export class IntelligentCopyService {
     if (healthKeywords.some(keyword => lowerTopic.includes(keyword))) category = 'health';
     else if (businessKeywords.some(keyword => lowerTopic.includes(keyword))) category = 'business';
     
-    // Analisi sentiment
     const positiveKeywords = ['benefici', 'vantaggi', 'successo', 'miglioramento', 'risultati', 'efficace'];
     const negativeKeywords = ['dolore', 'problema', 'difficoltà', 'stress', 'male'];
     
@@ -65,115 +62,55 @@ export class IntelligentCopyService {
     tone: string,
     user: any
   ): Promise<string> {
-    const analysis = this.analyzeTopicSemantics(topic);
-    
-    // Costruisci un prompt intelligente basato sull'analisi
-    const prompt = this.buildIntelligentPrompt(topic, analysis, audience, platform, tone, user);
-    
-    try {
-      const generatedCopy = await defaultOpenAIService.generateText({
-        topic: prompt,
+    const { data, error } = await supabase.functions.invoke('generate-content', {
+      body: {
+        topic,
         audience,
-        length: 'medio',
-        tone,
         platform,
-        postType: 'carosello'
-      });
-      
-      return generatedCopy;
-    } catch (error) {
-      console.error('Errore generazione AI:', error);
-      return this.generateFallbackCopy(topic, analysis, user);
+        tone,
+        postType: 'carosello',
+        numSlides: 5
+      }
+    });
+
+    if (error) {
+      console.error('Edge function error:', error);
+      throw new Error(error.message || 'Errore generazione contenuto');
     }
+
+    if (data?.error) {
+      throw new Error(data.error);
+    }
+
+    return data?.content || 'Errore nella generazione del contenuto';
   }
 
-  private static buildIntelligentPrompt(
+  static async generateViralContent(
+    format: ViralFormat,
     topic: string,
-    analysis: TopicAnalysis,
     audience: string,
-    platform: string,
-    tone: string,
     user: any
-  ): string {
-    const clinicName = user?.user_metadata?.clinic_name || 'il nostro studio';
+  ): Promise<string> {
+    // Use the same edge function with format context in the topic
+    const enhancedTopic = `[Format: ${format.name}] ${topic}. Segui questo template: ${format.template}`;
     
-    let hookStarter = '';
-    
-    // Hook intelligente basato sul tipo di topic
-    if (analysis.type === 'problem') {
-      hookStarter = `🚨 ATTENZIONE: Se anche tu hai problemi con ${topic}`;
-    } else if (analysis.type === 'solution') {
-      hookStarter = `💡 SCOPERTA: Ecco come ${topic} può trasformare la tua vita`;
-    } else {
-      hookStarter = `🔥 VERITÀ SU ${topic.toUpperCase()}`;
+    const { data, error } = await supabase.functions.invoke('generate-content', {
+      body: {
+        topic: enhancedTopic,
+        audience,
+        platform: format.platforms[0] || 'instagram',
+        tone: 'virale',
+        postType: 'viral-format',
+        numSlides: 1
+      }
+    });
+
+    if (error || data?.error) {
+      console.error('Viral content error:', error || data?.error);
+      return `🔥 ${topic.toUpperCase()}: la verità che cambia tutto\n\nScopri di più 👇`;
     }
-    
-    const contextualPrompt = `
-Crea un post ${platform} super-viral per ${audience} su: "${topic}"
 
-HOOK INIZIALE: ${hookStarter}
-
-CONTESTO SPECIFICO:
-- Tipo di contenuto: ${analysis.type}
-- Categoria: ${analysis.category}
-- Sentiment: ${analysis.sentiment}
-- Studio: ${clinicName}
-
-STRUTTURA RICHIESTA:
-1. Hook che ferma lo scroll (già definito sopra)
-2. Problema specifico che il target vive
-3. Soluzione concreta offerta
-4. Proof/testimonianza
-5. Call to action forte con ${clinicName}
-
-STILE: ${tone}, diretto, che converte
-LUNGHEZZA: Post completo con emojis strategici
-    `;
-    
-    return contextualPrompt;
-  }
-
-  private static generateFallbackCopy(topic: string, analysis: TopicAnalysis, user: any): string {
-    const clinicName = user?.user_metadata?.clinic_name || 'Il nostro studio';
-    
-    let hook = '';
-    if (analysis.type === 'problem') {
-      hook = `🚨 STOP! Se anche tu soffri di ${topic}, questo post può cambiarti la vita!`;
-    } else if (analysis.type === 'solution') {
-      hook = `💡 SCOPERTA: ${topic} - ecco come funziona davvero!`;
-    } else {
-      hook = `🔥 LA VERITÀ SU ${topic.toUpperCase()} che nessuno ti dice!`;
-    }
-    
-    return `${hook}
-
-💥 IL PROBLEMA: Ogni giorno vedo persone che lottano con questo problema senza trovare la soluzione giusta.
-
-❌ ERRORE COMUNE: La maggior parte delle persone ignora i primi segnali e si affida a rimedi temporanei.
-
-✅ LA SOLUZIONE: Come professionista con anni di esperienza, ho sviluppato un approccio che funziona davvero:
-
-🎯 3 PASSI SCIENTIFICI:
-1️⃣ Valutazione completa della situazione
-2️⃣ Protocollo personalizzato
-3️⃣ Follow-up per risultati duraturi
-
-🔥 RISULTATI GARANTITI:
-• Miglioramento visibile in 7-14 giorni
-• Soluzione duratura nel tempo
-• Approccio 100% naturale
-
-💬 TESTIMONIANZA: "Finalmente ho risolto un problema che avevo da mesi!" - Maria, 45 anni
-
-🚀 VUOI RISULTATI CONCRETI?
-
-📞 Prenota una consulenza GRATUITA
-💬 Scrivici in DM "CONSULENZA"
-🏢 ${clinicName}
-
-⏰ SOLO 5 POSTI DISPONIBILI questa settimana!
-
-#fisioterapia #salute #benessere`;
+    return data?.content || '';
   }
 
   static getViralFormats(): ViralFormat[] {
@@ -233,68 +170,5 @@ LUNGHEZZA: Post completo con emojis strategici
         platforms: ['instagram', 'facebook', 'linkedin']
       }
     ];
-  }
-
-  static async generateViralContent(
-    format: ViralFormat,
-    topic: string,
-    audience: string,
-    user: any
-  ): Promise<string> {
-    const analysis = this.analyzeTopicSemantics(topic);
-    const clinicName = user?.user_metadata?.clinic_name || 'il nostro studio';
-    
-    const prompt = `
-Crea un contenuto viral usando il format "${format.name}" per il topic: "${topic}"
-
-TARGET: ${audience}
-STUDIO: ${clinicName}
-
-TEMPLATE DA SEGUIRE:
-${format.template}
-
-ESEMPIO DI RIFERIMENTO:
-${format.example}
-
-REGOLE:
-- Usa il template esatto ma personalizzalo per ${topic}
-- Mantieni lo stesso livello di engagement dell'esempio
-- Include sempre una CTA con ${clinicName}
-- Stile: diretto, che ferma lo scroll, converte
-- Lunghezza: ottimizzata per ${format.platforms.join(', ')}
-    `;
-
-    try {
-      return await defaultOpenAIService.generateText({
-        topic: prompt,
-        audience,
-        length: 'medio',
-        tone: 'virale',
-        platform: format.platforms[0],
-        postType: 'viral-format'
-      });
-    } catch (error) {
-      console.error('Errore generazione viral format:', error);
-      return this.generateFallbackViralContent(format, topic, analysis, clinicName);
-    }
-  }
-
-  private static generateFallbackViralContent(
-    format: ViralFormat,
-    topic: string,
-    analysis: TopicAnalysis,
-    clinicName: string
-  ): string {
-    // Fallback semplice basato sul template
-    switch (format.id) {
-      case 'thread-shock':
-        return `🚨 La verità su ${topic} che nessuno ti dice\n\nMa quello che è successo dopo ha cambiato tutto.\n\n(Thread con dettagli che vi scioccheranno) 🧵\n\n1/5`;
-      
-      case 'problem-agitation':
-        return `😡 Ti è mai capitato di avere problemi con ${topic}?\n\n💥 È PEGGIO di quello che pensi perché ogni giorno può peggiorare\n\n✅ Ecco come ${clinicName} può aiutarti`;
-      
-      default:
-        return `🔥 ${topic.toUpperCase()}: la verità che cambia tutto\n\nScopri come ${clinicName} ha rivoluzionato l'approccio\n\n👉 Prenota la tua consulenza`;
-    }
   }
 }

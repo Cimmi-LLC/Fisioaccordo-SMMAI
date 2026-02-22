@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Wand2, Undo2, Redo2, Trash2, Type, Download } from "lucide-react";
-import { defaultOpenAIService } from "@/services/openaiService";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import AdvancedTextEditor from './AdvancedTextEditor';
 
@@ -118,22 +118,25 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ imageUrl, onImageUpdate, onCl
         return;
       }
 
-      const result = await defaultOpenAIService.generateImage({
-        positivePrompt: enhancePrompt,
-        numberResults: 1,
-        imageUrl: currentImage.url,  // Passiamo l'URL dell'immagine originale
-        quality: 'hd'
+      const { data, error } = await supabase.functions.invoke('generate-carousel-images', {
+        body: {
+          slides: [{ title: enhancePrompt, body: enhancePrompt, theme: 'image enhancement' }],
+          style: 'photorealistic, professional'
+        }
       });
 
-      if (result.imageURL) {
-        addToHistory(result.imageURL, enhancePrompt);
-        onImageUpdate(result.imageURL);
-        
-        toast({
-          title: "Immagine migliorata! ✨",
-          description: "La tua immagine è stata migliorata mantenendo il contenuto originale"
-        });
+      const imageUrl = data?.images?.[0]?.url;
+      if (error || !imageUrl) {
+        throw new Error('Errore nella generazione dell\'immagine');
       }
+
+      addToHistory(imageUrl, enhancePrompt);
+      onImageUpdate(imageUrl);
+      
+      toast({
+        title: "Immagine migliorata! ✨",
+        description: "La tua immagine è stata migliorata mantenendo il contenuto originale"
+      });
     } catch (error) {
       console.error('Errore nel miglioramento immagine:', error);
       toast({
