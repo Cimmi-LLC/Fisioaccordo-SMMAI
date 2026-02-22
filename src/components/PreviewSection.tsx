@@ -207,6 +207,15 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
 
     return (
       <div key={index} className="relative aspect-square rounded-lg overflow-hidden group border border-border" style={bgStyle}>
+      {/* AI-generated image as background */}
+        {slide.imageUrl && (
+          <img
+            src={slide.imageUrl}
+            alt={`Slide ${index + 1}`}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
+
         {/* Photo zone */}
         {designTemplate.photoZone && slide.userImageUrl && (
           <img
