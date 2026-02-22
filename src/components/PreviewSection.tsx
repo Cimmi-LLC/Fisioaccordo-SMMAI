@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Copy, Download, Sparkles, Upload, X } from "lucide-react";
 import CarouselImageManager from "@/components/CarouselImageManager";
-import TemplateLayoutEngine from "@/components/template/TemplateLayoutEngine";
+// TemplateLayoutEngine replaced by inline layer rendering
 import SmartCopyActions from "@/components/SmartCopyActions";
 import { useToast } from "@/hooks/use-toast";
 
@@ -95,6 +95,103 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
     reader.readAsDataURL(file);
   };
 
+  const generateDefaultLayers = (slideData: Record<string, string>, slideIndex: number, totalSlides: number, textColor: string) => {
+    const layers: any[] = [];
+    
+    if (slideIndex === 0) {
+      // Slide apertura - enfasi sul titolo/hook
+      layers.push({ id: 'title', type: 'title', x: 5, y: 12, width: 90, height: 22, fontSize: 32, fontWeight: 900, color: textColor, textAlign: 'center', fontFamily: 'Arial Black, sans-serif', textTransform: 'uppercase', shadow: { enabled: true, offsetX: 0, offsetY: 2, blur: 8, color: 'rgba(0,0,0,0.6)' } });
+      layers.push({ id: 'subtitle', type: 'subtitle', x: 10, y: 38, width: 80, height: 10, fontSize: 16, fontWeight: 600, color: textColor, textAlign: 'center', fontFamily: 'Arial, sans-serif', opacity: 0.9 });
+      layers.push({ id: 'body', type: 'body', x: 8, y: 52, width: 84, height: 28, fontSize: 13, fontWeight: 400, color: textColor, textAlign: 'center', fontFamily: 'Arial, sans-serif', lineHeight: 1.4 });
+      layers.push({ id: 'footer', type: 'footer', x: 10, y: 86, width: 80, height: 8, fontSize: 11, fontWeight: 600, color: textColor, textAlign: 'center', fontFamily: 'Arial, sans-serif', opacity: 0.7 });
+    } else if (slideIndex === totalSlides - 1) {
+      // Slide CTA finale
+      layers.push({ id: 'title', type: 'title', x: 8, y: 8, width: 84, height: 15, fontSize: 24, fontWeight: 800, color: textColor, textAlign: 'center', fontFamily: 'Arial Black, sans-serif', textTransform: 'uppercase', shadow: { enabled: true, offsetX: 0, offsetY: 2, blur: 6, color: 'rgba(0,0,0,0.5)' } });
+      layers.push({ id: 'body', type: 'body', x: 10, y: 28, width: 80, height: 30, fontSize: 14, fontWeight: 400, color: textColor, textAlign: 'center', fontFamily: 'Arial, sans-serif', lineHeight: 1.5 });
+      layers.push({ id: 'banner', type: 'cta', x: 5, y: 64, width: 90, height: 12, fontSize: 18, fontWeight: 800, color: '#ffffff', textAlign: 'center', fontFamily: 'Arial Black, sans-serif', backgroundColor: textColor, borderRadius: 8, textTransform: 'uppercase' });
+      layers.push({ id: 'footer', type: 'footer', x: 10, y: 82, width: 80, height: 10, fontSize: 13, fontWeight: 700, color: textColor, textAlign: 'center', fontFamily: 'Arial, sans-serif' });
+    } else {
+      // Slide contenuto - enfasi sul numero
+      layers.push({ id: 'title', type: 'title', x: 5, y: 5, width: 90, height: 14, fontSize: 20, fontWeight: 700, color: textColor, textAlign: 'center', fontFamily: 'Arial, sans-serif', textTransform: 'uppercase', shadow: { enabled: true, offsetX: 0, offsetY: 1, blur: 4, color: 'rgba(0,0,0,0.4)' } });
+      layers.push({ id: 'number', type: 'number', x: 25, y: 20, width: 50, height: 28, fontSize: 56, fontWeight: 900, color: textColor, textAlign: 'center', fontFamily: 'Arial Black, sans-serif', shadow: { enabled: true, offsetX: 0, offsetY: 3, blur: 10, color: 'rgba(0,0,0,0.5)' } });
+      layers.push({ id: 'body', type: 'body', x: 8, y: 50, width: 84, height: 26, fontSize: 12, fontWeight: 400, color: textColor, textAlign: 'center', fontFamily: 'Arial, sans-serif', lineHeight: 1.4 });
+      layers.push({ id: 'banner', type: 'banner', x: 0, y: 80, width: 100, height: 8, fontSize: 10, fontWeight: 700, color: '#ffffff', textAlign: 'center', fontFamily: 'Arial, sans-serif', backgroundColor: textColor, opacity: 0.85 });
+      layers.push({ id: 'footer', type: 'footer', x: 10, y: 90, width: 80, height: 7, fontSize: 9, fontWeight: 500, color: textColor, textAlign: 'center', fontFamily: 'Arial, sans-serif', opacity: 0.6 });
+    }
+    
+    return layers;
+  };
+
+  const renderLayerContent = (layers: any[], slideData: Record<string, string>, slide: CarouselSlide, textColor: string) => {
+    return layers.map((layer: any) => {
+      const contentMap: Record<string, string> = {
+        title: slideData.title || '',
+        number: slideData.number || '',
+        subtitle: slideData.subtitle || '',
+        body: slideData.body || '',
+        cta: slideData.cta || '',
+        banner: slideData.banner || '',
+        footer: slideData.footer || '',
+        logo: slideData.logo || '',
+        image: '',
+      };
+      const text = contentMap[layer.type] || '';
+      const isImageLayer = layer.type === 'image';
+
+      if (!text && !isImageLayer) return null;
+
+      const shadow = layer.shadow?.enabled
+        ? `${layer.shadow.offsetX || 0}px ${layer.shadow.offsetY || 0}px ${layer.shadow.blur || 0}px ${layer.shadow.color || '#000'}`
+        : undefined;
+
+      // Scale factor: preview ~250px, original 1080px
+      const scaleFactor = 0.25;
+
+      return (
+        <div
+          key={layer.id}
+          className="absolute flex items-center justify-center overflow-hidden"
+          style={{
+            left: `${layer.x}%`,
+            top: `${layer.y}%`,
+            width: `${layer.width}%`,
+            height: `${layer.height}%`,
+            backgroundColor: layer.backgroundColor || 'transparent',
+            borderRadius: layer.borderRadius ? `${layer.borderRadius * scaleFactor}px` : undefined,
+            padding: layer.padding ? `${layer.padding * scaleFactor}px` : '2px',
+            opacity: layer.opacity ?? 1,
+          }}
+        >
+          {isImageLayer ? (
+            slide.userImageUrl ? (
+              <img src={slide.userImageUrl} className="w-full h-full object-cover" alt="user" />
+            ) : (
+              <div className="w-full h-full bg-muted/30 flex items-center justify-center text-muted-foreground text-xs">📷</div>
+            )
+          ) : (
+            <span
+              style={{
+                fontFamily: layer.fontFamily || 'Arial, sans-serif',
+                fontSize: `${Math.max(6, (layer.fontSize || 16) * scaleFactor)}px`,
+                fontWeight: layer.fontWeight as any,
+                color: layer.color || textColor,
+                textAlign: (layer.textAlign || 'center') as any,
+                textTransform: layer.textTransform as any,
+                textShadow: shadow,
+                lineHeight: layer.lineHeight ? `${layer.lineHeight}` : '1.2',
+                letterSpacing: layer.letterSpacing ? `${layer.letterSpacing * scaleFactor}px` : undefined,
+                width: '100%',
+                display: 'block',
+              }}
+            >
+              {text}
+            </span>
+          )}
+        </div>
+      );
+    });
+  };
+
   const renderSlideWithTemplate = (slide: CarouselSlide, index: number) => {
     let slideData: Record<string, string>;
     
@@ -113,101 +210,18 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
     if (canvaTemplate) {
       const textZones = canvaTemplate.text_zones as any;
       const hasLayers = textZones?.layers && Array.isArray(textZones.layers);
+      const textColor = canvaTemplate.text_color || '#FFFFFF';
+
+      // Use explicit layers if available, otherwise auto-generate based on slide position
+      const layers = hasLayers 
+        ? textZones.layers 
+        : generateDefaultLayers(slideData, index, carouselSlides.length, textColor);
 
       return (
         <div key={index} className="relative aspect-square rounded-lg overflow-hidden group border border-border">
           <img src={canvaTemplate.background_url} alt={canvaTemplate.name} className="absolute inset-0 w-full h-full object-cover" />
           
-          {hasLayers ? (
-            // New layer-based rendering
-            textZones.layers.map((layer: any) => {
-              const contentMap: Record<string, string> = {
-                title: slideData.title || '',
-                number: slideData.number || '',
-                subtitle: slideData.subtitle || '',
-                body: slideData.body || '',
-                cta: slideData.cta || '',
-                banner: slideData.banner || '',
-                footer: slideData.footer || '',
-                logo: slideData.logo || '',
-              };
-              const text = contentMap[layer.type] || '';
-              const isImageLayer = layer.type === 'image';
-
-              if (!text && !isImageLayer) return null;
-
-              const shadow = layer.shadow?.enabled
-                ? `${layer.shadow.offsetX || 0}px ${layer.shadow.offsetY || 0}px ${layer.shadow.blur || 0}px ${layer.shadow.color || '#000'}`
-                : undefined;
-
-              return (
-                <div
-                  key={layer.id}
-                  className="absolute flex items-center justify-center overflow-hidden"
-                  style={{
-                    left: `${layer.x}%`,
-                    top: `${layer.y}%`,
-                    width: `${layer.width}%`,
-                    height: `${layer.height}%`,
-                    backgroundColor: layer.backgroundColor || 'transparent',
-                    borderRadius: layer.borderRadius ? `${layer.borderRadius}px` : undefined,
-                    padding: layer.padding ? `${layer.padding}px` : undefined,
-                    opacity: layer.opacity ?? 1,
-                  }}
-                >
-                  {isImageLayer ? (
-                    slide.userImageUrl ? (
-                      <img src={slide.userImageUrl} className="w-full h-full object-cover" alt="user" />
-                    ) : (
-                      <div className="w-full h-full bg-muted/30 flex items-center justify-center text-muted-foreground text-xs">📷</div>
-                    )
-                  ) : (
-                    <span
-                      style={{
-                        fontFamily: layer.fontFamily || 'Arial',
-                        fontSize: `${Math.max(6, (layer.fontSize || 16) * 0.35)}px`,
-                        fontWeight: layer.fontWeight as any,
-                        color: layer.color || canvaTemplate.text_color,
-                        textAlign: layer.textAlign as any,
-                        textTransform: layer.textTransform as any,
-                        textShadow: shadow,
-                        lineHeight: layer.lineHeight ? `${layer.lineHeight}` : undefined,
-                        letterSpacing: layer.letterSpacing ? `${layer.letterSpacing}px` : undefined,
-                        width: '100%',
-                        display: 'block',
-                      }}
-                      className="leading-tight"
-                    >
-                      {text}
-                    </span>
-                  )}
-                </div>
-              );
-            })
-          ) : (
-            // Fallback: old zones format
-            (() => {
-              const zones = textZones?.zones || [
-                { id: 'top', y: 5, height: 20, align: 'center', fontSize: 'lg' },
-                { id: 'center', y: 35, height: 40, align: 'center', fontSize: 'sm' },
-                { id: 'bottom', y: 80, height: 15, align: 'center', fontSize: 'xs' },
-              ];
-              const contentMap: Record<string, string> = {
-                top: slideData.title || '',
-                center: slideData.body || '',
-                bottom: slideData.footer || '',
-              };
-              const fontSizeMap: Record<string, string> = { lg: 'text-sm font-bold', md: 'text-xs font-semibold', sm: 'text-xs', xs: 'text-[10px] opacity-80' };
-              return zones.map((zone: any) => (
-                contentMap[zone.id] ? (
-                  <div key={zone.id} className={`absolute left-0 right-0 flex items-center justify-center px-3 drop-shadow-lg ${fontSizeMap[zone.fontSize] || 'text-xs'}`}
-                    style={{ top: `${zone.y}%`, height: `${zone.height}%`, color: canvaTemplate.text_color, textAlign: zone.align || 'center' }}>
-                    <span className="leading-tight">{contentMap[zone.id]}</span>
-                  </div>
-                ) : null
-              ));
-            })()
-          )}
+          {renderLayerContent(layers, slideData, slide, textColor)}
 
           {/* Hover controls */}
           <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
@@ -221,21 +235,19 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
       );
     }
 
-    // Fallback: use old TemplateLayoutEngine
-    const templateData = {
-      title: slideData.title,
-      mainNumber: index === 0 ? '🚨' : index === 1 ? '❌' : index === 2 ? '✅' : index === 3 ? '🔥' : '🎯',
-      subtitle: slideData.subtitle,
-      body: slideData.body,
-      cta: index >= carouselSlides.length - 1 ? slideData.body : '',
-      footer: slideData.footer || 'Studio Fisioterapico',
-      imageUrl: slide.userImageUrl || slide.imageUrl,
-      backgroundColor: index === 0 ? '#dc2626' : index === 1 ? '#ef4444' : index === 2 ? '#16a34a' : index === 3 ? '#7c3aed' : '#ea580c'
-    };
+    // Fallback without template: colored backgrounds with auto-generated layers
+    const bgColors = ['#dc2626', '#ef4444', '#16a34a', '#7c3aed', '#ea580c', '#0891b2', '#d97706'];
+    const bgColor = bgColors[index % bgColors.length];
+    const layers = generateDefaultLayers(slideData, index, carouselSlides.length, '#FFFFFF');
 
     return (
-      <div key={index} className="relative aspect-square rounded-lg overflow-hidden group border border-border bg-card">
-        <TemplateLayoutEngine template="fisioaccordo" data={templateData} width={400} height={400} className="w-full h-full" />
+      <div key={index} className="relative aspect-square rounded-lg overflow-hidden group border border-border" style={{ backgroundColor: bgColor }}>
+        {slide.userImageUrl && (
+          <img src={slide.userImageUrl} className="absolute inset-0 w-full h-full object-cover opacity-30" alt="background" />
+        )}
+        
+        {renderLayerContent(layers, slideData, slide, '#FFFFFF')}
+
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
           <Button onClick={() => onImageEdit(slide.userImageUrl || slide.imageUrl || '', index)} size="sm" className="p-1 h-6 w-6 bg-primary hover:bg-primary/90">✏️</Button>
           <Button onClick={() => downloadImage(slide.userImageUrl || slide.imageUrl || '', index)} size="sm" className="p-1 h-6 w-6 bg-accent hover:bg-accent/90"><Download className="w-3 h-3" /></Button>
