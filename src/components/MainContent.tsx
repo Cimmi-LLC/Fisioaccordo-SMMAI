@@ -9,7 +9,7 @@ import PreviewSection from "./PreviewSection";
 import HookGenerator from "./HookGenerator";
 import LazyCopyImprover from "./LazyCopyImprover";
 import ViralFormatGenerator from "./ViralFormatGenerator";
-import BlotatoConnection from "./BlotatoConnection";
+import MetaConnection from "./MetaConnection";
 import PhotoLibrary from "./PhotoLibrary";
 import AIMemoryPanel from "./AIMemoryPanel";
 import ViralAnalyzer from "./ViralAnalyzer";
@@ -22,7 +22,7 @@ import { useCarouselSlides } from "@/hooks/useCarouselSlides";
 import { useHookManager } from "@/hooks/useHookManager";
 import { useImageManager } from "@/hooks/useImageManager";
 import { usePhotoManager } from "@/hooks/usePhotoManager";
-import { BlotatoService } from '@/services/blotatoService';
+import { MetaService } from '@/services/metaService';
 
 interface MainContentProps {
   user: any;
@@ -91,17 +91,40 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
       return;
     }
     try {
-      const publishResult = await BlotatoService.publishPost({
-        content: generatedContent,
-        platforms,
-        images: basePhoto ? [basePhoto] : [],
-        ...(formData.scheduleDate && { scheduleFor: formData.scheduleDate })
-      });
-      if (publishResult.success) {
-        toast({ title: "🎉 Pubblicato!", description: `Contenuto pubblicato su ${platforms.length} piattaform${platforms.length > 1 ? 'e' : 'a'}` });
-      } else {
-        throw new Error(publishResult.error || 'Errore durante la pubblicazione');
+      const isMetaConnected = await MetaService.isConnected();
+      if (!isMetaConnected) {
+        toast({ title: "📋 Usa Smart Copy", description: "Copia il testo e scarica le immagini dall'anteprima per pubblicare manualmente." });
+        return;
       }
+
+      const connections = await MetaService.getConnections();
+      const connection = connections[0];
+      if (!connection) throw new Error('Nessuna connessione attiva');
+
+      const imageUrl = basePhoto || undefined;
+
+      for (const platform of platforms) {
+        if (platform === 'facebook') {
+          const result = await MetaService.publishToFacebook(connection.id, generatedContent, imageUrl);
+          if (!result.success) throw new Error(result.error);
+        } else if (platform === 'instagram') {
+          if (!imageUrl) {
+            toast({ title: "⚠️ Instagram richiede un'immagine", description: "Carica una foto per pubblicare su Instagram", variant: "destructive" });
+            continue;
+          }
+          const carouselUrls = carouselSlides
+            .map(s => s.userImageUrl || s.imageUrl)
+            .filter((url): url is string => !!url);
+          
+          const result = await MetaService.publishToInstagram(
+            connection.id, generatedContent, imageUrl,
+            carouselUrls.length > 1 ? carouselUrls : undefined
+          );
+          if (!result.success) throw new Error(result.error);
+        }
+      }
+
+      toast({ title: "🎉 Pubblicato!", description: `Contenuto pubblicato su ${platforms.length} piattaform${platforms.length > 1 ? 'e' : 'a'}` });
     } catch (error) {
       toast({ title: "❌ Errore Pubblicazione", description: error instanceof Error ? error.message : 'Errore sconosciuto', variant: "destructive" });
     }
@@ -216,7 +239,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
         </TabsContent>
       </Tabs>
 
-      <div className="mt-8"><BlotatoConnection /></div>
+      <div className="mt-8"><MetaConnection /></div>
 
       <HookGenerator
         showHookGenerator={showHookGenerator}
