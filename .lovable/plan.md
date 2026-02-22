@@ -1,102 +1,101 @@
 
 
-# Integrazione Template Canva + Connessione Canva Utenti
+# Collegamento Canva API -- I Tuoi Template per Tutti
 
-## Il Problema Attuale
+## Cosa Faremo
 
-I template attuali (FisioaccordoTemplate, BusinessTemplate, ecc.) sono componenti React con CSS basico -- colori piatti, niente texture, niente design professionale. Le immagini generate dall'AI con Gemini sono inconsistenti e spesso brutte.
+Collegheremo il tuo account Canva tramite le API ufficiali (OAuth 2.0). I tuoi template selezionati diventeranno disponibili a TUTTI gli utenti dell'app come template predefiniti. In piu, ogni utente potra collegare il proprio account Canva per importare i propri template personali.
 
-## La Soluzione
+## Come Funziona
 
-### Parte 1: I Tuoi Template Pre-caricati (per tutti gli utenti)
+### Flusso Owner (Tu)
+1. Vai nelle impostazioni dell'app e clicchi "Collega Canva"
+2. Si apre la pagina di autorizzazione Canva -- fai login con il tuo account
+3. L'app ti mostra i tuoi design Canva
+4. Selezioni quali template vuoi rendere disponibili a tutti
+5. L'app li esporta come PNG 1080x1080, li salva nel bucket Supabase, e li inserisce nella tabella `canva_templates` con `is_default = true`
 
-**Come funziona:**
-1. Tu esporti da Canva i tuoi template come PNG vuoti a 1080x1080 (solo sfondo, layout grafico, decorazioni -- SENZA testo)
-2. Li carichi qui in chat
-3. Li salvo nel bucket Supabase `user-photos` (pubblico)
-4. L'app li usa come sfondo e ci sovrappone il testo generato dall'AI con posizionamento professionale
+### Flusso Utente (Chiunque altro)
+1. L'utente vede gia i tuoi template nella griglia di selezione
+2. Se vuole, puo cliccare "Collega il tuo Canva" per aggiungere i propri template personali
+3. Stesso flusso OAuth, ma i template importati hanno `is_default = false` e `user_id = [loro id]`
 
-**Database -- nuova tabella `canva_templates`:**
-- `id` (uuid)
-- `name` (text) -- es. "Fisioaccordo Rosa", "Business Blu"
-- `description` (text)
-- `category` (text) -- es. "healthcare", "business", "minimal"
-- `background_url` (text) -- URL dell'immagine PNG nel bucket
-- `text_zones` (jsonb) -- zone dove posizionare il testo (top, center, bottom, etc.)
-- `text_color` (text) -- colore testo consigliato (bianco, nero, etc.)
-- `is_default` (boolean) -- template pre-caricati dal proprietario
-- `user_id` (uuid, nullable) -- null = template globale, uuid = template utente
-- `created_at` (timestamptz)
+### Riconoscimento Automatico Zone di Testo
+Quando importi un template, l'app analizza l'immagine per capire dove posizionare il testo:
+- Zone chiare/scure vengono identificate come aree di testo
+- Il colore del testo viene scelto automaticamente per massimo contrasto
+- Tu puoi personalizzare le zone manualmente se necessario
 
-**Nuovo componente `CanvaTemplateSelector.tsx`:**
-- Griglia visuale con miniature dei template (non piu un dropdown triste)
-- Ogni template mostra l'anteprima reale dello sfondo
-- Click per selezionare, bordo evidenziato sul selezionato
-- Sezione "I miei template" se l'utente ha Canva collegato
+## Prerequisiti -- Credenziali Canva
 
-**Modifica al rendering delle slide:**
-- Invece di usare i componenti React (FisioaccordoTemplate, etc.), le slide usano l'immagine PNG come sfondo
-- Il testo viene posizionato sopra con CSS absolute positioning
-- Le `text_zones` definiscono dove va il titolo, il body, il CTA, il footer
-- Risultato: slide con aspetto professionale identico a Canva
+Per far funzionare le API Canva servono:
+1. **Canva Developer App** -- da creare su [canva.com/developers](https://www.canva.com/developers)
+2. **Client ID** e **Client Secret** -- generati nella Developer Portal
+3. **Redirect URI** configurata -- puntera alla nostra edge function
+4. **Scopi richiesti**: `design:content:read`, `design:meta:read`
 
-### Parte 2: Connessione Canva per gli Utenti (opzionale)
-
-**Canva Connect API** permette agli utenti di:
-- Fare login con il proprio account Canva
-- Importare i propri template come immagini di sfondo
-- I template importati vengono salvati nella stessa tabella `canva_templates` con il loro `user_id`
-
-**Prerequisiti per Canva API:**
-- Creare una Canva App su [canva.com/developers](https://www.canva.com/developers)
-- Ottenere Client ID e Client Secret
-- Configurare il redirect URI
-
-**Edge function `canva-auth`:**
-- Scambia il codice OAuth per access token
-- Recupera i design dell'utente via Canva API
-- Salva la connessione
-
-**Edge function `canva-import`:**
-- Riceve l'ID di un design Canva
-- Lo esporta come PNG via Canva Export API
-- Lo salva nel bucket Supabase
-- Crea record in `canva_templates`
-
-**Componente `CanvaConnection.tsx`:**
-- Pulsante "Collega Canva" per gli utenti
-- Lista dei design importabili
-- Pulsante "Importa come template" per ogni design
-
----
+Ti guidero passo passo nella creazione dell'app Canva.
 
 ## Dettagli Tecnici
 
-### File da creare:
-- `src/components/CanvaTemplateSelector.tsx` -- griglia visuale template
-- `src/components/CanvaConnection.tsx` -- collegamento account Canva utente
-- `src/services/canvaService.ts` -- servizio frontend Canva API
-- `supabase/functions/canva-auth/index.ts` -- OAuth Canva
-- `supabase/functions/canva-import/index.ts` -- importa design come PNG
+### Nuova tabella `canva_connections`
+Salva i token OAuth degli utenti che collegano il proprio Canva.
 
-### File da modificare:
-- `src/components/ContentForm.tsx` -- sostituire `VisualTemplateSelector` con `CanvaTemplateSelector`
-- `src/components/PreviewSection.tsx` -- rendering slide con sfondo PNG invece di componenti React
-- `src/components/template/TemplateLayoutEngine.tsx` -- supporto template basati su immagine
-- `supabase/config.toml` -- registrare nuove edge functions
+| Colonna | Tipo | Note |
+|---------|------|------|
+| id | uuid | PK |
+| user_id | uuid | chi ha collegato |
+| access_token | text | token Canva (cifrato) |
+| refresh_token | text | per rinnovare il token |
+| token_expires_at | timestamptz | scadenza |
+| canva_user_id | text | ID utente Canva |
+| display_name | text | nome visualizzato |
+| is_owner | boolean | true = tu (template per tutti) |
+| created_at | timestamptz | |
 
-### Migrazione database:
-- Creare tabella `canva_templates` con RLS
-- Creare bucket storage dedicato (o usare `user-photos` esistente)
+RLS: ogni utente vede solo la propria connessione.
 
----
+### Edge Functions
 
-## Prossimo Step Immediato
+**`canva-auth`** -- Gestisce OAuth
+- Genera authorization URL con PKCE
+- Scambia il codice per access/refresh token
+- Salva in `canva_connections`
 
-Per iniziare, ho bisogno che tu:
-1. **Esporti da Canva 3-5 template vuoti** (solo sfondo/layout, senza testo) a 1080x1080 PNG
-2. **Li carichi qui in chat**
+**`canva-designs`** -- Lista design dell'utente
+- Chiama `GET /v1/designs` con il token salvato
+- Ritorna la lista dei design con anteprima
 
-Una volta che li ho, creo tutto il sistema e le slide avranno un aspetto professionale da subito.
+**`canva-import`** -- Importa un design come template
+- Chiama `POST /v1/exports` per esportare come PNG 1080x1080
+- Scarica il PNG e lo carica nel bucket Supabase
+- Crea record in `canva_templates`
+- Se l'utente e l'owner, setta `is_default = true`
 
-Per la parte Canva API degli utenti, serviranno le credenziali della Canva App (Client ID e Secret) -- ma questo lo facciamo in un secondo momento.
+### Componente `CanvaConnection.tsx`
+- Pulsante "Collega Canva" con logo Canva
+- Stato connessione (collegato/non collegato)
+- Griglia dei design disponibili su Canva
+- Pulsante "Importa" per ogni design
+- Toggle "Disponibile a tutti" (solo per l'owner)
+
+### Modifiche a File Esistenti
+
+- **`CanvaTemplateSelector.tsx`**: aggiungere sezione "Collega il tuo Canva" in fondo alla griglia
+- **`PreviewSection.tsx`**: gia predisposto per template con sfondo PNG (fatto nello step precedente)
+- **`supabase/config.toml`**: registrare le 3 nuove edge functions
+- **`MainContent.tsx`**: aggiungere pannello connessione Canva nelle impostazioni
+
+### Secrets Necessari
+- `CANVA_CLIENT_ID` -- Client ID dalla Canva Developer Portal
+- `CANVA_CLIENT_SECRET` -- Client Secret dalla Canva Developer Portal
+
+### Sequenza di Implementazione
+1. Ti guido a creare la Canva Developer App e ottenere le credenziali
+2. Salvo le credenziali come secrets Supabase
+3. Creo la tabella `canva_connections` con migrazione
+4. Creo le 3 edge functions (auth, designs, import)
+5. Creo il componente `CanvaConnection.tsx`
+6. Aggiorno `CanvaTemplateSelector` con opzione di collegamento
+7. Test end-to-end: colleghi il tuo account, importi template, li vedi nella griglia
+
