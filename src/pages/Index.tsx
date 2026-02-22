@@ -7,7 +7,7 @@ import { useGlobalLoading } from "@/contexts/GlobalLoadingContext";
 import { contentService } from "@/services/contentService";
 import { Loader2 } from "lucide-react";
 import LazyImageEditor from "@/components/LazyImageEditor";
-import InstagramConnection from "@/components/InstagramConnection";
+
 import AppHeader from "@/components/AppHeader";
 import MainContent from "@/components/MainContent";
 import SavedContents from "@/components/SavedContents";
@@ -156,11 +156,6 @@ const Index = () => {
           />
         </ErrorBoundary>
 
-        <div className="mt-6 sm:mt-8">
-          <ErrorBoundary>
-            <InstagramConnection />
-          </ErrorBoundary>
-        </div>
 
         {/* Footer migliorato con responsività */}
         <div className="mt-8 sm:mt-12 p-4 sm:p-6 bg-card/70 backdrop-blur-sm rounded-lg border border-border shadow-enhanced">
