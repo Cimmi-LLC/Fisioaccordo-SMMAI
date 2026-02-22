@@ -231,6 +231,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
                     canvaTemplate={formData.canvaTemplate}
                     onPublishDirect={handlePublish}
                     isGeneratingImages={isGeneratingImages}
+                    postType={formData.postType}
                   />
                   {generatedContent && <div className="mt-3"><FeedbackWidget generatedContent={generatedContent} /></div>}
                 </>

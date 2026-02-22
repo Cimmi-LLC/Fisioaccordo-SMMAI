@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { slides, style } = await req.json();
+    const { slides, style, format } = await req.json();
 
     if (!slides || !Array.isArray(slides) || slides.length === 0) {
       return new Response(JSON.stringify({ error: "slides array is required" }), {
@@ -32,10 +32,12 @@ serve(async (req) => {
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     const visualStyle = style || "modern, clean, professional";
+    const isVertical = format === "vertical";
+    const dimensions = isVertical ? "1080x1920, vertical 9:16 format" : "1080x1080, square format";
 
     // Generate images for each slide
     const imagePromises = slides.map(async (slide: { title: string; body: string; theme?: string }, index: number) => {
-      const prompt = `Create a professional social media carousel slide image (1080x1080, square format).
+      const prompt = `Create a professional social media image (${dimensions}).
 Theme: ${slide.theme || slide.title}
 Context: ${slide.body?.substring(0, 100) || slide.title}
 Style: ${visualStyle}
