@@ -1476,6 +1476,51 @@ export type Database = {
         }
         Relationships: []
       }
+      meta_connections: {
+        Row: {
+          created_at: string
+          facebook_user_id: string | null
+          id: string
+          instagram_business_id: string | null
+          instagram_username: string | null
+          is_active: boolean
+          page_access_token: string | null
+          page_id: string | null
+          page_name: string | null
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          facebook_user_id?: string | null
+          id?: string
+          instagram_business_id?: string | null
+          instagram_username?: string | null
+          is_active?: boolean
+          page_access_token?: string | null
+          page_id?: string | null
+          page_name?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          facebook_user_id?: string | null
+          id?: string
+          instagram_business_id?: string | null
+          instagram_username?: string | null
+          is_active?: boolean
+          page_access_token?: string | null
+          page_id?: string | null
+          page_name?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       organization_chart: {
         Row: {
           children_node_ids: string[] | null

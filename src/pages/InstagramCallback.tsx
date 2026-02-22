@@ -1,7 +1,7 @@
 
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { InstagramService } from '@/services/instagramService';
+import { MetaService } from '@/services/metaService';
 import { useToast } from '@/hooks/use-toast';
 
 const InstagramCallback: React.FC = () => {
@@ -25,12 +25,12 @@ const InstagramCallback: React.FC = () => {
       }
 
       if (code) {
-        const result = await InstagramService.exchangeCodeForToken(code);
+        const result = await MetaService.exchangeCodeForToken(code);
         
         if (result.success) {
           toast({
-            title: "🎉 Instagram Collegato!",
-            description: "Il tuo account Instagram è stato collegato con successo"
+            title: "🎉 Meta Collegato!",
+            description: "Il tuo account Facebook/Instagram è stato collegato con successo"
           });
         } else {
           toast({
@@ -56,7 +56,7 @@ const InstagramCallback: React.FC = () => {
     <div className="min-h-screen bg-gray-900 flex items-center justify-center">
       <div className="text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
-        <p className="text-white">Elaborazione autenticazione Instagram...</p>
+        <p className="text-white">Elaborazione autenticazione Meta...</p>
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Copy, Download, Sparkles, Upload, X } from "lucide-react";
 import CarouselImageManager from "@/components/CarouselImageManager";
 import TemplateLayoutEngine from "@/components/template/TemplateLayoutEngine";
+import SmartCopyActions from "@/components/SmartCopyActions";
 import { useToast } from "@/hooks/use-toast";
 
 interface CarouselSlide {
@@ -239,6 +240,12 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
                 Copia
               </Button>
             </div>
+
+            {/* Smart Copy Actions */}
+            <SmartCopyActions
+              generatedContent={generatedContent}
+              carouselSlides={carouselSlides}
+            />
 
             {/* Gestione Immagini Carosello */}
             {carouselSlides.length > 0 && (

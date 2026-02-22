@@ -20,3 +20,9 @@ verify_jwt = false
 
 [functions.find-trends]
 verify_jwt = false
+
+[functions.meta-auth]
+verify_jwt = false
+
+[functions.meta-publish]
+verify_jwt = false

@@ -1,0 +1,142 @@
+import React, { useEffect, useState } from 'react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Facebook, Instagram, Link2, Unlink, Loader2 } from "lucide-react";
+import { MetaService, type MetaConnectionData } from '@/services/metaService';
+import { useToast } from '@/hooks/use-toast';
+
+const MetaConnection: React.FC = () => {
+  const [connections, setConnections] = useState<MetaConnectionData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [connecting, setConnecting] = useState(false);
+  const { toast } = useToast();
+
+  const loadConnections = async () => {
+    setLoading(true);
+    try {
+      const data = await MetaService.getConnections();
+      setConnections(data);
+    } catch (error) {
+      console.error('Errore caricamento connessioni:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadConnections();
+  }, []);
+
+  const handleConnect = () => {
+    setConnecting(true);
+    try {
+      MetaService.initiateAuth();
+    } catch (error) {
+      toast({
+        title: "Errore",
+        description: error instanceof Error ? error.message : "Impossibile avviare l'autenticazione",
+        variant: "destructive"
+      });
+      setConnecting(false);
+    }
+  };
+
+  const handleDisconnect = async (connectionId: string) => {
+    try {
+      await MetaService.disconnect(connectionId);
+      toast({ title: "Disconnesso", description: "Account Meta disconnesso con successo" });
+      loadConnections();
+    } catch {
+      toast({ title: "Errore", description: "Impossibile disconnettere", variant: "destructive" });
+    }
+  };
+
+  const activeConnection = connections.find(c => c.is_active);
+
+  if (loading) {
+    return (
+      <Card className="bg-card/50 border-border">
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="bg-card/50 border-border backdrop-blur-sm">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-card-foreground flex items-center gap-2 text-base">
+          <Link2 className="h-5 w-5" />
+          Connessione Social
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {activeConnection ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Badge className="bg-green-600/20 text-green-400 border-green-600/30">
+                ✅ Collegato
+              </Badge>
+            </div>
+            
+            {activeConnection.page_name && (
+              <div className="flex items-center gap-2 text-sm text-card-foreground">
+                <Facebook className="h-4 w-4 text-blue-500" />
+                <span>{activeConnection.page_name}</span>
+              </div>
+            )}
+            
+            {activeConnection.instagram_username && (
+              <div className="flex items-center gap-2 text-sm text-card-foreground">
+                <Instagram className="h-4 w-4 text-pink-500" />
+                <span>@{activeConnection.instagram_username}</span>
+              </div>
+            )}
+
+            <Button
+              onClick={() => handleDisconnect(activeConnection.id)}
+              variant="outline"
+              size="sm"
+              className="w-full mt-2"
+            >
+              <Unlink className="mr-2 h-4 w-4" />
+              Scollega
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Collega il tuo Instagram Business e la tua Pagina Facebook per pubblicare direttamente.
+            </p>
+            
+            <Button
+              onClick={handleConnect}
+              disabled={connecting}
+              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white"
+            >
+              {connecting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Facebook className="mr-2 h-4 w-4" />
+              )}
+              Collega con Facebook
+            </Button>
+
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p className="font-medium">Requisiti:</p>
+              <ol className="list-decimal list-inside space-y-0.5">
+                <li>Account Instagram Business o Creator</li>
+                <li>Pagina Facebook collegata all'account Instagram</li>
+                <li>Essere admin della Pagina Facebook</li>
+              </ol>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+export default MetaConnection;
