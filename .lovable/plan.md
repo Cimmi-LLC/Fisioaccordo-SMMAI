@@ -1,62 +1,62 @@
 
 
-## Rimuovere "Pubblica su X Piattaforma" + Feedback su Copy e Immagini
+## Fix: Indicatore di caricamento + Immagini AI visibili nelle slide
 
-### Cosa cambia
+### Problema 1: L'indicatore di caricamento non appare mai
+Il flusso attuale e':
+1. `generateCarouselSlides()` chiama `setCarouselSlides(slides)` -- le slide esistono
+2. Poi chiama `generateImagesForSlides()` che setta `isGeneratingImages = true`
 
-1. **Rimuovere il tasto "Pubblica su X Piattaforma"** dal form di generazione (il tasto duplicato in basso a sinistra). I tasti di pubblicazione nella sezione Anteprima a destra restano.
+Il blocco `isGeneratingImages && carouselSlides.length === 0` non si attiva MAI perche' le slide vengono create PRIMA che `isGeneratingImages` diventi `true`.
 
-2. **Aggiungere feedback sul copy generato** nella sezione Anteprima: widget thumbs up/down + commento sotto il testo generato, usando il `FeedbackWidget` gia' esistente.
+**Soluzione:** Settare `isGeneratingImages = true` all'INIZIO di `generateCarouselSlides()`, non solo dentro `generateImagesForSlides()`.
 
-3. **Aggiungere feedback sulle immagini generate**: nuovo widget simile sotto le slide/immagini, con un tipo di memoria dedicato `image_feedback` che viene salvato e usato dall'AI per migliorare le immagini future.
+### Problema 2: Le immagini AI generate non vengono mostrate
+La edge function genera le immagini e le salva su Storage (funziona -- i log confermano upload riusciti). Il risultato viene salvato in `slide.imageUrl`. Ma la funzione `renderSlide()` in PreviewSection.tsx mostra solo:
+- Layer di testo del template
+- `userImageUrl` nelle photo zone (foto caricate dall'utente)
 
-4. **Usare i feedback immagini nella generazione**: la edge function `generate-carousel-images` carichera' i feedback immagini dell'utente e li includera' nel prompt, cosi' le immagini miglioreranno di volta in volta.
+L'`imageUrl` (immagine AI) non viene MAI renderizzata come sfondo o immagine visibile nella slide.
+
+**Soluzione:** Usare `imageUrl` come sfondo della slide quando disponibile, mostrando l'immagine AI sotto i layer di testo.
+
+### File da modificare
+
+**`src/hooks/useCarouselSlides.ts`**
+- Aggiungere `setIsGeneratingImages(true)` all'inizio di `generateCarouselSlides()` (prima della chiamata a `generate-content`)
+- Gestire il caso errore con `setIsGeneratingImages(false)`
+
+**`src/components/PreviewSection.tsx`**
+- Nel metodo `renderSlide()`, rendere `slide.imageUrl` come immagine di sfondo della slide quando presente
+- L'immagine AI viene mostrata sotto i layer di testo del template, funzionando come sfondo visivo
 
 ### Dettagli tecnici
 
-**File: `src/components/ContentForm.tsx`**
-- Rimuovere il blocco "Publish Button" (righe 277-286) che mostra "Pubblica su X Piattaforma"
-
-**File: `src/components/PreviewSection.tsx`**
-- Importare e aggiungere `FeedbackWidget` sotto il testo generato (dopo il blocco `<pre>`)
-- Creare un nuovo componente `ImageFeedbackWidget` inline o separato, sotto le immagini generate, con thumbs up/down + commento
-- Il feedback immagini salva con tipo `image_feedback` nella memoria AI
-
-**File: `src/hooks/useAIMemory.ts`**
-- Aggiungere funzione `addImageFeedback(isPositive, comment, imageContext)` che salva con `memory_type: 'image_feedback'`
-
-**File: `src/components/ImageFeedbackWidget.tsx`** (nuovo)
-- Widget simile a `FeedbackWidget` ma per immagini
-- Domanda: "Come ti sembrano le immagini?"
-- Placeholder commento: "Es: troppo scure, preferisco colori caldi, piu' minimaliste..."
-- Usa `addImageFeedback` da `useAIMemory`
-
-**File: `supabase/functions/generate-carousel-images/index.ts`**
-- Accettare un parametro opzionale `imagePreferences` (stringa) dal client
-- Includere le preferenze immagini nel prompt di generazione
-
-**File: `src/hooks/useCarouselSlides.ts`**
-- Caricare le memorie `image_feedback` dell'utente prima di chiamare `generate-carousel-images`
-- Passarle come parametro `imagePreferences` alla funzione
-
-### Flusso feedback
-
+**useCarouselSlides.ts - loading anticipato:**
 ```text
-Utente genera contenuto
-    |
-    v
-Vede copy + immagini nella Preview
-    |
-    +-- Feedback copy: thumbs + commento --> salva come "feedback" in user_ai_memory
-    |       --> la prossima generazione copy legge queste memorie e si adatta
-    |
-    +-- Feedback immagini: thumbs + commento --> salva come "image_feedback" in user_ai_memory
-            --> la prossima generazione immagini legge queste preferenze nel prompt
+const generateCarouselSlides = useCallback(async () => {
+    setIsGeneratingImages(true);  // <-- SUBITO all'inizio
+    // ... rest of function
+    // In caso di errore senza chiamare generateImagesForSlides:
+    // setIsGeneratingImages(false);
+});
+```
+
+**PreviewSection.tsx - mostrare imageUrl come sfondo:**
+```text
+// Dentro renderSlide, dopo bgStyle e prima dei layer:
+{slide.imageUrl && (
+  <img
+    src={slide.imageUrl}
+    alt={`Slide ${index + 1}`}
+    className="absolute inset-0 w-full h-full object-cover"
+  />
+)}
 ```
 
 ### Risultato
-- Niente piu' tasto "Pubblica" duplicato nel form
-- L'utente puo' dare feedback sia sul copy che sulle immagini
-- L'AI ricorda e migliora di volta in volta per ogni utente
-- Le preferenze immagini vengono incluse direttamente nel prompt di generazione
+- L'utente vede "Creazione immagini in corso..." immediatamente quando clicca Genera
+- Le immagini AI generate appaiono come sfondo delle slide nel carosello
+- I layer di testo del template si sovrappongono alle immagini
+- Funziona per tutti i tipi di post (carosello, singolo, storia, reel)
 
