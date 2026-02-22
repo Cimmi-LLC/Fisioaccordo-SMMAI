@@ -1,101 +1,97 @@
 
 
-# Collegamento Canva API -- I Tuoi Template per Tutti
+# Implementazione Connessione Canva API
 
-## Cosa Faremo
+## Step 1: Salvataggio Credenziali
 
-Collegheremo il tuo account Canva tramite le API ufficiali (OAuth 2.0). I tuoi template selezionati diventeranno disponibili a TUTTI gli utenti dell'app come template predefiniti. In piu, ogni utente potra collegare il proprio account Canva per importare i propri template personali.
+Per prima cosa salveremo le tue credenziali Canva come secrets Supabase:
+- **CANVA_CLIENT_ID** -- il Client ID dalla tua Canva Developer App
+- **CANVA_CLIENT_SECRET** -- il Client Secret
 
-## Come Funziona
+## Step 2: Migrazione Database -- tabella `canva_connections`
 
-### Flusso Owner (Tu)
-1. Vai nelle impostazioni dell'app e clicchi "Collega Canva"
-2. Si apre la pagina di autorizzazione Canva -- fai login con il tuo account
-3. L'app ti mostra i tuoi design Canva
-4. Selezioni quali template vuoi rendere disponibili a tutti
-5. L'app li esporta come PNG 1080x1080, li salva nel bucket Supabase, e li inserisce nella tabella `canva_templates` con `is_default = true`
-
-### Flusso Utente (Chiunque altro)
-1. L'utente vede gia i tuoi template nella griglia di selezione
-2. Se vuole, puo cliccare "Collega il tuo Canva" per aggiungere i propri template personali
-3. Stesso flusso OAuth, ma i template importati hanno `is_default = false` e `user_id = [loro id]`
-
-### Riconoscimento Automatico Zone di Testo
-Quando importi un template, l'app analizza l'immagine per capire dove posizionare il testo:
-- Zone chiare/scure vengono identificate come aree di testo
-- Il colore del testo viene scelto automaticamente per massimo contrasto
-- Tu puoi personalizzare le zone manualmente se necessario
-
-## Prerequisiti -- Credenziali Canva
-
-Per far funzionare le API Canva servono:
-1. **Canva Developer App** -- da creare su [canva.com/developers](https://www.canva.com/developers)
-2. **Client ID** e **Client Secret** -- generati nella Developer Portal
-3. **Redirect URI** configurata -- puntera alla nostra edge function
-4. **Scopi richiesti**: `design:content:read`, `design:meta:read`
-
-Ti guidero passo passo nella creazione dell'app Canva.
-
-## Dettagli Tecnici
-
-### Nuova tabella `canva_connections`
-Salva i token OAuth degli utenti che collegano il proprio Canva.
+Creeremo la tabella per salvare i token OAuth di chi collega il proprio Canva:
 
 | Colonna | Tipo | Note |
 |---------|------|------|
 | id | uuid | PK |
 | user_id | uuid | chi ha collegato |
-| access_token | text | token Canva (cifrato) |
-| refresh_token | text | per rinnovare il token |
+| access_token | text | token Canva |
+| refresh_token | text | per rinnovare |
 | token_expires_at | timestamptz | scadenza |
 | canva_user_id | text | ID utente Canva |
 | display_name | text | nome visualizzato |
-| is_owner | boolean | true = tu (template per tutti) |
+| is_owner | boolean | true = tu (i tuoi template vanno a tutti) |
 | created_at | timestamptz | |
 
 RLS: ogni utente vede solo la propria connessione.
 
-### Edge Functions
+## Step 3: Tre Edge Functions
 
-**`canva-auth`** -- Gestisce OAuth
-- Genera authorization URL con PKCE
-- Scambia il codice per access/refresh token
-- Salva in `canva_connections`
+### `canva-auth`
+- Riceve `action` nel body: `get_auth_url` oppure `exchange_token`
+- `get_auth_url`: genera URL OAuth Canva con PKCE e lo ritorna al frontend
+- `exchange_token`: riceve il `code` dalla callback, chiama `POST https://api.canva.com/rest/v1/oauth/token` per ottenere access + refresh token, salva in `canva_connections`
 
-**`canva-designs`** -- Lista design dell'utente
-- Chiama `GET /v1/designs` con il token salvato
-- Ritorna la lista dei design con anteprima
+### `canva-designs`
+- Riceve il `user_id` autenticato
+- Recupera il token dalla tabella `canva_connections`
+- Chiama `GET https://api.canva.com/rest/v1/designs` con il token
+- Ritorna la lista dei design con titolo e thumbnail
 
-**`canva-import`** -- Importa un design come template
-- Chiama `POST /v1/exports` per esportare come PNG 1080x1080
-- Scarica il PNG e lo carica nel bucket Supabase
-- Crea record in `canva_templates`
-- Se l'utente e l'owner, setta `is_default = true`
+### `canva-import`
+- Riceve `design_id` e `make_default` (boolean)
+- Chiama `POST https://api.canva.com/rest/v1/exports` per esportare il design come PNG 1080x1080
+- Scarica il PNG risultante
+- Lo carica nel bucket Supabase `user-photos`
+- Crea il record in `canva_templates` con `is_default = make_default`
+- Analizza le zone di testo (zone chiare/scure) per determinare `text_zones` e `text_color`
 
-### Componente `CanvaConnection.tsx`
-- Pulsante "Collega Canva" con logo Canva
-- Stato connessione (collegato/non collegato)
-- Griglia dei design disponibili su Canva
-- Pulsante "Importa" per ogni design
-- Toggle "Disponibile a tutti" (solo per l'owner)
+## Step 4: Componente `CanvaConnection.tsx`
 
-### Modifiche a File Esistenti
+Nuovo componente (sostituisce il file vuoto attuale):
+- Pulsante "Collega Canva" con icona
+- Stato connessione (collegato/scollegato)
+- Griglia dei design Canva disponibili
+- Per ogni design: pulsante "Importa" e toggle "Per tutti" (solo per owner)
+- Pulsante "Scollega"
 
-- **`CanvaTemplateSelector.tsx`**: aggiungere sezione "Collega il tuo Canva" in fondo alla griglia
-- **`PreviewSection.tsx`**: gia predisposto per template con sfondo PNG (fatto nello step precedente)
-- **`supabase/config.toml`**: registrare le 3 nuove edge functions
-- **`MainContent.tsx`**: aggiungere pannello connessione Canva nelle impostazioni
+## Step 5: Pagina Callback
 
-### Secrets Necessari
-- `CANVA_CLIENT_ID` -- Client ID dalla Canva Developer Portal
-- `CANVA_CLIENT_SECRET` -- Client Secret dalla Canva Developer Portal
+Nuova rotta `/canva-callback` che:
+- Riceve il codice OAuth dal redirect Canva
+- Chiama `canva-auth` con `exchange_token`
+- Redirige alla pagina principale con messaggio di successo
 
-### Sequenza di Implementazione
-1. Ti guido a creare la Canva Developer App e ottenere le credenziali
-2. Salvo le credenziali come secrets Supabase
-3. Creo la tabella `canva_connections` con migrazione
-4. Creo le 3 edge functions (auth, designs, import)
-5. Creo il componente `CanvaConnection.tsx`
-6. Aggiorno `CanvaTemplateSelector` con opzione di collegamento
-7. Test end-to-end: colleghi il tuo account, importi template, li vedi nella griglia
+## Step 6: Integrare nell'App
 
+- Aggiungere `CanvaConnection` nel tab "Genera" o come sezione dedicata nel `MainContent`
+- Aggiungere rotta `/canva-callback` in `App.tsx`
+- Aggiornare `supabase/config.toml` con le 3 nuove edge functions
+- Aggiornare `CanvaTemplateSelector` con link "Collega il tuo Canva" quando non ci sono template utente
+
+## Dettagli Tecnici
+
+### File da creare:
+- `supabase/functions/canva-auth/index.ts`
+- `supabase/functions/canva-designs/index.ts`
+- `supabase/functions/canva-import/index.ts`
+- `src/pages/CanvaCallback.tsx`
+
+### File da modificare:
+- `src/components/CanvaConnection.tsx` -- riscrivere con UI completa
+- `src/components/CanvaTemplateSelector.tsx` -- aggiungere link "Collega Canva"
+- `src/components/MainContent.tsx` -- aggiungere sezione CanvaConnection
+- `src/App.tsx` -- aggiungere rotta `/canva-callback`
+- `supabase/config.toml` -- registrare 3 nuove edge functions
+
+### Flusso OAuth Canva
+1. Utente clicca "Collega Canva"
+2. Frontend chiama `canva-auth` con `action: get_auth_url`
+3. Edge function genera URL con PKCE e lo ritorna
+4. Frontend apre URL in nuova finestra
+5. Utente autorizza su Canva
+6. Canva redirige a `/canva-callback?code=XXX`
+7. Callback chiama `canva-auth` con `action: exchange_token, code: XXX`
+8. Edge function scambia codice per token e salva in DB
+9. Callback redirige alla home con toast di successo
