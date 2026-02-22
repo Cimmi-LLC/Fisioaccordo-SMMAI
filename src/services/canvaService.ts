@@ -6,7 +6,14 @@ export interface CanvaTemplate {
   description: string | null;
   category: string;
   background_url: string;
-  text_zones: any;
+  text_zones: {
+    background?: { type: 'solid' | 'gradient' | 'photo'; value: string };
+    photoZone?: { x: number; y: number; width: number; height: number; opacity: number; objectFit: string };
+    overlayColor?: string;
+    layers?: any[];
+    // Legacy format fields
+    [key: string]: any;
+  };
   text_color: string;
   is_default: boolean;
   user_id: string | null;
