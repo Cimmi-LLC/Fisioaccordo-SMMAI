@@ -39,6 +39,7 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
     
     if (cached) {
       setGeneratedContent(cached.content);
+      generateCarouselSlides();
       toast({
         title: "⚡ Contenuto dalla cache!",
         description: "Contenuto caricato istantaneamente dalla cache"
