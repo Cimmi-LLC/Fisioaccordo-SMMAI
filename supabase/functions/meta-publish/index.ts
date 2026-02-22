@@ -89,6 +89,7 @@ Deno.serve(async (req) => {
 })
 
 async function publishSingleImage(igId: string, token: string, caption: string, imageUrl: string) {
+  console.log('publishSingleImage - igId:', igId, 'token length:', token?.length, 'imageUrl:', imageUrl)
   // Step 1: Create media container via graph.instagram.com
   const containerRes = await fetch(`https://graph.instagram.com/v21.0/${igId}/media`, {
     method: 'POST',
@@ -96,8 +97,10 @@ async function publishSingleImage(igId: string, token: string, caption: string, 
     body: JSON.stringify({ image_url: imageUrl, caption, access_token: token })
   })
   const containerData = await containerRes.json()
+  console.log('Container creation response:', JSON.stringify(containerData))
 
   if (containerData.error) {
+    console.error('Container creation failed:', containerData.error)
     return errorResponse(containerData.error.message)
   }
 
@@ -106,6 +109,7 @@ async function publishSingleImage(igId: string, token: string, caption: string, 
 }
 
 async function publishCarousel(igId: string, token: string, caption: string, urls: string[]) {
+  console.log('publishCarousel - igId:', igId, 'token length:', token?.length, 'urls:', urls.length)
   const childIds: string[] = []
 
   for (const url of urls) {
@@ -115,6 +119,7 @@ async function publishCarousel(igId: string, token: string, caption: string, url
       body: JSON.stringify({ image_url: url, is_carousel_item: true, access_token: token })
     })
     const data = await res.json()
+    console.log('Carousel item response:', JSON.stringify(data))
     if (data.error) {
       return errorResponse(`Errore carousel item: ${data.error.message}`)
     }

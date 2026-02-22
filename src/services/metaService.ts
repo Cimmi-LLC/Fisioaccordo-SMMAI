@@ -152,6 +152,7 @@ export class MetaService {
 
   static async publishToInstagram(connectionId: string, caption: string, imageUrl: string, carouselUrls?: string[]): Promise<{ success: boolean; error?: string }> {
     try {
+      console.log('[MetaService] publishToInstagram:', { connectionId, imageUrl, carouselCount: carouselUrls?.length });
       const response = await supabase.functions.invoke('meta-publish', {
         body: {
           connection_id: connectionId,
@@ -162,6 +163,8 @@ export class MetaService {
         }
       });
 
+      console.log('[MetaService] publishToInstagram response:', { data: response.data, error: response.error?.message });
+
       if (response.error) {
         const realError = response.data?.error || response.error.message;
         throw new Error(realError);
@@ -170,6 +173,7 @@ export class MetaService {
 
       return { success: true };
     } catch (error) {
+      console.error('[MetaService] publishToInstagram error:', error);
       return { success: false, error: error instanceof Error ? error.message : 'Errore sconosciuto' };
     }
   }
