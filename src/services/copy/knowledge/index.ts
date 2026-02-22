@@ -10,6 +10,7 @@ import { HORMOZI_HOOKS_KNOWLEDGE } from './hormozi_hooks';
 import { HORMOZI_PROOF_KNOWLEDGE } from './hormozi_proof';
 import { HORMOZI_BRANDING_KNOWLEDGE } from './hormozi_branding';
 import { HORMOZI_LTV_KNOWLEDGE } from './hormozi_ltv';
+import { SOCIAL_SECRETS_KNOWLEDGE } from './social_secrets';
 
 export const KNOWLEDGE_BASE: KnowledgeEntry[] = [
   ...FUNDAMENTALS_KNOWLEDGE,
@@ -21,7 +22,8 @@ export const KNOWLEDGE_BASE: KnowledgeEntry[] = [
   ...HORMOZI_HOOKS_KNOWLEDGE,
   ...HORMOZI_PROOF_KNOWLEDGE,
   ...HORMOZI_BRANDING_KNOWLEDGE,
-  ...HORMOZI_LTV_KNOWLEDGE
+  ...HORMOZI_LTV_KNOWLEDGE,
+  ...SOCIAL_SECRETS_KNOWLEDGE
 ];
 
 export const getKnowledgeByCategory = (category?: string): KnowledgeEntry[] => {
