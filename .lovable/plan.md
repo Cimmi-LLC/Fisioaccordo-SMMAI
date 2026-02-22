@@ -1,75 +1,41 @@
 
 
-## Fix: Generazione immagini reali per Instagram
+## Fix: Pubblicazione Instagram fallita (non-2xx status code)
 
-### Problema attuale
-Le immagini NON sono reali. Ci sono due bug:
+### Problema
+L'errore "Edge Function returned a non-2xx status code" nasconde il vero problema. Ci sono due cause:
 
-1. **La risposta API non viene letta correttamente**: il codice cerca `message.parts` (formato Google), ma il gateway Lovable restituisce `message.images` (formato OpenAI). Le immagini generate vengono ignorate.
-2. **Instagram non accetta base64**: anche correggendo il parsing, Instagram richiede URL pubblici (`https://...`), non stringhe base64. Le immagini devono essere caricate su Supabase Storage.
+1. **CORS headers incompleti**: Il client Supabase invia header extra (`x-supabase-client-platform`, ecc.) che la funzione `meta-publish` non accetta. Questo puo' bloccare la richiesta.
+2. **Gestione errori opaca**: Quando la funzione restituisce un errore (es. token scaduto, immagine non raggiungibile), il messaggio reale viene perso e l'utente vede solo "non-2xx status code".
 
-### Soluzione in 2 step
+### Soluzione
 
-**Step 1 - Fix parsing risposta API**
-File: `supabase/functions/generate-carousel-images/index.ts`
+**File: `supabase/functions/meta-publish/index.ts`**
 
-- Aggiungere `"modalities": ["image", "text"]` nel body della richiesta al modello (richiesto per generare immagini)
-- Leggere le immagini da `data.choices[0].message.images[0].image_url.url` (formato corretto del gateway Lovable)
-- Mantenere il fallback per `parts` e `content` come backup
+- Aggiornare i CORS headers per includere tutti gli header inviati dal client Supabase (stessa configurazione usata in `generate-carousel-images`)
+- Aggiungere logging (`console.log`/`console.error`) per tracciare richieste e risposte Instagram, cosi' da poter debuggare errori futuri nei log
 
-**Step 2 - Upload su Supabase Storage per Instagram**
-File: `supabase/functions/generate-carousel-images/index.ts`
-
-- Dopo aver ottenuto l'immagine base64, convertirla in un file binario
-- Caricarla su Supabase Storage (bucket `carousel-images`)
-- Restituire l'URL pubblico dello storage invece del base64
-- Questo URL funziona sia per l'anteprima che per la pubblicazione Instagram
-
-### Dettagli tecnici
-
-**Parsing corretto della risposta (Step 1):**
+CORS headers aggiornati:
 ```text
-// Aggiungere modalities nella richiesta
-body: JSON.stringify({
-  model: "google/gemini-2.5-flash-image",
-  messages: [{ role: "user", content: prompt }],
-  modalities: ["image", "text"]  // <-- AGGIUNGERE QUESTO
-})
+"Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version"
+```
 
-// Leggere dal formato corretto
-const images = data.choices?.[0]?.message?.images;
-if (images && images.length > 0) {
-  const base64Url = images[0].image_url.url;
-  // ... upload to storage
+**File: `src/services/metaService.ts`**
+
+- Migliorare la gestione errori in `publishToInstagram`: quando `response.error` esiste MA `response.data` contiene dettagli, usare il messaggio da `response.data.error` invece del generico "non-2xx"
+- Questo mostra all'utente il vero errore (es. "Token scaduto", "Immagine non raggiungibile")
+
+Codice aggiornato:
+```text
+if (response.error) {
+  // Il data potrebbe contenere il messaggio di errore reale
+  const realError = response.data?.error || response.error.message;
+  throw new Error(realError);
 }
 ```
 
-**Upload su Storage (Step 2):**
-```text
-// Convertire base64 in blob
-const base64Data = base64Url.replace(/^data:image\/\w+;base64,/, '');
-const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-
-// Upload su Supabase Storage
-const fileName = `slide_${Date.now()}_${index}.png`;
-const { data: uploadData } = await supabaseClient.storage
-  .from('carousel-images')
-  .upload(fileName, imageBytes, { contentType: 'image/png' });
-
-// Ottenere URL pubblico
-const { data: urlData } = supabaseClient.storage
-  .from('carousel-images')
-  .getPublicUrl(fileName);
-
-return { index, url: urlData.publicUrl, error: null };
-```
-
-**Creazione bucket Storage:**
-- Creare il bucket `carousel-images` come pubblico tramite migration SQL
-
-### Risultato finale
-- Le immagini vengono generate dall'AI come immagini reali (PNG)
-- Vengono caricate su Supabase Storage con URL pubblico
-- L'anteprima mostra immagini reali
-- Instagram accetta le immagini per la pubblicazione diretta
+### Risultato
+- Le richieste non vengono piu' bloccate dal CORS
+- In caso di errore, l'utente vede il messaggio reale da Instagram (es. "Token scaduto") invece di "non-2xx status code"
+- I log della funzione mostrano dettagli utili per il debug
 
