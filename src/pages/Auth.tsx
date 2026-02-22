@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Heart, Zap } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -16,6 +17,10 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -187,18 +192,23 @@ const Auth = () => {
                       required
                     />
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground">Password</Label>
-                    <Input
-                      type="password"
-                      name="password"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      className="bg-muted border-border"
-                      placeholder="••••••••"
-                      required
-                    />
-                  </div>
+                   <div>
+                     <Label className="text-muted-foreground">Password</Label>
+                     <div className="relative">
+                       <Input
+                         type={showPassword ? "text" : "password"}
+                         name="password"
+                         value={formData.password}
+                         onChange={handleInputChange}
+                         className="bg-muted border-border pr-10"
+                         placeholder="••••••••"
+                         required
+                       />
+                       <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                       </button>
+                     </div>
+                   </div>
                   
                   {/* Opzione "Resta collegato" */}
                   <div className="flex items-center space-x-2">
@@ -211,8 +221,12 @@ const Auth = () => {
                       🔒 Resta collegato
                     </Label>
                   </div>
-                  
-                  <Button 
+                   
+                   <button type="button" onClick={() => setShowForgotPassword(true)} className="text-sm text-fisio hover:underline w-full text-right">
+                     Password dimenticata?
+                   </button>
+
+                   <Button
                     type="submit" 
                     disabled={loading}
                     className="w-full bg-fisio hover:bg-fisio/90 text-fisio-foreground"
@@ -280,18 +294,23 @@ const Auth = () => {
                       required
                     />
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground">Password</Label>
-                    <Input
-                      type="password"
-                      name="password"
-                      value={formData.password}
-                      onChange={handleInputChange}
-                      className="bg-muted border-border"
-                      placeholder="••••••••"
-                      required
-                    />
-                  </div>
+                   <div>
+                     <Label className="text-muted-foreground">Password</Label>
+                     <div className="relative">
+                       <Input
+                         type={showPassword ? "text" : "password"}
+                         name="password"
+                         value={formData.password}
+                         onChange={handleInputChange}
+                         className="bg-muted border-border pr-10"
+                         placeholder="••••••••"
+                         required
+                       />
+                       <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                       </button>
+                     </div>
+                   </div>
                   
                   {/* Consensi e Privacy */}
                   <div className="space-y-3 p-4 bg-muted/50 rounded-lg border border-border">
@@ -345,6 +364,43 @@ const Auth = () => {
             È vietata la copia, riproduzione o replica di questa piattaforma senza autorizzazione scritta.
           </p>
         </div>
+
+        <Dialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader>
+              <DialogTitle className="text-card-foreground">Recupera Password</DialogTitle>
+              <DialogDescription>Inserisci la tua email e ti invieremo un link per reimpostare la password.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              setForgotLoading(true);
+              try {
+                const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+                  redirectTo: `${window.location.origin}/reset-password`
+                });
+                if (error) {
+                  toast({ title: "Errore", description: error.message, variant: "destructive" });
+                } else {
+                  toast({ title: "📧 Email inviata!", description: "Controlla la tua casella email per il link di recupero" });
+                  setShowForgotPassword(false);
+                  setForgotEmail('');
+                }
+              } catch {
+                toast({ title: "Errore", description: "Errore durante l'invio", variant: "destructive" });
+              } finally {
+                setForgotLoading(false);
+              }
+            }} className="space-y-4">
+              <div>
+                <Label className="text-muted-foreground">Email</Label>
+                <Input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} className="bg-muted border-border" placeholder="la-tua-email@esempio.com" required />
+              </div>
+              <Button type="submit" disabled={forgotLoading} className="w-full bg-fisio hover:bg-fisio/90 text-fisio-foreground">
+                {forgotLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Invio...</> : 'Invia link di recupero'}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
