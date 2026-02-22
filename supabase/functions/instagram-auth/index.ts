@@ -31,7 +31,7 @@ serve(async (req) => {
     }
 
     // App centralizzata per Instagram Business
-    const INSTAGRAM_APP_ID = '1440410323636643'
+    const INSTAGRAM_APP_ID = '1261520952551293'
     const INSTAGRAM_APP_SECRET = Deno.env.get('INSTAGRAM_APP_SECRET')
     
     console.log('🔑 App ID centralizzata:', INSTAGRAM_APP_ID)
