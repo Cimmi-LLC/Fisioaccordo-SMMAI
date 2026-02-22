@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,7 @@ const CATEGORIES = ['generale', 'logo', 'team', 'clinica', 'trattamento', 'prodo
 
 const PhotoLibrary: React.FC<PhotoLibraryProps> = ({ selectable, selectedPhotos = [], onSelectPhoto, onDeselectPhoto }) => {
   const { photos, loading, uploading, uploadPhoto, deletePhoto, updateCategory } = useUserPhotos();
+  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [uploadCategory, setUploadCategory] = useState('generale');
@@ -25,9 +27,14 @@ const PhotoLibrary: React.FC<PhotoLibraryProps> = ({ selectable, selectedPhotos 
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
+    console.log('PhotoLibrary handleFileSelect: files selected:', files?.length);
     if (!files) return;
     for (const file of Array.from(files)) {
-      if (file.size > 10 * 1024 * 1024) continue;
+      console.log('PhotoLibrary: processing file', file.name, 'size:', file.size);
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: '⚠️ File troppo grande', description: `${file.name} supera i 10MB`, variant: 'destructive' });
+        continue;
+      }
       await uploadPhoto(file, uploadCategory);
     }
     if (fileInputRef.current) fileInputRef.current.value = '';
