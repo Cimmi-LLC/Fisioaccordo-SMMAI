@@ -64,19 +64,61 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
     toast({ title: "📥 Download completato!", description: `${imageSlides.length} immagini scaricate` });
   };
 
-  const handleOpenInstagram = () => {
+  const downloadAllImages = async () => {
+    const imageSlides = carouselSlides.filter(s => s.userImageUrl || s.imageUrl);
+    for (let i = 0; i < imageSlides.length; i++) {
+      const url = imageSlides[i].userImageUrl || imageSlides[i].imageUrl;
+      if (!url) continue;
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `slide-${i + 1}.png`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(blobUrl);
+        document.body.removeChild(a);
+      } catch {
+        console.error(`Errore download slide ${i + 1}`);
+      }
+    }
+  };
+
+  const handleOpenInstagram = async () => {
+    // 1. Copia testo
+    try { await navigator.clipboard.writeText(generatedContent); } catch {}
+    // 2. Scarica immagini
+    const hasImgs = carouselSlides.some(s => s.userImageUrl || s.imageUrl);
+    if (hasImgs) await downloadAllImages();
+    // 3. Toast
+    toast({
+      title: "✅ Tutto pronto!",
+      description: hasImgs
+        ? "Testo copiato e immagini scaricate! Apri 'Nuovo Post', seleziona le foto e incolla il testo."
+        : "Testo copiato! Apri 'Nuovo Post' e incolla il testo."
+    });
+    // 4. Apri Instagram
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     if (isMobile) {
       window.open('instagram://app', '_blank');
-      setTimeout(() => {
-        window.open('https://www.instagram.com/', '_blank');
-      }, 500);
+      setTimeout(() => window.open('https://www.instagram.com/', '_blank'), 500);
     } else {
       window.open('https://www.instagram.com/', '_blank');
     }
   };
 
-  const handleOpenFacebook = () => {
+  const handleOpenFacebook = async () => {
+    try { await navigator.clipboard.writeText(generatedContent); } catch {}
+    const hasImgs = carouselSlides.some(s => s.userImageUrl || s.imageUrl);
+    if (hasImgs) await downloadAllImages();
+    toast({
+      title: "✅ Tutto pronto!",
+      description: hasImgs
+        ? "Testo copiato e immagini scaricate! Crea un nuovo post, seleziona le foto e incolla il testo."
+        : "Testo copiato! Crea un nuovo post e incolla il testo."
+    });
     window.open('https://www.facebook.com/', '_blank');
   };
 
@@ -106,12 +148,12 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
 
         <Button onClick={handleOpenInstagram} variant="outline" size="sm">
           <ExternalLink className="mr-1.5 h-4 w-4" />
-          Apri Instagram
+          Pubblica su Instagram
         </Button>
 
         <Button onClick={handleOpenFacebook} variant="outline" size="sm">
           <ExternalLink className="mr-1.5 h-4 w-4" />
-          Apri Facebook
+          Pubblica su Facebook
         </Button>
       </div>
 
