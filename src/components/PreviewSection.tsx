@@ -124,35 +124,31 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
             className="absolute inset-0 w-full h-full object-cover"
           />
           
-          {/* Text overlay */}
-          <div className="absolute inset-0 flex flex-col justify-between p-4" style={{ color: canvaTemplate.text_color }}>
-            {/* Top zone - Title */}
-            <div className="text-center pt-2">
-              {slideData.title && (
-                <h3 className="font-bold text-sm leading-tight drop-shadow-lg" style={{ color: canvaTemplate.text_color }}>
-                  {slideData.title}
-                </h3>
-              )}
-            </div>
-
-            {/* Center zone - Body */}
-            <div className="flex-1 flex items-center justify-center px-2">
-              {slideData.body && (
-                <p className="text-xs text-center leading-relaxed drop-shadow-md" style={{ color: canvaTemplate.text_color }}>
-                  {slideData.body}
-                </p>
-              )}
-            </div>
-
-            {/* Bottom zone - CTA / Footer */}
-            <div className="text-center pb-2">
-              {slideData.footer && (
-                <p className="text-[10px] opacity-80 drop-shadow-sm" style={{ color: canvaTemplate.text_color }}>
-                  {slideData.footer}
-                </p>
-              )}
-            </div>
-          </div>
+          {/* Text overlay using text_zones */}
+          {(() => {
+            const zones = canvaTemplate.text_zones?.zones || [
+              { id: 'top', y: 5, height: 20, align: 'center', fontSize: 'lg' },
+              { id: 'center', y: 35, height: 40, align: 'center', fontSize: 'sm' },
+              { id: 'bottom', y: 80, height: 15, align: 'center', fontSize: 'xs' },
+            ];
+            const contentMap: Record<string, string> = {
+              top: slideData.title || '',
+              center: slideData.body || '',
+              bottom: slideData.footer || '',
+            };
+            const fontSizeMap: Record<string, string> = { lg: 'text-sm font-bold', md: 'text-xs font-semibold', sm: 'text-xs', xs: 'text-[10px] opacity-80' };
+            return zones.map((zone: any) => (
+              contentMap[zone.id] ? (
+                <div
+                  key={zone.id}
+                  className={`absolute left-0 right-0 flex items-center justify-center px-3 drop-shadow-lg ${fontSizeMap[zone.fontSize] || 'text-xs'}`}
+                  style={{ top: `${zone.y}%`, height: `${zone.height}%`, color: canvaTemplate.text_color, textAlign: zone.align || 'center' }}
+                >
+                  <span className="leading-tight">{contentMap[zone.id]}</span>
+                </div>
+              ) : null
+            ));
+          })()}
 
           {/* Hover controls */}
           <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
