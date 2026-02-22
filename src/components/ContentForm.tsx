@@ -193,6 +193,7 @@ const ContentForm: React.FC<ContentFormProps> = ({
         {/* Template Canva */}
         <CanvaTemplateSelector
           value={formData.visualTemplate === 'default' ? null : formData.visualTemplate}
+          postType={formData.postType}
           onChange={(templateId, template) => {
             onInputChange('visualTemplate', templateId || 'default');
             if (template) {
