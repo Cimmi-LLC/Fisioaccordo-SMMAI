@@ -62,12 +62,12 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
         }
       });
 
-      if (error) {
-        throw new Error(error.message || 'Errore nella chiamata AI');
-      }
-
       if (data?.error) {
         throw new Error(data.error);
+      }
+
+      if (error && !data) {
+        throw new Error(error.message || 'Errore nella chiamata AI');
       }
 
       const personalizedContent = data?.content || '';

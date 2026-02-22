@@ -45,8 +45,8 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
         }
       });
 
-      if (error || data?.error) {
-        console.error('Error generating slides:', error || data?.error);
+      if (data?.error || (error && !data)) {
+        console.error('Error generating slides:', data?.error || error);
         const fallbackSlides = createFallbackSlides(topic, numSlides, user, basePhoto);
         setCarouselSlides(fallbackSlides);
         generateImagesForSlides(fallbackSlides, topic);
