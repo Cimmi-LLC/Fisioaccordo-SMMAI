@@ -20,6 +20,7 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
 
   const generateCarouselSlides = useCallback(async () => {
+    setIsGeneratingImages(true);
     const postType = formData.postType || 'carosello';
     const isSinglePost = ['post-singolo', 'storia', 'reel'].includes(postType);
     const numSlides = isSinglePost ? 1 : parseInt(formData.numSlides);
