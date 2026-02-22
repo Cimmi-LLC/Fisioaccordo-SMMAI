@@ -54,36 +54,38 @@ Deno.serve(async (req) => {
 
     const shortLivedToken = tokenData.access_token
     const instagramUserId = tokenData.user_id?.toString()
+    console.log('Short-lived token ottenuto, user_id:', instagramUserId)
 
-    // Step 2: Exchange for long-lived token (60 days) - Must use POST
-    console.log('Exchanging for long-lived token...')
-    const longLivedRes = await fetch('https://graph.instagram.com/access_token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        grant_type: 'ig_exchange_token',
-        client_secret: appSecret,
-        access_token: shortLivedToken,
-      }),
-    })
-    const longLivedData = await longLivedRes.json()
-    console.log('Long-lived token response status:', longLivedRes.status)
+    // Step 2: Try to exchange for long-lived token (best effort, non-blocking)
+    let finalToken = shortLivedToken
+    let tokenExpiresAt = new Date(Date.now() + 3600 * 1000).toISOString() // 1 hour default
+    let tokenType = 'short-lived'
 
-    if (longLivedData.error) {
-      console.error('Long-lived token error:', longLivedData.error)
-      return new Response(
-        JSON.stringify({ success: false, error: longLivedData.error.message }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    try {
+      console.log('Tentativo scambio long-lived token (GET)...')
+      const longLivedRes = await fetch(
+        `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${appSecret}&access_token=${shortLivedToken}`
       )
+      const longLivedData = await longLivedRes.json()
+      console.log('Long-lived token response status:', longLivedRes.status)
+
+      if (longLivedData.access_token) {
+        finalToken = longLivedData.access_token
+        const expiresIn = longLivedData.expires_in || 5184000
+        tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString()
+        tokenType = 'long-lived'
+        console.log('Long-lived token ottenuto con successo, scade tra', expiresIn, 'secondi')
+      } else {
+        console.warn('Long-lived token non ottenuto, risposta:', JSON.stringify(longLivedData))
+        console.warn('Fallback: uso short-lived token (1 ora)')
+      }
+    } catch (e) {
+      console.warn('Long-lived token exchange fallito, uso short-lived:', e.message)
     }
 
-    const longLivedToken = longLivedData.access_token
-    const expiresIn = longLivedData.expires_in || 5184000
-    const tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString()
-
-    // Step 3: Get Instagram user profile
+    // Step 3: Get Instagram user profile (use whatever token we have)
     const profileRes = await fetch(
-      `https://graph.instagram.com/v21.0/me?fields=user_id,username,account_type,name&access_token=${longLivedToken}`
+      `https://graph.instagram.com/v21.0/me?fields=user_id,username,account_type,name&access_token=${finalToken}`
     )
     const profileData = await profileRes.json()
 
@@ -117,7 +119,7 @@ Deno.serve(async (req) => {
         facebook_user_id: null,
         page_id: null,
         page_name: null,
-        page_access_token: longLivedToken, // Store the IG long-lived token here
+        page_access_token: finalToken,
         instagram_business_id: igBusinessId,
         instagram_username: igUsername,
         token_expires_at: tokenExpiresAt,
@@ -132,11 +134,14 @@ Deno.serve(async (req) => {
       )
     }
 
+    console.log(`Connessione salvata con successo: @${igUsername}, token type: ${tokenType}`)
+
     return new Response(
       JSON.stringify({
         success: true,
         instagram_username: igUsername,
-        account_type: profileData.account_type
+        account_type: profileData.account_type,
+        token_type: tokenType
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

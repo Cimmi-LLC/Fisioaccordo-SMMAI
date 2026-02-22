@@ -37,9 +37,20 @@ export class MetaService {
       throw new Error('Popup bloccato dal browser. Abilita i popup per questo sito.');
     }
 
+    // Listen for postMessage from popup for immediate feedback
+    const messageHandler = (event: MessageEvent) => {
+      if (event.data?.type === 'meta-auth-success' || event.data?.type === 'meta-auth-error') {
+        window.removeEventListener('message', messageHandler);
+        clearInterval(checkClosed);
+        window.location.reload();
+      }
+    };
+    window.addEventListener('message', messageHandler);
+
     const checkClosed = setInterval(() => {
       if (popup.closed) {
         clearInterval(checkClosed);
+        window.removeEventListener('message', messageHandler);
         window.location.reload();
       }
     }, 1000);
@@ -57,6 +68,7 @@ export class MetaService {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error('Utente non autenticato');
 
+      console.log('[MetaService] Invocazione meta-auth con codice...');
       const response = await supabase.functions.invoke('meta-auth', {
         body: {
           code,
@@ -65,11 +77,16 @@ export class MetaService {
         }
       });
 
-      if (response.error) throw new Error(response.error.message || 'Errore autenticazione Meta');
-      if (!response.data?.success) throw new Error(response.data?.error || 'Errore sconosciuto');
+      console.log('[MetaService] Risposta:', { data: response.data, error: response.error?.message });
 
-      return { success: true };
+      // Check data.error first (Supabase SDK puts real error in data when status is non-2xx)
+      if (response.data?.success) return { success: true };
+      if (response.data?.error) throw new Error(response.data.error);
+      if (response.error) throw new Error(response.error.message || 'Errore autenticazione Meta');
+      
+      throw new Error('Risposta non valida dal server');
     } catch (error) {
+      console.error('[MetaService] Errore exchangeCodeForToken:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Errore sconosciuto'
