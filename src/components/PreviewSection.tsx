@@ -259,15 +259,9 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
             {carouselSlides.length > 0 && (
               <div className="mb-4">
                 <h3 className="text-card-foreground font-semibold mb-3">Slide del Carosello con Testo</h3>
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  {carouselSlides.slice(0, 4).map((slide, index) => renderSlideWithTemplate(slide, index))}
+                <div className={`grid gap-3 mb-4 ${carouselSlides.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : 'grid-cols-2 md:grid-cols-3'}`}>
+                  {carouselSlides.map((slide, index) => renderSlideWithTemplate(slide, index))}
                 </div>
-                
-                {carouselSlides.length > 4 && (
-                  <p className="text-muted-foreground text-sm text-center">
-                    +{carouselSlides.length - 4} altre slide
-                  </p>
-                )}
               </div>
             )}
             
