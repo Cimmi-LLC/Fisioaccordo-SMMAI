@@ -2791,6 +2791,108 @@ export type Database = {
           },
         ]
       }
+      trending_topics: {
+        Row: {
+          category: string
+          created_at: string
+          expires_at: string
+          id: string
+          source: string | null
+          suggested_content: string | null
+          topic: string
+          trend_score: number
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          source?: string | null
+          suggested_content?: string | null
+          topic: string
+          trend_score?: number
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          source?: string | null
+          suggested_content?: string | null
+          topic?: string
+          trend_score?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_ai_memory: {
+        Row: {
+          content: string
+          context: string | null
+          created_at: string
+          id: string
+          importance: number
+          memory_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          context?: string | null
+          created_at?: string
+          id?: string
+          importance?: number
+          memory_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          context?: string | null
+          created_at?: string
+          id?: string
+          importance?: number
+          memory_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_photos: {
+        Row: {
+          category: string
+          created_at: string
+          filename: string
+          id: string
+          public_url: string
+          storage_path: string
+          tags: string[] | null
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          filename: string
+          id?: string
+          public_url: string
+          storage_path: string
+          tags?: string[] | null
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          filename?: string
+          id?: string
+          public_url?: string
+          storage_path?: string
+          tags?: string[] | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
           allow_therapist_calendar: boolean | null
@@ -2853,6 +2955,42 @@ export type Database = {
           enable_therapist_availability_filter?: boolean | null
           id?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      viral_analysis: {
+        Row: {
+          analysis_text: string | null
+          created_at: string
+          engagement_data: Json | null
+          id: string
+          patterns: Json | null
+          platform: string
+          post_type: string
+          post_url: string | null
+          user_id: string
+        }
+        Insert: {
+          analysis_text?: string | null
+          created_at?: string
+          engagement_data?: Json | null
+          id?: string
+          patterns?: Json | null
+          platform?: string
+          post_type?: string
+          post_url?: string | null
+          user_id: string
+        }
+        Update: {
+          analysis_text?: string | null
+          created_at?: string
+          engagement_data?: Json | null
+          id?: string
+          patterns?: Json | null
+          platform?: string
+          post_type?: string
+          post_url?: string | null
           user_id?: string
         }
         Relationships: []

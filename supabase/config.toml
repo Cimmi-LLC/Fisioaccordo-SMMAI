@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.instagram-auth]
 verify_jwt = false
+
+[functions.analyze-viral-post]
+verify_jwt = false
+
+[functions.find-trends]
+verify_jwt = false
