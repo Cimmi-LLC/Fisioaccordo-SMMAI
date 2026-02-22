@@ -1,67 +1,63 @@
 
 
-## Fix: Collegamento Instagram fallisce per alcuni utenti
+## Fix: Rendere il profile fetch (Step 3) non bloccante
 
-### Problema identificato
+### Il problema (confermato dallo screenshot)
 
-Ho analizzato i log, il codice, il database e la documentazione Meta. Il problema e' chiaro:
+L'errore "Edge Function returned a non-2xx status code" arriva perche' le righe 92-98 di `meta-auth/index.ts` trattano il fallimento del profile fetch come errore fatale, restituendo status 400. La connessione non viene mai salvata nel database.
 
-1. L'utente clicca "Collega", autorizza su Instagram, il codice riceve il token correttamente (Step 1 funziona)
-2. Lo scambio per il **long-lived token** (Step 2) fallisce con errore "Unsupported request" - sia con GET che con POST
-3. Questo e' un **bug noto di Meta** che colpisce alcuni account ma non altri (il tuo account `attiliocimminiello` funziona, altri utenti no)
-4. Siccome lo Step 2 fallisce, la connessione non viene MAI salvata nel database, e l'utente torna sull'app senza nulla collegato
+### La modifica
 
-### Soluzione
+**File: `supabase/functions/meta-auth/index.ts`** (righe 86-101)
 
-Rendere lo Step 2 (long-lived token) **non bloccante**. Se fallisce, il sistema salva comunque la connessione usando il token short-lived (dura 1 ora invece di 60 giorni). L'utente vede immediatamente il collegamento e puo' usare l'app.
-
-### Modifiche tecniche
-
-**1. `supabase/functions/meta-auth/index.ts`**
-
-- Cambiare lo Step 2 da GET a... tentare GET (come da documentazione ufficiale Meta), e se fallisce, usare il short-lived token come fallback
-- Aggiungere try/catch attorno allo Step 2 per non bloccare il flusso
-- Salvare il token disponibile (long-lived se possibile, short-lived come fallback)
-- Aggiungere log dettagliati per diagnostica
+Wrappare lo Step 3 in un try/catch e usare valori di default se fallisce:
 
 ```text
-// Step 2: Try to exchange for long-lived token (best effort)
-let finalToken = shortLivedToken
-let tokenExpiresAt = new Date(Date.now() + 3600 * 1000).toISOString() // 1 ora
+// Step 3: Get Instagram user profile (best effort - non-blocking)
+let igUsername = null
+let igBusinessId = instagramUserId  // dal Step 1, sempre disponibile
+let accountType = 'BUSINESS'
 
 try {
-  const longLivedRes = await fetch(
-    `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${appSecret}&access_token=${shortLivedToken}`
+  const profileRes = await fetch(
+    `https://graph.instagram.com/v21.0/me?fields=user_id,username,account_type,name&access_token=${finalToken}`
   )
-  const longLivedData = await longLivedRes.json()
+  const profileData = await profileRes.json()
 
-  if (longLivedData.access_token) {
-    finalToken = longLivedData.access_token
-    const expiresIn = longLivedData.expires_in || 5184000
-    tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString()
-    console.log('Long-lived token ottenuto con successo')
+  if (profileData.error) {
+    console.warn('Profile fetch fallito, salvo senza username:', profileData.error.message)
   } else {
-    console.warn('Long-lived token fallback: usando short-lived token')
+    igUsername = profileData.username || null
+    igBusinessId = instagramUserId || profileData.user_id?.toString() || profileData.id
+    accountType = profileData.account_type || 'BUSINESS'
+    console.log('Profilo ottenuto:', igUsername, accountType)
   }
 } catch (e) {
-  console.warn('Long-lived token exchange fallito, uso short-lived:', e.message)
+  console.warn('Profile fetch exception, salvo senza username:', e.message)
 }
 
-// Continua con finalToken (long-lived o short-lived)
+// Step 4 procede SEMPRE con igBusinessId e igUsername (anche se null)
 ```
 
-**2. `src/pages/InstagramCallback.tsx`**
+Il resto del codice (Step 4, salvataggio DB) resta identico, usa `igBusinessId` e `igUsername` gia' definiti sopra.
 
-- Aggiungere logging piu' dettagliato per capire cosa succede nel popup
-- Migliorare la comunicazione tra popup e finestra principale
+Aggiornare anche la risposta finale per includere `accountType`:
 
-**3. `src/services/metaService.ts`**
+```text
+return new Response(
+  JSON.stringify({
+    success: true,
+    instagram_username: igUsername,
+    account_type: accountType,
+    token_type: tokenType
+  }),
+  { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+)
+```
 
-- Migliorare la gestione errori in `exchangeCodeForToken` per gestire il caso dove `response.data` ha `success: true` ma `error` e' anche presente (caso edge del Supabase SDK con status non-2xx)
+### Risultato
 
-### Risultato atteso
-
-- Gli utenti che prima non riuscivano a collegare Instagram vedranno immediatamente la connessione attiva
-- Il token short-lived durera' 1 ora (sufficiente per pubblicare)
-- Per gli account dove il long-lived token funziona, si avranno i 60 giorni come prima
-- Nessun errore silenzioso: tutto viene loggato per diagnostica futura
+- La connessione viene salvata SEMPRE (con o senza username)
+- L'utente vede "Collegato" nell'app
+- La pubblicazione funziona perche' il token e' valido
+- Se il profilo non viene caricato, l'username sara' null (mostra solo "Collegato" senza @username)
