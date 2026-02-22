@@ -32,6 +32,7 @@ interface PreviewSectionProps {
   onImageEdit: (imageUrl: string, slideIndex: number) => void;
   onSaveContent: () => void;
   canvaTemplate?: CanvaTemplateData | null;
+  onPublishDirect?: (platforms: string[]) => Promise<void>;
 }
 
 const PreviewSection: React.FC<PreviewSectionProps> = ({
@@ -42,7 +43,8 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
   onRemoveHook,
   onImageEdit,
   onSaveContent,
-  canvaTemplate
+  canvaTemplate,
+  onPublishDirect
 }) => {
   const { toast } = useToast();
 
@@ -278,7 +280,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
               </Button>
             </div>
 
-            <SmartCopyActions generatedContent={generatedContent} carouselSlides={carouselSlides} />
+            <SmartCopyActions generatedContent={generatedContent} carouselSlides={carouselSlides} onPublishDirect={onPublishDirect} />
 
             {carouselSlides.length > 0 && (
               <CarouselImageManager slides={carouselSlides} onSlidesUpdate={setCarouselSlides} onImageEdit={onImageEdit} />
