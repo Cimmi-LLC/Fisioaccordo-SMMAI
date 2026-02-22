@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { topic, audience, platform, tone, postType, numSlides } = await req.json();
+    const { topic, audience, platform, tone, postType, numSlides, userPhotos } = await req.json();
 
     if (!topic || typeof topic !== "string" || topic.trim().length < 2) {
       return new Response(JSON.stringify({ error: "Topic is required (min 2 chars)" }), {
@@ -26,6 +27,54 @@ serve(async (req) => {
 
     const slidesCount = Math.min(Math.max(parseInt(numSlides) || 5, 2), 10);
 
+    // Load user AI memories if auth token is present
+    let memoriesContext = "";
+    const authHeader = req.headers.get("authorization");
+    if (authHeader) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+        const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+        if (supabaseUrl && supabaseKey) {
+          const supabase = createClient(supabaseUrl, supabaseKey);
+          const token = authHeader.replace("Bearer ", "");
+          const { data: { user } } = await supabase.auth.getUser(token);
+          
+          if (user) {
+            const { data: memories } = await supabase
+              .from("user_ai_memory")
+              .select("memory_type, content, importance")
+              .eq("user_id", user.id)
+              .order("importance", { ascending: false })
+              .limit(20);
+
+            if (memories && memories.length > 0) {
+              memoriesContext = "\n\nMEMORIA UTENTE - Rispetta SEMPRE queste preferenze:\n" +
+                memories.map((m: any) => {
+                  const typeLabel = {
+                    correction: "CORREZIONE",
+                    preference: "PREFERENZA", 
+                    style: "STILE",
+                    brand_voice: "BRAND",
+                    feedback: "FEEDBACK"
+                  }[m.memory_type] || m.memory_type.toUpperCase();
+                  return `- [${typeLabel}] ${m.content}`;
+                }).join("\n");
+            }
+          }
+        }
+      } catch (memErr) {
+        console.error("Error loading memories:", memErr);
+      }
+    }
+
+    // Build photos context
+    let photosContext = "";
+    if (userPhotos && Array.isArray(userPhotos) && userPhotos.length > 0) {
+      photosContext = "\n\nFOTO UTENTE DISPONIBILI:\n" +
+        userPhotos.map((p: string, i: number) => `- Foto ${i + 1}: ${p}`).join("\n") +
+        "\nSuggerisci quale foto usare per ogni slide nel campo 'suggested_photo_index'.";
+    }
+
     const systemPrompt = `Sei un copywriter esperto con 20+ anni di esperienza, specializzato in contenuti social virali.
 Il tuo stile è ispirato a Iman Gadzhi: diretto, carismatico, orientato ai risultati.
 Usi le strategie di Mr.Beast per massimizzare engagement e viralità.
@@ -38,7 +87,7 @@ REGOLE ASSOLUTE:
 - CTA forte e specifica
 - Emojis strategici (non casuali)
 - NO frasi fatte come "Solo 5 posti disponibili" o "87% delle persone"
-- Ogni frase deve aggiungere valore specifico al topic
+- Ogni frase deve aggiungere valore specifico al topic${memoriesContext}${photosContext}
 
 Rispondi SOLO con un JSON valido, nessun altro testo.`;
 
@@ -56,7 +105,7 @@ Rispondi con questo JSON esatto:
       "title": "TITOLO SLIDE (max 6 parole, impattante)",
       "subtitle": "Sottotitolo specifico per il topic",
       "body": "Corpo slide con contenuto di valore specifico",
-      "cta": "Call to action (solo ultima slide, le altre null)"
+      "cta": "Call to action (solo ultima slide, le altre null)"${userPhotos?.length ? ',\n      "suggested_photo_index": 0' : ''}
     }
   ]
 }
@@ -89,14 +138,12 @@ IMPORTANTE: Ogni slide deve contenere informazioni SPECIFICHE e UNICHE sul topic
       const status = response.status;
       if (status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Riprova tra qualche secondo." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (status === 402) {
         return new Response(JSON.stringify({ error: "Crediti AI esauriti. Aggiungi crediti al workspace." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const errText = await response.text();
@@ -107,17 +154,13 @@ IMPORTANTE: Ogni slide deve contenere informazioni SPECIFICHE e UNICHE sul topic
     const data = await response.json();
     const rawContent = data.choices?.[0]?.message?.content;
 
-    if (!rawContent) {
-      throw new Error("No content returned from AI");
-    }
+    if (!rawContent) throw new Error("No content returned from AI");
 
-    // Parse JSON from response (handle markdown code blocks)
     let parsed;
     try {
       const jsonStr = rawContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       parsed = JSON.parse(jsonStr);
     } catch {
-      // If JSON parsing fails, return raw content as fallback
       parsed = {
         content: rawContent,
         slides: Array.from({ length: slidesCount }, (_, i) => ({
