@@ -1,55 +1,83 @@
 
 
-## Fix: Pubblicazione Instagram fallisce con status 400
+## Fix: Instagram Content Publishing richiede form-urlencoded, non JSON
 
-### Problema identificato
+### Il problema (dai log)
 
-I log mostrano:
-1. Il collegamento ora funziona (la connessione viene salvata nel database)
-2. La pubblicazione restituisce **status 400** in ~1.5 secondi
-3. Non ci sono log di polling, quindi l'errore avviene al **primo step** (creazione media container)
-4. Il token e' **short-lived** (1 ora) e l'`instagram_business_id` viene dal `user_id` dello Step 1
-
-La causa probabile: la chiamata `POST graph.instagram.com/v21.0/{igId}/media` fallisce perche':
-- Il short-lived token potrebbe non avere lo scope `instagram_business_content_publish` (necessario per pubblicare)
-- Oppure il formato dell'`instagram_business_id` non e' corretto per l'API Content Publishing
-
-### Soluzione
-
-**1. Aggiungere logging dettagliato in `meta-publish`** per capire l'errore esatto dall'API Instagram:
-
-```text
-// In publishSingleImage, loggare la risposta completa di Instagram:
-console.log('Container creation response:', JSON.stringify(containerData))
-console.log('Using igId:', igId, 'imageUrl:', imageUrl)
+```
+Container creation failed: {
+  message: "Unsupported request - method type: post",
+  type: "IGApiException",
+  code: 100
+}
 ```
 
-**2. Aggiungere lo scope `instagram_business_content_publish` alla richiesta OAuth** in `metaService.ts`:
+Il codice attuale in `meta-publish/index.ts` invia le richieste all'API Instagram con `Content-Type: application/json` e `JSON.stringify()`. L'API Instagram Content Publishing richiede invece `application/x-www-form-urlencoded` con `URLSearchParams`.
 
-Attualmente gli scope sono:
-```text
-instagram_business_basic, instagram_business_content_publish
-```
-
-Questo sembra gia' corretto. Ma verificare che nel codice siano effettivamente questi gli scope richiesti.
-
-**3. Migliorare la gestione errori in `meta-publish`** per restituire messaggi utili invece del generico "non-2xx status code":
-
-- Loggare ogni risposta dall'API Instagram prima di controllare errori
-- Includere l'errore esatto nell'output per diagnostica
-
-### Modifiche tecniche
+### La modifica
 
 **File: `supabase/functions/meta-publish/index.ts`**
 
-- Aggiungere `console.log` dettagliati in `publishSingleImage` e `publishCarousel` per vedere la risposta esatta di Instagram
-- Loggare `igId`, `token length`, e `image_url` per diagnostica
-- Loggare la risposta completa di Instagram quando la creazione del container fallisce
+Cambiare TUTTE le chiamate `fetch` verso `graph.instagram.com` da JSON a form-urlencoded:
 
-**File: `src/services/metaService.ts`**
+**1. publishSingleImage - creazione container (riga 92-97)**
+```text
+// PRIMA (non funziona):
+const containerRes = await fetch(`https://graph.instagram.com/v21.0/${igId}/media`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ image_url: imageUrl, caption, access_token: token })
+})
 
-- In `publishToInstagram`, loggare l'errore completo ricevuto dalla edge function per mostrarlo nella console del browser
+// DOPO (corretto):
+const containerRes = await fetch(`https://graph.instagram.com/v21.0/${igId}/media`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  body: new URLSearchParams({ image_url: imageUrl, caption, access_token: token })
+})
+```
 
-### Risultato
+**2. publishCarousel - creazione item carousel (riga 114-119)**
+```text
+// PRIMA:
+body: JSON.stringify({ image_url: url, is_carousel_item: true, access_token: token })
 
-Con questi log potremo vedere esattamente quale errore ritorna Instagram e risolvere il problema specifico (token non valido, scope mancante, formato ID sbagliato, ecc.).
+// DOPO:
+headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+body: new URLSearchParams({ image_url: url, is_carousel_item: 'true', access_token: token })
+```
+
+**3. publishCarousel - creazione container carousel (riga 126-130)**
+```text
+// PRIMA:
+body: JSON.stringify({ media_type: 'CAROUSEL', children: childIds, caption, access_token: token })
+
+// DOPO (children come comma-separated):
+body: new URLSearchParams({
+  media_type: 'CAROUSEL',
+  caption,
+  access_token: token,
+  children: childIds.join(',')
+})
+```
+
+**4. publishContainer - pubblicazione finale (riga 147-151)**
+```text
+// PRIMA:
+body: JSON.stringify({ creation_id: creationId, access_token: token })
+
+// DOPO:
+headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+body: new URLSearchParams({ creation_id: creationId, access_token: token })
+```
+
+### Perche' funziona
+
+L'API Instagram Graph (graph.instagram.com) accetta solo richieste form-urlencoded per la Content Publishing API. Quando riceve JSON, restituisce "Unsupported request - method type: post" perche' non riconosce il formato del body.
+
+### Risultato atteso
+
+- La creazione del media container funzionera' correttamente
+- La pubblicazione su Instagram andra' a buon fine
+- Sia post singoli che carousel funzioneranno
+
