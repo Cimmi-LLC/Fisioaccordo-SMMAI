@@ -46,14 +46,17 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
       }
 
       const aiSlides: CarouselSlide[] = (data.slides || []).slice(0, numSlides).map(
-        (slide: { title: string; subtitle: string; body: string; cta?: string | null }, i: number) => ({
+        (slide: { title: string; subtitle: string; body: string; cta?: string | null; number?: string | null; banner?: string | null }, i: number) => ({
           type: i === 0 ? 'attention' : i === numSlides - 1 ? 'cta' : i === 1 ? 'problem' : 'solution',
           content: JSON.stringify({
             title: slide.title,
             subtitle: slide.subtitle,
             body: slide.body,
-            ...(slide.cta && { footer: slide.cta }),
-            ...(i === numSlides - 1 && { footer: user?.user_metadata?.clinic_name || 'Studio Fisioterapico' })
+            number: slide.number || '',
+            cta: slide.cta || '',
+            banner: slide.banner || '',
+            logo: user?.user_metadata?.clinic_name || 'Studio Fisioterapico',
+            footer: i === numSlides - 1 ? (user?.user_metadata?.clinic_name || 'Studio Fisioterapico') : (slide.cta || ''),
           }),
           imageUrl: undefined,
           userImageUrl: basePhoto && i === 0 ? basePhoto : undefined

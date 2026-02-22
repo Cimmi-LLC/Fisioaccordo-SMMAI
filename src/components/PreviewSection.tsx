@@ -96,7 +96,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
   };
 
   const renderSlideWithTemplate = (slide: CarouselSlide, index: number) => {
-    let slideData;
+    let slideData: Record<string, string>;
     
     try {
       slideData = JSON.parse(slide.content);
@@ -110,45 +110,104 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
       };
     }
 
-    // If we have a Canva template, render with PNG background
     if (canvaTemplate) {
+      const textZones = canvaTemplate.text_zones as any;
+      const hasLayers = textZones?.layers && Array.isArray(textZones.layers);
+
       return (
-        <div
-          key={index}
-          className="relative aspect-square rounded-lg overflow-hidden group border border-border"
-        >
-          {/* Canva template background */}
-          <img
-            src={canvaTemplate.background_url}
-            alt={canvaTemplate.name}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
+        <div key={index} className="relative aspect-square rounded-lg overflow-hidden group border border-border">
+          <img src={canvaTemplate.background_url} alt={canvaTemplate.name} className="absolute inset-0 w-full h-full object-cover" />
           
-          {/* Text overlay using text_zones */}
-          {(() => {
-            const zones = canvaTemplate.text_zones?.zones || [
-              { id: 'top', y: 5, height: 20, align: 'center', fontSize: 'lg' },
-              { id: 'center', y: 35, height: 40, align: 'center', fontSize: 'sm' },
-              { id: 'bottom', y: 80, height: 15, align: 'center', fontSize: 'xs' },
-            ];
-            const contentMap: Record<string, string> = {
-              top: slideData.title || '',
-              center: slideData.body || '',
-              bottom: slideData.footer || '',
-            };
-            const fontSizeMap: Record<string, string> = { lg: 'text-sm font-bold', md: 'text-xs font-semibold', sm: 'text-xs', xs: 'text-[10px] opacity-80' };
-            return zones.map((zone: any) => (
-              contentMap[zone.id] ? (
+          {hasLayers ? (
+            // New layer-based rendering
+            textZones.layers.map((layer: any) => {
+              const contentMap: Record<string, string> = {
+                title: slideData.title || '',
+                number: slideData.number || '',
+                subtitle: slideData.subtitle || '',
+                body: slideData.body || '',
+                cta: slideData.cta || '',
+                banner: slideData.banner || '',
+                footer: slideData.footer || '',
+                logo: slideData.logo || '',
+              };
+              const text = contentMap[layer.type] || '';
+              const isImageLayer = layer.type === 'image';
+
+              if (!text && !isImageLayer) return null;
+
+              const shadow = layer.shadow?.enabled
+                ? `${layer.shadow.offsetX || 0}px ${layer.shadow.offsetY || 0}px ${layer.shadow.blur || 0}px ${layer.shadow.color || '#000'}`
+                : undefined;
+
+              return (
                 <div
-                  key={zone.id}
-                  className={`absolute left-0 right-0 flex items-center justify-center px-3 drop-shadow-lg ${fontSizeMap[zone.fontSize] || 'text-xs'}`}
-                  style={{ top: `${zone.y}%`, height: `${zone.height}%`, color: canvaTemplate.text_color, textAlign: zone.align || 'center' }}
+                  key={layer.id}
+                  className="absolute flex items-center justify-center overflow-hidden"
+                  style={{
+                    left: `${layer.x}%`,
+                    top: `${layer.y}%`,
+                    width: `${layer.width}%`,
+                    height: `${layer.height}%`,
+                    backgroundColor: layer.backgroundColor || 'transparent',
+                    borderRadius: layer.borderRadius ? `${layer.borderRadius}px` : undefined,
+                    padding: layer.padding ? `${layer.padding}px` : undefined,
+                    opacity: layer.opacity ?? 1,
+                  }}
                 >
-                  <span className="leading-tight">{contentMap[zone.id]}</span>
+                  {isImageLayer ? (
+                    slide.userImageUrl ? (
+                      <img src={slide.userImageUrl} className="w-full h-full object-cover" alt="user" />
+                    ) : (
+                      <div className="w-full h-full bg-muted/30 flex items-center justify-center text-muted-foreground text-xs">📷</div>
+                    )
+                  ) : (
+                    <span
+                      style={{
+                        fontFamily: layer.fontFamily || 'Arial',
+                        fontSize: `${Math.max(6, (layer.fontSize || 16) * 0.35)}px`,
+                        fontWeight: layer.fontWeight as any,
+                        color: layer.color || canvaTemplate.text_color,
+                        textAlign: layer.textAlign as any,
+                        textTransform: layer.textTransform as any,
+                        textShadow: shadow,
+                        lineHeight: layer.lineHeight ? `${layer.lineHeight}` : undefined,
+                        letterSpacing: layer.letterSpacing ? `${layer.letterSpacing}px` : undefined,
+                        width: '100%',
+                        display: 'block',
+                      }}
+                      className="leading-tight"
+                    >
+                      {text}
+                    </span>
+                  )}
                 </div>
-              ) : null
-            ));
-          })()}
+              );
+            })
+          ) : (
+            // Fallback: old zones format
+            (() => {
+              const zones = textZones?.zones || [
+                { id: 'top', y: 5, height: 20, align: 'center', fontSize: 'lg' },
+                { id: 'center', y: 35, height: 40, align: 'center', fontSize: 'sm' },
+                { id: 'bottom', y: 80, height: 15, align: 'center', fontSize: 'xs' },
+              ];
+              const contentMap: Record<string, string> = {
+                top: slideData.title || '',
+                center: slideData.body || '',
+                bottom: slideData.footer || '',
+              };
+              const fontSizeMap: Record<string, string> = { lg: 'text-sm font-bold', md: 'text-xs font-semibold', sm: 'text-xs', xs: 'text-[10px] opacity-80' };
+              return zones.map((zone: any) => (
+                contentMap[zone.id] ? (
+                  <div key={zone.id} className={`absolute left-0 right-0 flex items-center justify-center px-3 drop-shadow-lg ${fontSizeMap[zone.fontSize] || 'text-xs'}`}
+                    style={{ top: `${zone.y}%`, height: `${zone.height}%`, color: canvaTemplate.text_color, textAlign: zone.align || 'center' }}>
+                    <span className="leading-tight">{contentMap[zone.id]}</span>
+                  </div>
+                ) : null
+              ));
+            })()
+          )}
 
           {/* Hover controls */}
           <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
@@ -157,8 +216,6 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
             <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadImageToSlide(index, file); }} className="hidden" id={`upload-${index}`} />
             <Button asChild size="sm" className="p-1 h-6 w-6 bg-secondary hover:bg-secondary/90 cursor-pointer"><label htmlFor={`upload-${index}`}><Upload className="w-3 h-3" /></label></Button>
           </div>
-          
-          {/* Slide number */}
           <div className="absolute top-2 left-2 bg-background/70 text-foreground text-xs px-2 py-1 rounded-full font-bold z-10">{index + 1}</div>
         </div>
       );
