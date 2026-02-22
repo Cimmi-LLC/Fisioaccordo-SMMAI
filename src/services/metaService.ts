@@ -15,7 +15,7 @@ export interface MetaConnectionData {
 }
 
 export class MetaService {
-  private static readonly META_APP_ID = '578518187777036';
+  private static readonly META_APP_ID = '1440410323636643';
   private static readonly REDIRECT_URI = window.location.origin + '/auth/instagram/callback';
 
   static initiateAuth(): void {
