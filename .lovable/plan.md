@@ -1,23 +1,21 @@
 
+# Fix Redirect URI Meta OAuth
 
-# Supporto Upload Multi-Formato nel Template Uploader
+## Problema
+Il codice usa `window.location.origin` per costruire il redirect URI. Quando si testa dalla preview di Lovable, l'origin e' l'URL di preview (diverso da quello configurato su Meta), causando l'errore "URL bloccato".
 
-## Cosa cambia
-Attualmente il template uploader accetta solo PNG, JPG e WebP. Aggiungeremo il supporto per:
-
-- **SVG** (`.svg`) -- ideale per estrarre livelli vettoriali
-- **HEIC/HEIF** (`.heic`, `.heif`) -- formato nativo iPhone
-- **PDF** (`.pdf`) -- utile per esportazioni da Canva
-- **Qualsiasi altro formato immagine** (BMP, TIFF, ecc.)
+## Soluzione
+Hardcodare il redirect URI nel `metaService.ts` con l'URL pubblicato, che corrisponde a quello configurato nelle impostazioni di Facebook Login.
 
 ## Modifiche
 
-### `src/components/TemplateUploader.tsx`
+### 1. `src/services/metaService.ts`
+- Cambiare la riga `REDIRECT_URI` da:
+  `window.location.origin + '/auth/instagram/callback'`
+  a:
+  `'https://social-generator-fisioaccordo.lovable.app/auth/instagram/callback'`
 
-1. **Attributo `accept` degli input file** (riga 276-277): espandere per includere `image/*,.svg,.pdf,.heic,.heif`
-2. **Filtro `handleFilesSelected`** (riga 131): invece di filtrare solo `image/png|jpeg|webp`, accettare tutti i file immagine (`f.type.startsWith('image/')`) piu SVG (`image/svg+xml`), PDF (`application/pdf`), e HEIC/HEIF (che su iPhone possono avere MIME vuoto, quindi accettare anche per estensione `.heic`/`.heif`)
-3. **Messaggio di errore** (riga 133): aggiornare il testo per elencare i nuovi formati supportati
-4. **Upload su storage** (riga 224-226): il `contentType` viene gia preso da `pf.file.type`, quindi funziona automaticamente per i nuovi formati. Per HEIC con MIME vuoto, impostare un fallback a `image/heic`
-
-Nota: i file SVG e PDF verranno usati come riferimento visivo nel pannello di anteprima dell'editor livelli, non come sfondo finale (come da piano precedente).
-
+### Dettagli tecnici
+- Solo 1 file da modificare
+- Nessuna dipendenza aggiuntiva
+- Il redirect URI sara' fisso e corrispondera' sempre a quello configurato su Meta
