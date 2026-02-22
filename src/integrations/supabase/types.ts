@@ -429,6 +429,45 @@ export type Database = {
         }
         Relationships: []
       }
+      canva_templates: {
+        Row: {
+          background_url: string
+          category: string
+          created_at: string
+          description: string | null
+          id: string
+          is_default: boolean
+          name: string
+          text_color: string
+          text_zones: Json
+          user_id: string | null
+        }
+        Insert: {
+          background_url: string
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          text_color?: string
+          text_zones?: Json
+          user_id?: string | null
+        }
+        Update: {
+          background_url?: string
+          category?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          text_color?: string
+          text_zones?: Json
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       clinic_availability: {
         Row: {
           created_at: string

@@ -44,7 +44,8 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
     postType: 'carosello',
     numSlides: '5',
     numImages: '1',
-    visualTemplate: 'default' as const,
+    visualTemplate: 'default',
+    canvaTemplate: null as any,
     selectedPlatforms: ['instagram'] as string[],
     scheduleDate: '',
   });
@@ -209,6 +210,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
                     onRemoveHook={hookManager.removeHook}
                     onImageEdit={imageManager.handleImageEdit}
                     onSaveContent={handleSaveContent}
+                    canvaTemplate={formData.canvaTemplate}
                   />
                   {generatedContent && <div className="mt-3"><FeedbackWidget generatedContent={generatedContent} /></div>}
                 </>
