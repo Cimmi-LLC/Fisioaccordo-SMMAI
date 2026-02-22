@@ -1,68 +1,138 @@
 
 
-# Fix Rendering Anteprima: Rispettare i Livelli Grafici del Template
+# Ricreare i Template Interamente in HTML/CSS (Senza PNG con Testo)
 
-## Problema
-Tutti i template nel database usano ancora il vecchio formato `zones` (3 bande: top/center/bottom) senza informazioni su font, colori, ombre, banner, numeri. Il risultato e un rendering brutto con testo sovrapposto senza stile.
+## Il vero problema
+I template salvati nel database sono **screenshot PNG da Canva** che contengono gia il testo ("ASSUMIAMO", "SE SAI FAR FUNZIONARE", "CLICCA IN BASSO E LAVORA CON NOI", ecc.). Poi il sistema sovrappone ALTRO testo generato dall'AI sopra, creando il pasticcio visibile nello screenshot.
 
-Nessun template ha ancora il formato `layers` perche sono stati caricati prima dell'editor livelli.
+**Non si puo risolvere con overlay** -- finche il PNG contiene testo, sara sempre un disastro.
 
-## Soluzione
+## Soluzione: Template costruiti al 100% in HTML/CSS
 
-### 1. `PreviewSection.tsx` -- Fallback intelligente per template senza layers
-Quando un template ha il vecchio formato `zones` (o nessun layer definito), generare automaticamente dei layer di default basati sul tipo di slide:
+Invece di usare un PNG come sfondo, ogni template definisce:
+- **Sfondo**: colore solido, gradiente, o solo la foto dell'utente (non un PNG con testo)
+- **Tutti i livelli di testo**: posizione, font, colore, ombra, banner -- tutto in HTML/CSS
+- **Zona immagine**: dove va la foto dell'utente (es. mezza slide, angolo, sfondo)
 
-- **Slide 1 (attention)**: titolo grande in alto, sottotitolo, corpo testo
-- **Slide 2-4 (problem/solution)**: numero grande al centro, body sotto, banner in basso
-- **Ultima slide (cta)**: CTA grande, footer brand
+Il risultato e una slide completamente generata dal codice, senza nessun PNG pre-renderizzato.
 
-I layer auto-generati avranno:
-- Font, grandezze e pesi diversi per tipo (titolo grande e bold, body piu piccolo, banner con sfondo colorato)
-- Colori e ombre letti dal `text_color` del template
-- Sfondo per i banner
-- Posizioni che non si sovrappongono
+## Struttura di un "Design Template" (nuovo formato)
 
-### 2. `PreviewSection.tsx` -- Migliorare il scaling dei font
-Il fattore `* 0.35` e troppo aggressivo. Usare un fattore relativo alla dimensione del container (la preview e circa 200-300px, il template originale e 1080px, quindi `* 0.25` circa).
+Ogni template non ha piu un `background_url` con un PNG pieno di testo. Invece ha:
 
-### 3. `PreviewSection.tsx` -- Variare il layout tra le slide del carosello
-Per i caroselli, ogni slide avra un layout leggermente diverso:
-- Slide 1: enfasi sul titolo/hook (grande, colorato)
-- Slide centrali: enfasi sul numero e body
-- Ultima slide: enfasi sulla CTA e brand
+| Campo | Descrizione |
+|---|---|
+| `background` | Oggetto con `type` (solid/gradient/photo) e relativo valore (colore, gradiente CSS, o posizione foto utente) |
+| `layers` | Array di livelli con tutte le proprieta visive (come definito nel piano precedente) |
+| `photoZone` | Opzionale: dove posizionare la foto dell'utente (`{ x, y, width, height, opacity, objectFit }`) |
+| `overlayColor` | Colore overlay sopra la foto per leggibilita testo (es. `rgba(0,0,0,0.4)`) |
 
-### 4. `useCarouselSlides.ts` -- Assicurarsi che il campo `number` sia popolato
-Il generate-content gia ritorna `number` per le slide, ma verificare che il fallback lo includa.
+### Esempio template "Fisioaccordo Rosa"
+```text
+{
+  "background": {
+    "type": "solid",
+    "value": "#1a1a2e"
+  },
+  "photoZone": {
+    "x": 0, "y": 0, "width": 100, "height": 100,
+    "opacity": 0.3, "objectFit": "cover"
+  },
+  "overlayColor": "rgba(0,0,0,0.35)",
+  "layers": [
+    { "id": "brand", "type": "logo", "x": 15, "y": 3, "width": 70, "height": 7,
+      "fontSize": 22, "fontFamily": "Montserrat, sans-serif", "fontWeight": "800",
+      "color": "#E91E63", "textAlign": "center", "textTransform": "uppercase",
+      "letterSpacing": 4, "defaultText": "ASSUMIAMO" },
+
+    { "id": "title", "type": "title", "x": 5, "y": 12, "width": 90, "height": 18,
+      "fontSize": 28, "fontFamily": "Arial Black, sans-serif", "fontWeight": "900",
+      "color": "#FFFFFF", "textAlign": "center", "textTransform": "uppercase",
+      "shadow": { "enabled": true, "color": "rgba(0,0,0,0.7)", "blur": 6 } },
+
+    { "id": "subtitle", "type": "subtitle", "x": 10, "y": 32, "width": 80, "height": 8,
+      "fontSize": 14, "fontFamily": "Arial, sans-serif", "fontWeight": "600",
+      "color": "#E91E63", "textAlign": "center" },
+
+    { "id": "body", "type": "body", "x": 5, "y": 42, "width": 90, "height": 28,
+      "fontSize": 11, "fontFamily": "Arial, sans-serif", "fontWeight": "400",
+      "color": "#FFFFFF", "textAlign": "center", "lineHeight": 1.4 },
+
+    { "id": "banner", "type": "banner", "x": 5, "y": 74, "width": 90, "height": 8,
+      "fontSize": 11, "fontFamily": "Arial Black, sans-serif", "fontWeight": "800",
+      "color": "#FFFFFF", "textAlign": "center", "textTransform": "uppercase",
+      "backgroundColor": "#E91E63", "borderRadius": 4 },
+
+    { "id": "footer-line", "type": "footer", "x": 5, "y": 85, "width": 90, "height": 5,
+      "fontSize": 7, "fontFamily": "Arial, sans-serif", "fontWeight": "400",
+      "color": "#FFFFFF", "textAlign": "center", "opacity": 0.6,
+      "defaultText": "CANDIDATI ORA IMPRENDITORI SOLO DI PERSONE INTERNE, NO FREELANCERS, SOLO FUNN" },
+
+    { "id": "partner", "type": "footer", "x": 10, "y": 91, "width": 80, "height": 6,
+      "fontSize": 9, "fontFamily": "Arial, sans-serif", "fontWeight": "600",
+      "color": "#FFFFFF", "textAlign": "center",
+      "defaultText": "By partnering with FISIOACCORDO" }
+  ]
+}
+```
+
+## File da modificare
+
+### 1. `src/components/PreviewSection.tsx`
+- Aggiornare `renderSlideWithTemplate` per usare il nuovo formato:
+  - Se il template ha `background.type === 'solid'` o `'gradient'`: usare CSS background
+  - Se ha `photoZone`: posizionare la foto dell'utente nella zona definita
+  - Se ha `overlayColor`: aggiungere un div overlay semitrasparente
+  - Rendere i layer come prima, ma con supporto per `defaultText` (testo fisso del template che non cambia)
+- Per i template che hanno ancora il vecchio formato (con `background_url`): NON mostrare il PNG come sfondo, usare solo il fallback con colore solido + layer auto-generati
+
+### 2. `src/components/TemplateUploader.tsx`
+- Aggiungere la possibilita di definire il `background` (colore, gradiente, o "usa foto utente")
+- Aggiungere la `photoZone` (posizione e opacita della foto utente)
+- Aggiungere `overlayColor` con color picker
+- Aggiungere campo `defaultText` per ogni layer (testo statico che non viene sostituito dall'AI, es. "ASSUMIAMO", "By partnering with FISIOACCORDO")
+- L'immagine PNG caricata serve SOLO come **riferimento visivo** per l'account mother mentre configura i livelli, ma NON viene usata come sfondo nella preview finale
+
+### 3. `src/services/canvaService.ts`
+- Aggiornare l'interfaccia `CanvaTemplate` per includere i nuovi campi opzionali nella struttura `text_zones`
+
+### 4. Hardcode di 2-3 template di default
+- Creare 2-3 template predefiniti direttamente nel codice (non nel DB) che replicano lo stile Fisioaccordo rosa:
+  - **Template "Fisioaccordo Rosa"**: sfondo scuro, foto utente con overlay, testo ASSUMIAMO in rosa, banner rosa
+  - **Template "Minimalista"**: sfondo bianco, testi neri, accento colore
+  - **Template "Bold Dark"**: sfondo nero, testi grandi bianchi, numeri enormi
+- Questi template servono come fallback quando non ci sono template con layers nel DB
+
+## Come funziona dopo la modifica
+
+1. L'utente genera un post
+2. Il sistema prende il template selezionato
+3. Se il template ha il nuovo formato (`layers` + `background`): costruisce la slide interamente in HTML/CSS con i colori, font, e posizioni definiti
+4. Se il template ha il vecchio formato (solo PNG): usa un template hardcoded di default (non il PNG con testo)
+5. Il testo generato dall'AI riempie i layer di tipo `title`, `body`, `number`, ecc.
+6. I layer con `defaultText` (es. "ASSUMIAMO", "By partnering with...") mantengono il testo fisso
 
 ## Dettagli tecnici
 
-### Logica auto-generazione layer (in PreviewSection)
+### Rendering di una slide (pseudocodice)
 ```text
-function generateDefaultLayers(slideData, slideIndex, totalSlides, textColor):
-  layers = []
-
-  if slideIndex == 0:  // Slide apertura
-    layers.push({ type: 'title', y: 15, height: 20, fontSize: 28, fontWeight: 900, color: textColor })
-    layers.push({ type: 'subtitle', y: 40, height: 10, fontSize: 14 })
-    layers.push({ type: 'body', y: 55, height: 25, fontSize: 12 })
-    layers.push({ type: 'footer', y: 88, height: 8, fontSize: 10, opacity: 0.7 })
-
-  elif slideIndex == totalSlides - 1:  // Slide CTA finale
-    layers.push({ type: 'title', y: 10, height: 15, fontSize: 22 })
-    layers.push({ type: 'body', y: 30, height: 30, fontSize: 13 })
-    layers.push({ type: 'banner', y: 70, height: 10, bg: textColor, color: '#fff' })
-    layers.push({ type: 'footer', y: 85, height: 10, fontSize: 12 })
-
-  else:  // Slide contenuto
-    layers.push({ type: 'title', y: 5, height: 15, fontSize: 18, fontWeight: bold })
-    layers.push({ type: 'number', y: 22, height: 25, fontSize: 48, fontWeight: 900 })
-    layers.push({ type: 'body', y: 50, height: 25, fontSize: 11 })
-    layers.push({ type: 'banner', y: 80, height: 8, bg: textColor })
-    layers.push({ type: 'footer', y: 90, height: 8, fontSize: 9 })
-
-  return layers
+renderSlide(template, slideData, userPhoto):
+  1. Crea container aspect-square
+  2. Se template.background.type == 'solid': background-color CSS
+     Se template.background.type == 'gradient': background CSS gradient
+  3. Se template.photoZone && userPhoto:
+     Posiziona img con x/y/w/h dalla photoZone, opacity dalla photoZone
+  4. Se template.overlayColor:
+     Div assoluto con backgroundColor = overlayColor
+  5. Per ogni layer in template.layers:
+     - Se layer.defaultText: usa defaultText (testo fisso)
+     - Altrimenti: usa slideData[layer.type] (testo dall'AI)
+     - Renderizza con tutte le proprieta CSS del layer
 ```
 
 ### File modificati
-- `src/components/PreviewSection.tsx` -- auto-generazione layer per vecchio formato + miglior scaling + variazione tra slide
-- `src/hooks/useCarouselSlides.ts` -- assicurare campo `number` nel fallback
+- `src/components/PreviewSection.tsx` -- rendering completamente CSS-based
+- `src/components/TemplateUploader.tsx` -- editor per nuovo formato (background, photoZone, overlay, defaultText)
+- `src/services/canvaService.ts` -- interfaccia aggiornata
+- Nuovo file con template hardcoded di default
+
