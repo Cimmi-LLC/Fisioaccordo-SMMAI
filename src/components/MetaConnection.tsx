@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Facebook, Instagram, Link2, Unlink, Loader2 } from "lucide-react";
+import { Instagram, Link2, Unlink, Loader2 } from "lucide-react";
 import { MetaService, type MetaConnectionData } from '@/services/metaService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -81,13 +81,6 @@ const MetaConnection: React.FC = () => {
               </Badge>
             </div>
             
-            {activeConnection.page_name && (
-              <div className="flex items-center gap-2 text-sm text-card-foreground">
-                <Facebook className="h-4 w-4 text-blue-500" />
-                <span>{activeConnection.page_name}</span>
-              </div>
-            )}
-            
             {activeConnection.instagram_username && (
               <div className="flex items-center gap-2 text-sm text-card-foreground">
                 <Instagram className="h-4 w-4 text-pink-500" />
@@ -108,28 +101,26 @@ const MetaConnection: React.FC = () => {
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Collega il tuo Instagram Business e la tua Pagina Facebook per pubblicare direttamente.
+              Collega il tuo account Instagram Business per pubblicare direttamente.
             </p>
             
             <Button
               onClick={handleConnect}
               disabled={connecting}
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white"
+              className="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white"
             >
               {connecting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
-                <Facebook className="mr-2 h-4 w-4" />
+                <Instagram className="mr-2 h-4 w-4" />
               )}
-              Collega con Facebook
+              Collega Instagram Business
             </Button>
 
             <div className="text-xs text-muted-foreground space-y-1">
               <p className="font-medium">Requisiti:</p>
               <ol className="list-decimal list-inside space-y-0.5">
                 <li>Account Instagram Business o Creator</li>
-                <li>Pagina Facebook collegata all'account Instagram</li>
-                <li>Essere admin della Pagina Facebook</li>
               </ol>
             </div>
           </div>
