@@ -1,10 +1,11 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { Upload, FolderOpen, X, Loader2, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,6 +49,16 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ open, onOpenChange,
   const [textColor, setTextColor] = useState('#FFFFFF');
   const [textZones, setTextZones] = useState<TextZone[]>(DEFAULT_ZONES);
   const [isUploading, setIsUploading] = useState(false);
+  const [isMotherAccount, setIsMotherAccount] = useState(false);
+  const [makeDefault, setMakeDefault] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase.from('profiles').select('account_type').eq('id', user.id).single()
+      .then(({ data }) => {
+        setIsMotherAccount(data?.account_type === 'mother');
+      });
+  }, [user]);
 
   const handleFilesSelected = useCallback((files: FileList | null) => {
     if (!files) return;
@@ -104,7 +115,7 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ open, onOpenChange,
 
       try {
         const ext = pf.file.name.split('.').pop() || 'png';
-        const filePath = `templates/${user.id}/${Date.now()}-${i}.${ext}`;
+        const filePath = `${user.id}/templates/${Date.now()}-${i}.${ext}`;
 
         const { error: uploadError } = await supabase.storage
           .from('user-photos')
@@ -124,8 +135,8 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ open, onOpenChange,
             background_url: urlData.publicUrl,
             text_zones: { zones: textZones } as any,
             text_color: textColor,
-            is_default: false,
-            user_id: user.id,
+            is_default: makeDefault && isMotherAccount,
+            user_id: makeDefault && isMotherAccount ? null : user.id,
           }]);
 
         if (dbError) throw dbError;
@@ -240,6 +251,17 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ open, onOpenChange,
                 </div>
               </div>
             </div>
+
+            {/* Make default toggle (mother accounts only) */}
+            {isMotherAccount && (
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <div>
+                  <Label className="font-medium">Rendi disponibile a tutti</Label>
+                  <p className="text-xs text-muted-foreground">Tutti gli utenti vedranno questi template</p>
+                </div>
+                <Switch checked={makeDefault} onCheckedChange={setMakeDefault} />
+              </div>
+            )}
 
             {/* Text zone editor */}
             <div className="space-y-3">
