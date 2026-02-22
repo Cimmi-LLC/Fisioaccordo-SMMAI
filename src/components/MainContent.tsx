@@ -59,7 +59,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
   const [showViralGenerator, setShowViralGenerator] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
 
-  const { carouselSlides, setCarouselSlides, generateCarouselSlides, isGeneratingImages } = useCarouselSlides(formData, user, basePhoto);
+  const { carouselSlides, setCarouselSlides, generateCarouselSlides, isGeneratingImages, regenerateImages } = useCarouselSlides(formData, user, basePhoto);
   const { generatedContent, setGeneratedContent, generateContent, saveContent } = useContentGeneration(user, formData, generateCarouselSlides);
 
   const hookManager = useHookManager({ carouselSlides, setCarouselSlides, generatedContent, setGeneratedContent, appliedHook, setAppliedHook, formData });
@@ -232,6 +232,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
                     onPublishDirect={handlePublish}
                     isGeneratingImages={isGeneratingImages}
                     postType={formData.postType}
+                    onRegenerateImages={regenerateImages}
                   />
                   {generatedContent && <div className="mt-3"><FeedbackWidget generatedContent={generatedContent} /></div>}
                 </>
