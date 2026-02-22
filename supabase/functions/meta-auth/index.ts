@@ -83,22 +83,28 @@ Deno.serve(async (req) => {
       console.warn('Long-lived token exchange fallito, uso short-lived:', e.message)
     }
 
-    // Step 3: Get Instagram user profile (use whatever token we have)
-    const profileRes = await fetch(
-      `https://graph.instagram.com/v21.0/me?fields=user_id,username,account_type,name&access_token=${finalToken}`
-    )
-    const profileData = await profileRes.json()
+    // Step 3: Get Instagram user profile (best effort - non-blocking)
+    let igUsername = null
+    let igBusinessId = instagramUserId  // dal Step 1, sempre disponibile
+    let accountType = 'BUSINESS'
 
-    if (profileData.error) {
-      console.error('Profile fetch error:', profileData.error)
-      return new Response(
-        JSON.stringify({ success: false, error: profileData.error.message }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    try {
+      const profileRes = await fetch(
+        `https://graph.instagram.com/v21.0/me?fields=user_id,username,account_type,name&access_token=${finalToken}`
       )
-    }
+      const profileData = await profileRes.json()
 
-    const igUsername = profileData.username || null
-    const igBusinessId = instagramUserId || profileData.user_id?.toString() || profileData.id
+      if (profileData.error) {
+        console.warn('Profile fetch fallito, salvo senza username:', profileData.error.message)
+      } else {
+        igUsername = profileData.username || null
+        igBusinessId = instagramUserId || profileData.user_id?.toString() || profileData.id
+        accountType = profileData.account_type || 'BUSINESS'
+        console.log('Profilo ottenuto:', igUsername, accountType)
+      }
+    } catch (e) {
+      console.warn('Profile fetch exception, salvo senza username:', e.message)
+    }
 
     // Step 4: Save to database
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -140,7 +146,7 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         instagram_username: igUsername,
-        account_type: profileData.account_type,
+        account_type: accountType,
         token_type: tokenType
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
