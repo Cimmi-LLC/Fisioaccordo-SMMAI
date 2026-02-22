@@ -93,8 +93,8 @@ async function publishSingleImage(igId: string, token: string, caption: string, 
   // Step 1: Create media container via graph.instagram.com
   const containerRes = await fetch(`https://graph.instagram.com/v21.0/${igId}/media`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image_url: imageUrl, caption, access_token: token })
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ image_url: imageUrl, caption, access_token: token })
   })
   const containerData = await containerRes.json()
   console.log('Container creation response:', JSON.stringify(containerData))
@@ -115,8 +115,8 @@ async function publishCarousel(igId: string, token: string, caption: string, url
   for (const url of urls) {
     const res = await fetch(`https://graph.instagram.com/v21.0/${igId}/media`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image_url: url, is_carousel_item: true, access_token: token })
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ image_url: url, is_carousel_item: 'true', access_token: token })
     })
     const data = await res.json()
     console.log('Carousel item response:', JSON.stringify(data))
@@ -129,8 +129,8 @@ async function publishCarousel(igId: string, token: string, caption: string, url
   // Create carousel container
   const containerRes = await fetch(`https://graph.instagram.com/v21.0/${igId}/media`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ media_type: 'CAROUSEL', children: childIds, caption, access_token: token })
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ media_type: 'CAROUSEL', caption, access_token: token, children: childIds.join(',') })
   })
   const containerData = await containerRes.json()
 
@@ -165,8 +165,8 @@ async function publishContainer(igId: string, token: string, creationId: string)
 
   const publishRes = await fetch(`https://graph.instagram.com/v21.0/${igId}/media_publish`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ creation_id: creationId, access_token: token })
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ creation_id: creationId, access_token: token })
   })
   const publishData = await publishRes.json()
 
