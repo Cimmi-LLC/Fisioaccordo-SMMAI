@@ -1,31 +1,28 @@
 
 
-## Chiarimento e Miglioramento UX Pulsanti Pubblicazione
+## Fix: Generazione immagini sempre attiva + Indicatore di caricamento
 
-### Limitazione tecnica importante
-Instagram e Facebook **non permettono** a nessun sito web esterno di aprire direttamente la schermata "Nuovo Post" con immagini e testo gia' inseriti. Questa e' una limitazione delle piattaforme stesse, non del nostro sistema. Nessuna app al mondo puo' farlo.
+### Problema 1: Le immagini non vengono generate
+Nel file `useCarouselSlides.ts`, la funzione `generateImagesForSlides` viene chiamata **solo** quando ci sono slide da carosello (riga 91). Ma per i post singoli (riga 50-69) e per i fallback (riga 44, 94), la generazione immagini **non viene mai chiamata**. Ecco perche' non vedi piu' immagini.
 
-### Cosa faremo
+### Problema 2: Nessun indicatore di caricamento
+La variabile `isGeneratingImages` esiste nel hook ma non viene mai passata alla `PreviewSection`, quindi l'utente non sa che le immagini si stanno generando.
 
-Ci sono **due modi** per pubblicare, e li rendiamo piu' chiari:
+### Soluzione
 
-**Modo 1 - Pubblicazione Diretta (automatica, via API)**
-I pulsanti viola "Pubblica su Instagram" e "Pubblica su Facebook" pubblicano direttamente il post sul tuo account collegato tramite le API di Meta. Non devi fare nulla: il post appare direttamente sul tuo profilo Instagram.
+**File: `src/hooks/useCarouselSlides.ts`**
+- Chiamare `generateImagesForSlides` anche dopo aver creato le slide per post singoli (dopo riga 68)
+- Chiamare `generateImagesForSlides` anche dopo aver creato le fallback slides (righe 44-45 e 94-95)
+- Assicurarsi che almeno 1 immagine venga sempre generata
 
-**Modo 2 - Manuale (copia e incolla)**
-I pulsanti "Apri Instagram" / "Apri Facebook" copiano il testo, scaricano le immagini e aprono il sito. Poi devi manualmente creare il post.
+**File: `src/components/MainContent.tsx`**
+- Passare `isGeneratingImages` come prop a `PreviewSection`
 
-### Modifiche previste
+**File: `src/components/PreviewSection.tsx`**
+- Aggiungere la prop `isGeneratingImages` all'interfaccia
+- Mostrare un indicatore di caricamento sopra le slide quando `isGeneratingImages` e' true: un banner con icona spinner e testo "Creazione immagini in corso..." che scompare quando le immagini sono pronte
 
-**File: `src/components/SmartCopyActions.tsx`**
+### Risultato
+- Ogni volta che generi contenuto, almeno 1 immagine viene sempre generata
+- Sopra le slide appare un indicatore "Creazione immagini..." che scompare quando le immagini sono pronte
 
-1. Rendere i pulsanti di pubblicazione diretta (API) molto piu' prominenti e chiari, con icone e testo esplicito tipo "Pubblica Ora su Instagram (automatico)"
-2. Spostare i pulsanti manuali (Apri Instagram/Facebook) in una sezione separata e meno prominente, etichettata chiaramente come "Metodo manuale"
-3. Aggiungere una nota esplicativa che dice: "Il pulsante 'Pubblica Ora' pubblica automaticamente sul tuo profilo. I pulsanti sotto sono per chi preferisce copiare e incollare manualmente."
-4. Rimuovere i pulsanti "Apri Instagram" e "Apri Facebook" se la connessione Meta e' attiva (dato che il metodo diretto e' superiore), oppure nasconderli in un collapsible "Metodo manuale"
-
-### Dettagli tecnici
-
-- Sezione primaria: pulsanti grandi e colorati per pubblicazione diretta API (solo se `onPublishDirect` e' presente)
-- Sezione secondaria collassabile: pulsanti outline per copia testo, scarica immagini, apri manualmente
-- Testo guida chiaro per l'utente non tecnico
