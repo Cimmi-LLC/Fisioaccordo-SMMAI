@@ -1,28 +1,43 @@
 
 
-## Fix: Generazione immagini sempre attiva + Indicatore di caricamento
+## Fix: Errore "richiede almeno un'immagine" quando le slide esistono
 
-### Problema 1: Le immagini non vengono generate
-Nel file `useCarouselSlides.ts`, la funzione `generateImagesForSlides` viene chiamata **solo** quando ci sono slide da carosello (riga 91). Ma per i post singoli (riga 50-69) e per i fallback (riga 44, 94), la generazione immagini **non viene mai chiamata**. Ecco perche' non vedi piu' immagini.
+### Il problema
+La slide che vedi nell'anteprima e' renderizzata come HTML (testo su sfondo colorato tramite il template engine). Ma Instagram ha bisogno di un'immagine vera (un URL di file immagine), non di HTML. Il campo `imageUrl` sulla slide e' `undefined` perche' la generazione AI delle immagini e' fallita o non e' ancora completata.
 
-### Problema 2: Nessun indicatore di caricamento
-La variabile `isGeneratingImages` esiste nel hook ma non viene mai passata alla `PreviewSection`, quindi l'utente non sa che le immagini si stanno generando.
+Quando clicchi "Pubblica su Instagram", il codice controlla se esiste un `imageUrl` reale -- non lo trova e mostra l'errore.
 
 ### Soluzione
 
-**File: `src/hooks/useCarouselSlides.ts`**
-- Chiamare `generateImagesForSlides` anche dopo aver creato le slide per post singoli (dopo riga 68)
-- Chiamare `generateImagesForSlides` anche dopo aver creato le fallback slides (righe 44-45 e 94-95)
-- Assicurarsi che almeno 1 immagine venga sempre generata
-
 **File: `src/components/MainContent.tsx`**
-- Passare `isGeneratingImages` come prop a `PreviewSection`
+
+1. Se `isGeneratingImages` e' true quando l'utente clicca "Pubblica", mostrare: "Attendi il completamento della generazione immagini..." invece dell'errore attuale
+2. Se le slide esistono ma non hanno immagini (generazione fallita), mostrare un messaggio piu' chiaro: "La generazione immagini non e' riuscita. Carica una foto manualmente o riprova a generare il contenuto."
+3. Aggiungere come fallback: se ci sono slide senza immagini, provare a usare `basePhoto` come immagine per tutte le slide
 
 **File: `src/components/PreviewSection.tsx`**
-- Aggiungere la prop `isGeneratingImages` all'interfaccia
-- Mostrare un indicatore di caricamento sopra le slide quando `isGeneratingImages` e' true: un banner con icona spinner e testo "Creazione immagini in corso..." che scompare quando le immagini sono pronte
 
-### Risultato
-- Ogni volta che generi contenuto, almeno 1 immagine viene sempre generata
-- Sopra le slide appare un indicatore "Creazione immagini..." che scompare quando le immagini sono pronte
+4. Disabilitare il pulsante "Pubblica su Instagram" mentre `isGeneratingImages` e' true, con testo "Generazione immagini..." per evitare che l'utente clicchi prima che le immagini siano pronte
+
+### Dettagli tecnici
+
+**MainContent.tsx - handlePublish (riga 118-122):**
+```text
+// Prima del check imageUrl, aggiungere:
+if (isGeneratingImages) {
+  toast({ title: "⏳ Attendi", description: "Le immagini sono ancora in fase di creazione. Riprova tra qualche secondo." });
+  return;
+}
+
+// Modificare il messaggio di errore:
+if (!imageUrl) {
+  errors.push("La generazione immagini non e' riuscita. Carica una foto o riprova a generare il contenuto.");
+  continue;
+}
+```
+
+**SmartCopyActions.tsx:**
+- Passare `isGeneratingImages` come prop
+- Disabilitare il pulsante "Pubblica su Instagram" quando `isGeneratingImages === true`
+- Mostrare testo "⏳ Generazione immagini..." sul pulsante durante il caricamento
 
