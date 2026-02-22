@@ -55,11 +55,19 @@ Deno.serve(async (req) => {
     const shortLivedToken = tokenData.access_token
     const instagramUserId = tokenData.user_id?.toString()
 
-    // Step 2: Exchange for long-lived token (60 days)
-    const longLivedRes = await fetch(
-      `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${appSecret}&access_token=${shortLivedToken}`
-    )
+    // Step 2: Exchange for long-lived token (60 days) - Must use POST
+    console.log('Exchanging for long-lived token...')
+    const longLivedRes = await fetch('https://graph.instagram.com/access_token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'ig_exchange_token',
+        client_secret: appSecret,
+        access_token: shortLivedToken,
+      }),
+    })
     const longLivedData = await longLivedRes.json()
+    console.log('Long-lived token response status:', longLivedRes.status)
 
     if (longLivedData.error) {
       console.error('Long-lived token error:', longLivedData.error)
