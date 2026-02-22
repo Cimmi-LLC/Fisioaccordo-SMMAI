@@ -1,62 +1,56 @@
 
 
-## Fix: Indicatore di caricamento + Immagini AI visibili nelle slide
+## Recupero Password + Mostra/Nascondi Password
 
-### Problema 1: L'indicatore di caricamento non appare mai
-Il flusso attuale e':
-1. `generateCarouselSlides()` chiama `setCarouselSlides(slides)` -- le slide esistono
-2. Poi chiama `generateImagesForSlides()` che setta `isGeneratingImages = true`
+### Cosa viene aggiunto
 
-Il blocco `isGeneratingImages && carouselSlides.length === 0` non si attiva MAI perche' le slide vengono create PRIMA che `isGeneratingImages` diventi `true`.
-
-**Soluzione:** Settare `isGeneratingImages = true` all'INIZIO di `generateCarouselSlides()`, non solo dentro `generateImagesForSlides()`.
-
-### Problema 2: Le immagini AI generate non vengono mostrate
-La edge function genera le immagini e le salva su Storage (funziona -- i log confermano upload riusciti). Il risultato viene salvato in `slide.imageUrl`. Ma la funzione `renderSlide()` in PreviewSection.tsx mostra solo:
-- Layer di testo del template
-- `userImageUrl` nelle photo zone (foto caricate dall'utente)
-
-L'`imageUrl` (immagine AI) non viene MAI renderizzata come sfondo o immagine visibile nella slide.
-
-**Soluzione:** Usare `imageUrl` come sfondo della slide quando disponibile, mostrando l'immagine AI sotto i layer di testo.
-
-### File da modificare
-
-**`src/hooks/useCarouselSlides.ts`**
-- Aggiungere `setIsGeneratingImages(true)` all'inizio di `generateCarouselSlides()` (prima della chiamata a `generate-content`)
-- Gestire il caso errore con `setIsGeneratingImages(false)`
-
-**`src/components/PreviewSection.tsx`**
-- Nel metodo `renderSlide()`, rendere `slide.imageUrl` come immagine di sfondo della slide quando presente
-- L'immagine AI viene mostrata sotto i layer di testo del template, funzionando come sfondo visivo
+1. **Icona occhio** sui campi password (login e registrazione) per mostrare/nascondere la password digitata
+2. **Link "Password dimenticata?"** sotto il form di login che apre un dialog per inserire l'email e ricevere il link di reset
+3. **Pagina `/reset-password`** per impostare la nuova password dopo aver cliccato il link nell'email
 
 ### Dettagli tecnici
 
-**useCarouselSlides.ts - loading anticipato:**
+**File: `src/pages/Auth.tsx`**
+- Aggiungere stato `showPassword` (boolean) per toggle visibilita' password
+- Cambiare `type` dell'input password da `"password"` a `showPassword ? "text" : "password"`
+- Aggiungere icona `Eye`/`EyeOff` da lucide-react come bottone dentro il campo password (sia login che registrazione)
+- Aggiungere stato `showForgotPassword` per il dialog di recupero
+- Aggiungere link "Password dimenticata?" tra il checkbox "Resta collegato" e il bottone "Accedi"
+- Dialog con input email + bottone che chiama `supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/reset-password' })`
+
+**File: `src/pages/ResetPassword.tsx`** (nuovo)
+- Pagina pubblica su route `/reset-password`
+- Controlla `type=recovery` nell'URL hash
+- Form con due campi "Nuova password" e "Conferma password" (entrambi con toggle visibilita')
+- Chiama `supabase.auth.updateUser({ password })` per aggiornare
+- Dopo il successo, redirect a `/auth`
+
+**File: `src/App.tsx`**
+- Aggiungere route `<Route path="/reset-password" element={<ResetPassword />} />`
+
+### Struttura UI
+
+**Login - campo password con toggle:**
 ```text
-const generateCarouselSlides = useCallback(async () => {
-    setIsGeneratingImages(true);  // <-- SUBITO all'inizio
-    // ... rest of function
-    // In caso di errore senza chiamare generateImagesForSlides:
-    // setIsGeneratingImages(false);
-});
+[Password          ] [icona occhio]
+[x] Resta collegato
+Password dimenticata?      <-- link cliccabile
+[     Accedi     ]
 ```
 
-**PreviewSection.tsx - mostrare imageUrl come sfondo:**
+**Dialog recupero password:**
 ```text
-// Dentro renderSlide, dopo bgStyle e prima dei layer:
-{slide.imageUrl && (
-  <img
-    src={slide.imageUrl}
-    alt={`Slide ${index + 1}`}
-    className="absolute inset-0 w-full h-full object-cover"
-  />
-)}
+Recupera Password
+Inserisci la tua email e ti invieremo un link per reimpostare la password.
+[Email                    ]
+[  Invia link di recupero  ]
 ```
 
-### Risultato
-- L'utente vede "Creazione immagini in corso..." immediatamente quando clicca Genera
-- Le immagini AI generate appaiono come sfondo delle slide nel carosello
-- I layer di testo del template si sovrappongono alle immagini
-- Funziona per tutti i tipi di post (carosello, singolo, storia, reel)
+**Pagina /reset-password:**
+```text
+Reimposta Password
+[Nuova password       ] [occhio]
+[Conferma password    ] [occhio]
+[  Aggiorna Password  ]
+```
 
