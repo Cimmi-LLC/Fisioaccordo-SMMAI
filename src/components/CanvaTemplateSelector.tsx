@@ -21,9 +21,17 @@ export interface CanvaTemplate {
 interface CanvaTemplateSelectorProps {
   value: string | null;
   onChange: (templateId: string | null, template: CanvaTemplate | null) => void;
+  postType?: string;
 }
 
-const CanvaTemplateSelector: React.FC<CanvaTemplateSelectorProps> = ({ value, onChange }) => {
+const POST_TYPE_TO_CATEGORY: Record<string, string> = {
+  'carosello': 'carosello',
+  'post-singolo': 'post',
+  'storia': 'storia',
+  'reel': 'reel',
+};
+
+const CanvaTemplateSelector: React.FC<CanvaTemplateSelectorProps> = ({ value, onChange, postType }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [templates, setTemplates] = useState<CanvaTemplate[]>([]);
@@ -57,6 +65,11 @@ const CanvaTemplateSelector: React.FC<CanvaTemplateSelectorProps> = ({ value, on
 
   useEffect(() => { loadTemplates(); }, [user]);
 
+  const targetCategory = postType ? POST_TYPE_TO_CATEGORY[postType] : null;
+  const filteredTemplates = targetCategory
+    ? templates.filter(t => t.category === targetCategory || t.category === 'all')
+    : templates;
+
   const deleteTemplate = async (templateId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
@@ -76,7 +89,7 @@ const CanvaTemplateSelector: React.FC<CanvaTemplateSelectorProps> = ({ value, on
         <Palette className="h-4 w-4 mr-2 text-primary" />
         Template Visivo
         <span className="ml-auto text-xs text-muted-foreground font-normal">
-          {templates.length} disponibil{templates.length === 1 ? 'e' : 'i'}
+          {filteredTemplates.length} disponibil{filteredTemplates.length === 1 ? 'e' : 'i'}
         </span>
       </Label>
 
@@ -101,7 +114,12 @@ const CanvaTemplateSelector: React.FC<CanvaTemplateSelectorProps> = ({ value, on
           </button>
 
           {/* Templates */}
-          {templates.map(template => (
+          {filteredTemplates.length === 0 && (
+            <div className="col-span-2 flex items-center justify-center p-4 text-sm text-muted-foreground">
+              Nessun template per questo formato
+            </div>
+          )}
+          {filteredTemplates.map(template => (
             <button
               key={template.id}
               type="button"

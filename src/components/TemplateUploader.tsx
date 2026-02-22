@@ -227,6 +227,7 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ open, onOpenChange,
                     <SelectItem value="post">Post Singolo</SelectItem>
                     <SelectItem value="storia">Storia</SelectItem>
                     <SelectItem value="reel">Reel</SelectItem>
+                    <SelectItem value="all">Tutti i formati</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
