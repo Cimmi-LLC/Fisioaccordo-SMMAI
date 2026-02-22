@@ -1,35 +1,22 @@
 
 
-## Aggiornamento UI: Unificare e correggere i componenti di connessione Instagram
+## Aggiornamento App ID Meta
 
-### Problema attuale
-La pagina mostra **due sezioni di connessione separate**:
-1. "Connessione Social" (MetaConnection) - con testo "Collega con Facebook" e requisiti Facebook
-2. "Collega il tuo Account Instagram Business" (InstagramConnection) - vecchio componente
-
-Entrambi sono obsoleti rispetto al nuovo flusso OAuth Instagram Platform API.
+### Problema
+Il codice usa l'App ID vecchio `1261520952551293`, ma la tua app Meta ha ID `3382844873466520`.
 
 ### Modifiche
 
-#### 1. Aggiornare `MetaConnection.tsx` - Testi e icone corretti
-- Cambiare il bottone da "Collega con Facebook" a "Collega Instagram Business"
-- Sostituire icona Facebook con icona Instagram (rosa/viola)
-- Aggiornare la descrizione: rimuovere riferimenti a Facebook
-- Aggiornare i requisiti: solo "Account Instagram Business o Creator" (la pagina Facebook non serve piu con la nuova API)
-- Cambiare il gradiente del bottone da blu (Facebook) a rosa/viola (Instagram)
+#### 1. `src/services/metaService.ts` (riga 15)
+- Cambiare `META_APP_ID` da `'1261520952551293'` a `'3382844873466520'`
 
-#### 2. Rimuovere `InstagramConnection` dalla pagina
-- In `Index.tsx`: rimuovere il componente `InstagramConnection` che e duplicato e usa il vecchio servizio
-- Tenere solo `MetaConnection` come unico punto di connessione
+#### 2. `supabase/functions/meta-auth/index.ts` (riga 26)
+- Cambiare `appId` da `'1261520952551293'` a `'3382844873466520'`
 
-### Dettagli tecnici
+### Azione manuale richiesta (dashboard Meta)
+Nella dashboard Meta della tua app "POST PER I SOCIAL 2":
+1. Vai in **Instagram** nella sidebar
+2. Cerca le impostazioni di **Instagram Business Login**
+3. Aggiungi il redirect URI: `https://social-generator-fisioaccordo.lovable.app/auth/instagram/callback`
+4. Salva
 
-**`src/components/MetaConnection.tsx`**:
-- Riga 5: rimuovere import `Facebook`, tenere `Instagram`
-- Riga 111: cambiare descrizione in "Collega il tuo account Instagram Business per pubblicare direttamente."
-- Righe 114-125: cambiare bottone - gradiente rosa/viola, icona Instagram, testo "Collega Instagram Business"
-- Righe 127-134: aggiornare requisiti - solo "Account Instagram Business o Creator"
-- Righe 84-88: rimuovere sezione Facebook page name (non applicabile)
-
-**`src/pages/Index.tsx`**:
-- Rimuovere import e rendering di `InstagramConnection`
