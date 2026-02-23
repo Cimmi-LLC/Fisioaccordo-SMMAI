@@ -1,70 +1,82 @@
 
 
-## Tutorial post-errore per account personali Instagram
+## Fix errori Instagram API - formato richieste
 
-### Obiettivo
+### Problema
 
-Quando un utente prova a collegare un account Instagram personale e riceve l'errore, invece di un semplice toast, mostrare un **dialog/modal tutorial** con:
-- Rassicurazione che non perdono nulla (follower, post, messaggi restano)
-- Possono tornare a personale quando vogliono
-- Devono anche avere il **profilo pubblico**
-- Passaggi chiari step-by-step con icone
+Tutte le chiamate all'API Instagram falliscono con "Unsupported request - method type: post/get" (codice 100). La causa principale sono due errori nel formato delle richieste HTTP.
+
+### Causa
+
+La documentazione ufficiale Meta (aggiornata 2025) specifica che le richieste al Content Publishing API devono usare:
+- `Content-Type: application/json` con body JSON
+- `Authorization: Bearer <TOKEN>` nell'header
+- NON `application/x-www-form-urlencoded` con token nel body
+
+Il codice attuale usa il formato vecchio (URLSearchParams) che non e' piu' supportato.
 
 ### Modifiche
 
-**File 1: Nuovo componente `src/components/PersonalAccountGuide.tsx`**
+**File 1: `supabase/functions/meta-publish/index.ts`**
 
-Un dialog modale che si apre automaticamente quando viene rilevato un account personale. Contiene:
+Aggiornare tutte le chiamate a `graph.instagram.com` per usare il formato corretto:
 
-- Titolo rassicurante ("Non preoccuparti, e' facilissimo!")
-- Sezione "Cosa NON cambia": follower, post, messaggi, bio - tutto resta uguale
-- Sezione "Puoi tornare indietro": si puo' riconvertire a personale in qualsiasi momento
-- **Guida step-by-step**:
-  1. Apri Instagram → Impostazioni
-  2. Account → Passa a un account professionale
-  3. Scegli "Business" o "Creator"
-  4. Vai su Privacy → Imposta il profilo come **Pubblico**
-  5. Torna qui e riprova il collegamento
-- Bottone "Ho capito, vado a convertire" che chiude il dialog
+- `publishSingleImage`: cambiare da URLSearchParams a JSON body + Authorization header
+- `publishCarousel`: cambiare carousel item creation e carousel container creation
+- `publishContainer`: cambiare la chiamata media_publish
+- `waitForMediaReady`: aggiungere Authorization header nella GET
 
-**File 2: `src/components/MetaConnection.tsx`**
+Esempio del cambiamento (container creation):
+```text
+// PRIMA (non funziona)
+headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+body: new URLSearchParams({ image_url, caption, access_token: token })
 
-- Aggiungere uno state `showPersonalGuide` (default `false`)
-- Ascoltare il `postMessage` dall'iframe/popup: se riceve `meta-auth-error` con errore "personale non supportato", settare `showPersonalGuide = true`
-- Rendere il componente `PersonalAccountGuide` nel JSX, controllato dallo state
-- Aggiornare la sezione Requisiti per includere "Profilo pubblico (non privato)"
-
-**File 3: `src/pages/InstagramCallback.tsx`**
-
-- Mantenere il toast attuale come feedback immediato nel popup
-- Aggiungere `error_type: 'PERSONAL_ACCOUNT'` nel `postMessage` inviato al parent, cosi' il componente MetaConnection puo' reagire e aprire il tutorial
-
-### Contenuto del tutorial
-
-```
-"Non preoccuparti! Convertire il tuo account e' gratuito,
-ci vogliono 30 secondi e non perdi nulla."
-
-- I tuoi follower restano
-- I tuoi post e storie restano
-- I tuoi messaggi restano
-- La tua bio e foto profilo restano
-
-"Puoi tornare a un account personale in qualsiasi momento
-dalle stesse impostazioni."
-
-Passaggi:
-1. Apri Instagram e vai su Impostazioni (icona ingranaggio)
-2. Tocca "Account" → "Passa a un account professionale"
-3. Scegli "Creator" o "Business" (consigliamo Creator)
-4. Vai su Impostazioni → Privacy → disattiva "Account privato"
-5. Torna qui e clicca "Collega Instagram Business"
+// DOPO (formato ufficiale Meta)
+headers: {
+  'Content-Type': 'application/json',
+  'Authorization': `Bearer ${token}`
+},
+body: JSON.stringify({ image_url: imageUrl, caption })
 ```
 
-### Dettagli tecnici
+**File 2: `supabase/functions/meta-auth/index.ts`**
 
-- Il dialog usa i componenti `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogDescription` gia' presenti nel progetto
-- Icone da `lucide-react`: `Shield`, `Users`, `Image`, `MessageCircle`, `ArrowRight`, `CheckCircle`
-- Il componente e' controllato via prop `open` / `onOpenChange`
-- Nessuna dipendenza aggiuntiva necessaria
+Aggiornare lo scambio long-lived token da POST a GET:
+```text
+// PRIMA (POST - fallisce)
+fetch('https://graph.instagram.com/access_token', {
+  method: 'POST',
+  body: new URLSearchParams({ grant_type, client_secret, access_token })
+})
+
+// DOPO (GET con query params)
+const params = new URLSearchParams({ grant_type, client_secret, access_token })
+fetch(`https://graph.instagram.com/access_token?${params}`)
+```
+
+Aggiornare anche il profile fetch per usare Authorization header:
+```text
+fetch(`https://graph.instagram.com/v21.0/me?fields=user_id,username,account_type,name`, {
+  headers: { 'Authorization': `Bearer ${finalToken}` }
+})
+```
+
+### Riepilogo chiamate da aggiornare
+
+| Funzione | Endpoint | Cambiamento |
+|----------|----------|-------------|
+| meta-auth | /access_token (long-lived) | POST -> GET con query params |
+| meta-auth | /me (profilo) | Aggiungere Authorization header |
+| meta-publish | /{igId}/media (single) | URLSearchParams -> JSON + Bearer |
+| meta-publish | /{igId}/media (carousel item) | URLSearchParams -> JSON + Bearer |
+| meta-publish | /{igId}/media (carousel container) | URLSearchParams -> JSON + Bearer |
+| meta-publish | /{igId}/media_publish | URLSearchParams -> JSON + Bearer |
+| meta-publish | /{containerId}?fields=status_code | Aggiungere Authorization header |
+
+### Risultato atteso
+
+- Long-lived token funzionante (60 giorni invece di 1 ora)
+- Username recuperato correttamente nel profilo
+- Pubblicazione su Instagram funzionante
 
