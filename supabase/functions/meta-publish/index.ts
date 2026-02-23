@@ -40,6 +40,11 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Check token expiration server-side
+    if (connection.token_expires_at && new Date(connection.token_expires_at) < new Date()) {
+      return errorResponse('Token scaduto. Riconnetti Instagram dalle impostazioni.', 401)
+    }
+
     const accessToken = connection.page_access_token // This is the IG long-lived token
     const igId = connection.instagram_business_id
 
