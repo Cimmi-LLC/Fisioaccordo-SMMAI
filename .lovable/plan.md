@@ -1,71 +1,58 @@
 
 
-## Fix definitivo: Token short-lived e connessione scaduta
+## Blocco account Instagram personali + guida conversione
 
-### Causa radice
+### Cosa cambia
 
-Il problema principale NON e' il formato della richiesta (gia' fixato con form-urlencoded). Il problema e':
-
-1. **Lo scambio long-lived token usa GET invece di POST** in `meta-auth/index.ts` (riga 66-68). L'API Instagram richiede POST per `ig_exchange_token`. Il GET fallisce silenziosamente, il sistema usa il token short-lived (1 ora), che scade subito.
-
-2. **La connessione scaduta `dff701c2` e' ancora `is_active: true`** nel database. Anche se il filtro client-side dovrebbe escluderla, e' meglio pulirla.
-
-3. **L'utente dovra' ricollegarsi** dopo il fix per ottenere un token long-lived (60 giorni).
+Quando un utente prova a collegare un account Instagram **personale** (non Business/Creator), il sistema:
+1. Rileva il tipo di account dalla risposta API (`account_type`)
+2. Blocca il salvataggio della connessione
+3. Mostra un messaggio chiaro con istruzioni per convertire l'account
 
 ### Modifiche tecniche
 
 **File 1: `supabase/functions/meta-auth/index.ts`**
 
-Cambiare lo scambio long-lived token da GET a POST (riga 65-68):
+Dopo lo Step 3 (profilo), aggiungere un controllo sul tipo di account:
 
-```
-// PRIMA (fallisce):
-const longLivedRes = await fetch(
-  `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${appSecret}&access_token=${shortLivedToken}`
-)
-
-// DOPO (corretto):
-const longLivedRes = await fetch('https://graph.instagram.com/access_token', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  body: new URLSearchParams({
-    grant_type: 'ig_exchange_token',
-    client_secret: appSecret,
-    access_token: shortLivedToken
-  })
-})
-```
-
-**File 2: Pulizia database**
-
-Disattivare la connessione scaduta `dff701c2` direttamente:
-```sql
-UPDATE meta_connections SET is_active = false WHERE id = 'dff701c2-c866-4b4e-9dd5-e5608705d176';
-```
-
-**File 3: `supabase/functions/meta-publish/index.ts`**
-
-Aggiungere un controllo server-side per token scaduti (non fidarsi solo del client):
-
-```
-// Dopo aver recuperato la connessione, verificare scadenza token
-if (connection.token_expires_at && new Date(connection.token_expires_at) < new Date()) {
-  return errorResponse('Token scaduto. Riconnetti Instagram dalle impostazioni.', 401)
+```text
+// Dopo aver ottenuto accountType (riga ~109)
+if (accountType === 'PERSONAL') {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: 'Account Instagram personale non supportato. Converti il tuo account in Business o Creator dalle impostazioni di Instagram, poi riprova.',
+      error_type: 'PERSONAL_ACCOUNT'
+    }),
+    { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  )
 }
 ```
 
-**Deploy e ri-deploy**: Entrambe le edge functions `meta-auth` e `meta-publish` verranno deployate.
+Se il profilo non e' raggiungibile (errore API), il sistema continuera' a salvare come oggi (fallback sicuro per Business/Creator che hanno permessi corretti).
 
-### Dopo il fix
+**File 2: `src/components/MetaConnection.tsx`**
 
-L'utente dovra':
-1. Scollegare Instagram dalle impostazioni
-2. Ricollegare Instagram — questa volta ottenendo un token long-lived (60 giorni)
-3. Provare a pubblicare
+Migliorare la sezione "Requisiti" con una guida chiara:
+
+```text
+<div className="text-xs text-muted-foreground space-y-1">
+  <p className="font-medium">Requisiti:</p>
+  <ol className="list-decimal list-inside space-y-0.5">
+    <li>Account Instagram Business o Creator</li>
+    <li>Se hai un account personale, convertilo:
+      Impostazioni > Account > Passa a un account professionale</li>
+  </ol>
+</div>
+```
+
+**File 3: `src/pages/InstagramCallback.tsx`**
+
+Gestire il nuovo `error_type: 'PERSONAL_ACCOUNT'` per mostrare un toast specifico con istruzioni di conversione, invece del messaggio di errore generico.
 
 ### Risultato
 
-- Token long-lived (60 giorni invece di 1 ora)
-- Connessioni scadute bloccate sia lato client che server
-- La pubblicazione funzionera' stabilmente
+- Account personali: errore chiaro con istruzioni di conversione
+- Account Business/Creator: funzionano normalmente
+- Se l'API non risponde: fallback al comportamento attuale (nessun blocco)
 
