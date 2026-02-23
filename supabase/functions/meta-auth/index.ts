@@ -106,10 +106,23 @@ Deno.serve(async (req) => {
         igUsername = profileData.username || null
         igBusinessId = instagramUserId || profileData.user_id?.toString() || profileData.id
         accountType = profileData.account_type || 'BUSINESS'
-        console.log('Profilo ottenuto:', igUsername, accountType)
+      console.log('Profilo ottenuto:', igUsername, accountType)
       }
     } catch (e) {
       console.warn('Profile fetch exception, salvo senza username:', e.message)
+    }
+
+    // Step 3.5: Block personal accounts
+    if (accountType === 'PERSONAL') {
+      console.warn('Account personale rilevato, blocco connessione')
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Account Instagram personale non supportato. Converti il tuo account in Business o Creator dalle impostazioni di Instagram, poi riprova.',
+          error_type: 'PERSONAL_ACCOUNT'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Step 4: Save to database

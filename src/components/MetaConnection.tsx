@@ -121,6 +121,7 @@ const MetaConnection: React.FC = () => {
               <p className="font-medium">Requisiti:</p>
               <ol className="list-decimal list-inside space-y-0.5">
                 <li>Account Instagram Business o Creator</li>
+                <li>Se hai un account personale, convertilo: <span className="font-medium">Impostazioni → Account → Passa a un account professionale</span></li>
               </ol>
             </div>
           </div>
