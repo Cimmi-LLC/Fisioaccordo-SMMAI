@@ -62,16 +62,13 @@ Deno.serve(async (req) => {
     let tokenType = 'short-lived'
 
     try {
-      console.log('Tentativo scambio long-lived token (POST)...')
-      const longLivedRes = await fetch('https://graph.instagram.com/access_token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'ig_exchange_token',
-          client_secret: appSecret,
-          access_token: shortLivedToken
-        })
+      console.log('Tentativo scambio long-lived token (GET)...')
+      const llParams = new URLSearchParams({
+        grant_type: 'ig_exchange_token',
+        client_secret: appSecret,
+        access_token: shortLivedToken
       })
+      const longLivedRes = await fetch(`https://graph.instagram.com/access_token?${llParams}`)
       const longLivedData = await longLivedRes.json()
       console.log('Long-lived token response status:', longLivedRes.status)
 
@@ -96,7 +93,8 @@ Deno.serve(async (req) => {
 
     try {
       const profileRes = await fetch(
-        `https://graph.instagram.com/v21.0/me?fields=user_id,username,account_type,name&access_token=${finalToken}`
+        `https://graph.instagram.com/v21.0/me?fields=user_id,username,account_type,name`,
+        { headers: { 'Authorization': `Bearer ${finalToken}` } }
       )
       const profileData = await profileRes.json()
 
