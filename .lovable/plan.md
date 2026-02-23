@@ -1,65 +1,71 @@
 
 
-## Fix completo: Pubblicazione Instagram e barra di caricamento
+## Fix definitivo: Token short-lived e connessione scaduta
 
-### Problema 1: Connessione duplicata nel database
+### Causa radice
 
-Nel database ci sono DUE connessioni attive:
-- `32f48d34` - Token valido (scade aprile 2026), username: attiliocimminiello
-- `dff701c2` - Token SCADUTO (22 febbraio 2026), senza username
+Il problema principale NON e' il formato della richiesta (gia' fixato con form-urlencoded). Il problema e':
 
-Il codice potrebbe usare quella sbagliata. Inoltre, lo step di disattivazione delle vecchie connessioni in `meta-auth` potrebbe non funzionare correttamente a causa di una race condition.
+1. **Lo scambio long-lived token usa GET invece di POST** in `meta-auth/index.ts` (riga 66-68). L'API Instagram richiede POST per `ig_exchange_token`. Il GET fallisce silenziosamente, il sistema usa il token short-lived (1 ora), che scade subito.
 
-**Soluzione:**
-- In `metaService.ts` > `getConnections()`: filtrare connessioni con token non scaduto
-- In `meta-auth/index.ts`: assicurarsi che la disattivazione delle vecchie connessioni avvenga prima dell'inserimento
+2. **La connessione scaduta `dff701c2` e' ancora `is_active: true`** nel database. Anche se il filtro client-side dovrebbe escluderla, e' meglio pulirla.
 
-### Problema 2: Barra di caricamento ferma al 30%
-
-In `useContentGeneration.ts`, il progress viene impostato al 30% (riga 52) prima della chiamata API. Se la generazione riesce ma poi l'utente clicca "Pubblica", il `handlePublish` in `MainContent.tsx` non gestisce il loading state globale. Se la pubblicazione fallisce, il loading non viene resettato.
-
-**Soluzione:**
-- Aggiungere `loadingState.startLoading` / `finishLoading` nel `handlePublish` di `MainContent.tsx`
-- Aggiungere progressi graduali durante la pubblicazione (30% -> 60% -> 100%)
-
-### Problema 3: CORS headers incompleti in meta-auth
-
-Il file `meta-auth/index.ts` ha CORS headers ridotti rispetto al formato richiesto da Supabase. Questo potrebbe causare errori di preflight.
-
-**Soluzione:**
-- Aggiornare i CORS headers in `meta-auth/index.ts` per includere tutti gli headers necessari
+3. **L'utente dovra' ricollegarsi** dopo il fix per ottenere un token long-lived (60 giorni).
 
 ### Modifiche tecniche
 
 **File 1: `supabase/functions/meta-auth/index.ts`**
-- Aggiornare CORS headers da `'authorization, x-client-info, apikey, content-type'` alla versione completa con tutti gli headers Supabase
 
-**File 2: `src/services/metaService.ts`**
-- In `getConnections()`: aggiungere filtro `token_expires_at > now()` per escludere connessioni scadute
-- Oppure filtrare lato client controllando la data di scadenza
+Cambiare lo scambio long-lived token da GET a POST (riga 65-68):
 
-**File 3: `src/components/MainContent.tsx`**
-- Nel `handlePublish`: aggiungere gestione loading state con progress incrementale
-- Aggiungere `try/finally` per garantire che il loading venga resettato anche in caso di errore
+```
+// PRIMA (fallisce):
+const longLivedRes = await fetch(
+  `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret=${appSecret}&access_token=${shortLivedToken}`
+)
 
-```text
-// In handlePublish:
-loadingState.startLoading('Pubblicazione in corso...');
-loadingState.updateProgress(30, 'Connessione a Instagram...');
-// ... dopo la chiamata API
-loadingState.updateProgress(80, 'Invio contenuto...');
-// ... dopo successo/errore
-loadingState.finishLoading(success, message);
+// DOPO (corretto):
+const longLivedRes = await fetch('https://graph.instagram.com/access_token', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  body: new URLSearchParams({
+    grant_type: 'ig_exchange_token',
+    client_secret: appSecret,
+    access_token: shortLivedToken
+  })
+})
 ```
 
-**File 4: `supabase/functions/meta-publish/index.ts`**
-- Il codice form-urlencoded e' gia' corretto dall'ultimo deploy
-- Aggiungere un log iniziale per confermare che la versione deployata sia quella aggiornata
+**File 2: Pulizia database**
 
-### Risultato atteso
+Disattivare la connessione scaduta `dff701c2` direttamente:
+```sql
+UPDATE meta_connections SET is_active = false WHERE id = 'dff701c2-c866-4b4e-9dd5-e5608705d176';
+```
 
-- Solo la connessione con token valido verra' usata
-- La barra di caricamento mostrera' il progresso reale e si resettera' sempre
-- I CORS non bloccheranno le chiamate
-- Messaggi di errore chiari in caso di problemi
+**File 3: `supabase/functions/meta-publish/index.ts`**
+
+Aggiungere un controllo server-side per token scaduti (non fidarsi solo del client):
+
+```
+// Dopo aver recuperato la connessione, verificare scadenza token
+if (connection.token_expires_at && new Date(connection.token_expires_at) < new Date()) {
+  return errorResponse('Token scaduto. Riconnetti Instagram dalle impostazioni.', 401)
+}
+```
+
+**Deploy e ri-deploy**: Entrambe le edge functions `meta-auth` e `meta-publish` verranno deployate.
+
+### Dopo il fix
+
+L'utente dovra':
+1. Scollegare Instagram dalle impostazioni
+2. Ricollegare Instagram — questa volta ottenendo un token long-lived (60 giorni)
+3. Provare a pubblicare
+
+### Risultato
+
+- Token long-lived (60 giorni invece di 1 ora)
+- Connessioni scadute bloccate sia lato client che server
+- La pubblicazione funzionera' stabilmente
 
