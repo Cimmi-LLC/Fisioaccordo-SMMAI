@@ -110,7 +110,14 @@ export class MetaService {
       return [];
     }
 
-    return (data || []) as unknown as MetaConnectionData[];
+    // Filter out expired tokens client-side
+    const now = new Date().toISOString();
+    const validConnections = (data || []).filter((conn: any) => {
+      if (!conn.token_expires_at) return true;
+      return conn.token_expires_at > now;
+    });
+
+    return validConnections as unknown as MetaConnectionData[];
   }
 
   static async disconnect(connectionId: string): Promise<void> {

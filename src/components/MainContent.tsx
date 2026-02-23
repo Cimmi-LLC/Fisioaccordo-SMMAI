@@ -95,16 +95,27 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
       toast({ title: "⏳ Attendi", description: "Le immagini sono ancora in fase di creazione. Riprova tra qualche secondo." });
       return;
     }
+
+    loadingState.startLoading('Preparazione pubblicazione...');
+    loadingState.updateProgress(10, 'Verifica connessione...');
+
     try {
       const isMetaConnected = await MetaService.isConnected();
       if (!isMetaConnected) {
         toast({ title: "📋 Usa Smart Copy", description: "Copia il testo e scarica le immagini dall'anteprima per pubblicare manualmente." });
+        loadingState.finishLoading(false, 'Nessuna connessione attiva');
         return;
       }
 
+      loadingState.updateProgress(20, 'Recupero connessione...');
       const connections = await MetaService.getConnections();
       const connection = connections[0];
-      if (!connection) throw new Error('Nessuna connessione attiva');
+      if (!connection) {
+        loadingState.finishLoading(false, 'Nessuna connessione valida trovata');
+        throw new Error('Nessuna connessione attiva o token scaduto. Riconnetti Instagram.');
+      }
+
+      loadingState.updateProgress(30, 'Preparazione contenuto...');
 
       // Use basePhoto first, then fall back to carousel slide images
       const imageUrl = basePhoto
@@ -112,13 +123,12 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
         || carouselSlides.find(s => s.imageUrl)?.imageUrl
         || undefined;
 
-      // Fallback: if no image found but slides exist, show clearer error
-
-
       let publishedCount = 0;
       const errors: string[] = [];
 
       for (const platform of platforms) {
+        loadingState.updateProgress(50, `Pubblicazione su ${platform}...`);
+
         if (platform === 'facebook') {
           const result = await MetaService.publishToFacebook(connection.id, generatedContent, imageUrl);
           if (result.success) { publishedCount++; } else { errors.push(`Facebook: ${result.error}`); }
@@ -139,13 +149,18 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
         }
       }
 
+      loadingState.updateProgress(90, 'Completamento...');
+
       if (publishedCount > 0) {
         toast({ title: "🎉 Pubblicato!", description: `Contenuto pubblicato su ${publishedCount} piattaform${publishedCount > 1 ? 'e' : 'a'}` });
+        loadingState.finishLoading(true, 'Pubblicato con successo!');
       } else if (errors.length > 0) {
         toast({ title: "❌ Pubblicazione fallita", description: errors.join(' | '), variant: "destructive" });
+        loadingState.finishLoading(false, errors.join(' | '));
       }
     } catch (error) {
       toast({ title: "❌ Errore Pubblicazione", description: error instanceof Error ? error.message : 'Errore sconosciuto', variant: "destructive" });
+      loadingState.finishLoading(false, error instanceof Error ? error.message : 'Errore sconosciuto');
     }
   };
 
