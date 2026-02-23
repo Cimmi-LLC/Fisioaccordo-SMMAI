@@ -55,4 +55,3 @@ Gestire il nuovo `error_type: 'PERSONAL_ACCOUNT'` per mostrare un toast specific
 - Account personali: errore chiaro con istruzioni di conversione
 - Account Business/Creator: funzionano normalmente
 - Se l'API non risponde: fallback al comportamento attuale (nessun blocco)
-

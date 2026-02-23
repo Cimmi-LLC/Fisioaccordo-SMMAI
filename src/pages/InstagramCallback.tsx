@@ -45,9 +45,12 @@ const InstagramCallback: React.FC = () => {
             window.opener.postMessage({ type: 'meta-auth-success' }, '*');
           }
         } else {
+          const isPersonalAccount = result.error?.includes('personale non supportato');
           toast({
-            title: "❌ Errore Collegamento",
-            description: result.error || "Si è verificato un errore durante il collegamento",
+            title: isPersonalAccount ? "⚠️ Account Personale" : "❌ Errore Collegamento",
+            description: isPersonalAccount
+              ? "Il tuo account è personale. Vai su Impostazioni → Account → Passa a un account professionale, poi riprova."
+              : (result.error || "Si è verificato un errore durante il collegamento"),
             variant: "destructive"
           });
           if (window.opener) {
