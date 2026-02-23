@@ -1,18 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Instagram, Link2, Unlink, Loader2 } from "lucide-react";
 import { MetaService, type MetaConnectionData } from '@/services/metaService';
 import { useToast } from '@/hooks/use-toast';
+import PersonalAccountGuide from './PersonalAccountGuide';
 
 const MetaConnection: React.FC = () => {
   const [connections, setConnections] = useState<MetaConnectionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
+  const [showPersonalGuide, setShowPersonalGuide] = useState(false);
   const { toast } = useToast();
 
-  const loadConnections = async () => {
+  const loadConnections = useCallback(async () => {
     setLoading(true);
     try {
       const data = await MetaService.getConnections();
@@ -22,11 +24,27 @@ const MetaConnection: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Listen for postMessage from auth popup
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'meta-auth-error' && event.data?.error_type === 'PERSONAL_ACCOUNT') {
+        setShowPersonalGuide(true);
+        setConnecting(false);
+      }
+      if (event.data?.type === 'meta-auth-success' || event.data?.type === 'meta-auth-error') {
+        setConnecting(false);
+        loadConnections();
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [loadConnections]);
 
   useEffect(() => {
     loadConnections();
-  }, []);
+  }, [loadConnections]);
 
   const handleConnect = () => {
     setConnecting(true);
@@ -121,11 +139,14 @@ const MetaConnection: React.FC = () => {
               <p className="font-medium">Requisiti:</p>
               <ol className="list-decimal list-inside space-y-0.5">
                 <li>Account Instagram Business o Creator</li>
+                <li>Profilo pubblico (non privato)</li>
                 <li>Se hai un account personale, convertilo: <span className="font-medium">Impostazioni → Account → Passa a un account professionale</span></li>
               </ol>
             </div>
           </div>
         )}
+
+        <PersonalAccountGuide open={showPersonalGuide} onOpenChange={setShowPersonalGuide} />
       </CardContent>
     </Card>
   );
