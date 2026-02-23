@@ -54,7 +54,8 @@ const InstagramCallback: React.FC = () => {
             variant: "destructive"
           });
           if (window.opener) {
-            window.opener.postMessage({ type: 'meta-auth-error', error: result.error }, '*');
+            const errorType = isPersonalAccount ? 'PERSONAL_ACCOUNT' : undefined;
+            window.opener.postMessage({ type: 'meta-auth-error', error: result.error, error_type: errorType }, '*');
           }
         }
       }
