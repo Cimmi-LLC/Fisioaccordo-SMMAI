@@ -1,57 +1,70 @@
 
 
-## Blocco account Instagram personali + guida conversione
+## Tutorial post-errore per account personali Instagram
 
-### Cosa cambia
+### Obiettivo
 
-Quando un utente prova a collegare un account Instagram **personale** (non Business/Creator), il sistema:
-1. Rileva il tipo di account dalla risposta API (`account_type`)
-2. Blocca il salvataggio della connessione
-3. Mostra un messaggio chiaro con istruzioni per convertire l'account
+Quando un utente prova a collegare un account Instagram personale e riceve l'errore, invece di un semplice toast, mostrare un **dialog/modal tutorial** con:
+- Rassicurazione che non perdono nulla (follower, post, messaggi restano)
+- Possono tornare a personale quando vogliono
+- Devono anche avere il **profilo pubblico**
+- Passaggi chiari step-by-step con icone
 
-### Modifiche tecniche
+### Modifiche
 
-**File 1: `supabase/functions/meta-auth/index.ts`**
+**File 1: Nuovo componente `src/components/PersonalAccountGuide.tsx`**
 
-Dopo lo Step 3 (profilo), aggiungere un controllo sul tipo di account:
+Un dialog modale che si apre automaticamente quando viene rilevato un account personale. Contiene:
 
-```text
-// Dopo aver ottenuto accountType (riga ~109)
-if (accountType === 'PERSONAL') {
-  return new Response(
-    JSON.stringify({
-      success: false,
-      error: 'Account Instagram personale non supportato. Converti il tuo account in Business o Creator dalle impostazioni di Instagram, poi riprova.',
-      error_type: 'PERSONAL_ACCOUNT'
-    }),
-    { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  )
-}
-```
-
-Se il profilo non e' raggiungibile (errore API), il sistema continuera' a salvare come oggi (fallback sicuro per Business/Creator che hanno permessi corretti).
+- Titolo rassicurante ("Non preoccuparti, e' facilissimo!")
+- Sezione "Cosa NON cambia": follower, post, messaggi, bio - tutto resta uguale
+- Sezione "Puoi tornare indietro": si puo' riconvertire a personale in qualsiasi momento
+- **Guida step-by-step**:
+  1. Apri Instagram → Impostazioni
+  2. Account → Passa a un account professionale
+  3. Scegli "Business" o "Creator"
+  4. Vai su Privacy → Imposta il profilo come **Pubblico**
+  5. Torna qui e riprova il collegamento
+- Bottone "Ho capito, vado a convertire" che chiude il dialog
 
 **File 2: `src/components/MetaConnection.tsx`**
 
-Migliorare la sezione "Requisiti" con una guida chiara:
-
-```text
-<div className="text-xs text-muted-foreground space-y-1">
-  <p className="font-medium">Requisiti:</p>
-  <ol className="list-decimal list-inside space-y-0.5">
-    <li>Account Instagram Business o Creator</li>
-    <li>Se hai un account personale, convertilo:
-      Impostazioni > Account > Passa a un account professionale</li>
-  </ol>
-</div>
-```
+- Aggiungere uno state `showPersonalGuide` (default `false`)
+- Ascoltare il `postMessage` dall'iframe/popup: se riceve `meta-auth-error` con errore "personale non supportato", settare `showPersonalGuide = true`
+- Rendere il componente `PersonalAccountGuide` nel JSX, controllato dallo state
+- Aggiornare la sezione Requisiti per includere "Profilo pubblico (non privato)"
 
 **File 3: `src/pages/InstagramCallback.tsx`**
 
-Gestire il nuovo `error_type: 'PERSONAL_ACCOUNT'` per mostrare un toast specifico con istruzioni di conversione, invece del messaggio di errore generico.
+- Mantenere il toast attuale come feedback immediato nel popup
+- Aggiungere `error_type: 'PERSONAL_ACCOUNT'` nel `postMessage` inviato al parent, cosi' il componente MetaConnection puo' reagire e aprire il tutorial
 
-### Risultato
+### Contenuto del tutorial
 
-- Account personali: errore chiaro con istruzioni di conversione
-- Account Business/Creator: funzionano normalmente
-- Se l'API non risponde: fallback al comportamento attuale (nessun blocco)
+```
+"Non preoccuparti! Convertire il tuo account e' gratuito,
+ci vogliono 30 secondi e non perdi nulla."
+
+- I tuoi follower restano
+- I tuoi post e storie restano
+- I tuoi messaggi restano
+- La tua bio e foto profilo restano
+
+"Puoi tornare a un account personale in qualsiasi momento
+dalle stesse impostazioni."
+
+Passaggi:
+1. Apri Instagram e vai su Impostazioni (icona ingranaggio)
+2. Tocca "Account" → "Passa a un account professionale"
+3. Scegli "Creator" o "Business" (consigliamo Creator)
+4. Vai su Impostazioni → Privacy → disattiva "Account privato"
+5. Torna qui e clicca "Collega Instagram Business"
+```
+
+### Dettagli tecnici
+
+- Il dialog usa i componenti `Dialog`, `DialogContent`, `DialogHeader`, `DialogTitle`, `DialogDescription` gia' presenti nel progetto
+- Icone da `lucide-react`: `Shield`, `Users`, `Image`, `MessageCircle`, `ArrowRight`, `CheckCircle`
+- Il componente e' controllato via prop `open` / `onOpenChange`
+- Nessuna dipendenza aggiuntiva necessaria
+
