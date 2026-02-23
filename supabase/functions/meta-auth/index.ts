@@ -5,6 +5,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
+const API_VERSION = 'v22.0'
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -56,58 +58,82 @@ Deno.serve(async (req) => {
     const instagramUserId = tokenData.user_id?.toString()
     console.log('Short-lived token ottenuto, user_id:', instagramUserId)
 
-    // Step 2: Try to exchange for long-lived token (best effort, non-blocking)
+    // Step 2: Try to exchange for long-lived token
     let finalToken = shortLivedToken
-    let tokenExpiresAt = new Date(Date.now() + 3600 * 1000).toISOString() // 1 hour default
+    let tokenExpiresAt = new Date(Date.now() + 3600 * 1000).toISOString()
     let tokenType = 'short-lived'
 
-    try {
-      console.log('Tentativo scambio long-lived token (GET)...')
-      const llParams = new URLSearchParams({
-        grant_type: 'ig_exchange_token',
-        client_secret: appSecret,
-        access_token: shortLivedToken
-      })
-      const longLivedRes = await fetch(`https://graph.instagram.com/access_token?${llParams}`)
-      const longLivedData = await longLivedRes.json()
-      console.log('Long-lived token response status:', longLivedRes.status)
+    // Try POST first, then GET as fallback
+    for (const method of ['POST', 'GET']) {
+      try {
+        console.log(`Tentativo scambio long-lived token (${method})...`)
+        const params = new URLSearchParams({
+          grant_type: 'ig_exchange_token',
+          client_secret: appSecret,
+          access_token: shortLivedToken
+        })
 
-      if (longLivedData.access_token) {
-        finalToken = longLivedData.access_token
-        const expiresIn = longLivedData.expires_in || 5184000
-        tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString()
-        tokenType = 'long-lived'
-        console.log('Long-lived token ottenuto con successo, scade tra', expiresIn, 'secondi')
-      } else {
-        console.warn('Long-lived token non ottenuto, risposta:', JSON.stringify(longLivedData))
-        console.warn('Fallback: uso short-lived token (1 ora)')
+        let longLivedRes: Response
+        if (method === 'POST') {
+          longLivedRes = await fetch('https://graph.instagram.com/access_token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params
+          })
+        } else {
+          longLivedRes = await fetch(`https://graph.instagram.com/access_token?${params}`)
+        }
+
+        const longLivedData = await longLivedRes.json()
+        console.log(`Long-lived token (${method}) status:`, longLivedRes.status, JSON.stringify(longLivedData).substring(0, 200))
+
+        if (longLivedData.access_token) {
+          finalToken = longLivedData.access_token
+          const expiresIn = longLivedData.expires_in || 5184000
+          tokenExpiresAt = new Date(Date.now() + expiresIn * 1000).toISOString()
+          tokenType = 'long-lived'
+          console.log('Long-lived token ottenuto con successo via', method, ', scade tra', expiresIn, 'secondi')
+          break
+        }
+      } catch (e) {
+        console.warn(`Long-lived token (${method}) fallito:`, e.message)
       }
-    } catch (e) {
-      console.warn('Long-lived token exchange fallito, uso short-lived:', e.message)
     }
 
-    // Step 3: Get Instagram user profile (best effort - non-blocking)
+    if (tokenType === 'short-lived') {
+      console.warn('Fallback: uso short-lived token (1 ora)')
+    }
+
+    // Step 3: Get Instagram user profile
     let igUsername = null
-    let igBusinessId = instagramUserId  // dal Step 1, sempre disponibile
+    let igBusinessId = instagramUserId
     let accountType = 'BUSINESS'
 
-    try {
-      const profileRes = await fetch(
-        `https://graph.instagram.com/v21.0/me?fields=user_id,username,account_type,name`,
-        { headers: { 'Authorization': `Bearer ${finalToken}` } }
-      )
-      const profileData = await profileRes.json()
+    // Try multiple approaches for profile fetch
+    const profileUrls = [
+      `https://graph.instagram.com/${API_VERSION}/me?fields=user_id,username,account_type,name&access_token=${finalToken}`,
+      `https://graph.instagram.com/me?fields=user_id,username,account_type,name&access_token=${finalToken}`,
+    ]
 
-      if (profileData.error) {
-        console.warn('Profile fetch fallito, salvo senza username:', profileData.error.message)
-      } else {
+    for (const url of profileUrls) {
+      try {
+        console.log('Profile fetch tentativo:', url.substring(0, 80) + '...')
+        const profileRes = await fetch(url)
+        const profileData = await profileRes.json()
+
+        if (profileData.error) {
+          console.warn('Profile fetch fallito:', profileData.error.message)
+          continue
+        }
+
         igUsername = profileData.username || null
         igBusinessId = instagramUserId || profileData.user_id?.toString() || profileData.id
         accountType = profileData.account_type || 'BUSINESS'
-      console.log('Profilo ottenuto:', igUsername, accountType)
+        console.log('Profilo ottenuto:', igUsername, accountType)
+        break
+      } catch (e) {
+        console.warn('Profile fetch exception:', e.message)
       }
-    } catch (e) {
-      console.warn('Profile fetch exception, salvo senza username:', e.message)
     }
 
     // Step 3.5: Block personal accounts
@@ -134,7 +160,7 @@ Deno.serve(async (req) => {
       .update({ is_active: false })
       .eq('user_id', user_id)
 
-    // Insert new connection (using instagram fields, no Facebook page needed)
+    // Insert new connection
     const { error: insertError } = await supabase
       .from('meta_connections')
       .insert({
@@ -157,14 +183,15 @@ Deno.serve(async (req) => {
       )
     }
 
-    console.log(`Connessione salvata con successo: @${igUsername}, token type: ${tokenType}`)
+    console.log(`Connessione salvata con successo: @${igUsername}, token type: ${tokenType}, igId: ${igBusinessId}`)
 
     return new Response(
       JSON.stringify({
         success: true,
         instagram_username: igUsername,
         account_type: accountType,
-        token_type: tokenType
+        token_type: tokenType,
+        needs_username: !igUsername
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

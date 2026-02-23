@@ -5,6 +5,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
 
+const API_VERSION = 'v22.0'
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -40,33 +42,23 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Check token expiration server-side
     if (connection.token_expires_at && new Date(connection.token_expires_at) < new Date()) {
       return errorResponse('Token scaduto. Riconnetti Instagram dalle impostazioni.', 401)
     }
 
-    const accessToken = connection.page_access_token // This is the IG long-lived token
+    const accessToken = connection.page_access_token
     const igId = connection.instagram_business_id
 
     if (platform === 'facebook') {
-      return new Response(
-        JSON.stringify({ success: false, error: 'La pubblicazione su Facebook non è supportata con Instagram Business Login. Usa la funzione copia/incolla per Facebook.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return errorResponse('La pubblicazione su Facebook non è supportata con Instagram Business Login.', 400)
     }
 
     if (platform !== 'instagram') {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Piattaforma non supportata' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return errorResponse('Piattaforma non supportata', 400)
     }
 
     if (!igId) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Nessun account Instagram collegato' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return errorResponse('Nessun account Instagram collegato', 400)
     }
 
     // Carousel post
@@ -76,10 +68,7 @@ Deno.serve(async (req) => {
 
     // Single image post
     if (!image_url) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Instagram richiede almeno un\'immagine' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return errorResponse('Instagram richiede almeno un\'immagine', 400)
     }
 
     return await publishSingleImage(igId, accessToken, content, image_url)
@@ -93,51 +82,64 @@ Deno.serve(async (req) => {
   }
 })
 
+async function igFetch(url: string, token: string, method: string = 'GET', body?: Record<string, any>): Promise<any> {
+  const separator = url.includes('?') ? '&' : '?'
+  const fullUrl = `${url}${separator}access_token=${token}`
+  
+  const options: RequestInit = { method }
+  if (body && method === 'POST') {
+    options.headers = { 'Content-Type': 'application/json' }
+    options.body = JSON.stringify(body)
+  }
+
+  console.log(`igFetch ${method} ${url.substring(0, 80)}...`)
+  const res = await fetch(fullUrl, options)
+  const data = await res.json()
+  console.log(`igFetch response:`, JSON.stringify(data).substring(0, 300))
+  return data
+}
+
 async function publishSingleImage(igId: string, token: string, caption: string, imageUrl: string) {
-  console.log('publishSingleImage - igId:', igId, 'token length:', token?.length, 'imageUrl:', imageUrl)
-  // Step 1: Create media container via graph.instagram.com
-  const containerRes = await fetch(`https://graph.instagram.com/v21.0/${igId}/media`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ image_url: imageUrl, caption })
-  })
-  const containerData = await containerRes.json()
-  console.log('Container creation response:', JSON.stringify(containerData))
+  console.log('publishSingleImage - igId:', igId, 'imageUrl:', imageUrl)
+
+  const containerData = await igFetch(
+    `https://graph.instagram.com/${API_VERSION}/${igId}/media`,
+    token,
+    'POST',
+    { image_url: imageUrl, caption }
+  )
 
   if (containerData.error) {
     console.error('Container creation failed:', containerData.error)
     return errorResponse(containerData.error.message)
   }
 
-  // Step 2: Publish
   return await publishContainer(igId, token, containerData.id)
 }
 
 async function publishCarousel(igId: string, token: string, caption: string, urls: string[]) {
-  console.log('publishCarousel - igId:', igId, 'token length:', token?.length, 'urls:', urls.length)
+  console.log('publishCarousel - igId:', igId, 'urls:', urls.length)
   const childIds: string[] = []
 
   for (const url of urls) {
-    const res = await fetch(`https://graph.instagram.com/v21.0/${igId}/media`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ image_url: url, is_carousel_item: true })
-    })
-    const data = await res.json()
-    console.log('Carousel item response:', JSON.stringify(data))
+    const data = await igFetch(
+      `https://graph.instagram.com/${API_VERSION}/${igId}/media`,
+      token,
+      'POST',
+      { image_url: url, is_carousel_item: true }
+    )
     if (data.error) {
       return errorResponse(`Errore carousel item: ${data.error.message}`)
     }
     childIds.push(data.id)
   }
 
-  // Create carousel container
-  const containerRes = await fetch(`https://graph.instagram.com/v21.0/${igId}/media`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ media_type: 'CAROUSEL', caption, children: childIds })
-  })
-  const containerData = await containerRes.json()
+  const containerData = await igFetch(
+    `https://graph.instagram.com/${API_VERSION}/${igId}/media`,
+    token,
+    'POST',
+    { media_type: 'CAROUSEL', caption, children: childIds }
+  )
 
   if (containerData.error) {
     return errorResponse(containerData.error.message)
@@ -148,10 +150,10 @@ async function publishCarousel(igId: string, token: string, caption: string, url
 
 async function waitForMediaReady(containerId: string, token: string, maxAttempts = 30, delayMs = 2000): Promise<{ ready: boolean; error?: string }> {
   for (let i = 0; i < maxAttempts; i++) {
-    const res = await fetch(`https://graph.instagram.com/v21.0/${containerId}?fields=status_code`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-    const data = await res.json()
+    const data = await igFetch(
+      `https://graph.instagram.com/${API_VERSION}/${containerId}?fields=status_code`,
+      token
+    )
     console.log(`Polling attempt ${i + 1}: status_code = ${data.status_code}`)
 
     if (data.status_code === 'FINISHED') return { ready: true }
@@ -164,18 +166,17 @@ async function waitForMediaReady(containerId: string, token: string, maxAttempts
 }
 
 async function publishContainer(igId: string, token: string, creationId: string) {
-  // Wait for media to be ready
   const status = await waitForMediaReady(creationId, token)
   if (!status.ready) {
     return errorResponse(status.error || 'Media not ready')
   }
 
-  const publishRes = await fetch(`https://graph.instagram.com/v21.0/${igId}/media_publish`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ creation_id: creationId })
-  })
-  const publishData = await publishRes.json()
+  const publishData = await igFetch(
+    `https://graph.instagram.com/${API_VERSION}/${igId}/media_publish`,
+    token,
+    'POST',
+    { creation_id: creationId }
+  )
 
   if (publishData.error) {
     return errorResponse(publishData.error.message)
