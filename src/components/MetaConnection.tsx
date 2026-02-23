@@ -2,16 +2,21 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Instagram, Link2, Unlink, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Instagram, Link2, Unlink, Loader2, Pencil, Check, X } from "lucide-react";
 import { MetaService, type MetaConnectionData } from '@/services/metaService';
 import { useToast } from '@/hooks/use-toast';
 import PersonalAccountGuide from './PersonalAccountGuide';
+import { supabase } from '@/integrations/supabase/client';
 
 const MetaConnection: React.FC = () => {
   const [connections, setConnections] = useState<MetaConnectionData[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [showPersonalGuide, setShowPersonalGuide] = useState(false);
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [usernameInput, setUsernameInput] = useState('');
+  const [savingUsername, setSavingUsername] = useState(false);
   const { toast } = useToast();
 
   const loadConnections = useCallback(async () => {
@@ -70,6 +75,32 @@ const MetaConnection: React.FC = () => {
     }
   };
 
+  const handleSaveUsername = async (connectionId: string) => {
+    const cleaned = usernameInput.replace(/^@/, '').trim();
+    if (!cleaned) {
+      toast({ title: "Errore", description: "Inserisci un username valido", variant: "destructive" });
+      return;
+    }
+    setSavingUsername(true);
+    try {
+      const { error } = await supabase
+        .from('meta_connections' as any)
+        .update({ instagram_username: cleaned } as any)
+        .eq('id', connectionId);
+
+      if (error) throw error;
+
+      toast({ title: "Salvato!", description: `Username @${cleaned} aggiornato` });
+      setEditingUsername(false);
+      setUsernameInput('');
+      loadConnections();
+    } catch (err) {
+      toast({ title: "Errore", description: "Impossibile salvare l'username", variant: "destructive" });
+    } finally {
+      setSavingUsername(false);
+    }
+  };
+
   const activeConnection = connections.find(c => c.is_active);
 
   if (loading) {
@@ -99,10 +130,80 @@ const MetaConnection: React.FC = () => {
               </Badge>
             </div>
             
-            {activeConnection.instagram_username && (
+            {/* Username display/edit */}
+            {editingUsername ? (
+              <div className="flex items-center gap-2">
+                <Instagram className="h-4 w-4 text-pink-500 shrink-0" />
+                <Input
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value)}
+                  placeholder="tuousername"
+                  className="h-8 text-sm"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveUsername(activeConnection.id);
+                    if (e.key === 'Escape') setEditingUsername(false);
+                  }}
+                />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => handleSaveUsername(activeConnection.id)}
+                  disabled={savingUsername}
+                >
+                  {savingUsername ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-green-500" />}
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => setEditingUsername(false)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : activeConnection.instagram_username ? (
               <div className="flex items-center gap-2 text-sm text-card-foreground">
                 <Instagram className="h-4 w-4 text-pink-500" />
                 <span>@{activeConnection.instagram_username}</span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  onClick={() => {
+                    setUsernameInput(activeConnection.instagram_username || '');
+                    setEditingUsername(true);
+                  }}
+                >
+                  <Pencil className="h-3 w-3 text-muted-foreground" />
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-amber-400">
+                  ⚠️ Username non recuperato automaticamente. Inseriscilo manualmente:
+                </p>
+                <div className="flex items-center gap-2">
+                  <Instagram className="h-4 w-4 text-pink-500 shrink-0" />
+                  <Input
+                    value={usernameInput}
+                    onChange={(e) => setUsernameInput(e.target.value)}
+                    placeholder="tuousername"
+                    className="h-8 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveUsername(activeConnection.id);
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => handleSaveUsername(activeConnection.id)}
+                    disabled={savingUsername || !usernameInput.trim()}
+                    className="shrink-0"
+                  >
+                    {savingUsername ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Salva'}
+                  </Button>
+                </div>
               </div>
             )}
 
