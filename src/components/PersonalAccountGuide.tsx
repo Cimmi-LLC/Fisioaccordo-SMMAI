@@ -78,7 +78,7 @@ const PersonalAccountGuide: React.FC<PersonalAccountGuideProps> = ({ open, onOpe
           </div>
 
           <Button onClick={() => onOpenChange(false)} className="w-full">
-            Ho capito, vado a convertire 🚀
+            Got it, let me convert 🚀
           </Button>
         </div>
       </DialogContent>

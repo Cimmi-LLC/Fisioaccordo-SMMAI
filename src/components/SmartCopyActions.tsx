@@ -120,13 +120,13 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
               className="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white w-full"
             >
               {isGeneratingImages ? (
-                <span className="animate-pulse">⏳ Generazione immagini...</span>
+                <span className="animate-pulse">⏳ Generating images...</span>
               ) : isPublishing === 'instagram' ? (
-                <span className="animate-pulse">Pubblicando...</span>
+                <span className="animate-pulse">Publishing...</span>
               ) : (
                 <>
                   <Send className="mr-2 h-5 w-5" />
-                  Pubblica Ora su Instagram
+                  Publish Now on Instagram
                 </>
               )}
             </Button>
@@ -137,11 +137,11 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
               className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white w-full"
             >
               {isPublishing === 'facebook' ? (
-                <span className="animate-pulse">Pubblicando...</span>
+                <span className="animate-pulse">Publishing...</span>
               ) : (
                 <>
                   <Send className="mr-2 h-5 w-5" />
-                  Pubblica Ora su Facebook
+                  Publish Now on Facebook
                 </>
               )}
             </Button>
@@ -153,7 +153,7 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
       <Collapsible open={manualOpen} onOpenChange={setManualOpen}>
         <CollapsibleTrigger asChild>
           <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground text-xs">
-            ✋ Metodo manuale (copia e incolla)
+            ✋ Manual method (copy & paste)
             <ChevronDown className={`h-4 w-4 transition-transform ${manualOpen ? 'rotate-180' : ''}`} />
           </Button>
         </CollapsibleTrigger>
@@ -162,21 +162,21 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
             <Button onClick={handleCopyText} variant={copiedText ? "default" : "outline"} size="sm"
               className={copiedText ? "bg-green-600 hover:bg-green-700 text-white" : ""}>
               {copiedText ? <Check className="mr-1.5 h-4 w-4" /> : <Copy className="mr-1.5 h-4 w-4" />}
-              {copiedText ? "Copiato!" : "Copia Testo"}
+              {copiedText ? "Copied!" : "Copy Text"}
             </Button>
             {hasImages && (
               <Button onClick={downloadAllImages} variant="outline" size="sm">
                 <Download className="mr-1.5 h-4 w-4" />
-                Scarica Immagini
+                Download Images
               </Button>
             )}
             <Button onClick={() => handleOpenPlatform('instagram')} variant="outline" size="sm">
               <ExternalLink className="mr-1.5 h-4 w-4" />
-              Apri Instagram
+              Open Instagram
             </Button>
             <Button onClick={() => handleOpenPlatform('facebook')} variant="outline" size="sm">
               <ExternalLink className="mr-1.5 h-4 w-4" />
-              Apri Facebook
+              Open Facebook
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">

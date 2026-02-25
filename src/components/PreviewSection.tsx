@@ -298,7 +298,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
                 </div>
                 {carouselSlides.some(s => !s.imageUrl) && !isGeneratingImages && onRegenerateImages && (
                   <Button onClick={onRegenerateImages} variant="outline" size="sm" className="w-full">
-                    <RefreshCw className="mr-2 h-4 w-4" /> Rigenera Immagini
+                    <RefreshCw className="mr-2 h-4 w-4" /> Regenerate Images
                   </Button>
                 )}
               </div>
@@ -328,10 +328,10 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
 
             <div className="flex gap-2">
               <Button onClick={onSaveContent} className="flex-1 bg-fisio hover:bg-fisio/90">
-                <Download className="mr-2 h-4 w-4" /> Salva
+                <Download className="mr-2 h-4 w-4" /> Save
               </Button>
               <Button onClick={() => copyToClipboard(generatedContent)} variant="outline" className="flex-1">
-                <Copy className="mr-2 h-4 w-4" /> Copia
+                <Copy className="mr-2 h-4 w-4" /> Copy
               </Button>
             </div>
 

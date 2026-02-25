@@ -52,7 +52,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({
         disabled={!originalCopy.trim()}
       >
         <Target className="mr-2 h-4 w-4" />
-        Analizza Copy con AI
+        Analyze Copy with AI
       </Button>
 
       {analysis && (

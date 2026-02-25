@@ -37,7 +37,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             className="bg-purple-600 hover:bg-purple-700 text-white border-0 shadow-lg"
           >
             <Brain className="h-4 w-4 mr-2" />
-            {showCopyImprover ? 'Nascondi' : 'Copy AI Pro'}
+            {showCopyImprover ? 'Hide' : 'Copy AI Pro'}
           </Button>
           <span className="text-gray-300 hidden sm:inline">
             Ciao, {user?.user_metadata?.first_name || 'Utente'}!
@@ -49,7 +49,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             className="bg-gray-700 hover:bg-gray-600 text-white border-0"
           >
             <LogOut className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Esci</span>
+            <span className="hidden sm:inline">Log Out</span>
           </Button>
         </div>
       </div>

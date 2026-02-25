@@ -78,7 +78,7 @@ export const TemplatesTab: React.FC<TemplatesTabProps> = ({
               disabled={selectedTemplates.includes(template.id)}
             >
               <Zap className="w-4 h-4 mr-2" />
-              {selectedTemplates.includes(template.id) ? 'Applicato' : 'Applica Template'}
+              {selectedTemplates.includes(template.id) ? 'Applied' : 'Apply Template'}
             </Button>
           </div>
         ))}

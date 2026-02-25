@@ -30,7 +30,7 @@ export const ImproveTab: React.FC<ImproveTabProps> = ({
         className="w-full bg-green-600 hover:bg-green-700 transition-colors"
       >
         <Sparkles className="mr-2 h-4 w-4" />
-        Genera Copy Migliorato
+        Generate Improved Copy
       </Button>
 
       {improvedCopy && (
@@ -52,7 +52,7 @@ export const ImproveTab: React.FC<ImproveTabProps> = ({
             className="w-full text-white border-gray-600 hover:bg-gray-700 transition-colors"
           >
             <Copy className="mr-2 h-4 w-4" />
-            Copia Copy Migliorato
+            Copy Improved Text
           </Button>
         </div>
       )}

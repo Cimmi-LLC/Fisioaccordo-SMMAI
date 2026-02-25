@@ -201,7 +201,7 @@ const MetaConnection: React.FC = () => {
                     disabled={savingUsername || !usernameInput.trim()}
                     className="shrink-0"
                   >
-                    {savingUsername ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Salva'}
+                    {savingUsername ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
                   </Button>
                 </div>
               </div>
@@ -214,7 +214,7 @@ const MetaConnection: React.FC = () => {
               className="w-full mt-2"
             >
               <Unlink className="mr-2 h-4 w-4" />
-              Scollega
+              Disconnect
             </Button>
           </div>
         ) : (
@@ -233,7 +233,7 @@ const MetaConnection: React.FC = () => {
               ) : (
                 <Instagram className="mr-2 h-4 w-4" />
               )}
-              Collega Instagram Business
+              Connect Instagram Business
             </Button>
 
             <div className="text-xs text-muted-foreground space-y-1">
