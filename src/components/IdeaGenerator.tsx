@@ -54,7 +54,7 @@ const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({
             className="px-4 sm:px-6 py-2 min-h-[44px] whitespace-nowrap"
           >
             <Sparkles className="h-4 w-4 mr-2 flex-shrink-0" />
-            <span className="text-sm sm:text-base">Trova Idee</span>
+            <span className="text-sm sm:text-base">Find Ideas</span>
           </Button>
         </div>
       </CardContent>
