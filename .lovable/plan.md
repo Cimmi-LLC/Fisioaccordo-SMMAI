@@ -1,82 +1,57 @@
 
 
-## Fix errori Instagram API - formato richieste
+## Translate Button Labels to English
 
-### Problema
+Only button text will be translated. Labels, titles, descriptions, placeholders, and other UI text stay in Italian.
 
-Tutte le chiamate all'API Instagram falliscono con "Unsupported request - method type: post/get" (codice 100). La causa principale sono due errori nel formato delle richieste HTTP.
+### Changes by file
 
-### Causa
+**`src/components/AppHeader.tsx`**
+- "Nascondi" -> "Hide"
+- "Esci" -> "Log Out"
 
-La documentazione ufficiale Meta (aggiornata 2025) specifica che le richieste al Content Publishing API devono usare:
-- `Content-Type: application/json` con body JSON
-- `Authorization: Bearer <TOKEN>` nell'header
-- NON `application/x-www-form-urlencoded` con token nel body
+**`src/components/IdeaGenerator.tsx`**
+- "Trova Idee" -> "Find Ideas"
 
-Il codice attuale usa il formato vecchio (URLSearchParams) che non e' piu' supportato.
+**`src/components/ContentForm.tsx`**
+- "3. Genera Contenuto" -> "3. Generate Content"
+- "Generando contenuto..." -> "Generating content..."
 
-### Modifiche
+**`src/components/PreviewSection.tsx`**
+- "Salva" -> "Save"
+- "Copia" -> "Copy"
+- "Rigenera Immagini" -> "Regenerate Images"
 
-**File 1: `supabase/functions/meta-publish/index.ts`**
+**`src/components/SmartCopyActions.tsx`**
+- "Pubblica Ora su Instagram" -> "Publish Now on Instagram"
+- "Pubblica Ora su Facebook" -> "Publish Now on Facebook"
+- "Pubblicando..." -> "Publishing..."
+- "Generazione immagini..." -> "Generating images..."
+- "Metodo manuale (copia e incolla)" -> "Manual method (copy & paste)"
+- "Copia Testo" -> "Copy Text"
+- "Copiato!" -> "Copied!"
+- "Scarica Immagini" -> "Download Images"
+- "Apri Instagram" -> "Open Instagram"
+- "Apri Facebook" -> "Open Facebook"
 
-Aggiornare tutte le chiamate a `graph.instagram.com` per usare il formato corretto:
+**`src/components/MetaConnection.tsx`**
+- "Scollega" -> "Disconnect"
+- "Collega Instagram Business" -> "Connect Instagram Business"
+- "Salva" -> "Save"
 
-- `publishSingleImage`: cambiare da URLSearchParams a JSON body + Authorization header
-- `publishCarousel`: cambiare carousel item creation e carousel container creation
-- `publishContainer`: cambiare la chiamata media_publish
-- `waitForMediaReady`: aggiungere Authorization header nella GET
+**`src/components/PersonalAccountGuide.tsx`**
+- "Ho capito, vado a convertire" -> "Got it, let me convert"
 
-Esempio del cambiamento (container creation):
-```text
-// PRIMA (non funziona)
-headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-body: new URLSearchParams({ image_url, caption, access_token: token })
+**`src/components/CopyImprover.tsx`** (tabs and buttons inside sub-components)
+- Buttons in `ImproveTab.tsx`: "Genera Copy Migliorato" -> "Generate Improved Copy", "Copia Copy Migliorato" -> "Copy Improved Text"
+- Buttons in `AnalysisTab.tsx`: "Analizza Copy con AI" -> "Analyze Copy with AI"
+- Buttons in `TemplatesTab.tsx`: "Applica Template" -> "Apply Template", "Applicato" -> "Applied"
 
-// DOPO (formato ufficiale Meta)
-headers: {
-  'Content-Type': 'application/json',
-  'Authorization': `Bearer ${token}`
-},
-body: JSON.stringify({ image_url: imageUrl, caption })
-```
+**`src/components/FeedbackWidget.tsx`** and **`src/components/ImageFeedbackWidget.tsx`**
+- "Invia" (Send button) -> "Send"
 
-**File 2: `supabase/functions/meta-auth/index.ts`**
-
-Aggiornare lo scambio long-lived token da POST a GET:
-```text
-// PRIMA (POST - fallisce)
-fetch('https://graph.instagram.com/access_token', {
-  method: 'POST',
-  body: new URLSearchParams({ grant_type, client_secret, access_token })
-})
-
-// DOPO (GET con query params)
-const params = new URLSearchParams({ grant_type, client_secret, access_token })
-fetch(`https://graph.instagram.com/access_token?${params}`)
-```
-
-Aggiornare anche il profile fetch per usare Authorization header:
-```text
-fetch(`https://graph.instagram.com/v21.0/me?fields=user_id,username,account_type,name`, {
-  headers: { 'Authorization': `Bearer ${finalToken}` }
-})
-```
-
-### Riepilogo chiamate da aggiornare
-
-| Funzione | Endpoint | Cambiamento |
-|----------|----------|-------------|
-| meta-auth | /access_token (long-lived) | POST -> GET con query params |
-| meta-auth | /me (profilo) | Aggiungere Authorization header |
-| meta-publish | /{igId}/media (single) | URLSearchParams -> JSON + Bearer |
-| meta-publish | /{igId}/media (carousel item) | URLSearchParams -> JSON + Bearer |
-| meta-publish | /{igId}/media (carousel container) | URLSearchParams -> JSON + Bearer |
-| meta-publish | /{igId}/media_publish | URLSearchParams -> JSON + Bearer |
-| meta-publish | /{containerId}?fields=status_code | Aggiungere Authorization header |
-
-### Risultato atteso
-
-- Long-lived token funzionante (60 giorni invece di 1 ora)
-- Username recuperato correttamente nel profilo
-- Pubblicazione su Instagram funzionante
+### Technical details
+- Only `Button` component text and inline button labels are changed
+- No structural or logic changes
+- 12 files edited, all simple string replacements
 
