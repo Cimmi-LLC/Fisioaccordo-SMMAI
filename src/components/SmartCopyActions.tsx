@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Check, Copy, Download, ExternalLink, Send, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import PublishingPipeline, { type PipelineStep } from "@/components/PublishingPipeline";
 
 interface CarouselSlide {
   type: string;
@@ -18,6 +19,16 @@ interface SmartCopyActionsProps {
   isGeneratingImages?: boolean;
 }
 
+const INITIAL_STEPS: PipelineStep[] = [
+  { label: 'Verifying connection...', status: 'pending' },
+  { label: 'Preparing content and caption', status: 'pending' },
+  { label: 'Uploading images', status: 'pending' },
+  { label: 'Creating media container', status: 'pending' },
+  { label: 'Waiting for media processing', status: 'pending' },
+  { label: 'Publishing to feed', status: 'pending' },
+  { label: 'Publication confirmed! ✨', status: 'pending' },
+];
+
 const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
   generatedContent,
   carouselSlides,
@@ -28,14 +39,59 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
   const [copiedText, setCopiedText] = useState(false);
   const [isPublishing, setIsPublishing] = useState<string | null>(null);
   const [manualOpen, setManualOpen] = useState(false);
+  const [publishSteps, setPublishSteps] = useState<PipelineStep[]>([]);
+  const [publishProgress, setPublishProgress] = useState(0);
+
+  const advanceStep = (stepIndex: number, status: 'active' | 'done' | 'error') => {
+    setPublishSteps(prev => prev.map((s, i) => {
+      if (i < stepIndex) return { ...s, status: 'done' as const };
+      if (i === stepIndex) return { ...s, status };
+      return s;
+    }));
+    const progressPerStep = 100 / INITIAL_STEPS.length;
+    setPublishProgress(Math.min(100, status === 'done' ? (stepIndex + 1) * progressPerStep : (stepIndex + 0.5) * progressPerStep));
+  };
 
   const handleDirectPublish = async (platform: string) => {
     if (!onPublishDirect) return;
     setIsPublishing(platform);
+    setPublishSteps(INITIAL_STEPS.map(s => ({ ...s })));
+    setPublishProgress(0);
+
+    // Simulate step-by-step progress for visual feedback
+    advanceStep(0, 'active');
+    await delay(600);
+    advanceStep(0, 'done');
+
+    advanceStep(1, 'active');
+    await delay(400);
+    advanceStep(1, 'done');
+
+    advanceStep(2, 'active');
+    await delay(500);
+    advanceStep(2, 'done');
+
+    advanceStep(3, 'active');
+
     try {
       await onPublishDirect([platform]);
+      advanceStep(3, 'done');
+      advanceStep(4, 'active');
+      await delay(800);
+      advanceStep(4, 'done');
+      advanceStep(5, 'active');
+      await delay(500);
+      advanceStep(5, 'done');
+      advanceStep(6, 'done');
+      setPublishProgress(100);
+      await delay(3000);
+    } catch {
+      advanceStep(3, 'error');
+      await delay(3000);
     } finally {
       setIsPublishing(null);
+      setPublishSteps([]);
+      setPublishProgress(0);
     }
   };
 
@@ -106,7 +162,16 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
     <div className="bg-muted/30 border border-border rounded-lg p-4 space-y-4">
       <h4 className="text-sm font-semibold text-foreground">📲 Publish Your Content</h4>
 
-      {onPublishDirect && (
+      {/* Publishing pipeline progress */}
+      {isPublishing && publishSteps.length > 0 && (
+        <PublishingPipeline
+          steps={publishSteps}
+          title={`Publishing to ${isPublishing === 'instagram' ? 'Instagram' : 'Facebook'}...`}
+          progress={publishProgress}
+        />
+      )}
+
+      {onPublishDirect && !isPublishing && (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
             ⚡ <strong>Automatic publishing</strong> — The post is published directly to your connected profile.
@@ -120,8 +185,6 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
             >
               {isGeneratingImages ? (
                 <span className="animate-pulse">⏳ Generating images...</span>
-              ) : isPublishing === 'instagram' ? (
-                <span className="animate-pulse">Publishing...</span>
               ) : (
                 <>
                   <Send className="mr-2 h-5 w-5" />
@@ -135,14 +198,10 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
               disabled={isPublishing !== null}
               className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white w-full"
             >
-              {isPublishing === 'facebook' ? (
-                <span className="animate-pulse">Publishing...</span>
-              ) : (
-                <>
-                  <Send className="mr-2 h-5 w-5" />
-                  Publish Now on Facebook
-                </>
-              )}
+              <>
+                <Send className="mr-2 h-5 w-5" />
+                Publish Now on Facebook
+              </>
             </Button>
           </div>
         </div>
@@ -185,5 +244,9 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
     </div>
   );
 };
+
+function delay(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 export default SmartCopyActions;
