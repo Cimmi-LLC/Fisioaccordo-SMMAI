@@ -86,7 +86,7 @@ const Privacy = () => {
             <p>You can request deletion of your data at any time through the following methods:</p>
             <ul className="list-disc pl-6 space-y-2">
               <li><strong className="text-foreground">Disconnect account:</strong> Use the "Disconnect" button in the App to immediately remove your Instagram/Facebook connection and associated tokens.</li>
-              <li><strong className="text-foreground">Email request:</strong> Contact us at <a href="mailto:privacy@cimmillc.com" className="text-primary hover:underline">privacy@cimmillc.com</a> to request complete deletion of all your data, including your account and all generated content.</li>
+              <li><strong className="text-foreground">Email request:</strong> Contact us at <a href="mailto:privacy@fisioaccordo.com" className="text-primary hover:underline">privacy@fisioaccordo.com</a> to request complete deletion of all your data, including your account and all generated content.</li>
             </ul>
             <p>We will process deletion requests within 30 days of receipt.</p>
           </section>
@@ -107,7 +107,7 @@ const Privacy = () => {
               from children under 13. If we become aware that we have collected personal data from a child under 13 without 
               verification of parental consent, we will take steps to delete that information promptly. If you believe we may 
               have collected information from a child under 13, please contact us at{' '}
-              <a href="mailto:privacy@cimmillc.com" className="text-primary hover:underline">privacy@cimmillc.com</a>.
+              <a href="mailto:privacy@fisioaccordo.com" className="text-primary hover:underline">privacy@fisioaccordo.com</a>.
             </p>
           </section>
 
@@ -130,7 +130,7 @@ const Privacy = () => {
             </p>
             <p className="text-foreground">
               <strong>Cimmi LLC</strong><br />
-              Email: <a href="mailto:privacy@cimmillc.com" className="text-primary hover:underline">privacy@cimmillc.com</a>
+              Email: <a href="mailto:privacy@fisioaccordo.com" className="text-primary hover:underline">privacy@fisioaccordo.com</a>
             </p>
           </section>
         </div>

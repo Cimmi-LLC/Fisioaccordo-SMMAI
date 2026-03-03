@@ -101,7 +101,7 @@ const Terms = () => {
             <h2 className="text-xl font-semibold text-foreground">9. Contact</h2>
             <p className="text-muted-foreground text-sm leading-relaxed">
               For questions about these Terms, contact us at:{' '}
-              <a href="mailto:privacy@cimmillc.com" className="text-primary hover:underline">privacy@cimmillc.com</a>
+              <a href="mailto:privacy@fisioaccordo.com" className="text-primary hover:underline">privacy@fisioaccordo.com</a>
             </p>
           </section>
 
