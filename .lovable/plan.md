@@ -1,77 +1,95 @@
 
 
-## Piano: Privacy Policy Page + Traduzione completa interfaccia in inglese
+## Checklist completo per approvazione Meta
 
-### Problema 1 — Privacy Policy (PRIORITA' MASSIMA)
+### Stato attuale
 
-Creare una pagina `/privacy` pubblica (accessibile senza login) che soddisfi i requisiti Meta.
+| Elemento | Stato |
+|----------|-------|
+| Privacy Policy page (`/privacy`) | Codice OK, ma NON pubblicata |
+| UI in inglese | Completata |
+| Data Deletion Callback URL | MANCANTE |
+| Terms of Service page | MANCANTE |
 
-**Nuovo file: `src/pages/Privacy.tsx`**
+---
 
-Pagina statica con:
-- Nome app: "FisioAccordo Social Content AI"
-- Sviluppatore: Cimmi LLC
-- Dati raccolti: Instagram username, access token, contenuti pubblicati tramite l'app
-- Uso dei dati: esclusivamente per pubblicare post su Instagram/Facebook per conto dell'utente
-- Conservazione: dati salvati su Supabase (infrastruttura cloud sicura)
-- Cancellazione: l'utente puo' disconnettere l'account in qualsiasi momento dall'app, oppure contattare via email per richiedere la cancellazione completa
-- Contatto email per richieste privacy
-- Design pulito, responsive, accessibile senza autenticazione
+### Cosa serve fare
+
+#### 1. RIPUBBLICARE L'APP (urgente, 0 codice)
+
+La pagina `/privacy` esiste nel codice ma il sito pubblicato non e' stato aggiornato. Per questo Meta vede un 404.
+
+**Azione**: Clicca il pulsante "Publish" -> "Update" in alto a destra nell'editor Lovable. Dopo la pubblicazione, verifica che `https://social-generator-fisioaccordo.lovable.app/privacy` funzioni in una finestra in incognito.
+
+#### 2. Creare Data Deletion Callback endpoint
+
+Meta richiede obbligatoriamente un endpoint che gestisca le richieste di cancellazione dati degli utenti. Quando un utente rimuove la tua app dalle impostazioni Facebook, Meta chiama questo URL.
+
+**Nuovo file: `supabase/functions/meta-data-deletion/index.ts`**
+
+Edge function che:
+- Riceve la richiesta di cancellazione firmata da Meta
+- Verifica la firma HMAC con l'App Secret
+- Cancella i dati dell'utente dalla tabella `meta_connections`
+- Restituisce un JSON con `url` (link di conferma) e `confirmation_code`
+
+**Nuova pagina: `src/pages/DeletionStatus.tsx`**
+
+Pagina semplice che mostra lo stato della richiesta di cancellazione (Meta richiede un URL di conferma visibile all'utente).
 
 **Modifica: `src/App.tsx`**
 
-Aggiungere la route `/privacy` PRIMA del catch-all `*`.
+Aggiungere route `/deletion-status` prima del catch-all.
 
-**Modifica: `src/pages/Index.tsx`** (footer)
+#### 3. Creare pagina Terms of Service
 
-Aggiungere link "Privacy Policy" nel footer che punta a `/privacy`.
+Meta richiede anche un link ai Terms of Service nelle impostazioni dell'app.
 
----
+**Nuovo file: `src/pages/Terms.tsx`**
 
-### Problema 2 — Traduzione completa interfaccia in inglese
+Pagina statica con termini d'uso base:
+- Descrizione del servizio
+- Requisiti per l'uso (account Instagram Business)
+- Limitazioni di responsabilita'
+- Proprieta' intellettuale (Cimmi LLC)
 
-Per il video screencast Meta, tutta l'interfaccia visibile deve essere in inglese. Attualmente solo i bottoni sono tradotti, ma titoli, descrizioni, tab, placeholder e toast sono ancora in italiano.
+**Modifica: `src/App.tsx`**
 
-**File da modificare:**
+Aggiungere route `/terms`.
 
-1. **`src/components/AppHeader.tsx`** — "Generatore di Post Social" -> "Social Post Generator", "Ciao, {name}" -> "Hi, {name}"
+**Modifica: footer** (Index.tsx e Auth.tsx)
 
-2. **`src/components/MainContent.tsx`** — Titolo principale, descrizione, nomi tab ("Genera" -> "Generate", "Foto" -> "Photos", "Virale" -> "Viral"), label delle card, tutti i toast messages
-
-3. **`src/pages/Index.tsx`** — "Caricamento in corso..." -> "Loading...", toast messages, footer text (copyright notice)
-
-4. **`src/components/ContentForm.tsx`** — Label dei campi form, placeholder, opzioni select (tono, piattaforma, tipo post, lunghezza)
-
-5. **`src/components/PreviewSection.tsx`** — Titoli sezioni, testo placeholder
-
-6. **`src/components/MetaConnection.tsx`** — Titolo card, badge "Collegato" -> "Connected", requisiti, descrizioni
-
-7. **`src/components/IdeaGenerator.tsx`** — Titolo, placeholder, descrizioni
-
-8. **`src/components/SavedContents.tsx`** — Titolo sezione, label, stati vuoti
-
-9. **`src/components/SmartCopyActions.tsx`** — Label sezioni, descrizioni metodi
-
-10. **`src/components/PersonalAccountGuide.tsx`** — Tutto il contenuto del tutorial (gia' rilevante per il video screencast)
-
-11. **`src/pages/Auth.tsx`** — Pagina login/signup se visibile nel video
-
-12. **`src/components/HookGenerator.tsx`** — Titoli e label
-
-13. **`src/components/FeedbackWidget.tsx`** / **`src/components/ImageFeedbackWidget.tsx`** — Label e placeholder
+Aggiungere link "Terms of Service" accanto a "Privacy Policy".
 
 ---
 
-### Ordine di implementazione
+### Dopo le modifiche al codice
 
-1. Creare la pagina Privacy Policy (`/privacy`)
-2. Aggiungere la route e il link nel footer
-3. Tradurre tutti i componenti UI in inglese (circa 13 file)
+1. **Ripubblicare** l'app
+2. **Nelle impostazioni Meta Developer**:
+   - Privacy Policy URL: `https://social-generator-fisioaccordo.lovable.app/privacy`
+   - Terms of Service URL: `https://social-generator-fisioaccordo.lovable.app/terms`
+   - Data Deletion Request URL: `https://<supabase-project-url>/functions/v1/meta-data-deletion`
+3. Verificare tutti gli URL in incognito
+4. Registrare il nuovo screencast con i 5 passaggi richiesti
+5. Risubmettere
 
-### Note tecniche
+### Dettagli tecnici
 
-- La pagina Privacy deve essere accessibile SENZA autenticazione (nessun redirect a `/auth`)
-- Circa 13 file da modificare per la traduzione
-- Nessuna dipendenza aggiuntiva necessaria
-- Le stringhe hardcoded verranno sostituite direttamente (no i18n framework, troppo overhead per questo caso)
+**Data Deletion Callback** (formato richiesto da Meta):
+
+La funzione deve restituire:
+```text
+{
+  "url": "https://social-generator-fisioaccordo.lovable.app/deletion-status?id=abc123",
+  "confirmation_code": "abc123"
+}
+```
+
+Meta invia un POST con `signed_request` (base64url encoded, firmato HMAC-SHA256 con App Secret). La funzione deve decodificare e verificare prima di procedere.
+
+**Riepilogo file**:
+- 1 nuova edge function (`meta-data-deletion`)
+- 2 nuove pagine (`Terms.tsx`, `DeletionStatus.tsx`)
+- 3 file modificati (`App.tsx`, `Index.tsx` footer, `Auth.tsx` footer)
 
