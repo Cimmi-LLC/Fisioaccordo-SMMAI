@@ -16,9 +16,15 @@ interface FormData {
   postType?: string;
 }
 
+export interface ImageGenProgress {
+  current: number;
+  total: number;
+}
+
 export const useCarouselSlides = (formData: FormData, user: any, basePhoto: string | null) => {
   const [carouselSlides, setCarouselSlides] = useState<CarouselSlide[]>([]);
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
+  const [imageGenProgress, setImageGenProgress] = useState<ImageGenProgress>({ current: 0, total: 0 });
   const { toast } = useToast();
 
   const generateCarouselSlides = useCallback(async () => {
@@ -33,16 +39,11 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
       return;
     }
 
+    setImageGenProgress({ current: 0, total: numSlides });
+
     try {
       const { data, error } = await supabase.functions.invoke('generate-content', {
-        body: {
-          topic,
-          audience: '',
-          platform: 'instagram',
-          tone: 'professionale',
-          postType,
-          numSlides
-        }
+        body: { topic, audience: '', platform: 'instagram', tone: 'professionale', postType, numSlides }
       });
 
       if (data?.error || (error && !data)) {
@@ -62,9 +63,7 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
             title: lines[0] || topic.toUpperCase(),
             subtitle: lines[1] || '',
             body: lines.slice(2, 5).join('\n') || content.substring(0, 200),
-            number: '',
-            cta: '',
-            banner: '',
+            number: '', cta: '', banner: '',
             logo: user?.user_metadata?.clinic_name || 'Studio Fisioterapico',
             footer: user?.user_metadata?.clinic_name || 'Studio Fisioterapico',
           }),
@@ -80,12 +79,8 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
         (slide: { title: string; subtitle: string; body: string; cta?: string | null; number?: string | null; banner?: string | null }, i: number) => ({
           type: i === 0 ? 'attention' : i === numSlides - 1 ? 'cta' : i === 1 ? 'problem' : 'solution',
           content: JSON.stringify({
-            title: slide.title,
-            subtitle: slide.subtitle,
-            body: slide.body,
-            number: slide.number || '',
-            cta: slide.cta || '',
-            banner: slide.banner || '',
+            title: slide.title, subtitle: slide.subtitle, body: slide.body,
+            number: slide.number || '', cta: slide.cta || '', banner: slide.banner || '',
             logo: user?.user_metadata?.clinic_name || 'Studio Fisioterapico',
             footer: i === numSlides - 1 ? (user?.user_metadata?.clinic_name || 'Studio Fisioterapico') : (slide.cta || ''),
           }),
@@ -106,10 +101,10 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
 
   const generateImagesForSlides = async (slides: CarouselSlide[], topic: string) => {
     setIsGeneratingImages(true);
+    setImageGenProgress({ current: 0, total: slides.length });
     const postType = formData.postType || 'carosello';
     const imageFormat = ['storia', 'reel'].includes(postType) ? 'vertical' : 'square';
     
-    // Load image feedback memories
     let imagePreferences = '';
     try {
       const { data: memories } = await supabase
@@ -129,20 +124,29 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
       const slideData = slides.map(slide => {
         let parsed;
         try { parsed = JSON.parse(slide.content); } catch { parsed = { title: topic }; }
-        return {
-          title: parsed.title || topic,
-          body: parsed.body || '',
-          theme: topic
-        };
+        return { title: parsed.title || topic, body: parsed.body || '', theme: topic };
       });
+
+      // Simulate per-slide progress since API returns all at once
+      const progressInterval = setInterval(() => {
+        setImageGenProgress(prev => {
+          if (prev.current < prev.total - 1) {
+            return { ...prev, current: prev.current + 1 };
+          }
+          return prev;
+        });
+      }, 2000);
 
       const { data, error } = await supabase.functions.invoke('generate-carousel-images', {
         body: { slides: slideData, style: 'modern, clean, professional healthcare', format: imageFormat, imagePreferences }
       });
 
+      clearInterval(progressInterval);
+
       if (error) {
         console.error('Error calling generate-carousel-images:', error);
         toast({ title: "Errore generazione immagini", description: "Non è stato possibile generare le immagini. Riprova.", variant: "destructive" });
+        setImageGenProgress({ current: 0, total: 0 });
         setIsGeneratingImages(false);
         return;
       }
@@ -150,6 +154,8 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
       if (data?.images) {
         const successCount = data.images.filter((img: any) => img.url).length;
         const totalCount = data.images.length;
+
+        setImageGenProgress({ current: totalCount, total: totalCount });
 
         setCarouselSlides(prev => prev.map((slide, i) => ({
           ...slide,
@@ -183,7 +189,8 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
     setCarouselSlides,
     generateCarouselSlides,
     isGeneratingImages,
-    regenerateImages
+    regenerateImages,
+    imageGenProgress
   };
 };
 

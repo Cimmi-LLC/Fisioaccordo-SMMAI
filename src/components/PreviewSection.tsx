@@ -7,8 +7,10 @@ import CarouselImageManager from "@/components/CarouselImageManager";
 import SmartCopyActions from "@/components/SmartCopyActions";
 import FeedbackWidget from "@/components/FeedbackWidget";
 import ImageFeedbackWidget from "@/components/ImageFeedbackWidget";
+import ImageGenerationProgress from "@/components/ImageGenerationProgress";
 import { useToast } from "@/hooks/use-toast";
 import { DEFAULT_TEMPLATES, generateSlideLayers, type DesignTemplate, type DesignTemplateLayer } from "@/data/defaultTemplates";
+import type { ImageGenProgress } from "@/hooks/useCarouselSlides";
 
 interface CarouselSlide {
   type: string;
@@ -38,6 +40,7 @@ interface PreviewSectionProps {
   isGeneratingImages?: boolean;
   postType?: string;
   onRegenerateImages?: () => void;
+  imageGenProgress?: ImageGenProgress;
 }
 
 const PreviewSection: React.FC<PreviewSectionProps> = ({
@@ -52,7 +55,8 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
   onPublishDirect,
   isGeneratingImages,
   postType,
-  onRegenerateImages
+  onRegenerateImages,
+  imageGenProgress
 }) => {
   const { toast } = useToast();
 
@@ -257,10 +261,11 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
                     'reel': 'Reel Image',
                   }[postType || ''] || 'Carousel Slides'}
                 </h3>
-                <div className="flex items-center gap-2 mb-3 p-2 rounded-lg bg-accent/20 border border-accent/30 text-accent-foreground text-sm animate-pulse">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Creating images...</span>
-                </div>
+                <ImageGenerationProgress
+                  totalSlides={imageGenProgress?.total || 1}
+                  currentSlide={imageGenProgress?.current || 0}
+                  isGenerating={true}
+                />
               </div>
             )}
             {carouselSlides.length > 0 && (
@@ -272,11 +277,12 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
                     'reel': 'Reel Image',
                   }[postType || ''] || 'Carousel Slides'}
                 </h3>
-                {isGeneratingImages && (
-                  <div className="flex items-center gap-2 mb-3 p-2 rounded-lg bg-accent/20 border border-accent/30 text-accent-foreground text-sm animate-pulse">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Creating images...</span>
-                  </div>
+                {isGeneratingImages && imageGenProgress && (
+                  <ImageGenerationProgress
+                    totalSlides={imageGenProgress.total}
+                    currentSlide={imageGenProgress.current}
+                    isGenerating={true}
+                  />
                 )}
                 <div className={`grid gap-3 mb-4 ${carouselSlides.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : 'grid-cols-2 md:grid-cols-3'}`}>
                   {carouselSlides.map((slide, index) => renderSlide(slide, index))}
