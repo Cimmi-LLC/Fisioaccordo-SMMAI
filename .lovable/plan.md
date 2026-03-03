@@ -1,35 +1,58 @@
 
 
-## Dove sono i checkbox e cosa serve aggiungere
+## Analisi: cosa manca ancora per il 100% di compliance Meta
 
-### Stato attuale
+Ho confrontato il tuo setup attuale con i requisiti Meta e ho trovato **5 problemi** che i reviewer probabilmente segnaleranno.
 
-Il checkbox per accettare **Terms of Service** e **Privacy Policy** esiste gia' nella pagina di **registrazione** (`/auth` → tab "Sign Up"). Quando un utente si registra, deve spuntare il checkbox prima di poter creare l'account.
+---
 
-### Cosa manca per Meta
+### Problema 1 — Nome app diverso tra Meta e Privacy/Terms
 
-Meta vuole vedere che l'utente acconsente esplicitamente ai permessi **anche quando connette Instagram**. Attualmente il componente `MetaConnection` non ha alcun checkbox di consenso — l'utente clicca "Connect Instagram Business" e parte direttamente l'OAuth.
+Nello screenshot OAuth si legge **"POST PER I SOCIAL 2-IG"**, ma nelle pagine Privacy e Terms il nome e' **"FisioAccordo Social Content AI"**. I reviewer Meta confrontano questi nomi — devono corrispondere esattamente.
 
-### Piano
+**Soluzione**: Aggiornare Privacy.tsx e Terms.tsx per usare il nome esatto configurato nel Meta Developer portal, oppure cambiare il nome nell'app Meta. Devo sapere da te: quale nome vuoi usare? Se vuoi mantenere "POST PER I SOCIAL 2-IG" nel portal Meta, aggiorno le pagine legal. Se preferisci cambiare il nome nel portal, non serve toccare il codice.
 
-Aggiungere un **checkbox di consenso dati** nel componente `MetaConnection.tsx`, visibile PRIMA del pulsante "Connect Instagram Business". Il checkbox deve:
+### Problema 2 — Permessi Meta non elencati esplicitamente nella Privacy Policy
 
-- Contenere un testo tipo: *"I agree to share my Instagram data (username, access token) with this app as described in the [Privacy Policy](/privacy) and [Terms of Service](/terms)"*
-- Disabilitare il pulsante "Connect Instagram Business" finche' non viene spuntato
-- Essere ben visibile nello screenshot/video per Meta
+Meta vuole che la Privacy Policy elenchi esattamente **quali permessi/scope** vengono richiesti e perche'. Attualmente la pagina dice genericamente "access tokens" ma non specifica:
+- `instagram_business_basic` — per leggere username e info profilo
+- `instagram_business_content_publish` — per pubblicare post
 
-**File da modificare: `src/components/MetaConnection.tsx`**
+**Soluzione**: Aggiungere una sezione "Permissions We Request" nella Privacy Policy.
 
-Aggiungere:
-1. Stato `agreedToConnect` (boolean, default false)
-2. Checkbox con label che linka a `/privacy` e `/terms`
-3. Il pulsante "Connect Instagram Business" diventa `disabled` se `!agreedToConnect`
+### Problema 3 — Email di contatto inconsistenti
 
-### Riepilogo per gli screenshot Meta
+- Privacy Policy: `privacy@cimmillc.com`
+- Terms of Service: `support@cimmi.co`
 
-Dopo questa modifica, potrai mostrare a Meta:
-1. **Screenshot 1**: Pagina Sign Up con checkbox Terms/Privacy spuntato
-2. **Screenshot 2**: Sezione Instagram Connection con checkbox consenso dati spuntato, prima di cliccare "Connect"
+Meta potrebbe segnalare l'incongruenza. Servono email uniformi su entrambe le pagine.
 
-Un solo file modificato, modifica minima.
+### Problema 4 — Anno copyright sbagliato
+
+Privacy Policy ha "© 2024" hardcoded (riga 115). Footer di Index.tsx e Auth.tsx anche. Dovrebbe essere dinamico con `new Date().getFullYear()` (come gia' fatto in Terms.tsx e DeletionStatus.tsx).
+
+### Problema 5 — Manca dichiarazione su dati dei minori (COPPA/Children's Data)
+
+Meta richiede che la Privacy Policy dichiari esplicitamente se l'app raccoglie dati di minori di 13 anni. Serve una sezione "Children's Privacy" che dica che l'app non e' destinata a minori e non raccoglie intenzionalmente dati di utenti sotto i 13 anni.
+
+---
+
+### Bonus: Terms.tsx manca il link "Back to App"
+
+La Privacy Policy ha il link "← Back to App" in alto, ma i Terms no. Per coerenza e usabilita' (e per i reviewer) conviene aggiungerlo.
+
+---
+
+### Riepilogo modifiche
+
+| File | Modifica |
+|------|----------|
+| `src/pages/Privacy.tsx` | Aggiungere sezione permessi Meta, sezione Children's Privacy, anno dinamico, uniformare nome app |
+| `src/pages/Terms.tsx` | Aggiungere link "Back to App", uniformare nome app ed email |
+| `src/pages/Index.tsx` | Anno copyright dinamico |
+| `src/pages/Auth.tsx` | Anno copyright dinamico |
+
+**Prima di procedere ho bisogno di sapere**:
+1. Quale nome app usare: "POST PER I SOCIAL 2-IG" o "FisioAccordo Social Content AI"?
+2. Quale email di contatto usare per entrambe le pagine?
 
