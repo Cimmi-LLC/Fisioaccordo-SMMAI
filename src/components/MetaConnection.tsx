@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +8,7 @@ import { Instagram, Link2, Unlink, Loader2, Pencil, Check, X } from "lucide-reac
 import { MetaService, type MetaConnectionData } from '@/services/metaService';
 import { useToast } from '@/hooks/use-toast';
 import PersonalAccountGuide from './PersonalAccountGuide';
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from '@/integrations/supabase/client';
 
 const MetaConnection: React.FC = () => {
@@ -17,6 +19,7 @@ const MetaConnection: React.FC = () => {
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
   const [savingUsername, setSavingUsername] = useState(false);
+  const [agreedToConnect, setAgreedToConnect] = useState(false);
   const { toast } = useToast();
 
   const loadConnections = useCallback(async () => {
@@ -183,8 +186,22 @@ const MetaConnection: React.FC = () => {
             <p className="text-sm text-muted-foreground">
               Connect your Instagram Business account to publish directly.
             </p>
+
+            <div className="flex items-start space-x-2">
+              <Checkbox
+                id="consent-connect"
+                checked={agreedToConnect}
+                onCheckedChange={(checked) => setAgreedToConnect(checked === true)}
+                className="mt-0.5"
+              />
+              <label htmlFor="consent-connect" className="text-xs text-muted-foreground leading-snug cursor-pointer">
+                I agree to share my Instagram data (username, access token) with this app as described in the{' '}
+                <Link to="/privacy" className="underline text-primary hover:text-primary/80">Privacy Policy</Link> and{' '}
+                <Link to="/terms" className="underline text-primary hover:text-primary/80">Terms of Service</Link>.
+              </label>
+            </div>
             
-            <Button onClick={handleConnect} disabled={connecting} className="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white">
+            <Button onClick={handleConnect} disabled={connecting || !agreedToConnect} className="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white">
               {connecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Instagram className="mr-2 h-4 w-4" />}
               Connect Instagram Business
             </Button>
