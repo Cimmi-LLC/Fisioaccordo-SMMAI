@@ -248,7 +248,7 @@ const Auth = () => {
                     <div className="flex items-start space-x-2">
                       <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)} />
                       <Label htmlFor="terms" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
-                        I accept the <span className="text-fisio underline">Terms and Conditions</span>, the{' '}
+                        I accept the <a href="/terms" className="text-fisio underline">Terms of Service</a>, the{' '}
                         <a href="/privacy" className="text-fisio underline">Privacy Policy</a> and authorize 
                         Cimmi LLC to process my personal data for service delivery, 
                         commercial communications, and statistical analysis of generated content. 
@@ -281,7 +281,7 @@ const Auth = () => {
 
         <div className="mt-8 p-4 bg-card/50 rounded-lg border border-border">
           <p className="text-xs text-muted-foreground text-center leading-relaxed">
-            © 2024 Cimmi LLC. All rights reserved. | <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a><br/>
+            © 2024 Cimmi LLC. All rights reserved. | <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a> | <a href="/terms" className="text-primary hover:underline">Terms of Service</a><br/>
             FisioAccordo(VIRAL)ContentAI is the exclusive property of Cimmi LLC.<br/>
             Copying, reproduction, or replication of this platform without written authorization is prohibited.
           </p>
