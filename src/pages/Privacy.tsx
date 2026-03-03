@@ -21,7 +21,7 @@ const Privacy = () => {
           <section>
             <h2 className="text-xl font-semibold text-foreground">1. Introduction</h2>
             <p>
-              This Privacy Policy describes how <strong className="text-foreground">FisioAccordo Social Content AI</strong> 
+              This Privacy Policy describes how <strong className="text-foreground">POST PER I SOCIAL 2-IG</strong> 
               (the "App"), developed and operated by <strong className="text-foreground">Cimmi LLC</strong> ("we", "us", "our"), 
               collects, uses, stores, and protects your personal data when you use our application.
             </p>
@@ -40,7 +40,20 @@ const Privacy = () => {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">3. How We Use Your Data</h2>
+            <h2 className="text-xl font-semibold text-foreground">3. Permissions We Request</h2>
+            <p>When you connect your Instagram Business account, we request the following Meta API permissions:</p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li><strong className="text-foreground">instagram_business_basic:</strong> To read your Instagram Business account username and basic profile information.</li>
+              <li><strong className="text-foreground">instagram_business_content_publish:</strong> To publish content (images and text) to your Instagram Business account on your behalf.</li>
+              <li><strong className="text-foreground">pages_show_list:</strong> To list the Facebook Pages associated with your account.</li>
+              <li><strong className="text-foreground">pages_read_engagement:</strong> To read engagement data from your connected Facebook Page.</li>
+              <li><strong className="text-foreground">pages_manage_posts:</strong> To manage and publish posts on your connected Facebook Page.</li>
+            </ul>
+            <p>We only request permissions that are strictly necessary for the App's functionality. You can revoke these permissions at any time by disconnecting your account within the App or through your Meta account settings.</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">4. How We Use Your Data</h2>
             <p>Your data is used exclusively for the following purposes:</p>
             <ul className="list-disc pl-6 space-y-2">
               <li><strong className="text-foreground">Content creation:</strong> To generate AI-powered social media posts based on your inputs.</li>
@@ -51,7 +64,7 @@ const Privacy = () => {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">4. Data Storage</h2>
+            <h2 className="text-xl font-semibold text-foreground">5. Data Storage</h2>
             <p>
               All data is stored securely on <strong className="text-foreground">Supabase</strong>, a cloud infrastructure platform with 
               enterprise-grade security, including encryption at rest and in transit. Access tokens are stored in a secure database 
@@ -60,7 +73,7 @@ const Privacy = () => {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">5. Data Retention</h2>
+            <h2 className="text-xl font-semibold text-foreground">6. Data Retention</h2>
             <p>
               We retain your data for as long as your account is active. When you disconnect your Instagram/Facebook account, 
               the associated access tokens are immediately deleted from our database. Generated content is retained until you 
@@ -69,7 +82,7 @@ const Privacy = () => {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">6. Data Deletion</h2>
+            <h2 className="text-xl font-semibold text-foreground">7. Data Deletion</h2>
             <p>You can request deletion of your data at any time through the following methods:</p>
             <ul className="list-disc pl-6 space-y-2">
               <li><strong className="text-foreground">Disconnect account:</strong> Use the "Disconnect" button in the App to immediately remove your Instagram/Facebook connection and associated tokens.</li>
@@ -79,7 +92,7 @@ const Privacy = () => {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">7. Third-Party Services</h2>
+            <h2 className="text-xl font-semibold text-foreground">8. Third-Party Services</h2>
             <p>The App integrates with the following third-party services:</p>
             <ul className="list-disc pl-6 space-y-2">
               <li><strong className="text-foreground">Meta (Instagram/Facebook):</strong> For OAuth authentication and content publishing. Subject to <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Meta's Privacy Policy</a>.</li>
@@ -88,7 +101,18 @@ const Privacy = () => {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">8. Your Rights</h2>
+            <h2 className="text-xl font-semibold text-foreground">9. Children's Privacy</h2>
+            <p>
+              The App is not intended for use by individuals under the age of 13. We do not knowingly collect personal data 
+              from children under 13. If we become aware that we have collected personal data from a child under 13 without 
+              verification of parental consent, we will take steps to delete that information promptly. If you believe we may 
+              have collected information from a child under 13, please contact us at{' '}
+              <a href="mailto:privacy@cimmillc.com" className="text-primary hover:underline">privacy@cimmillc.com</a>.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground">10. Your Rights</h2>
             <p>Under applicable data protection laws (including GDPR), you have the right to:</p>
             <ul className="list-disc pl-6 space-y-2">
               <li>Access your personal data</li>
@@ -100,7 +124,7 @@ const Privacy = () => {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">9. Contact Us</h2>
+            <h2 className="text-xl font-semibold text-foreground">11. Contact Us</h2>
             <p>
               For any questions or requests regarding this Privacy Policy or your personal data, please contact us at:
             </p>
@@ -112,7 +136,7 @@ const Privacy = () => {
         </div>
 
         <div className="mt-12 pt-8 border-t border-border text-center text-xs text-muted-foreground">
-          © 2024 Cimmi LLC. All rights reserved.
+          © {new Date().getFullYear()} Cimmi LLC. All rights reserved.
         </div>
       </div>
     </div>
