@@ -48,8 +48,8 @@ const Index = () => {
     } catch (error) {
       console.error('Errore nel caricamento contenuti salvati:', error);
       toast({
-        title: "⚠️ Attenzione",
-        description: "Errore nel caricamento dei contenuti salvati",
+        title: "⚠️ Warning",
+        description: "Error loading saved contents",
         variant: "destructive"
       });
     } finally {
@@ -63,15 +63,15 @@ const Index = () => {
       if (!error) {
         navigate('/auth');
         toast({
-          title: "👋 Arrivederci!",
-          description: "Logout effettuato con successo"
+          title: "👋 Goodbye!",
+          description: "Successfully logged out"
         });
       }
     } catch (error) {
       console.error('Errore durante il logout:', error);
       toast({
-        title: "❌ Errore",
-        description: "Errore durante il logout",
+        title: "❌ Error",
+        description: "Error during logout",
         variant: "destructive"
       });
     }
@@ -87,8 +87,8 @@ const Index = () => {
     setEditingSlideIndex(null);
     
     toast({
-      title: "🎨 Immagine aggiornata!",
-      description: "L'immagine è stata modificata con successo"
+      title: "🎨 Image updated!",
+      description: "The image has been successfully modified"
     });
   };
 
@@ -96,8 +96,8 @@ const Index = () => {
     setImprovedCopyFromAI(improvedCopy);
     
     toast({
-      title: "🚀 Copy super-ottimizzato!",
-      description: "Il tuo copy è stato migliorato con strategie avanzate di copywriting"
+      title: "🚀 Super-optimized copy!",
+      description: "Your copy has been improved with advanced copywriting strategies"
     });
   };
 
@@ -107,7 +107,7 @@ const Index = () => {
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center space-y-4 max-w-sm">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground text-sm sm:text-base">Caricamento in corso...</p>
+          <p className="text-muted-foreground text-sm sm:text-base">Loading...</p>
         </div>
       </div>
     );
@@ -161,11 +161,11 @@ const Index = () => {
         <div className="mt-8 sm:mt-12 p-4 sm:p-6 bg-card/70 backdrop-blur-sm rounded-lg border border-border shadow-enhanced">
           <div className="text-center space-y-2">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              © 2024 Cimmi LLC. Tutti i diritti riservati.
+              © 2024 Cimmi LLC. All rights reserved. | <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a>
             </p>
             <p className="text-xs text-muted-foreground/80 leading-relaxed max-w-2xl mx-auto">
-              FisioAccordo(VIRAL)ContentAI è proprietà esclusiva di Cimmi LLC.
-              È vietata la copia, riproduzione o replica di questa piattaforma senza autorizzazione scritta.
+              FisioAccordo(VIRAL)ContentAI is the exclusive property of Cimmi LLC.
+              Copying, reproduction, or replication of this platform without written authorization is prohibited.
             </p>
           </div>
         </div>

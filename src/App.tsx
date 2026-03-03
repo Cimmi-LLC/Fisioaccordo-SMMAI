@@ -13,6 +13,7 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import InstagramCallback from "./pages/InstagramCallback";
 import NotFound from "./pages/NotFound";
+import Privacy from "./pages/Privacy";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,6 +40,7 @@ const App = () => (
               <BrowserRouter>
                 <Routes>
                   <Route path="/" element={<Index />} />
+                  <Route path="/privacy" element={<Privacy />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/auth/instagram/callback" element={<InstagramCallback />} />
                   <Route path="/reset-password" element={<ResetPassword />} />

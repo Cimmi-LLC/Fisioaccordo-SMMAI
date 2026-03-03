@@ -63,71 +63,71 @@ const ContentForm: React.FC<ContentFormProps> = ({
     <Card className="backdrop-blur-enhanced">
       <CardHeader>
         <CardTitle className="text-foreground">
-          Crea il tuo contenuto
+          Create Your Content
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* 1. Descrivi il tuo post */}
+        {/* 1. Describe your post */}
         <div>
-          <Label className="text-foreground text-lg font-medium">1. Descrivi il tuo post</Label>
+          <Label className="text-foreground text-lg font-medium">1. Describe Your Post</Label>
           <Textarea
             value={formData.description}
             onChange={(e) => onInputChange('description', e.target.value)}
-            placeholder="mal di schiena al pc"
+            placeholder="e.g. back pain from sitting at desk"
             className="bg-input border-border text-foreground mt-2 min-h-[100px] focus:border-primary focus:ring-primary"
           />
         </div>
 
-        {/* 2. Definisci la tua Audience */}
+        {/* 2. Define your Audience */}
         <div>
           <Label className="text-foreground text-lg font-medium flex items-center">
             <User className="h-4 w-4 mr-2 text-primary" />
-            2. Definisci la tua Audience (Opzionale)
+            2. Define Your Audience (Optional)
           </Label>
           <Input
             value={formData.audience}
             onChange={(e) => onInputChange('audience', e.target.value)}
-            placeholder="lavoratori al pc"
+            placeholder="e.g. office workers"
             className="bg-input border-border text-foreground mt-2 focus:border-primary focus:ring-primary"
           />
         </div>
 
-        {/* Opzioni in griglia */}
+        {/* Options grid */}
         <div className="grid grid-cols-2 gap-4">
-          {/* Lunghezza */}
+          {/* Length */}
           <div>
-            <Label className="text-foreground">Lunghezza</Label>
+            <Label className="text-foreground">Length</Label>
             <Select value={formData.length} onValueChange={(value) => onInputChange('length', value)}>
               <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
-                <SelectItem value="corto">Corto</SelectItem>
-                <SelectItem value="medio">Medio</SelectItem>
-                <SelectItem value="lungo">Lungo</SelectItem>
+                <SelectItem value="corto">Short</SelectItem>
+                <SelectItem value="medio">Medium</SelectItem>
+                <SelectItem value="lungo">Long</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Tono */}
+          {/* Tone */}
           <div>
-            <Label className="text-foreground">Tono</Label>
+            <Label className="text-foreground">Tone</Label>
             <Select value={formData.tone} onValueChange={(value) => onInputChange('tone', value)}>
               <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
-                <SelectItem value="professionale">Professionale</SelectItem>
-                <SelectItem value="informale">Informale</SelectItem>
-                <SelectItem value="divertente">Divertente</SelectItem>
-                <SelectItem value="motivazionale">Motivazionale</SelectItem>
+                <SelectItem value="professionale">Professional</SelectItem>
+                <SelectItem value="informale">Casual</SelectItem>
+                <SelectItem value="divertente">Fun</SelectItem>
+                <SelectItem value="motivazionale">Motivational</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Piattaforma */}
+          {/* Platform */}
           <div>
-            <Label className="text-foreground">Piattaforma</Label>
+            <Label className="text-foreground">Platform</Label>
             <Select value={formData.platform} onValueChange={(value) => onInputChange('platform', value)}>
               <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
@@ -140,57 +140,57 @@ const ContentForm: React.FC<ContentFormProps> = ({
             </Select>
           </div>
 
-          {/* Tipo di Post */}
+          {/* Post Type */}
           <div>
-            <Label className="text-foreground">Tipo di Post</Label>
+            <Label className="text-foreground">Post Type</Label>
             <Select value={formData.postType} onValueChange={(value) => onInputChange('postType', value)}>
               <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
-                <SelectItem value="carosello">Carosello</SelectItem>
-                <SelectItem value="post-singolo">Post Singolo</SelectItem>
-                <SelectItem value="storia">Storia</SelectItem>
+                <SelectItem value="carosello">Carousel</SelectItem>
+                <SelectItem value="post-singolo">Single Post</SelectItem>
+                <SelectItem value="storia">Story</SelectItem>
                 <SelectItem value="reel">Reel</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Numero Slide */}
+          {/* Number of Slides */}
           <div>
-            <Label className="text-foreground">Numero Slide</Label>
+            <Label className="text-foreground">Number of Slides</Label>
             <Select value={formData.numSlides} onValueChange={(value) => onInputChange('numSlides', value)}>
               <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
-                <SelectItem value="3">3 Slide</SelectItem>
-                <SelectItem value="5">5 Slide</SelectItem>
-                <SelectItem value="7">7 Slide</SelectItem>
-                <SelectItem value="10">10 Slide</SelectItem>
+                <SelectItem value="3">3 Slides</SelectItem>
+                <SelectItem value="5">5 Slides</SelectItem>
+                <SelectItem value="7">7 Slides</SelectItem>
+                <SelectItem value="10">10 Slides</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Numero Immagini */}
+          {/* Number of Images */}
           <div>
-            <Label className="text-foreground">Numero Immagini</Label>
+            <Label className="text-foreground">Number of Images</Label>
             <Select value={formData.numImages} onValueChange={(value) => onInputChange('numImages', value)}>
               <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
-                <SelectItem value="1">1 Immagine</SelectItem>
-                <SelectItem value="2">2 Immagini</SelectItem>
-                <SelectItem value="3">3 Immagini</SelectItem>
-                <SelectItem value="4">4 Immagini</SelectItem>
-                <SelectItem value="5">5 Immagini</SelectItem>
+                <SelectItem value="1">1 Image</SelectItem>
+                <SelectItem value="2">2 Images</SelectItem>
+                <SelectItem value="3">3 Images</SelectItem>
+                <SelectItem value="4">4 Images</SelectItem>
+                <SelectItem value="5">5 Images</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        {/* Template Canva */}
+        {/* Canva Template */}
         <CanvaTemplateSelector
           value={formData.visualTemplate === 'default' ? null : formData.visualTemplate}
           postType={formData.postType}
@@ -202,7 +202,7 @@ const ContentForm: React.FC<ContentFormProps> = ({
           }}
         />
 
-        {/* Upload foto base */}
+        {/* Base photo upload */}
         <PhotoUpload
           basePhoto={basePhoto}
           onPhotoUpload={onPhotoUpload}
@@ -211,7 +211,7 @@ const ContentForm: React.FC<ContentFormProps> = ({
 
         {/* Platform Selection */}
         <div className="space-y-3">
-          <Label className="text-foreground text-lg font-medium">Piattaforme di Pubblicazione</Label>
+          <Label className="text-foreground text-lg font-medium">Publishing Platforms</Label>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {supportedPlatforms.map((platform) => (
               <div key={platform.id} className="flex items-center space-x-2 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
@@ -245,7 +245,7 @@ const ContentForm: React.FC<ContentFormProps> = ({
 
         {/* Schedule Date */}
         <div className="space-y-2">
-          <Label htmlFor="scheduleDate" className="text-foreground">Programma Pubblicazione (Opzionale)</Label>
+          <Label htmlFor="scheduleDate" className="text-foreground">Schedule Publication (Optional)</Label>
           <Input
             id="scheduleDate"
             type="datetime-local"

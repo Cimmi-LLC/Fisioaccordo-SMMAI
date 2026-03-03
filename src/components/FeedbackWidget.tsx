@@ -22,17 +22,17 @@ const FeedbackWidget: React.FC<FeedbackWidgetProps> = ({ generatedContent }) => 
 
   const handleSend = async () => {
     if (isPositive === null) return;
-    await addFeedback(isPositive, comment || (isPositive ? 'Mi piace' : 'Non mi piace'), generatedContent);
+    await addFeedback(isPositive, comment || (isPositive ? 'I like it' : "I don't like it"), generatedContent);
     setSent(true);
     setTimeout(() => { setSent(false); setShowComment(false); setComment(''); setIsPositive(null); }, 2000);
   };
 
-  if (sent) return <p className="text-xs text-center text-muted-foreground py-2">✅ Feedback salvato! L'AI imparerà.</p>;
+  if (sent) return <p className="text-xs text-center text-muted-foreground py-2">✅ Feedback saved! The AI will learn.</p>;
 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 justify-center">
-        <span className="text-xs text-muted-foreground">Come ti sembra?</span>
+        <span className="text-xs text-muted-foreground">How does it look?</span>
         <Button size="sm" variant={isPositive === true ? 'default' : 'ghost'} className="h-7 w-7 p-0" onClick={() => handleVote(true)}>
           <ThumbsUp className="h-3.5 w-3.5" />
         </Button>
@@ -42,7 +42,7 @@ const FeedbackWidget: React.FC<FeedbackWidgetProps> = ({ generatedContent }) => 
       </div>
       {showComment && (
         <div className="flex gap-1.5">
-          <Textarea placeholder="Cosa miglioreresti?" value={comment} onChange={e => setComment(e.target.value)} rows={1} className="text-xs" />
+          <Textarea placeholder="What would you improve?" value={comment} onChange={e => setComment(e.target.value)} rows={1} className="text-xs" />
           <Button size="sm" className="h-8" onClick={handleSend}><Send className="h-3.5 w-3.5" /></Button>
         </div>
       )}

@@ -58,7 +58,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: "Copiato! 📋", description: "Contenuto copiato negli appunti" });
+    toast({ title: "Copied! 📋", description: "Content copied to clipboard" });
   };
 
   const downloadImage = async (imageUrl: string, slideIndex: number) => {
@@ -73,9 +73,9 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      toast({ title: "Download completato! 📥", description: `Slide ${slideIndex + 1} scaricata` });
+      toast({ title: "Download complete! 📥", description: `Slide ${slideIndex + 1} downloaded` });
     } catch {
-      toast({ title: "Errore download", description: "Non è stato possibile scaricare l'immagine", variant: "destructive" });
+      toast({ title: "Download error", description: "Could not download the image", variant: "destructive" });
     }
   };
 
@@ -85,12 +85,11 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
       const updatedSlides = [...carouselSlides];
       updatedSlides[slideIndex].userImageUrl = reader.result as string;
       setCarouselSlides(updatedSlides);
-      toast({ title: "Immagine caricata! 📸", description: `Immagine caricata per la slide ${slideIndex + 1}` });
+      toast({ title: "Image uploaded! 📸", description: `Image uploaded for slide ${slideIndex + 1}` });
     };
     reader.readAsDataURL(file);
   };
 
-  // Resolve the design template to use
   const resolveDesignTemplate = (): DesignTemplate => {
     if (canvaTemplate) {
       const tz = canvaTemplate.text_zones as any;
@@ -107,11 +106,10 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
         };
       }
     }
-    // Fallback: use first default template
     return DEFAULT_TEMPLATES[0];
   };
 
-  const SCALE = 0.25; // preview ~270px / 1080px original
+  const SCALE = 0.25;
 
   const renderLayer = (layer: DesignTemplateLayer, slideData: Record<string, string>, slide: CarouselSlide) => {
     const contentMap: Record<string, string> = {
@@ -126,7 +124,6 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
       image: '',
     };
 
-    // Use defaultText if present, otherwise use AI-generated text
     const text = layer.defaultText || contentMap[layer.type] || '';
     const isImageLayer = layer.type === 'image';
 
@@ -195,11 +192,8 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
     }
 
     const designTemplate = resolveDesignTemplate();
-    
-    // Generate slide-specific layers
     const slideLayers = generateSlideLayers(index, carouselSlides.length, designTemplate);
 
-    // Background style
     let bgStyle: React.CSSProperties = {};
     if (designTemplate.background.type === 'solid') {
       bgStyle.backgroundColor = designTemplate.background.value;
@@ -209,16 +203,10 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
 
     return (
       <div key={index} className="relative aspect-square rounded-lg overflow-hidden group border border-border" style={bgStyle}>
-      {/* AI-generated image as background */}
         {slide.imageUrl && (
-          <img
-            src={slide.imageUrl}
-            alt={`Slide ${index + 1}`}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
+          <img src={slide.imageUrl} alt={`Slide ${index + 1}`} className="absolute inset-0 w-full h-full object-cover" />
         )}
 
-        {/* Photo zone */}
         {designTemplate.photoZone && slide.userImageUrl && (
           <img
             src={slide.userImageUrl}
@@ -235,15 +223,12 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
           />
         )}
 
-        {/* Overlay */}
         {designTemplate.overlayColor && (
           <div className="absolute inset-0" style={{ backgroundColor: designTemplate.overlayColor }} />
         )}
 
-        {/* Layers */}
         {slideLayers.map(layer => renderLayer(layer, slideData, slide))}
 
-        {/* Hover controls */}
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
           <Button onClick={() => onImageEdit(slide.userImageUrl || slide.imageUrl || '', index)} size="sm" className="p-1 h-6 w-6 bg-primary hover:bg-primary/90">✏️</Button>
           <Button onClick={() => downloadImage(slide.userImageUrl || slide.imageUrl || '', index)} size="sm" className="p-1 h-6 w-6 bg-accent hover:bg-accent/90"><Download className="w-3 h-3" /></Button>
@@ -258,7 +243,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
   return (
     <Card className="bg-card/50 border-border backdrop-blur-sm">
       <CardHeader>
-        <CardTitle className="text-card-foreground">Anteprima</CardTitle>
+        <CardTitle className="text-card-foreground">Preview</CardTitle>
       </CardHeader>
       <CardContent>
         {generatedContent ? (
@@ -267,14 +252,14 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
               <div className="mb-4">
                 <h3 className="text-card-foreground font-semibold mb-3">
                   {{
-                    'post-singolo': 'Immagine del Post',
-                    'storia': 'Immagine della Storia',
-                    'reel': 'Immagine del Reel',
-                  }[postType || ''] || 'Slide del Carosello'}
+                    'post-singolo': 'Post Image',
+                    'storia': 'Story Image',
+                    'reel': 'Reel Image',
+                  }[postType || ''] || 'Carousel Slides'}
                 </h3>
                 <div className="flex items-center gap-2 mb-3 p-2 rounded-lg bg-accent/20 border border-accent/30 text-accent-foreground text-sm animate-pulse">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Creazione immagini in corso...</span>
+                  <span>Creating images...</span>
                 </div>
               </div>
             )}
@@ -282,15 +267,15 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
               <div className="mb-4">
                 <h3 className="text-card-foreground font-semibold mb-3">
                   {{
-                    'post-singolo': 'Immagine del Post',
-                    'storia': 'Immagine della Storia',
-                    'reel': 'Immagine del Reel',
-                  }[postType || ''] || 'Slide del Carosello'}
+                    'post-singolo': 'Post Image',
+                    'storia': 'Story Image',
+                    'reel': 'Reel Image',
+                  }[postType || ''] || 'Carousel Slides'}
                 </h3>
                 {isGeneratingImages && (
                   <div className="flex items-center gap-2 mb-3 p-2 rounded-lg bg-accent/20 border border-accent/30 text-accent-foreground text-sm animate-pulse">
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Creazione immagini in corso...</span>
+                    <span>Creating images...</span>
                   </div>
                 )}
                 <div className={`grid gap-3 mb-4 ${carouselSlides.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : 'grid-cols-2 md:grid-cols-3'}`}>
@@ -307,7 +292,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
             {appliedHook && (
               <div className="bg-accent/20 border border-accent rounded-lg p-3 mb-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-accent-foreground text-sm font-medium">Hook applicato:</span>
+                  <span className="text-accent-foreground text-sm font-medium">Applied hook:</span>
                   <Button onClick={onRemoveHook} size="sm" variant="ghost" className="text-accent-foreground hover:text-accent-foreground/80 p-1 h-auto">
                     <X className="w-4 h-4" />
                   </Button>
@@ -344,7 +329,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
         ) : (
           <div className="text-center py-12 text-muted-foreground">
             <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>I tuoi contenuti generati appariranno qui</p>
+            <p>Your generated content will appear here</p>
           </div>
         )}
       </CardContent>
