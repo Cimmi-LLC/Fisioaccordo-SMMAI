@@ -1,57 +1,77 @@
 
 
-## Translate Button Labels to English
+## Piano: Privacy Policy Page + Traduzione completa interfaccia in inglese
 
-Only button text will be translated. Labels, titles, descriptions, placeholders, and other UI text stay in Italian.
+### Problema 1 — Privacy Policy (PRIORITA' MASSIMA)
 
-### Changes by file
+Creare una pagina `/privacy` pubblica (accessibile senza login) che soddisfi i requisiti Meta.
 
-**`src/components/AppHeader.tsx`**
-- "Nascondi" -> "Hide"
-- "Esci" -> "Log Out"
+**Nuovo file: `src/pages/Privacy.tsx`**
 
-**`src/components/IdeaGenerator.tsx`**
-- "Trova Idee" -> "Find Ideas"
+Pagina statica con:
+- Nome app: "FisioAccordo Social Content AI"
+- Sviluppatore: Cimmi LLC
+- Dati raccolti: Instagram username, access token, contenuti pubblicati tramite l'app
+- Uso dei dati: esclusivamente per pubblicare post su Instagram/Facebook per conto dell'utente
+- Conservazione: dati salvati su Supabase (infrastruttura cloud sicura)
+- Cancellazione: l'utente puo' disconnettere l'account in qualsiasi momento dall'app, oppure contattare via email per richiedere la cancellazione completa
+- Contatto email per richieste privacy
+- Design pulito, responsive, accessibile senza autenticazione
 
-**`src/components/ContentForm.tsx`**
-- "3. Genera Contenuto" -> "3. Generate Content"
-- "Generando contenuto..." -> "Generating content..."
+**Modifica: `src/App.tsx`**
 
-**`src/components/PreviewSection.tsx`**
-- "Salva" -> "Save"
-- "Copia" -> "Copy"
-- "Rigenera Immagini" -> "Regenerate Images"
+Aggiungere la route `/privacy` PRIMA del catch-all `*`.
 
-**`src/components/SmartCopyActions.tsx`**
-- "Pubblica Ora su Instagram" -> "Publish Now on Instagram"
-- "Pubblica Ora su Facebook" -> "Publish Now on Facebook"
-- "Pubblicando..." -> "Publishing..."
-- "Generazione immagini..." -> "Generating images..."
-- "Metodo manuale (copia e incolla)" -> "Manual method (copy & paste)"
-- "Copia Testo" -> "Copy Text"
-- "Copiato!" -> "Copied!"
-- "Scarica Immagini" -> "Download Images"
-- "Apri Instagram" -> "Open Instagram"
-- "Apri Facebook" -> "Open Facebook"
+**Modifica: `src/pages/Index.tsx`** (footer)
 
-**`src/components/MetaConnection.tsx`**
-- "Scollega" -> "Disconnect"
-- "Collega Instagram Business" -> "Connect Instagram Business"
-- "Salva" -> "Save"
+Aggiungere link "Privacy Policy" nel footer che punta a `/privacy`.
 
-**`src/components/PersonalAccountGuide.tsx`**
-- "Ho capito, vado a convertire" -> "Got it, let me convert"
+---
 
-**`src/components/CopyImprover.tsx`** (tabs and buttons inside sub-components)
-- Buttons in `ImproveTab.tsx`: "Genera Copy Migliorato" -> "Generate Improved Copy", "Copia Copy Migliorato" -> "Copy Improved Text"
-- Buttons in `AnalysisTab.tsx`: "Analizza Copy con AI" -> "Analyze Copy with AI"
-- Buttons in `TemplatesTab.tsx`: "Applica Template" -> "Apply Template", "Applicato" -> "Applied"
+### Problema 2 — Traduzione completa interfaccia in inglese
 
-**`src/components/FeedbackWidget.tsx`** and **`src/components/ImageFeedbackWidget.tsx`**
-- "Invia" (Send button) -> "Send"
+Per il video screencast Meta, tutta l'interfaccia visibile deve essere in inglese. Attualmente solo i bottoni sono tradotti, ma titoli, descrizioni, tab, placeholder e toast sono ancora in italiano.
 
-### Technical details
-- Only `Button` component text and inline button labels are changed
-- No structural or logic changes
-- 12 files edited, all simple string replacements
+**File da modificare:**
+
+1. **`src/components/AppHeader.tsx`** — "Generatore di Post Social" -> "Social Post Generator", "Ciao, {name}" -> "Hi, {name}"
+
+2. **`src/components/MainContent.tsx`** — Titolo principale, descrizione, nomi tab ("Genera" -> "Generate", "Foto" -> "Photos", "Virale" -> "Viral"), label delle card, tutti i toast messages
+
+3. **`src/pages/Index.tsx`** — "Caricamento in corso..." -> "Loading...", toast messages, footer text (copyright notice)
+
+4. **`src/components/ContentForm.tsx`** — Label dei campi form, placeholder, opzioni select (tono, piattaforma, tipo post, lunghezza)
+
+5. **`src/components/PreviewSection.tsx`** — Titoli sezioni, testo placeholder
+
+6. **`src/components/MetaConnection.tsx`** — Titolo card, badge "Collegato" -> "Connected", requisiti, descrizioni
+
+7. **`src/components/IdeaGenerator.tsx`** — Titolo, placeholder, descrizioni
+
+8. **`src/components/SavedContents.tsx`** — Titolo sezione, label, stati vuoti
+
+9. **`src/components/SmartCopyActions.tsx`** — Label sezioni, descrizioni metodi
+
+10. **`src/components/PersonalAccountGuide.tsx`** — Tutto il contenuto del tutorial (gia' rilevante per il video screencast)
+
+11. **`src/pages/Auth.tsx`** — Pagina login/signup se visibile nel video
+
+12. **`src/components/HookGenerator.tsx`** — Titoli e label
+
+13. **`src/components/FeedbackWidget.tsx`** / **`src/components/ImageFeedbackWidget.tsx`** — Label e placeholder
+
+---
+
+### Ordine di implementazione
+
+1. Creare la pagina Privacy Policy (`/privacy`)
+2. Aggiungere la route e il link nel footer
+3. Tradurre tutti i componenti UI in inglese (circa 13 file)
+
+### Note tecniche
+
+- La pagina Privacy deve essere accessibile SENZA autenticazione (nessun redirect a `/auth`)
+- Circa 13 file da modificare per la traduzione
+- Nessuna dipendenza aggiuntiva necessaria
+- Le stringhe hardcoded verranno sostituite direttamente (no i18n framework, troppo overhead per questo caso)
 
