@@ -14,6 +14,8 @@ import ResetPassword from "./pages/ResetPassword";
 import InstagramCallback from "./pages/InstagramCallback";
 import NotFound from "./pages/NotFound";
 import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
+import DeletionStatus from "./pages/DeletionStatus";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,6 +43,8 @@ const App = () => (
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/privacy" element={<Privacy />} />
+                  <Route path="/terms" element={<Terms />} />
+                  <Route path="/deletion-status" element={<DeletionStatus />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/auth/instagram/callback" element={<InstagramCallback />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
