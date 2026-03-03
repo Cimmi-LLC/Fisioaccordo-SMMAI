@@ -281,8 +281,8 @@ const Auth = () => {
 
         <div className="mt-8 p-4 bg-card/50 rounded-lg border border-border">
           <p className="text-xs text-muted-foreground text-center leading-relaxed">
-            © 2024 Cimmi LLC. All rights reserved. | <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a> | <a href="/terms" className="text-primary hover:underline">Terms of Service</a><br/>
-            FisioAccordo(VIRAL)ContentAI is the exclusive property of Cimmi LLC.<br/>
+            © {new Date().getFullYear()} Cimmi LLC. All rights reserved. | <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a> | <a href="/terms" className="text-primary hover:underline">Terms of Service</a><br/>
+            POST PER I SOCIAL 2-IG is the exclusive property of Cimmi LLC.<br/>
             Copying, reproduction, or replication of this platform without written authorization is prohibited.
           </p>
         </div>

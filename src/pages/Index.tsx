@@ -161,10 +161,10 @@ const Index = () => {
         <div className="mt-8 sm:mt-12 p-4 sm:p-6 bg-card/70 backdrop-blur-sm rounded-lg border border-border shadow-enhanced">
           <div className="text-center space-y-2">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              © 2024 Cimmi LLC. All rights reserved. | <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a> | <a href="/terms" className="text-primary hover:underline">Terms of Service</a>
+              © {new Date().getFullYear()} Cimmi LLC. All rights reserved. | <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a> | <a href="/terms" className="text-primary hover:underline">Terms of Service</a>
             </p>
             <p className="text-xs text-muted-foreground/80 leading-relaxed max-w-2xl mx-auto">
-              FisioAccordo(VIRAL)ContentAI is the exclusive property of Cimmi LLC.
+              POST PER I SOCIAL 2-IG is the exclusive property of Cimmi LLC.
               Copying, reproduction, or replication of this platform without written authorization is prohibited.
             </p>
           </div>
