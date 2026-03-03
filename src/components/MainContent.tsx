@@ -83,41 +83,40 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
 
   const handleUseTrend = (topic: string) => {
     setFormData(prev => ({ ...prev, description: topic }));
-    toast({ title: '🔥 Trend selezionato!', description: `"${topic}" inserito nel form. Genera il post!` });
+    toast({ title: '🔥 Trend selected!', description: `"${topic}" inserted into the form. Generate the post!` });
   };
 
   const handlePublish = async (platforms: string[]) => {
     if (!generatedContent) {
-      toast({ title: "❌ Errore", description: "Genera prima un contenuto da pubblicare", variant: "destructive" });
+      toast({ title: "❌ Error", description: "Generate content first before publishing", variant: "destructive" });
       return;
     }
     if (isGeneratingImages) {
-      toast({ title: "⏳ Attendi", description: "Le immagini sono ancora in fase di creazione. Riprova tra qualche secondo." });
+      toast({ title: "⏳ Wait", description: "Images are still being created. Try again in a few seconds." });
       return;
     }
 
-    loadingState.startLoading('Preparazione pubblicazione...');
-    loadingState.updateProgress(10, 'Verifica connessione...');
+    loadingState.startLoading('Preparing publication...');
+    loadingState.updateProgress(10, 'Checking connection...');
 
     try {
       const isMetaConnected = await MetaService.isConnected();
       if (!isMetaConnected) {
-        toast({ title: "📋 Usa Smart Copy", description: "Copia il testo e scarica le immagini dall'anteprima per pubblicare manualmente." });
-        loadingState.finishLoading(false, 'Nessuna connessione attiva');
+        toast({ title: "📋 Use Smart Copy", description: "Copy the text and download images from the preview to publish manually." });
+        loadingState.finishLoading(false, 'No active connection');
         return;
       }
 
-      loadingState.updateProgress(20, 'Recupero connessione...');
+      loadingState.updateProgress(20, 'Retrieving connection...');
       const connections = await MetaService.getConnections();
       const connection = connections[0];
       if (!connection) {
-        loadingState.finishLoading(false, 'Nessuna connessione valida trovata');
-        throw new Error('Nessuna connessione attiva o token scaduto. Riconnetti Instagram.');
+        loadingState.finishLoading(false, 'No valid connection found');
+        throw new Error('No active connection or expired token. Reconnect Instagram.');
       }
 
-      loadingState.updateProgress(30, 'Preparazione contenuto...');
+      loadingState.updateProgress(30, 'Preparing content...');
 
-      // Use basePhoto first, then fall back to carousel slide images
       const imageUrl = basePhoto
         || carouselSlides.find(s => s.userImageUrl)?.userImageUrl
         || carouselSlides.find(s => s.imageUrl)?.imageUrl
@@ -127,14 +126,14 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
       const errors: string[] = [];
 
       for (const platform of platforms) {
-        loadingState.updateProgress(50, `Pubblicazione su ${platform}...`);
+        loadingState.updateProgress(50, `Publishing on ${platform}...`);
 
         if (platform === 'facebook') {
           const result = await MetaService.publishToFacebook(connection.id, generatedContent, imageUrl);
           if (result.success) { publishedCount++; } else { errors.push(`Facebook: ${result.error}`); }
         } else if (platform === 'instagram') {
           if (!imageUrl) {
-            errors.push("La generazione immagini non è riuscita. Carica una foto manualmente o riprova a generare il contenuto.");
+            errors.push("Image generation failed. Upload a photo manually or try generating content again.");
             continue;
           }
           const carouselUrls = carouselSlides
@@ -149,18 +148,18 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
         }
       }
 
-      loadingState.updateProgress(90, 'Completamento...');
+      loadingState.updateProgress(90, 'Completing...');
 
       if (publishedCount > 0) {
-        toast({ title: "🎉 Pubblicato!", description: `Contenuto pubblicato su ${publishedCount} piattaform${publishedCount > 1 ? 'e' : 'a'}` });
-        loadingState.finishLoading(true, 'Pubblicato con successo!');
+        toast({ title: "🎉 Published!", description: `Content published on ${publishedCount} platform${publishedCount > 1 ? 's' : ''}` });
+        loadingState.finishLoading(true, 'Published successfully!');
       } else if (errors.length > 0) {
-        toast({ title: "❌ Pubblicazione fallita", description: errors.join(' | '), variant: "destructive" });
+        toast({ title: "❌ Publishing failed", description: errors.join(' | '), variant: "destructive" });
         loadingState.finishLoading(false, errors.join(' | '));
       }
     } catch (error) {
-      toast({ title: "❌ Errore Pubblicazione", description: error instanceof Error ? error.message : 'Errore sconosciuto', variant: "destructive" });
-      loadingState.finishLoading(false, error instanceof Error ? error.message : 'Errore sconosciuto');
+      toast({ title: "❌ Publishing Error", description: error instanceof Error ? error.message : 'Unknown error', variant: "destructive" });
+      loadingState.finishLoading(false, error instanceof Error ? error.message : 'Unknown error');
     }
   };
 
@@ -168,10 +167,10 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
     <div className="max-w-7xl mx-auto px-4 py-4 sm:py-8">
       <div className="text-center mb-6 sm:mb-8 space-y-2">
         <h1 className="text-3xl sm:text-5xl font-extrabold text-foreground mb-2 sm:mb-4 leading-tight">
-          <span className="gradient-text">Generatore di Post Social</span> ✨
+          <span className="gradient-text">Social Post Generator</span> ✨
         </h1>
         <p className="text-base sm:text-lg text-muted-foreground px-4 max-w-2xl mx-auto">
-          Crea contenuti coinvolgenti per i tuoi social media con l'intelligenza artificiale
+          Create engaging content for your social media with artificial intelligence
         </p>
       </div>
 
@@ -195,11 +194,11 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
 
       <Tabs defaultValue="genera" className="mb-6">
         <TabsList className="grid grid-cols-5 w-full">
-          <TabsTrigger value="genera">✍️ Genera</TabsTrigger>
-          <TabsTrigger value="foto">📸 Foto</TabsTrigger>
+          <TabsTrigger value="genera">✍️ Generate</TabsTrigger>
+          <TabsTrigger value="foto">📸 Photos</TabsTrigger>
           <TabsTrigger value="memoria">🧠 AI Memory</TabsTrigger>
-          <TabsTrigger value="virale">🔍 Virale</TabsTrigger>
-          <TabsTrigger value="trend">🔥 Trend</TabsTrigger>
+          <TabsTrigger value="virale">🔍 Viral</TabsTrigger>
+          <TabsTrigger value="trend">🔥 Trends</TabsTrigger>
         </TabsList>
 
         <TabsContent value="genera" className="mt-4">
@@ -209,7 +208,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
           <div className="grid lg:grid-cols-2 gap-6 sm:gap-8">
             <div className="space-y-4">
               {loadingState.isLoading ? (
-                <Card><CardHeader><CardTitle>Configurazione Post</CardTitle></CardHeader><CardContent><SkeletonLoader type="form" /></CardContent></Card>
+                <Card><CardHeader><CardTitle>Post Configuration</CardTitle></CardHeader><CardContent><SkeletonLoader type="form" /></CardContent></Card>
               ) : (
                 <>
                   <ContentForm
@@ -224,7 +223,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
                   />
                   <div className="text-center">
                     <button onClick={() => setShowViralGenerator(!showViralGenerator)} className="text-accent hover:text-accent/80 underline text-sm font-medium transition-colors">
-                      {showViralGenerator ? '🔥 Nascondi Format Virali' : '🔥 Mostra Format Virali'}
+                      {showViralGenerator ? '🔥 Hide Viral Formats' : '🔥 Show Viral Formats'}
                     </button>
                   </div>
                 </>
@@ -232,7 +231,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
             </div>
             <div>
               {loadingState.isLoading && !generatedContent ? (
-                <Card><CardHeader><CardTitle>Anteprima Contenuto</CardTitle></CardHeader><CardContent><SkeletonLoader type="content" /><div className="mt-6"><SkeletonLoader type="carousel" /></div></CardContent></Card>
+                <Card><CardHeader><CardTitle>Content Preview</CardTitle></CardHeader><CardContent><SkeletonLoader type="content" /><div className="mt-6"><SkeletonLoader type="carousel" /></div></CardContent></Card>
               ) : (
                 <>
                   <PreviewSection

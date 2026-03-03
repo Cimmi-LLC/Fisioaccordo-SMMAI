@@ -26,7 +26,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             className="h-10 w-auto"
           />
           <h1 className="text-xl font-bold text-white">
-            Generatore di Post Social <Sparkles className="inline h-5 w-5 text-purple-300 ml-2" />
+            Social Post Generator <Sparkles className="inline h-5 w-5 text-purple-300 ml-2" />
           </h1>
         </div>
         <div className="flex items-center space-x-4">
@@ -40,7 +40,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             {showCopyImprover ? 'Hide' : 'Copy AI Pro'}
           </Button>
           <span className="text-gray-300 hidden sm:inline">
-            Ciao, {user?.user_metadata?.first_name || 'Utente'}!
+            Hi, {user?.user_metadata?.first_name || 'User'}!
           </span>
           <Button 
             variant="ghost" 

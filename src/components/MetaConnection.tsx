@@ -25,13 +25,12 @@ const MetaConnection: React.FC = () => {
       const data = await MetaService.getConnections();
       setConnections(data);
     } catch (error) {
-      console.error('Errore caricamento connessioni:', error);
+      console.error('Error loading connections:', error);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Listen for postMessage from auth popup
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'meta-auth-error' && event.data?.error_type === 'PERSONAL_ACCOUNT') {
@@ -57,8 +56,8 @@ const MetaConnection: React.FC = () => {
       MetaService.initiateAuth();
     } catch (error) {
       toast({
-        title: "Errore",
-        description: error instanceof Error ? error.message : "Impossibile avviare l'autenticazione",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Unable to start authentication",
         variant: "destructive"
       });
       setConnecting(false);
@@ -68,17 +67,17 @@ const MetaConnection: React.FC = () => {
   const handleDisconnect = async (connectionId: string) => {
     try {
       await MetaService.disconnect(connectionId);
-      toast({ title: "Disconnesso", description: "Account Meta disconnesso con successo" });
+      toast({ title: "Disconnected", description: "Meta account disconnected successfully" });
       loadConnections();
     } catch {
-      toast({ title: "Errore", description: "Impossibile disconnettere", variant: "destructive" });
+      toast({ title: "Error", description: "Unable to disconnect", variant: "destructive" });
     }
   };
 
   const handleSaveUsername = async (connectionId: string) => {
     const cleaned = usernameInput.replace(/^@/, '').trim();
     if (!cleaned) {
-      toast({ title: "Errore", description: "Inserisci un username valido", variant: "destructive" });
+      toast({ title: "Error", description: "Enter a valid username", variant: "destructive" });
       return;
     }
     setSavingUsername(true);
@@ -90,12 +89,12 @@ const MetaConnection: React.FC = () => {
 
       if (error) throw error;
 
-      toast({ title: "Salvato!", description: `Username @${cleaned} aggiornato` });
+      toast({ title: "Saved!", description: `Username @${cleaned} updated` });
       setEditingUsername(false);
       setUsernameInput('');
       loadConnections();
     } catch (err) {
-      toast({ title: "Errore", description: "Impossibile salvare l'username", variant: "destructive" });
+      toast({ title: "Error", description: "Unable to save username", variant: "destructive" });
     } finally {
       setSavingUsername(false);
     }
@@ -118,7 +117,7 @@ const MetaConnection: React.FC = () => {
       <CardHeader className="pb-3">
         <CardTitle className="text-card-foreground flex items-center gap-2 text-base">
           <Link2 className="h-5 w-5" />
-          Connessione Social
+          Social Connection
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -126,18 +125,17 @@ const MetaConnection: React.FC = () => {
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Badge className="bg-green-600/20 text-green-400 border-green-600/30">
-                ✅ Collegato
+                ✅ Connected
               </Badge>
             </div>
             
-            {/* Username display/edit */}
             {editingUsername ? (
               <div className="flex items-center gap-2">
                 <Instagram className="h-4 w-4 text-pink-500 shrink-0" />
                 <Input
                   value={usernameInput}
                   onChange={(e) => setUsernameInput(e.target.value)}
-                  placeholder="tuousername"
+                  placeholder="yourusername"
                   className="h-8 text-sm"
                   autoFocus
                   onKeyDown={(e) => {
@@ -145,21 +143,10 @@ const MetaConnection: React.FC = () => {
                     if (e.key === 'Escape') setEditingUsername(false);
                   }}
                 />
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 shrink-0"
-                  onClick={() => handleSaveUsername(activeConnection.id)}
-                  disabled={savingUsername}
-                >
+                <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => handleSaveUsername(activeConnection.id)} disabled={savingUsername}>
                   {savingUsername ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-green-500" />}
                 </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 shrink-0"
-                  onClick={() => setEditingUsername(false)}
-                >
+                <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => setEditingUsername(false)}>
                   <X className="h-3 w-3" />
                 </Button>
               </div>
@@ -167,52 +154,26 @@ const MetaConnection: React.FC = () => {
               <div className="flex items-center gap-2 text-sm text-card-foreground">
                 <Instagram className="h-4 w-4 text-pink-500" />
                 <span>@{activeConnection.instagram_username}</span>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-6 w-6"
-                  onClick={() => {
-                    setUsernameInput(activeConnection.instagram_username || '');
-                    setEditingUsername(true);
-                  }}
-                >
+                <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => { setUsernameInput(activeConnection.instagram_username || ''); setEditingUsername(true); }}>
                   <Pencil className="h-3 w-3 text-muted-foreground" />
                 </Button>
               </div>
             ) : (
               <div className="space-y-2">
                 <p className="text-xs text-amber-400">
-                  ⚠️ Username non recuperato automaticamente. Inseriscilo manualmente:
+                  ⚠️ Username not retrieved automatically. Enter it manually:
                 </p>
                 <div className="flex items-center gap-2">
                   <Instagram className="h-4 w-4 text-pink-500 shrink-0" />
-                  <Input
-                    value={usernameInput}
-                    onChange={(e) => setUsernameInput(e.target.value)}
-                    placeholder="tuousername"
-                    className="h-8 text-sm"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleSaveUsername(activeConnection.id);
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    onClick={() => handleSaveUsername(activeConnection.id)}
-                    disabled={savingUsername || !usernameInput.trim()}
-                    className="shrink-0"
-                  >
+                  <Input value={usernameInput} onChange={(e) => setUsernameInput(e.target.value)} placeholder="yourusername" className="h-8 text-sm" onKeyDown={(e) => { if (e.key === 'Enter') handleSaveUsername(activeConnection.id); }} />
+                  <Button size="sm" onClick={() => handleSaveUsername(activeConnection.id)} disabled={savingUsername || !usernameInput.trim()} className="shrink-0">
                     {savingUsername ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
                   </Button>
                 </div>
               </div>
             )}
 
-            <Button
-              onClick={() => handleDisconnect(activeConnection.id)}
-              variant="outline"
-              size="sm"
-              className="w-full mt-2"
-            >
+            <Button onClick={() => handleDisconnect(activeConnection.id)} variant="outline" size="sm" className="w-full mt-2">
               <Unlink className="mr-2 h-4 w-4" />
               Disconnect
             </Button>
@@ -220,28 +181,20 @@ const MetaConnection: React.FC = () => {
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Collega il tuo account Instagram Business per pubblicare direttamente.
+              Connect your Instagram Business account to publish directly.
             </p>
             
-            <Button
-              onClick={handleConnect}
-              disabled={connecting}
-              className="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white"
-            >
-              {connecting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Instagram className="mr-2 h-4 w-4" />
-              )}
+            <Button onClick={handleConnect} disabled={connecting} className="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white">
+              {connecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Instagram className="mr-2 h-4 w-4" />}
               Connect Instagram Business
             </Button>
 
             <div className="text-xs text-muted-foreground space-y-1">
-              <p className="font-medium">Requisiti:</p>
+              <p className="font-medium">Requirements:</p>
               <ol className="list-decimal list-inside space-y-0.5">
-                <li>Account Instagram Business o Creator</li>
-                <li>Profilo pubblico (non privato)</li>
-                <li>Se hai un account personale, convertilo: <span className="font-medium">Impostazioni → Account → Passa a un account professionale</span></li>
+                <li>Instagram Business or Creator account</li>
+                <li>Public profile (not private)</li>
+                <li>If you have a personal account, convert it: <span className="font-medium">Settings → Account → Switch to professional account</span></li>
               </ol>
             </div>
           </div>

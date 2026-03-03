@@ -43,17 +43,17 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
     try {
       await navigator.clipboard.writeText(generatedContent);
       setCopiedText(true);
-      toast({ title: "✅ Testo copiato!", description: "Incollalo nel tuo post social" });
+      toast({ title: "✅ Text copied!", description: "Paste it in your social post" });
       setTimeout(() => setCopiedText(false), 3000);
     } catch {
-      toast({ title: "Errore", description: "Non è stato possibile copiare il testo", variant: "destructive" });
+      toast({ title: "Error", description: "Could not copy text", variant: "destructive" });
     }
   };
 
   const downloadAllImages = async () => {
     const imageSlides = carouselSlides.filter(s => s.userImageUrl || s.imageUrl);
     if (imageSlides.length === 0) {
-      toast({ title: "Nessuna immagine", description: "Non ci sono immagini da scaricare" });
+      toast({ title: "No images", description: "There are no images to download" });
       return;
     }
     for (let i = 0; i < imageSlides.length; i++) {
@@ -71,10 +71,10 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
         window.URL.revokeObjectURL(blobUrl);
         document.body.removeChild(a);
       } catch {
-        console.error(`Errore download slide ${i + 1}`);
+        console.error(`Error downloading slide ${i + 1}`);
       }
     }
-    toast({ title: "📥 Download completato!", description: `${imageSlides.length} immagini scaricate` });
+    toast({ title: "📥 Download complete!", description: `${imageSlides.length} images downloaded` });
   };
 
   const handleOpenPlatform = async (platform: 'instagram' | 'facebook') => {
@@ -82,10 +82,10 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
     const hasImgs = carouselSlides.some(s => s.userImageUrl || s.imageUrl);
     if (hasImgs) await downloadAllImages();
     toast({
-      title: "✅ Tutto pronto!",
+      title: "✅ All ready!",
       description: hasImgs
-        ? "Testo copiato e immagini scaricate! Crea un nuovo post, seleziona le foto e incolla il testo."
-        : "Testo copiato! Crea un nuovo post e incolla il testo."
+        ? "Text copied and images downloaded! Create a new post, select the photos and paste the text."
+        : "Text copied! Create a new post and paste the text."
     });
     if (platform === 'instagram') {
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -104,13 +104,12 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
 
   return (
     <div className="bg-muted/30 border border-border rounded-lg p-4 space-y-4">
-      <h4 className="text-sm font-semibold text-foreground">📲 Pubblica il tuo contenuto</h4>
+      <h4 className="text-sm font-semibold text-foreground">📲 Publish Your Content</h4>
 
-      {/* === SEZIONE 1: Pubblicazione Diretta via API === */}
       {onPublishDirect && (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
-            ⚡ <strong>Pubblicazione automatica</strong> — Il post viene pubblicato direttamente sul tuo profilo collegato.
+            ⚡ <strong>Automatic publishing</strong> — The post is published directly to your connected profile.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Button
@@ -149,7 +148,6 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
         </div>
       )}
 
-      {/* === SEZIONE 2: Metodo manuale collassabile === */}
       <Collapsible open={manualOpen} onOpenChange={setManualOpen}>
         <CollapsibleTrigger asChild>
           <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground text-xs">
@@ -180,7 +178,7 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Copia il testo, scarica le immagini, poi apri il social e incolla manualmente.
+            Copy the text, download images, then open the social app and paste manually.
           </p>
         </CollapsibleContent>
       </Collapsible>

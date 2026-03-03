@@ -76,7 +76,7 @@ const HookGenerator: React.FC<HookGeneratorProps> = ({
             variant="ghost"
             size="sm"
           >
-            {showHookGenerator ? 'Nascondi' : 'Mostra'}
+            {showHookGenerator ? 'Hide' : 'Show'}
           </Button>
         </CardTitle>
       </CardHeader>
@@ -86,7 +86,7 @@ const HookGenerator: React.FC<HookGeneratorProps> = ({
             <Input
               value={hookTopic}
               onChange={(e) => setHookTopic(e.target.value)}
-              placeholder="Inserisci l'argomento (es. 'mal di schiena')"
+              placeholder="Enter a topic (e.g. 'back pain')"
               className="flex-1 glow-effect"
               disabled={isGenerating}
             />
@@ -98,12 +98,12 @@ const HookGenerator: React.FC<HookGeneratorProps> = ({
               {isGenerating ? (
                 <>
                   <Sparkles className="h-4 w-4 mr-2 animate-spin" />
-                  Generando...
+                  Generating...
                 </>
               ) : (
                 <>
                   <Zap className="h-4 w-4 mr-2" />
-                  Genera Hook
+                  Generate Hook
                 </>
               )}
             </Button>
@@ -114,7 +114,7 @@ const HookGenerator: React.FC<HookGeneratorProps> = ({
               <div className="flex items-center gap-2 mb-4">
                 <TrendingUp className="h-4 w-4 text-accent" />
                 <span className="text-sm text-muted-foreground">
-                  {generatedHooks.length} hook generati • Ordinati per virality score
+                  {generatedHooks.length} hooks generated • Sorted by virality score
                 </span>
               </div>
               
@@ -154,7 +154,7 @@ const HookGenerator: React.FC<HookGeneratorProps> = ({
                         size="sm"
                         className="bg-accent hover:bg-accent/90 shrink-0"
                       >
-                        Applica
+                        Apply
                       </Button>
                     </div>
                   </div>
