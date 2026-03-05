@@ -173,7 +173,7 @@ const Auth = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="signin" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2 bg-muted">
                 <TabsTrigger value="signin" className="data-[state=active]:bg-fisio data-[state=active]:text-fisio-foreground">
                   Login
