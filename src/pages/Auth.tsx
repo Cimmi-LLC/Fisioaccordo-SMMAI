@@ -78,8 +78,16 @@ const Auth = () => {
       });
 
       if (error) {
+        if (error.message.includes('already registered') || (error as any).code === 'user_already_exists') {
+          toast({
+            title: "📧 Email già registrata",
+            description: "Hai già un account! Ti portiamo al Login.",
+          });
+          setActiveTab('signin');
+          return;
+        }
         toast({
-          title: "Registration error",
+          title: "Errore di registrazione",
           description: error.message,
           variant: "destructive"
         });
