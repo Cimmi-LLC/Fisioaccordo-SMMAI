@@ -15,6 +15,7 @@ const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('signin');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -77,8 +78,16 @@ const Auth = () => {
       });
 
       if (error) {
+        if (error.message.includes('already registered') || (error as any).code === 'user_already_exists') {
+          toast({
+            title: "📧 Email già registrata",
+            description: "Hai già un account! Ti portiamo al Login.",
+          });
+          setActiveTab('signin');
+          return;
+        }
         toast({
-          title: "Registration error",
+          title: "Errore di registrazione",
           description: error.message,
           variant: "destructive"
         });
@@ -164,7 +173,7 @@ const Auth = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="signin" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2 bg-muted">
                 <TabsTrigger value="signin" className="data-[state=active]:bg-fisio data-[state=active]:text-fisio-foreground">
                   Login
