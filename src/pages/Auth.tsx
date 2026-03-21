@@ -202,22 +202,22 @@ const Auth = () => {
                   <div className="flex items-center space-x-2">
                     <Checkbox id="rememberMe" checked={rememberMe} onCheckedChange={(checked) => setRememberMe(checked as boolean)} />
                     <Label htmlFor="rememberMe" className="text-sm text-muted-foreground cursor-pointer">
-                      🔒 Remember me
+                      🔒 Ricordami
                     </Label>
                   </div>
                    
                    <button type="button" onClick={() => setShowForgotPassword(true)} className="text-sm text-fisio hover:underline w-full text-right">
-                     Forgot password?
+                     Password dimenticata?
                    </button>
 
                    <Button type="submit" disabled={loading} className="w-full bg-fisio hover:bg-fisio/90 text-fisio-foreground">
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Signing in...
+                        Accesso in corso...
                       </>
                     ) : (
-                      'Sign In'
+                      'Accedi'
                     )}
                   </Button>
                 </form>
