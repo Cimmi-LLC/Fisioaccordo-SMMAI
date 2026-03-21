@@ -227,21 +227,21 @@ const Auth = () => {
                 <form onSubmit={handleSignUp} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-muted-foreground">First Name</Label>
-                      <Input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} className="bg-muted border-border" placeholder="John" required />
+                      <Label className="text-muted-foreground">Nome</Label>
+                      <Input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} className="bg-muted border-border" placeholder="Mario" required />
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">Last Name</Label>
-                      <Input type="text" name="lastName" value={formData.lastName} onChange={handleInputChange} className="bg-muted border-border" placeholder="Doe" required />
+                      <Label className="text-muted-foreground">Cognome</Label>
+                      <Input type="text" name="lastName" value={formData.lastName} onChange={handleInputChange} className="bg-muted border-border" placeholder="Rossi" required />
                     </div>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Clinic/Studio</Label>
-                    <Input type="text" name="clinicName" value={formData.clinicName} onChange={handleInputChange} className="bg-muted border-border" placeholder="Physiotherapy Studio XYZ" />
+                    <Label className="text-muted-foreground">Studio/Clinica</Label>
+                    <Input type="text" name="clinicName" value={formData.clinicName} onChange={handleInputChange} className="bg-muted border-border" placeholder="Studio di Fisioterapia XYZ" />
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Email</Label>
-                    <Input type="email" name="email" value={formData.email} onChange={handleInputChange} className="bg-muted border-border" placeholder="your-email@example.com" required />
+                    <Input type="email" name="email" value={formData.email} onChange={handleInputChange} className="bg-muted border-border" placeholder="tua-email@esempio.com" required />
                   </div>
                    <div>
                      <Label className="text-muted-foreground">Password</Label>
@@ -257,12 +257,12 @@ const Auth = () => {
                     <div className="flex items-start space-x-2">
                       <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)} />
                       <Label htmlFor="terms" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
-                        I accept the <a href="/terms" className="text-fisio underline">Terms of Service</a>, the{' '}
-                        <a href="/privacy" className="text-fisio underline">Privacy Policy</a> and authorize 
-                        Cimmi LLC to process my personal data for service delivery, 
-                        commercial communications, and statistical analysis of generated content. 
-                        I understand that my data will be processed in compliance with GDPR and that I can 
-                        withdraw consent at any time.
+                        Accetto i <a href="/terms" className="text-fisio underline">Termini di Servizio</a>, la{' '}
+                        <a href="/privacy" className="text-fisio underline">Privacy Policy</a> e autorizzo
+                        Cimmi LLC a trattare i miei dati personali per l'erogazione del servizio,
+                        comunicazioni commerciali e analisi statistica dei contenuti generati.
+                        Comprendo che i miei dati saranno trattati in conformità al GDPR e che posso
+                        revocare il consenso in qualsiasi momento.
                       </Label>
                     </div>
                   </div>
@@ -271,10 +271,10 @@ const Auth = () => {
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Registering...
+                        Registrazione in corso...
                       </>
                     ) : (
-                      'Create Account'
+                      'Crea Account'
                     )}
                   </Button>
                 </form>
