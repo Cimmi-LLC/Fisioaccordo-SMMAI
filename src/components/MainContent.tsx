@@ -96,26 +96,26 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
       return;
     }
 
-    loadingState.startLoading('Preparing publication...');
-    loadingState.updateProgress(10, 'Checking connection...');
+    loadingState.startLoading('Preparazione pubblicazione...');
+    loadingState.updateProgress(10, 'Verifica connessione...');
 
     try {
       const isMetaConnected = await MetaService.isConnected();
       if (!isMetaConnected) {
-        toast({ title: "📋 Use Smart Copy", description: "Copy the text and download images from the preview to publish manually." });
-        loadingState.finishLoading(false, 'No active connection');
+        toast({ title: "📋 Usa Smart Copy", description: "Copia il testo e scarica le immagini dall'anteprima per pubblicare manualmente." });
+        loadingState.finishLoading(false, 'Nessuna connessione attiva');
         return;
       }
 
-      loadingState.updateProgress(20, 'Retrieving connection...');
+      loadingState.updateProgress(20, 'Recupero connessione...');
       const connections = await MetaService.getConnections();
       const connection = connections[0];
       if (!connection) {
-        loadingState.finishLoading(false, 'No valid connection found');
-        throw new Error('No active connection or expired token. Reconnect Instagram.');
+        loadingState.finishLoading(false, 'Nessuna connessione valida trovata');
+        throw new Error('Nessuna connessione attiva o token scaduto. Riconnetti Instagram.');
       }
 
-      loadingState.updateProgress(30, 'Preparing content...');
+      loadingState.updateProgress(30, 'Preparazione contenuto...');
 
       const imageUrl = basePhoto
         || carouselSlides.find(s => s.userImageUrl)?.userImageUrl
