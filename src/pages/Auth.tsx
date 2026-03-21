@@ -120,8 +120,8 @@ const Auth = () => {
 
       if (error) {
         toast({
-          title: "Login error",
-          description: error.message,
+          title: "Errore di accesso",
+          description: "Email o password non corretti. Usa 'Password dimenticata?' per reimpostarla.",
           variant: "destructive"
         });
       } else {
@@ -130,15 +130,15 @@ const Auth = () => {
         }
         
         toast({
-          title: "🚀 Welcome!",
-          description: "Successfully logged in"
+          title: "🚀 Benvenuto!",
+          description: "Accesso effettuato con successo"
         });
         navigate('/');
       }
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Error during login",
+        title: "Errore",
+        description: "Errore durante il login",
         variant: "destructive"
       });
     } finally {
