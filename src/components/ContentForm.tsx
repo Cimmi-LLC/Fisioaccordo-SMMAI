@@ -209,9 +209,9 @@ const ContentForm: React.FC<ContentFormProps> = ({
           onPhotoRemove={onPhotoRemove}
         />
 
-        {/* Platform Selection */}
+        {/* Selezione Piattaforme */}
         <div className="space-y-3">
-          <Label className="text-foreground text-lg font-medium">Publishing Platforms</Label>
+          <Label className="text-foreground text-lg font-medium">Piattaforme di Pubblicazione</Label>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {supportedPlatforms.map((platform) => (
               <div key={platform.id} className="flex items-center space-x-2 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
@@ -243,9 +243,9 @@ const ContentForm: React.FC<ContentFormProps> = ({
           )}
         </div>
 
-        {/* Schedule Date */}
+        {/* Pianifica Pubblicazione */}
         <div className="space-y-2">
-          <Label htmlFor="scheduleDate" className="text-foreground">Schedule Publication (Optional)</Label>
+          <Label htmlFor="scheduleDate" className="text-foreground">Pianifica Pubblicazione (Opzionale)</Label>
           <Input
             id="scheduleDate"
             type="datetime-local"
