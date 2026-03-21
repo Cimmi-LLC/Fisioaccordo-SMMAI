@@ -170,7 +170,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
           <span className="gradient-text">Social Post Generator</span> ✨
         </h1>
         <p className="text-base sm:text-lg text-muted-foreground px-4 max-w-2xl mx-auto">
-          Create engaging content for your social media with artificial intelligence
+          Crea contenuti coinvolgenti per i tuoi social media con l'intelligenza artificiale
         </p>
       </div>
 
