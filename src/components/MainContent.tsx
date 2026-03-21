@@ -208,7 +208,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
           <div className="grid lg:grid-cols-2 gap-6 sm:gap-8">
             <div className="space-y-4">
               {loadingState.isLoading ? (
-                <Card><CardHeader><CardTitle>Post Configuration</CardTitle></CardHeader><CardContent><SkeletonLoader type="form" /></CardContent></Card>
+                <Card><CardHeader><CardTitle>Configurazione Post</CardTitle></CardHeader><CardContent><SkeletonLoader type="form" /></CardContent></Card>
               ) : (
                 <>
                   <ContentForm
