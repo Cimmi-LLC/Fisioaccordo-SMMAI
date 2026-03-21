@@ -80,7 +80,7 @@ const MetaConnection: React.FC = () => {
   const handleSaveUsername = async (connectionId: string) => {
     const cleaned = usernameInput.replace(/^@/, '').trim();
     if (!cleaned) {
-      toast({ title: "Error", description: "Enter a valid username", variant: "destructive" });
+      toast({ title: "Errore", description: "Inserisci un username valido", variant: "destructive" });
       return;
     }
     setSavingUsername(true);
@@ -92,12 +92,12 @@ const MetaConnection: React.FC = () => {
 
       if (error) throw error;
 
-      toast({ title: "Saved!", description: `Username @${cleaned} updated` });
+      toast({ title: "Salvato!", description: `Username @${cleaned} aggiornato` });
       setEditingUsername(false);
       setUsernameInput('');
       loadConnections();
     } catch (err) {
-      toast({ title: "Error", description: "Unable to save username", variant: "destructive" });
+      toast({ title: "Errore", description: "Impossibile salvare l'username", variant: "destructive" });
     } finally {
       setSavingUsername(false);
     }
