@@ -194,11 +194,11 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
 
       <Tabs defaultValue="genera" className="mb-6">
         <TabsList className="grid grid-cols-5 w-full">
-          <TabsTrigger value="genera">✍️ Generate</TabsTrigger>
-          <TabsTrigger value="foto">📸 Photos</TabsTrigger>
+          <TabsTrigger value="genera">✍️ Genera</TabsTrigger>
+          <TabsTrigger value="foto">📸 Foto</TabsTrigger>
           <TabsTrigger value="memoria">🧠 AI Memory</TabsTrigger>
-          <TabsTrigger value="virale">🔍 Viral</TabsTrigger>
-          <TabsTrigger value="trend">🔥 Trends</TabsTrigger>
+          <TabsTrigger value="virale">🔍 Virale</TabsTrigger>
+          <TabsTrigger value="trend">🔥 Trend</TabsTrigger>
         </TabsList>
 
         <TabsContent value="genera" className="mt-4">
