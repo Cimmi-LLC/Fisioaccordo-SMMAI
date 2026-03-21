@@ -59,8 +59,8 @@ const MetaConnection: React.FC = () => {
       MetaService.initiateAuth();
     } catch (error) {
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Unable to start authentication",
+        title: "Errore",
+        description: error instanceof Error ? error.message : "Impossibile avviare l'autenticazione",
         variant: "destructive"
       });
       setConnecting(false);
@@ -70,10 +70,10 @@ const MetaConnection: React.FC = () => {
   const handleDisconnect = async (connectionId: string) => {
     try {
       await MetaService.disconnect(connectionId);
-      toast({ title: "Disconnected", description: "Meta account disconnected successfully" });
+      toast({ title: "Disconnesso", description: "Account Meta disconnesso con successo" });
       loadConnections();
     } catch {
-      toast({ title: "Error", description: "Unable to disconnect", variant: "destructive" });
+      toast({ title: "Errore", description: "Impossibile disconnettere", variant: "destructive" });
     }
   };
 
