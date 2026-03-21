@@ -93,14 +93,14 @@ const Auth = () => {
         });
       } else {
         toast({
-          title: "🎉 Registration complete!",
-          description: "Check your email to activate your account"
+          title: "🎉 Registrazione completata!",
+          description: "Controlla la tua email per attivare l'account"
         });
       }
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Error during registration",
+        title: "Errore",
+        description: "Errore durante la registrazione",
         variant: "destructive"
       });
     } finally {
