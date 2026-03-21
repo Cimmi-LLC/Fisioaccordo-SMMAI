@@ -83,16 +83,16 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
 
   const handleUseTrend = (topic: string) => {
     setFormData(prev => ({ ...prev, description: topic }));
-    toast({ title: '🔥 Trend selected!', description: `"${topic}" inserted into the form. Generate the post!` });
+    toast({ title: '🔥 Trend selezionato!', description: `"${topic}" inserito nel form. Genera il post!` });
   };
 
   const handlePublish = async (platforms: string[]) => {
     if (!generatedContent) {
-      toast({ title: "❌ Error", description: "Generate content first before publishing", variant: "destructive" });
+      toast({ title: "❌ Errore", description: "Genera prima il contenuto prima di pubblicare", variant: "destructive" });
       return;
     }
     if (isGeneratingImages) {
-      toast({ title: "⏳ Wait", description: "Images are still being created. Try again in a few seconds." });
+      toast({ title: "⏳ Attendi", description: "Le immagini sono ancora in fase di creazione. Riprova tra qualche secondo." });
       return;
     }
 
