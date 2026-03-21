@@ -130,7 +130,7 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
         console.error(`Error downloading slide ${i + 1}`);
       }
     }
-    toast({ title: "📥 Download complete!", description: `${imageSlides.length} images downloaded` });
+    toast({ title: "📥 Download completato!", description: `${imageSlides.length} immagini scaricate` });
   };
 
   const handleOpenPlatform = async (platform: 'instagram' | 'facebook') => {
@@ -138,10 +138,10 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
     const hasImgs = carouselSlides.some(s => s.userImageUrl || s.imageUrl);
     if (hasImgs) await downloadAllImages();
     toast({
-      title: "✅ All ready!",
+      title: "✅ Tutto pronto!",
       description: hasImgs
-        ? "Text copied and images downloaded! Create a new post, select the photos and paste the text."
-        : "Text copied! Create a new post and paste the text."
+        ? "Testo copiato e immagini scaricate! Crea un nuovo post, seleziona le foto e incolla il testo."
+        : "Testo copiato! Crea un nuovo post e incolla il testo."
     });
     if (platform === 'instagram') {
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
