@@ -223,7 +223,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
                   />
                   <div className="text-center">
                     <button onClick={() => setShowViralGenerator(!showViralGenerator)} className="text-accent hover:text-accent/80 underline text-sm font-medium transition-colors">
-                      {showViralGenerator ? '🔥 Hide Viral Formats' : '🔥 Show Viral Formats'}
+                      {showViralGenerator ? '🔥 Nascondi Formati Virali' : '🔥 Mostra Formati Virali'}
                     </button>
                   </div>
                 </>
