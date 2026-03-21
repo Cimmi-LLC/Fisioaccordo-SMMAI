@@ -94,40 +94,40 @@ const ContentForm: React.FC<ContentFormProps> = ({
 
         {/* Options grid */}
         <div className="grid grid-cols-2 gap-4">
-          {/* Length */}
+          {/* Lunghezza */}
           <div>
-            <Label className="text-foreground">Length</Label>
+            <Label className="text-foreground">Lunghezza</Label>
             <Select value={formData.length} onValueChange={(value) => onInputChange('length', value)}>
               <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
-                <SelectItem value="corto">Short</SelectItem>
-                <SelectItem value="medio">Medium</SelectItem>
-                <SelectItem value="lungo">Long</SelectItem>
+                <SelectItem value="corto">Corto</SelectItem>
+                <SelectItem value="medio">Medio</SelectItem>
+                <SelectItem value="lungo">Lungo</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Tone */}
+          {/* Tono */}
           <div>
-            <Label className="text-foreground">Tone</Label>
+            <Label className="text-foreground">Tono</Label>
             <Select value={formData.tone} onValueChange={(value) => onInputChange('tone', value)}>
               <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
-                <SelectItem value="professionale">Professional</SelectItem>
-                <SelectItem value="informale">Casual</SelectItem>
-                <SelectItem value="divertente">Fun</SelectItem>
-                <SelectItem value="motivazionale">Motivational</SelectItem>
+                <SelectItem value="professionale">Professionale</SelectItem>
+                <SelectItem value="informale">Informale</SelectItem>
+                <SelectItem value="divertente">Divertente</SelectItem>
+                <SelectItem value="motivazionale">Motivazionale</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Platform */}
+          {/* Piattaforma */}
           <div>
-            <Label className="text-foreground">Platform</Label>
+            <Label className="text-foreground">Piattaforma</Label>
             <Select value={formData.platform} onValueChange={(value) => onInputChange('platform', value)}>
               <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
@@ -140,51 +140,51 @@ const ContentForm: React.FC<ContentFormProps> = ({
             </Select>
           </div>
 
-          {/* Post Type */}
+          {/* Tipo di Post */}
           <div>
-            <Label className="text-foreground">Post Type</Label>
+            <Label className="text-foreground">Tipo di Post</Label>
             <Select value={formData.postType} onValueChange={(value) => onInputChange('postType', value)}>
               <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
-                <SelectItem value="carosello">Carousel</SelectItem>
-                <SelectItem value="post-singolo">Single Post</SelectItem>
-                <SelectItem value="storia">Story</SelectItem>
+                <SelectItem value="carosello">Carosello</SelectItem>
+                <SelectItem value="post-singolo">Post Singolo</SelectItem>
+                <SelectItem value="storia">Storia</SelectItem>
                 <SelectItem value="reel">Reel</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Number of Slides */}
+          {/* Numero di Slide */}
           <div>
-            <Label className="text-foreground">Number of Slides</Label>
+            <Label className="text-foreground">Numero di Slide</Label>
             <Select value={formData.numSlides} onValueChange={(value) => onInputChange('numSlides', value)}>
               <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
-                <SelectItem value="3">3 Slides</SelectItem>
-                <SelectItem value="5">5 Slides</SelectItem>
-                <SelectItem value="7">7 Slides</SelectItem>
-                <SelectItem value="10">10 Slides</SelectItem>
+                <SelectItem value="3">3 Slide</SelectItem>
+                <SelectItem value="5">5 Slide</SelectItem>
+                <SelectItem value="7">7 Slide</SelectItem>
+                <SelectItem value="10">10 Slide</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          {/* Number of Images */}
+          {/* Numero di Immagini */}
           <div>
-            <Label className="text-foreground">Number of Images</Label>
+            <Label className="text-foreground">Numero di Immagini</Label>
             <Select value={formData.numImages} onValueChange={(value) => onInputChange('numImages', value)}>
               <SelectTrigger className="bg-input border-border text-foreground">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-popover border-border">
-                <SelectItem value="1">1 Image</SelectItem>
-                <SelectItem value="2">2 Images</SelectItem>
-                <SelectItem value="3">3 Images</SelectItem>
-                <SelectItem value="4">4 Images</SelectItem>
-                <SelectItem value="5">5 Images</SelectItem>
+                <SelectItem value="1">1 Immagine</SelectItem>
+                <SelectItem value="2">2 Immagini</SelectItem>
+                <SelectItem value="3">3 Immagini</SelectItem>
+                <SelectItem value="4">4 Immagini</SelectItem>
+                <SelectItem value="5">5 Immagini</SelectItem>
               </SelectContent>
             </Select>
           </div>
