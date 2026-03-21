@@ -63,31 +63,31 @@ const ContentForm: React.FC<ContentFormProps> = ({
     <Card className="backdrop-blur-enhanced">
       <CardHeader>
         <CardTitle className="text-foreground">
-          Create Your Content
+          Crea il Tuo Contenuto
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* 1. Describe your post */}
+        {/* 1. Descrivi il tuo post */}
         <div>
-          <Label className="text-foreground text-lg font-medium">1. Describe Your Post</Label>
+          <Label className="text-foreground text-lg font-medium">1. Descrivi il Tuo Post</Label>
           <Textarea
             value={formData.description}
             onChange={(e) => onInputChange('description', e.target.value)}
-            placeholder="e.g. back pain from sitting at desk"
+            placeholder="es. mal di schiena da scrivania"
             className="bg-input border-border text-foreground mt-2 min-h-[100px] focus:border-primary focus:ring-primary"
           />
         </div>
 
-        {/* 2. Define your Audience */}
+        {/* 2. Definisci il Pubblico */}
         <div>
           <Label className="text-foreground text-lg font-medium flex items-center">
             <User className="h-4 w-4 mr-2 text-primary" />
-            2. Define Your Audience (Optional)
+            2. Definisci il Tuo Pubblico (Opzionale)
           </Label>
           <Input
             value={formData.audience}
             onChange={(e) => onInputChange('audience', e.target.value)}
-            placeholder="e.g. office workers"
+            placeholder="es. lavoratori in ufficio"
             className="bg-input border-border text-foreground mt-2 focus:border-primary focus:ring-primary"
           />
         </div>
