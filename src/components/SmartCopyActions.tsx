@@ -99,17 +99,17 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
     try {
       await navigator.clipboard.writeText(generatedContent);
       setCopiedText(true);
-      toast({ title: "✅ Text copied!", description: "Paste it in your social post" });
+      toast({ title: "✅ Testo copiato!", description: "Incollalo nel tuo post social" });
       setTimeout(() => setCopiedText(false), 3000);
     } catch {
-      toast({ title: "Error", description: "Could not copy text", variant: "destructive" });
+      toast({ title: "Errore", description: "Impossibile copiare il testo", variant: "destructive" });
     }
   };
 
   const downloadAllImages = async () => {
     const imageSlides = carouselSlides.filter(s => s.userImageUrl || s.imageUrl);
     if (imageSlides.length === 0) {
-      toast({ title: "No images", description: "There are no images to download" });
+      toast({ title: "Nessuna immagine", description: "Non ci sono immagini da scaricare" });
       return;
     }
     for (let i = 0; i < imageSlides.length; i++) {
