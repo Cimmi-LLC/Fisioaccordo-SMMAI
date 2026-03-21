@@ -120,7 +120,7 @@ const MetaConnection: React.FC = () => {
       <CardHeader className="pb-3">
         <CardTitle className="text-card-foreground flex items-center gap-2 text-base">
           <Link2 className="h-5 w-5" />
-          Social Connection
+          Connessione Social
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -128,7 +128,7 @@ const MetaConnection: React.FC = () => {
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Badge className="bg-green-600/20 text-green-400 border-green-600/30">
-                ✅ Connected
+                ✅ Connesso
               </Badge>
             </div>
             
