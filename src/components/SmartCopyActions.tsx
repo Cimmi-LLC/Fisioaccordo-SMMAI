@@ -20,13 +20,13 @@ interface SmartCopyActionsProps {
 }
 
 const INITIAL_STEPS: PipelineStep[] = [
-  { label: 'Verifying connection...', status: 'pending' },
-  { label: 'Preparing content and caption', status: 'pending' },
-  { label: 'Uploading images', status: 'pending' },
-  { label: 'Creating media container', status: 'pending' },
-  { label: 'Waiting for media processing', status: 'pending' },
-  { label: 'Publishing to feed', status: 'pending' },
-  { label: 'Publication confirmed! ✨', status: 'pending' },
+  { label: 'Verifica connessione...', status: 'pending' },
+  { label: 'Preparazione contenuto e caption', status: 'pending' },
+  { label: 'Caricamento immagini', status: 'pending' },
+  { label: 'Creazione container media', status: 'pending' },
+  { label: 'Attesa elaborazione media', status: 'pending' },
+  { label: 'Pubblicazione sul feed', status: 'pending' },
+  { label: 'Pubblicazione confermata! ✨', status: 'pending' },
 ];
 
 const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
