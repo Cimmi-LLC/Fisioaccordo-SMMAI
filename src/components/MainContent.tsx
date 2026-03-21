@@ -126,14 +126,14 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
       const errors: string[] = [];
 
       for (const platform of platforms) {
-        loadingState.updateProgress(50, `Publishing on ${platform}...`);
+        loadingState.updateProgress(50, `Pubblicazione su ${platform}...`);
 
         if (platform === 'facebook') {
           const result = await MetaService.publishToFacebook(connection.id, generatedContent, imageUrl);
           if (result.success) { publishedCount++; } else { errors.push(`Facebook: ${result.error}`); }
         } else if (platform === 'instagram') {
           if (!imageUrl) {
-            errors.push("Image generation failed. Upload a photo manually or try generating content again.");
+            errors.push("Generazione immagine fallita. Carica una foto manualmente o riprova a generare il contenuto.");
             continue;
           }
           const carouselUrls = carouselSlides
@@ -148,18 +148,18 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
         }
       }
 
-      loadingState.updateProgress(90, 'Completing...');
+      loadingState.updateProgress(90, 'Finalizzazione...');
 
       if (publishedCount > 0) {
-        toast({ title: "🎉 Published!", description: `Content published on ${publishedCount} platform${publishedCount > 1 ? 's' : ''}` });
-        loadingState.finishLoading(true, 'Published successfully!');
+        toast({ title: "🎉 Pubblicato!", description: `Contenuto pubblicato su ${publishedCount} piattaform${publishedCount > 1 ? 'e' : 'a'}` });
+        loadingState.finishLoading(true, 'Pubblicazione completata!');
       } else if (errors.length > 0) {
-        toast({ title: "❌ Publishing failed", description: errors.join(' | '), variant: "destructive" });
+        toast({ title: "❌ Pubblicazione fallita", description: errors.join(' | '), variant: "destructive" });
         loadingState.finishLoading(false, errors.join(' | '));
       }
     } catch (error) {
-      toast({ title: "❌ Publishing Error", description: error instanceof Error ? error.message : 'Unknown error', variant: "destructive" });
-      loadingState.finishLoading(false, error instanceof Error ? error.message : 'Unknown error');
+      toast({ title: "❌ Errore di pubblicazione", description: error instanceof Error ? error.message : 'Errore sconosciuto', variant: "destructive" });
+      loadingState.finishLoading(false, error instanceof Error ? error.message : 'Errore sconosciuto');
     }
   };
 
