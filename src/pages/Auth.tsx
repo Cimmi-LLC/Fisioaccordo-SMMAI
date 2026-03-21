@@ -162,24 +162,24 @@ const Auth = () => {
             FisioAccordo<span className="text-fisio">(VIRAL)</span>ContentAI
           </h1>
           <p className="text-muted-foreground">
-            Generate professional content for your social media
+            Genera contenuti professionali per i tuoi social media
           </p>
         </div>
 
         <Card className="bg-card/90 border-border backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-card-foreground text-center">
-              Access the Platform
+              Accedi alla Piattaforma
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2 bg-muted">
                 <TabsTrigger value="signin" className="data-[state=active]:bg-fisio data-[state=active]:text-fisio-foreground">
-                  Login
+                  Accedi
                 </TabsTrigger>
                 <TabsTrigger value="signup" className="data-[state=active]:bg-fisio data-[state=active]:text-fisio-foreground">
-                  Sign Up
+                  Registrati
                 </TabsTrigger>
               </TabsList>
               
