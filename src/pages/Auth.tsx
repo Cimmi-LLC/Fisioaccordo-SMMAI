@@ -52,8 +52,8 @@ const Auth = () => {
     
     if (!agreedToTerms) {
       toast({
-        title: "Terms and Conditions",
-        description: "You must accept the terms and conditions to register",
+        title: "Termini e Condizioni",
+        description: "Devi accettare i termini e condizioni per registrarti",
         variant: "destructive"
       });
       return;
@@ -93,14 +93,14 @@ const Auth = () => {
         });
       } else {
         toast({
-          title: "🎉 Registration complete!",
-          description: "Check your email to activate your account"
+          title: "🎉 Registrazione completata!",
+          description: "Controlla la tua email per attivare l'account"
         });
       }
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Error during registration",
+        title: "Errore",
+        description: "Errore durante la registrazione",
         variant: "destructive"
       });
     } finally {
@@ -120,8 +120,8 @@ const Auth = () => {
 
       if (error) {
         toast({
-          title: "Login error",
-          description: error.message,
+          title: "Errore di accesso",
+          description: "Email o password non corretti. Usa 'Password dimenticata?' per reimpostarla.",
           variant: "destructive"
         });
       } else {
@@ -130,15 +130,15 @@ const Auth = () => {
         }
         
         toast({
-          title: "🚀 Welcome!",
-          description: "Successfully logged in"
+          title: "🚀 Benvenuto!",
+          description: "Accesso effettuato con successo"
         });
         navigate('/');
       }
     } catch (error) {
       toast({
-        title: "Error",
-        description: "Error during login",
+        title: "Errore",
+        description: "Errore durante il login",
         variant: "destructive"
       });
     } finally {
@@ -162,24 +162,24 @@ const Auth = () => {
             FisioAccordo<span className="text-fisio">(VIRAL)</span>ContentAI
           </h1>
           <p className="text-muted-foreground">
-            Generate professional content for your social media
+            Genera contenuti professionali per i tuoi social media
           </p>
         </div>
 
         <Card className="bg-card/90 border-border backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-card-foreground text-center">
-              Access the Platform
+              Accedi alla Piattaforma
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2 bg-muted">
                 <TabsTrigger value="signin" className="data-[state=active]:bg-fisio data-[state=active]:text-fisio-foreground">
-                  Login
+                  Accedi
                 </TabsTrigger>
                 <TabsTrigger value="signup" className="data-[state=active]:bg-fisio data-[state=active]:text-fisio-foreground">
-                  Sign Up
+                  Registrati
                 </TabsTrigger>
               </TabsList>
               
@@ -202,22 +202,22 @@ const Auth = () => {
                   <div className="flex items-center space-x-2">
                     <Checkbox id="rememberMe" checked={rememberMe} onCheckedChange={(checked) => setRememberMe(checked as boolean)} />
                     <Label htmlFor="rememberMe" className="text-sm text-muted-foreground cursor-pointer">
-                      🔒 Remember me
+                      🔒 Ricordami
                     </Label>
                   </div>
                    
                    <button type="button" onClick={() => setShowForgotPassword(true)} className="text-sm text-fisio hover:underline w-full text-right">
-                     Forgot password?
+                     Password dimenticata?
                    </button>
 
                    <Button type="submit" disabled={loading} className="w-full bg-fisio hover:bg-fisio/90 text-fisio-foreground">
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Signing in...
+                        Accesso in corso...
                       </>
                     ) : (
-                      'Sign In'
+                      'Accedi'
                     )}
                   </Button>
                 </form>
@@ -227,21 +227,21 @@ const Auth = () => {
                 <form onSubmit={handleSignUp} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-muted-foreground">First Name</Label>
-                      <Input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} className="bg-muted border-border" placeholder="John" required />
+                      <Label className="text-muted-foreground">Nome</Label>
+                      <Input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} className="bg-muted border-border" placeholder="Mario" required />
                     </div>
                     <div>
-                      <Label className="text-muted-foreground">Last Name</Label>
-                      <Input type="text" name="lastName" value={formData.lastName} onChange={handleInputChange} className="bg-muted border-border" placeholder="Doe" required />
+                      <Label className="text-muted-foreground">Cognome</Label>
+                      <Input type="text" name="lastName" value={formData.lastName} onChange={handleInputChange} className="bg-muted border-border" placeholder="Rossi" required />
                     </div>
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Clinic/Studio</Label>
-                    <Input type="text" name="clinicName" value={formData.clinicName} onChange={handleInputChange} className="bg-muted border-border" placeholder="Physiotherapy Studio XYZ" />
+                    <Label className="text-muted-foreground">Studio/Clinica</Label>
+                    <Input type="text" name="clinicName" value={formData.clinicName} onChange={handleInputChange} className="bg-muted border-border" placeholder="Studio di Fisioterapia XYZ" />
                   </div>
                   <div>
                     <Label className="text-muted-foreground">Email</Label>
-                    <Input type="email" name="email" value={formData.email} onChange={handleInputChange} className="bg-muted border-border" placeholder="your-email@example.com" required />
+                    <Input type="email" name="email" value={formData.email} onChange={handleInputChange} className="bg-muted border-border" placeholder="tua-email@esempio.com" required />
                   </div>
                    <div>
                      <Label className="text-muted-foreground">Password</Label>
@@ -257,12 +257,12 @@ const Auth = () => {
                     <div className="flex items-start space-x-2">
                       <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)} />
                       <Label htmlFor="terms" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
-                        I accept the <a href="/terms" className="text-fisio underline">Terms of Service</a>, the{' '}
-                        <a href="/privacy" className="text-fisio underline">Privacy Policy</a> and authorize 
-                        Cimmi LLC to process my personal data for service delivery, 
-                        commercial communications, and statistical analysis of generated content. 
-                        I understand that my data will be processed in compliance with GDPR and that I can 
-                        withdraw consent at any time.
+                        Accetto i <a href="/terms" className="text-fisio underline">Termini di Servizio</a>, la{' '}
+                        <a href="/privacy" className="text-fisio underline">Privacy Policy</a> e autorizzo
+                        Cimmi LLC a trattare i miei dati personali per l'erogazione del servizio,
+                        comunicazioni commerciali e analisi statistica dei contenuti generati.
+                        Comprendo che i miei dati saranno trattati in conformità al GDPR e che posso
+                        revocare il consenso in qualsiasi momento.
                       </Label>
                     </div>
                   </div>
@@ -271,10 +271,10 @@ const Auth = () => {
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Registering...
+                        Registrazione in corso...
                       </>
                     ) : (
-                      'Create Account'
+                      'Crea Account'
                     )}
                   </Button>
                 </form>
@@ -284,23 +284,23 @@ const Auth = () => {
         </Card>
 
         <div className="text-center mt-6 text-foreground/70 text-sm">
-          <p>Create professional content for Instagram, LinkedIn, and Facebook</p>
-          <p className="mt-2">✨ AI copywriting + automatically generated images</p>
+          <p>Crea contenuti professionali per Instagram, LinkedIn e Facebook</p>
+          <p className="mt-2">✨ Copywriting AI + immagini generate automaticamente</p>
         </div>
 
         <div className="mt-8 p-4 bg-card/50 rounded-lg border border-border">
           <p className="text-xs text-muted-foreground text-center leading-relaxed">
-            © {new Date().getFullYear()} Cimmi LLC. All rights reserved. | <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a> | <a href="/terms" className="text-primary hover:underline">Terms of Service</a><br/>
-            POST PER I SOCIAL 2-IG is the exclusive property of Cimmi LLC.<br/>
-            Copying, reproduction, or replication of this platform without written authorization is prohibited.
+            © {new Date().getFullYear()} Cimmi LLC. Tutti i diritti riservati. | <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a> | <a href="/terms" className="text-primary hover:underline">Termini di Servizio</a><br/>
+            POST PER I SOCIAL 2-IG è di proprietà esclusiva di Cimmi LLC.<br/>
+            È vietata la copia, riproduzione o replica di questa piattaforma senza autorizzazione scritta.
           </p>
         </div>
 
         <Dialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
           <DialogContent className="bg-card border-border">
             <DialogHeader>
-              <DialogTitle className="text-card-foreground">Reset Password</DialogTitle>
-              <DialogDescription>Enter your email and we'll send you a link to reset your password.</DialogDescription>
+              <DialogTitle className="text-card-foreground">Reimposta Password</DialogTitle>
+              <DialogDescription>Inserisci la tua email e ti invieremo un link per reimpostare la password.</DialogDescription>
             </DialogHeader>
             <form onSubmit={async (e) => {
               e.preventDefault();
@@ -310,24 +310,24 @@ const Auth = () => {
                   redirectTo: `${window.location.origin}/reset-password`
                 });
                 if (error) {
-                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                  toast({ title: "Errore", description: error.message, variant: "destructive" });
                 } else {
-                  toast({ title: "📧 Email sent!", description: "Check your inbox for the recovery link" });
+                  toast({ title: "📧 Email inviata!", description: "Controlla la tua casella di posta per il link di recupero" });
                   setShowForgotPassword(false);
                   setForgotEmail('');
                 }
               } catch {
-                toast({ title: "Error", description: "Error sending email", variant: "destructive" });
+                toast({ title: "Errore", description: "Errore nell'invio dell'email", variant: "destructive" });
               } finally {
                 setForgotLoading(false);
               }
             }} className="space-y-4">
               <div>
                 <Label className="text-muted-foreground">Email</Label>
-                <Input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} className="bg-muted border-border" placeholder="your-email@example.com" required />
+                <Input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} className="bg-muted border-border" placeholder="tua-email@esempio.com" required />
               </div>
               <Button type="submit" disabled={forgotLoading} className="w-full bg-fisio hover:bg-fisio/90 text-fisio-foreground">
-                {forgotLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : 'Send Recovery Link'}
+                {forgotLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Invio in corso...</> : 'Invia Link di Recupero'}
               </Button>
             </form>
           </DialogContent>

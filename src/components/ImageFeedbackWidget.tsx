@@ -27,12 +27,12 @@ const ImageFeedbackWidget: React.FC<ImageFeedbackWidgetProps> = ({ imageContext 
     setTimeout(() => { setSent(false); setShowComment(false); setComment(''); setIsPositive(null); }, 2000);
   };
 
-  if (sent) return <p className="text-xs text-center text-muted-foreground py-2">✅ Image feedback saved! The AI will improve.</p>;
+  if (sent) return <p className="text-xs text-center text-muted-foreground py-2">✅ Feedback immagini salvato! L'AI migliorerà.</p>;
 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 justify-center">
-        <span className="text-xs text-muted-foreground">How do the images look?</span>
+        <span className="text-xs text-muted-foreground">Com'è venuta la grafica?</span>
         <Button size="sm" variant={isPositive === true ? 'default' : 'ghost'} className="h-7 w-7 p-0" onClick={() => handleVote(true)}>
           <ThumbsUp className="h-3.5 w-3.5" />
         </Button>
@@ -42,7 +42,7 @@ const ImageFeedbackWidget: React.FC<ImageFeedbackWidgetProps> = ({ imageContext 
       </div>
       {showComment && (
         <div className="flex gap-1.5">
-          <Textarea placeholder="E.g.: too dark, prefer warm colors, more minimalist..." value={comment} onChange={e => setComment(e.target.value)} rows={1} className="text-xs" />
+          <Textarea placeholder="Es.: troppo scura, preferisco colori caldi, più minimalista..." value={comment} onChange={e => setComment(e.target.value)} rows={1} className="text-xs" />
           <Button size="sm" className="h-8" onClick={handleSend}><Send className="h-3.5 w-3.5" /></Button>
         </div>
       )}

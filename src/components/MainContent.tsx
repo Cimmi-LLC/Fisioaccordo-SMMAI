@@ -83,39 +83,39 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
 
   const handleUseTrend = (topic: string) => {
     setFormData(prev => ({ ...prev, description: topic }));
-    toast({ title: '🔥 Trend selected!', description: `"${topic}" inserted into the form. Generate the post!` });
+    toast({ title: '🔥 Trend selezionato!', description: `"${topic}" inserito nel form. Genera il post!` });
   };
 
   const handlePublish = async (platforms: string[]) => {
     if (!generatedContent) {
-      toast({ title: "❌ Error", description: "Generate content first before publishing", variant: "destructive" });
+      toast({ title: "❌ Errore", description: "Genera prima il contenuto prima di pubblicare", variant: "destructive" });
       return;
     }
     if (isGeneratingImages) {
-      toast({ title: "⏳ Wait", description: "Images are still being created. Try again in a few seconds." });
+      toast({ title: "⏳ Attendi", description: "Le immagini sono ancora in fase di creazione. Riprova tra qualche secondo." });
       return;
     }
 
-    loadingState.startLoading('Preparing publication...');
-    loadingState.updateProgress(10, 'Checking connection...');
+    loadingState.startLoading('Preparazione pubblicazione...');
+    loadingState.updateProgress(10, 'Verifica connessione...');
 
     try {
       const isMetaConnected = await MetaService.isConnected();
       if (!isMetaConnected) {
-        toast({ title: "📋 Use Smart Copy", description: "Copy the text and download images from the preview to publish manually." });
-        loadingState.finishLoading(false, 'No active connection');
+        toast({ title: "📋 Usa Smart Copy", description: "Copia il testo e scarica le immagini dall'anteprima per pubblicare manualmente." });
+        loadingState.finishLoading(false, 'Nessuna connessione attiva');
         return;
       }
 
-      loadingState.updateProgress(20, 'Retrieving connection...');
+      loadingState.updateProgress(20, 'Recupero connessione...');
       const connections = await MetaService.getConnections();
       const connection = connections[0];
       if (!connection) {
-        loadingState.finishLoading(false, 'No valid connection found');
-        throw new Error('No active connection or expired token. Reconnect Instagram.');
+        loadingState.finishLoading(false, 'Nessuna connessione valida trovata');
+        throw new Error('Nessuna connessione attiva o token scaduto. Riconnetti Instagram.');
       }
 
-      loadingState.updateProgress(30, 'Preparing content...');
+      loadingState.updateProgress(30, 'Preparazione contenuto...');
 
       const imageUrl = basePhoto
         || carouselSlides.find(s => s.userImageUrl)?.userImageUrl
@@ -126,14 +126,14 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
       const errors: string[] = [];
 
       for (const platform of platforms) {
-        loadingState.updateProgress(50, `Publishing on ${platform}...`);
+        loadingState.updateProgress(50, `Pubblicazione su ${platform}...`);
 
         if (platform === 'facebook') {
           const result = await MetaService.publishToFacebook(connection.id, generatedContent, imageUrl);
           if (result.success) { publishedCount++; } else { errors.push(`Facebook: ${result.error}`); }
         } else if (platform === 'instagram') {
           if (!imageUrl) {
-            errors.push("Image generation failed. Upload a photo manually or try generating content again.");
+            errors.push("Generazione immagine fallita. Carica una foto manualmente o riprova a generare il contenuto.");
             continue;
           }
           const carouselUrls = carouselSlides
@@ -148,18 +148,18 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
         }
       }
 
-      loadingState.updateProgress(90, 'Completing...');
+      loadingState.updateProgress(90, 'Finalizzazione...');
 
       if (publishedCount > 0) {
-        toast({ title: "🎉 Published!", description: `Content published on ${publishedCount} platform${publishedCount > 1 ? 's' : ''}` });
-        loadingState.finishLoading(true, 'Published successfully!');
+        toast({ title: "🎉 Pubblicato!", description: `Contenuto pubblicato su ${publishedCount} piattaform${publishedCount > 1 ? 'e' : 'a'}` });
+        loadingState.finishLoading(true, 'Pubblicazione completata!');
       } else if (errors.length > 0) {
-        toast({ title: "❌ Publishing failed", description: errors.join(' | '), variant: "destructive" });
+        toast({ title: "❌ Pubblicazione fallita", description: errors.join(' | '), variant: "destructive" });
         loadingState.finishLoading(false, errors.join(' | '));
       }
     } catch (error) {
-      toast({ title: "❌ Publishing Error", description: error instanceof Error ? error.message : 'Unknown error', variant: "destructive" });
-      loadingState.finishLoading(false, error instanceof Error ? error.message : 'Unknown error');
+      toast({ title: "❌ Errore di pubblicazione", description: error instanceof Error ? error.message : 'Errore sconosciuto', variant: "destructive" });
+      loadingState.finishLoading(false, error instanceof Error ? error.message : 'Errore sconosciuto');
     }
   };
 
@@ -170,7 +170,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
           <span className="gradient-text">Social Post Generator</span> ✨
         </h1>
         <p className="text-base sm:text-lg text-muted-foreground px-4 max-w-2xl mx-auto">
-          Create engaging content for your social media with artificial intelligence
+          Crea contenuti coinvolgenti per i tuoi social media con l'intelligenza artificiale
         </p>
       </div>
 
@@ -194,11 +194,11 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
 
       <Tabs defaultValue="genera" className="mb-6">
         <TabsList className="grid grid-cols-5 w-full">
-          <TabsTrigger value="genera">✍️ Generate</TabsTrigger>
-          <TabsTrigger value="foto">📸 Photos</TabsTrigger>
+          <TabsTrigger value="genera">✍️ Genera</TabsTrigger>
+          <TabsTrigger value="foto">📸 Foto</TabsTrigger>
           <TabsTrigger value="memoria">🧠 AI Memory</TabsTrigger>
-          <TabsTrigger value="virale">🔍 Viral</TabsTrigger>
-          <TabsTrigger value="trend">🔥 Trends</TabsTrigger>
+          <TabsTrigger value="virale">🔍 Virale</TabsTrigger>
+          <TabsTrigger value="trend">🔥 Trend</TabsTrigger>
         </TabsList>
 
         <TabsContent value="genera" className="mt-4">
@@ -208,7 +208,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
           <div className="grid lg:grid-cols-2 gap-6 sm:gap-8">
             <div className="space-y-4">
               {loadingState.isLoading ? (
-                <Card><CardHeader><CardTitle>Post Configuration</CardTitle></CardHeader><CardContent><SkeletonLoader type="form" /></CardContent></Card>
+                <Card><CardHeader><CardTitle>Configurazione Post</CardTitle></CardHeader><CardContent><SkeletonLoader type="form" /></CardContent></Card>
               ) : (
                 <>
                   <ContentForm
@@ -223,7 +223,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
                   />
                   <div className="text-center">
                     <button onClick={() => setShowViralGenerator(!showViralGenerator)} className="text-accent hover:text-accent/80 underline text-sm font-medium transition-colors">
-                      {showViralGenerator ? '🔥 Hide Viral Formats' : '🔥 Show Viral Formats'}
+                      {showViralGenerator ? '🔥 Nascondi Formati Virali' : '🔥 Mostra Formati Virali'}
                     </button>
                   </div>
                 </>
@@ -231,7 +231,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
             </div>
             <div>
               {loadingState.isLoading && !generatedContent ? (
-                <Card><CardHeader><CardTitle>Content Preview</CardTitle></CardHeader><CardContent><SkeletonLoader type="content" /><div className="mt-6"><SkeletonLoader type="carousel" /></div></CardContent></Card>
+                <Card><CardHeader><CardTitle>Anteprima Contenuto</CardTitle></CardHeader><CardContent><SkeletonLoader type="content" /><div className="mt-6"><SkeletonLoader type="carousel" /></div></CardContent></Card>
               ) : (
                 <>
                   <PreviewSection

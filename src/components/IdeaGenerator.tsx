@@ -18,14 +18,14 @@ const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({
 }) => {
   const generateIdea = () => {
     const ideas = [
-      'Exercises for office back pain',
-      'Sports injury prevention',
-      'Post-surgery rehabilitation',
-      'Morning stretching routine',
-      'Physiotherapy for seniors',
-      'Ankle sprain recovery',
-      'Correct posture at the computer',
-      'Benefits of manual therapy'
+      'Esercizi per il mal di schiena da scrivania',
+      'Prevenzione infortuni sportivi',
+      'Riabilitazione post-operatoria',
+      'Routine di stretching mattutino',
+      'Fisioterapia per anziani',
+      'Recupero da distorsione alla caviglia',
+      'Postura corretta al computer',
+      'Benefici della terapia manuale'
     ];
     const randomIdea = ideas[Math.floor(Math.random() * ideas.length)];
     setIdeaInput(randomIdea);
@@ -37,7 +37,7 @@ const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({
       <CardHeader>
         <CardTitle className="text-foreground flex items-center text-base sm:text-lg">
           <Lightbulb className="h-5 w-5 mr-2 text-accent flex-shrink-0" />
-          💡 Need inspiration?
+          💡 Hai bisogno di ispirazione?
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -45,7 +45,7 @@ const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({
           <Input
             value={ideaInput}
             onChange={(e) => setIdeaInput(e.target.value)}
-            placeholder="Enter a topic (e.g. 'back pain', 'rehabilitation')"
+            placeholder="Inserisci un argomento (es. 'mal di schiena', 'riabilitazione')"
             className="bg-input border-border text-foreground flex-1 text-sm sm:text-base min-h-[44px] focus:border-primary focus:ring-primary"
           />
           <Button 
@@ -54,7 +54,7 @@ const IdeaGenerator: React.FC<IdeaGeneratorProps> = ({
             className="px-4 sm:px-6 py-2 min-h-[44px] whitespace-nowrap"
           >
             <Sparkles className="h-4 w-4 mr-2 flex-shrink-0" />
-            <span className="text-sm sm:text-base">Find Ideas</span>
+            <span className="text-sm sm:text-base">Trova Idee</span>
           </Button>
         </div>
       </CardContent>
