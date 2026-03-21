@@ -62,7 +62,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: "Copied! 📋", description: "Content copied to clipboard" });
+    toast({ title: "Copiato! 📋", description: "Contenuto copiato negli appunti" });
   };
 
   const downloadImage = async (imageUrl: string, slideIndex: number) => {
@@ -77,9 +77,9 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      toast({ title: "Download complete! 📥", description: `Slide ${slideIndex + 1} downloaded` });
+      toast({ title: "Download completato! 📥", description: `Slide ${slideIndex + 1} scaricata` });
     } catch {
-      toast({ title: "Download error", description: "Could not download the image", variant: "destructive" });
+      toast({ title: "Errore download", description: "Impossibile scaricare l'immagine", variant: "destructive" });
     }
   };
 
@@ -89,7 +89,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
       const updatedSlides = [...carouselSlides];
       updatedSlides[slideIndex].userImageUrl = reader.result as string;
       setCarouselSlides(updatedSlides);
-      toast({ title: "Image uploaded! 📸", description: `Image uploaded for slide ${slideIndex + 1}` });
+      toast({ title: "Immagine caricata! 📸", description: `Immagine caricata per la slide ${slideIndex + 1}` });
     };
     reader.readAsDataURL(file);
   };
