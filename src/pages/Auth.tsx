@@ -299,8 +299,8 @@ const Auth = () => {
         <Dialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
           <DialogContent className="bg-card border-border">
             <DialogHeader>
-              <DialogTitle className="text-card-foreground">Reset Password</DialogTitle>
-              <DialogDescription>Enter your email and we'll send you a link to reset your password.</DialogDescription>
+              <DialogTitle className="text-card-foreground">Reimposta Password</DialogTitle>
+              <DialogDescription>Inserisci la tua email e ti invieremo un link per reimpostare la password.</DialogDescription>
             </DialogHeader>
             <form onSubmit={async (e) => {
               e.preventDefault();
@@ -310,24 +310,24 @@ const Auth = () => {
                   redirectTo: `${window.location.origin}/reset-password`
                 });
                 if (error) {
-                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                  toast({ title: "Errore", description: error.message, variant: "destructive" });
                 } else {
-                  toast({ title: "📧 Email sent!", description: "Check your inbox for the recovery link" });
+                  toast({ title: "📧 Email inviata!", description: "Controlla la tua casella di posta per il link di recupero" });
                   setShowForgotPassword(false);
                   setForgotEmail('');
                 }
               } catch {
-                toast({ title: "Error", description: "Error sending email", variant: "destructive" });
+                toast({ title: "Errore", description: "Errore nell'invio dell'email", variant: "destructive" });
               } finally {
                 setForgotLoading(false);
               }
             }} className="space-y-4">
               <div>
                 <Label className="text-muted-foreground">Email</Label>
-                <Input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} className="bg-muted border-border" placeholder="your-email@example.com" required />
+                <Input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} className="bg-muted border-border" placeholder="tua-email@esempio.com" required />
               </div>
               <Button type="submit" disabled={forgotLoading} className="w-full bg-fisio hover:bg-fisio/90 text-fisio-foreground">
-                {forgotLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending...</> : 'Send Recovery Link'}
+                {forgotLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Invio in corso...</> : 'Invia Link di Recupero'}
               </Button>
             </form>
           </DialogContent>

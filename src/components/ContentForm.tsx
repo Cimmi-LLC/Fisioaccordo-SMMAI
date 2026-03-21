@@ -264,12 +264,12 @@ const ContentForm: React.FC<ContentFormProps> = ({
           {isGenerating ? (
             <>
               <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Generating content...
+              Generazione in corso...
             </>
           ) : (
             <>
               <Sparkles className="mr-2 h-5 w-5" />
-              3. Generate Content
+              3. Genera Contenuto
             </>
           )}
         </Button>

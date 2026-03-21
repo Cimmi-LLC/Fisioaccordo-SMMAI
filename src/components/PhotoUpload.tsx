@@ -42,9 +42,9 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
   };
 
   return (
-    <Card className="bg-gray-700/50 border-gray-600">
+    <Card className="bg-card/50 border-border">
       <CardHeader className="pb-2">
-        <CardTitle className="text-white text-sm flex items-center">
+        <CardTitle className="text-foreground text-sm flex items-center">
           <Camera className="h-4 w-4 mr-2" />
           📸 Carica una foto base (Opzionale)
         </CardTitle>
@@ -67,7 +67,7 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
             </Button>
           </div>
         ) : (
-          <div className="border-2 border-dashed border-gray-500 rounded-lg p-4 text-center">
+          <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
             <input
               type="file"
               accept="image/*"
@@ -79,11 +79,11 @@ const PhotoUpload: React.FC<PhotoUploadProps> = ({
               htmlFor="base-photo-upload" 
               className="cursor-pointer flex flex-col items-center"
             >
-              <Upload className="h-8 w-8 text-gray-400 mb-2" />
-              <span className="text-gray-300 text-sm">
+              <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+              <span className="text-muted-foreground text-sm">
                 Clicca per caricare una foto
               </span>
-              <span className="text-gray-500 text-xs mt-1">
+              <span className="text-muted-foreground/70 text-xs mt-1">
                 Questa foto sarà usata come base per il contenuto
               </span>
             </label>

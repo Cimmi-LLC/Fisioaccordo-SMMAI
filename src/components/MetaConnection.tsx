@@ -164,13 +164,13 @@ const MetaConnection: React.FC = () => {
             ) : (
               <div className="space-y-2">
                 <p className="text-xs text-amber-400">
-                  ⚠️ Username not retrieved automatically. Enter it manually:
+                  ⚠️ Username non recuperato automaticamente. Inseriscilo manualmente:
                 </p>
                 <div className="flex items-center gap-2">
                   <Instagram className="h-4 w-4 text-pink-500 shrink-0" />
-                  <Input value={usernameInput} onChange={(e) => setUsernameInput(e.target.value)} placeholder="yourusername" className="h-8 text-sm" onKeyDown={(e) => { if (e.key === 'Enter') handleSaveUsername(activeConnection.id); }} />
+                  <Input value={usernameInput} onChange={(e) => setUsernameInput(e.target.value)} placeholder="tuousername" className="h-8 text-sm" onKeyDown={(e) => { if (e.key === 'Enter') handleSaveUsername(activeConnection.id); }} />
                   <Button size="sm" onClick={() => handleSaveUsername(activeConnection.id)} disabled={savingUsername || !usernameInput.trim()} className="shrink-0">
-                    {savingUsername ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Save'}
+                    {savingUsername ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Salva'}
                   </Button>
                 </div>
               </div>
@@ -178,13 +178,13 @@ const MetaConnection: React.FC = () => {
 
             <Button onClick={() => handleDisconnect(activeConnection.id)} variant="outline" size="sm" className="w-full mt-2">
               <Unlink className="mr-2 h-4 w-4" />
-              Disconnect
+              Disconnetti
             </Button>
           </div>
         ) : (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Connect your Instagram Business account to publish directly.
+              Connetti il tuo account Instagram Business per pubblicare direttamente.
             </p>
 
             <div className="flex items-start space-x-2">
@@ -195,23 +195,23 @@ const MetaConnection: React.FC = () => {
                 className="mt-0.5"
               />
               <label htmlFor="consent-connect" className="text-xs text-muted-foreground leading-snug cursor-pointer">
-                I agree to share my Instagram data (username, access token) with this app as described in the{' '}
-                <Link to="/privacy" className="underline text-primary hover:text-primary/80">Privacy Policy</Link> and{' '}
-                <Link to="/terms" className="underline text-primary hover:text-primary/80">Terms of Service</Link>.
+                Acconsento a condividere i miei dati Instagram (username, access token) con questa app come descritto nella{' '}
+                <Link to="/privacy" className="underline text-primary hover:text-primary/80">Privacy Policy</Link> e nei{' '}
+                <Link to="/terms" className="underline text-primary hover:text-primary/80">Termini di Servizio</Link>.
               </label>
             </div>
             
             <Button onClick={handleConnect} disabled={connecting || !agreedToConnect} className="w-full bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white">
               {connecting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Instagram className="mr-2 h-4 w-4" />}
-              Connect Instagram Business
+              Connetti Instagram Business
             </Button>
 
             <div className="text-xs text-muted-foreground space-y-1">
-              <p className="font-medium">Requirements:</p>
+              <p className="font-medium">Requisiti:</p>
               <ol className="list-decimal list-inside space-y-0.5">
-                <li>Instagram Business or Creator account</li>
-                <li>Public profile (not private)</li>
-                <li>If you have a personal account, convert it: <span className="font-medium">Settings → Account → Switch to professional account</span></li>
+                <li>Account Instagram Business o Creator</li>
+                <li>Profilo pubblico (non privato)</li>
+                <li>Se hai un account personale, convertilo: <span className="font-medium">Impostazioni → Account → Passa a un account professionale</span></li>
               </ol>
             </div>
           </div>

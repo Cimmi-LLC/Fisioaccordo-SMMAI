@@ -160,13 +160,13 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
 
   return (
     <div className="bg-muted/30 border border-border rounded-lg p-4 space-y-4">
-      <h4 className="text-sm font-semibold text-foreground">📲 Publish Your Content</h4>
+      <h4 className="text-sm font-semibold text-foreground">📲 Pubblica il Tuo Contenuto</h4>
 
-      {/* Publishing pipeline progress */}
+      {/* Progresso pipeline di pubblicazione */}
       {isPublishing && publishSteps.length > 0 && (
         <PublishingPipeline
           steps={publishSteps}
-          title={`Publishing to ${isPublishing === 'instagram' ? 'Instagram' : 'Facebook'}...`}
+          title={`Pubblicazione su ${isPublishing === 'instagram' ? 'Instagram' : 'Facebook'}...`}
           progress={publishProgress}
         />
       )}
@@ -174,7 +174,7 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
       {onPublishDirect && !isPublishing && (
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
-            ⚡ <strong>Automatic publishing</strong> — The post is published directly to your connected profile.
+            ⚡ <strong>Pubblicazione automatica</strong> — Il post viene pubblicato direttamente sul tuo profilo connesso.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <Button
@@ -184,11 +184,11 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
               className="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white w-full"
             >
               {isGeneratingImages ? (
-                <span className="animate-pulse">⏳ Generating images...</span>
+                <span className="animate-pulse">⏳ Generazione immagini...</span>
               ) : (
                 <>
                   <Send className="mr-2 h-5 w-5" />
-                  Publish Now on Instagram
+                  Pubblica ora su Instagram
                 </>
               )}
             </Button>
@@ -200,7 +200,7 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
             >
               <>
                 <Send className="mr-2 h-5 w-5" />
-                Publish Now on Facebook
+                Pubblica ora su Facebook
               </>
             </Button>
           </div>
@@ -210,7 +210,7 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
       <Collapsible open={manualOpen} onOpenChange={setManualOpen}>
         <CollapsibleTrigger asChild>
           <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground text-xs">
-            ✋ Manual method (copy & paste)
+            ✋ Metodo manuale (copia & incolla)
             <ChevronDown className={`h-4 w-4 transition-transform ${manualOpen ? 'rotate-180' : ''}`} />
           </Button>
         </CollapsibleTrigger>
@@ -219,25 +219,25 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
             <Button onClick={handleCopyText} variant={copiedText ? "default" : "outline"} size="sm"
               className={copiedText ? "bg-green-600 hover:bg-green-700 text-white" : ""}>
               {copiedText ? <Check className="mr-1.5 h-4 w-4" /> : <Copy className="mr-1.5 h-4 w-4" />}
-              {copiedText ? "Copied!" : "Copy Text"}
+              {copiedText ? "Copiato!" : "Copia Testo"}
             </Button>
             {hasImages && (
               <Button onClick={downloadAllImages} variant="outline" size="sm">
                 <Download className="mr-1.5 h-4 w-4" />
-                Download Images
+                Scarica Immagini
               </Button>
             )}
             <Button onClick={() => handleOpenPlatform('instagram')} variant="outline" size="sm">
               <ExternalLink className="mr-1.5 h-4 w-4" />
-              Open Instagram
+              Apri Instagram
             </Button>
             <Button onClick={() => handleOpenPlatform('facebook')} variant="outline" size="sm">
               <ExternalLink className="mr-1.5 h-4 w-4" />
-              Open Facebook
+              Apri Facebook
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Copy the text, download images, then open the social app and paste manually.
+            Copia il testo, scarica le immagini, poi apri l'app social e incolla manualmente.
           </p>
         </CollapsibleContent>
       </Collapsible>

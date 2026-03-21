@@ -247,7 +247,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
   return (
     <Card className="bg-card/50 border-border backdrop-blur-sm">
       <CardHeader>
-        <CardTitle className="text-card-foreground">Preview</CardTitle>
+        <CardTitle className="text-card-foreground">Anteprima</CardTitle>
       </CardHeader>
       <CardContent>
         {generatedContent ? (
@@ -256,10 +256,10 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
               <div className="mb-4">
                 <h3 className="text-card-foreground font-semibold mb-3">
                   {{
-                    'post-singolo': 'Post Image',
-                    'storia': 'Story Image',
-                    'reel': 'Reel Image',
-                  }[postType || ''] || 'Carousel Slides'}
+                    'post-singolo': 'Immagine Post',
+                    'storia': 'Immagine Storia',
+                    'reel': 'Immagine Reel',
+                  }[postType || ''] || 'Slide Carosello'}
                 </h3>
                 <ImageGenerationProgress
                   totalSlides={imageGenProgress?.total || 1}
@@ -272,10 +272,10 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
               <div className="mb-4">
                 <h3 className="text-card-foreground font-semibold mb-3">
                   {{
-                    'post-singolo': 'Post Image',
-                    'storia': 'Story Image',
-                    'reel': 'Reel Image',
-                  }[postType || ''] || 'Carousel Slides'}
+                    'post-singolo': 'Immagine Post',
+                    'storia': 'Immagine Storia',
+                    'reel': 'Immagine Reel',
+                  }[postType || ''] || 'Slide Carosello'}
                 </h3>
                 {isGeneratingImages && imageGenProgress && (
                   <ImageGenerationProgress
@@ -289,7 +289,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
                 </div>
                 {carouselSlides.some(s => !s.imageUrl) && !isGeneratingImages && onRegenerateImages && (
                   <Button onClick={onRegenerateImages} variant="outline" size="sm" className="w-full">
-                    <RefreshCw className="mr-2 h-4 w-4" /> Regenerate Images
+                    <RefreshCw className="mr-2 h-4 w-4" /> Rigenera Immagini
                   </Button>
                 )}
               </div>
@@ -298,7 +298,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
             {appliedHook && (
               <div className="bg-accent/20 border border-accent rounded-lg p-3 mb-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-accent-foreground text-sm font-medium">Applied hook:</span>
+                  <span className="text-accent-foreground text-sm font-medium">Hook applicato:</span>
                   <Button onClick={onRemoveHook} size="sm" variant="ghost" className="text-accent-foreground hover:text-accent-foreground/80 p-1 h-auto">
                     <X className="w-4 h-4" />
                   </Button>
@@ -319,10 +319,10 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
 
             <div className="flex gap-2">
               <Button onClick={onSaveContent} className="flex-1 bg-fisio hover:bg-fisio/90">
-                <Download className="mr-2 h-4 w-4" /> Save
+                <Download className="mr-2 h-4 w-4" /> Salva
               </Button>
               <Button onClick={() => copyToClipboard(generatedContent)} variant="outline" className="flex-1">
-                <Copy className="mr-2 h-4 w-4" /> Copy
+                <Copy className="mr-2 h-4 w-4" /> Copia
               </Button>
             </div>
 
@@ -335,7 +335,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
         ) : (
           <div className="text-center py-12 text-muted-foreground">
             <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Your generated content will appear here</p>
+            <p>Il tuo contenuto generato apparirà qui</p>
           </div>
         )}
       </CardContent>

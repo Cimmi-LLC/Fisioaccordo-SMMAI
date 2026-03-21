@@ -231,7 +231,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
             </div>
             <div>
               {loadingState.isLoading && !generatedContent ? (
-                <Card><CardHeader><CardTitle>Content Preview</CardTitle></CardHeader><CardContent><SkeletonLoader type="content" /><div className="mt-6"><SkeletonLoader type="carousel" /></div></CardContent></Card>
+                <Card><CardHeader><CardTitle>Anteprima Contenuto</CardTitle></CardHeader><CardContent><SkeletonLoader type="content" /><div className="mt-6"><SkeletonLoader type="carousel" /></div></CardContent></Card>
               ) : (
                 <>
                   <PreviewSection
