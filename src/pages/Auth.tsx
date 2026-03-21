@@ -284,15 +284,15 @@ const Auth = () => {
         </Card>
 
         <div className="text-center mt-6 text-foreground/70 text-sm">
-          <p>Create professional content for Instagram, LinkedIn, and Facebook</p>
-          <p className="mt-2">✨ AI copywriting + automatically generated images</p>
+          <p>Crea contenuti professionali per Instagram, LinkedIn e Facebook</p>
+          <p className="mt-2">✨ Copywriting AI + immagini generate automaticamente</p>
         </div>
 
         <div className="mt-8 p-4 bg-card/50 rounded-lg border border-border">
           <p className="text-xs text-muted-foreground text-center leading-relaxed">
-            © {new Date().getFullYear()} Cimmi LLC. All rights reserved. | <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a> | <a href="/terms" className="text-primary hover:underline">Terms of Service</a><br/>
-            POST PER I SOCIAL 2-IG is the exclusive property of Cimmi LLC.<br/>
-            Copying, reproduction, or replication of this platform without written authorization is prohibited.
+            © {new Date().getFullYear()} Cimmi LLC. Tutti i diritti riservati. | <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a> | <a href="/terms" className="text-primary hover:underline">Termini di Servizio</a><br/>
+            POST PER I SOCIAL 2-IG è di proprietà esclusiva di Cimmi LLC.<br/>
+            È vietata la copia, riproduzione o replica di questa piattaforma senza autorizzazione scritta.
           </p>
         </div>
 
