@@ -52,8 +52,8 @@ const Auth = () => {
     
     if (!agreedToTerms) {
       toast({
-        title: "Terms and Conditions",
-        description: "You must accept the terms and conditions to register",
+        title: "Termini e Condizioni",
+        description: "Devi accettare i termini e condizioni per registrarti",
         variant: "destructive"
       });
       return;
