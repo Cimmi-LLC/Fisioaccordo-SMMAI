@@ -18,7 +18,7 @@ const Index = () => {
   const { toast } = useToast();
   const { user, loading: authLoading, signOut } = useAuth();
   const globalLoading = useGlobalLoading();
-  
+
   const [savedContents, setSavedContents] = useState<any[]>([]);
   const [loadingSavedContents, setLoadingSavedContents] = useState(false);
   const [selectedImageForEdit, setSelectedImageForEdit] = useState<string | null>(null);
@@ -27,31 +27,20 @@ const Index = () => {
   const [improvedCopyFromAI, setImprovedCopyFromAI] = useState('');
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      navigate('/auth');
-    }
+    if (!authLoading && !user) navigate('/auth');
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    if (user) {
-      loadSavedContents();
-    }
+    if (user) loadSavedContents();
   }, [user]);
 
   const loadSavedContents = async () => {
     setLoadingSavedContents(true);
     try {
       const { data, error } = await contentService.getUserContents();
-      if (data && !error) {
-        setSavedContents(data);
-      }
-    } catch (error) {
-      console.error('Errore nel caricamento contenuti salvati:', error);
-      toast({
-        title: "⚠️ Warning",
-        description: "Error loading saved contents",
-        variant: "destructive"
-      });
+      if (data && !error) setSavedContents(data);
+    } catch {
+      toast({ title: "Avviso", description: "Errore nel caricamento dei contenuti salvati", variant: "destructive" });
     } finally {
       setLoadingSavedContents(false);
     }
@@ -62,18 +51,10 @@ const Index = () => {
       const { error } = await signOut();
       if (!error) {
         navigate('/auth');
-        toast({
-          title: "👋 Goodbye!",
-          description: "Successfully logged out"
-        });
+        toast({ title: "Arrivederci!", description: "Disconnessione effettuata con successo" });
       }
-    } catch (error) {
-      console.error('Errore durante il logout:', error);
-      toast({
-        title: "❌ Error",
-        description: "Error during logout",
-        variant: "destructive"
-      });
+    } catch {
+      toast({ title: "Errore", description: "Errore durante il logout", variant: "destructive" });
     }
   };
 
@@ -85,52 +66,39 @@ const Index = () => {
   const handleImageUpdate = (newUrl: string) => {
     setSelectedImageForEdit(null);
     setEditingSlideIndex(null);
-    
-    toast({
-      title: "🎨 Image updated!",
-      description: "The image has been successfully modified"
-    });
+    toast({ title: "Immagine aggiornata!", description: "L'immagine è stata modificata con successo" });
   };
 
   const handleCopyImproved = (improvedCopy: string) => {
     setImprovedCopyFromAI(improvedCopy);
-    
-    toast({
-      title: "🚀 Super-optimized copy!",
-      description: "Your copy has been improved with advanced copywriting strategies"
-    });
+    toast({ title: "Copy ottimizzato!", description: "Il tuo copy è stato migliorato con strategie avanzate di copywriting" });
   };
 
-  // Loading state per auth
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="text-center space-y-4 max-w-sm">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground text-sm sm:text-base">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg)' }}>
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto" style={{ color: 'var(--viola)' }} />
+          <p className="text-sm font-medium" style={{ color: 'var(--ink3)' }}>Caricamento...</p>
         </div>
       </div>
     );
   }
 
-  // Image editor full screen
   if (selectedImageForEdit && editingSlideIndex !== null) {
     return (
-      <div className="min-h-screen bg-background p-2 sm:p-4">
+      <div className="min-h-screen p-2 sm:p-4" style={{ backgroundColor: 'var(--bg)' }}>
         <LazyImageEditor
           imageUrl={selectedImageForEdit}
           onImageUpdate={handleImageUpdate}
-          onClose={() => {
-            setSelectedImageForEdit(null);
-            setEditingSlideIndex(null);
-          }}
+          onClose={() => { setSelectedImageForEdit(null); setEditingSlideIndex(null); }}
         />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg)' }}>
       <ErrorBoundary>
         <AppHeader
           user={user}
@@ -148,24 +116,28 @@ const Index = () => {
         />
       </ErrorBoundary>
 
-      <div className="max-w-7xl mx-auto px-4">
+      <div className="max-w-7xl mx-auto px-4 pb-12">
         <ErrorBoundary>
-          <SavedContents 
-            savedContents={savedContents} 
-            isLoading={loadingSavedContents}
-          />
+          <SavedContents savedContents={savedContents} isLoading={loadingSavedContents} />
         </ErrorBoundary>
 
-
-        {/* Footer migliorato con responsività */}
-        <div className="mt-8 sm:mt-12 p-4 sm:p-6 bg-card/70 backdrop-blur-sm rounded-lg border border-border shadow-enhanced">
-          <div className="text-center space-y-2">
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              © {new Date().getFullYear()} Cimmi LLC. All rights reserved. | <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a> | <a href="/terms" className="text-primary hover:underline">Terms of Service</a>
+        {/* Footer */}
+        <div
+          className="mt-10 p-5 rounded-xl"
+          style={{
+            backgroundColor: 'var(--surface)',
+            border: '1px solid var(--line)',
+          }}
+        >
+          <div className="text-center space-y-1.5">
+            <p className="text-[11px] font-medium" style={{ color: 'var(--ink3)' }}>
+              © {new Date().getFullYear()} Cimmi LLC. Tutti i diritti riservati. |{' '}
+              <a href="/privacy" className="underline" style={{ color: 'var(--viola)' }}>Privacy Policy</a> |{' '}
+              <a href="/terms" className="underline" style={{ color: 'var(--viola)' }}>Termini di Servizio</a>
             </p>
-            <p className="text-xs text-muted-foreground/80 leading-relaxed max-w-2xl mx-auto">
-              POST PER I SOCIAL 2-IG is the exclusive property of Cimmi LLC.
-              Copying, reproduction, or replication of this platform without written authorization is prohibited.
+            <p className="text-[10px]" style={{ color: 'var(--ink3)' }}>
+              POST PER I SOCIAL 2-IG è di proprietà esclusiva di Cimmi LLC.
+              È vietata la copia, riproduzione o replica di questa piattaforma senza autorizzazione scritta.
             </p>
           </div>
         </div>

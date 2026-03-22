@@ -1,5 +1,5 @@
+
 import React, { useState } from 'react';
-import { Button } from "@/components/ui/button";
 import { Check, Copy, Download, ExternalLink, Send, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -26,7 +26,7 @@ const INITIAL_STEPS: PipelineStep[] = [
   { label: 'Creazione container media', status: 'pending' },
   { label: 'Attesa elaborazione media', status: 'pending' },
   { label: 'Pubblicazione sul feed', status: 'pending' },
-  { label: 'Pubblicazione confermata! ✨', status: 'pending' },
+  { label: 'Pubblicazione confermata!', status: 'pending' },
 ];
 
 const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
@@ -58,19 +58,15 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
     setPublishSteps(INITIAL_STEPS.map(s => ({ ...s })));
     setPublishProgress(0);
 
-    // Simulate step-by-step progress for visual feedback
     advanceStep(0, 'active');
     await delay(600);
     advanceStep(0, 'done');
-
     advanceStep(1, 'active');
     await delay(400);
     advanceStep(1, 'done');
-
     advanceStep(2, 'active');
     await delay(500);
     advanceStep(2, 'done');
-
     advanceStep(3, 'active');
 
     try {
@@ -99,7 +95,7 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
     try {
       await navigator.clipboard.writeText(generatedContent);
       setCopiedText(true);
-      toast({ title: "✅ Testo copiato!", description: "Incollalo nel tuo post social" });
+      toast({ title: "Testo copiato!", description: "Incollalo nel tuo post social" });
       setTimeout(() => setCopiedText(false), 3000);
     } catch {
       toast({ title: "Errore", description: "Impossibile copiare il testo", variant: "destructive" });
@@ -130,7 +126,7 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
         console.error(`Error downloading slide ${i + 1}`);
       }
     }
-    toast({ title: "📥 Download completato!", description: `${imageSlides.length} immagini scaricate` });
+    toast({ title: "Download completato!", description: `${imageSlides.length} immagini scaricate` });
   };
 
   const handleOpenPlatform = async (platform: 'instagram' | 'facebook') => {
@@ -138,7 +134,7 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
     const hasImgs = carouselSlides.some(s => s.userImageUrl || s.imageUrl);
     if (hasImgs) await downloadAllImages();
     toast({
-      title: "✅ Tutto pronto!",
+      title: "Tutto pronto!",
       description: hasImgs
         ? "Testo copiato e immagini scaricate! Crea un nuovo post, seleziona le foto e incolla il testo."
         : "Testo copiato! Crea un nuovo post e incolla il testo."
@@ -159,10 +155,20 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
   const hasImages = carouselSlides.some(s => s.userImageUrl || s.imageUrl);
 
   return (
-    <div className="bg-muted/30 border border-border rounded-lg p-4 space-y-4">
-      <h4 className="text-sm font-semibold text-foreground">📲 Pubblica il Tuo Contenuto</h4>
+    <div
+      className="rounded-2xl p-5 space-y-4"
+      style={{
+        backgroundColor: 'var(--surface)',
+        border: '1px solid var(--line)',
+      }}
+    >
+      <h4
+        className="text-[13px] font-black"
+        style={{ color: 'var(--ink)' }}
+      >
+        Pubblica il Tuo Contenuto
+      </h4>
 
-      {/* Progresso pipeline di pubblicazione */}
       {isPublishing && publishSteps.length > 0 && (
         <PublishingPipeline
           steps={publishSteps}
@@ -173,70 +179,97 @@ const SmartCopyActions: React.FC<SmartCopyActionsProps> = ({
 
       {onPublishDirect && !isPublishing && (
         <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            ⚡ <strong>Pubblicazione automatica</strong> — Il post viene pubblicato direttamente sul tuo profilo connesso.
+          <p className="text-[11px] font-medium" style={{ color: 'var(--ink3)' }}>
+            <strong style={{ color: 'var(--ink2)' }}>Pubblicazione automatica</strong> — Il post viene pubblicato direttamente sul tuo profilo connesso.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <Button
+            <button
               onClick={() => handleDirectPublish('instagram')}
-              size="lg"
               disabled={isPublishing !== null || isGeneratingImages}
-              className="bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white w-full"
+              className="w-full text-white text-[11px] font-black uppercase py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
+              style={{
+                backgroundColor: 'var(--rosa)',
+                border: '1px solid var(--rosa)',
+                letterSpacing: '0.5px',
+              }}
             >
               {isGeneratingImages ? (
-                <span className="animate-pulse">⏳ Generazione immagini...</span>
+                <span className="animate-pulse">Generazione immagini...</span>
               ) : (
                 <>
-                  <Send className="mr-2 h-5 w-5" />
-                  Pubblica ora su Instagram
+                  <Send className="h-3.5 w-3.5" />
+                  Pubblica su Instagram
                 </>
               )}
-            </Button>
-            <Button
+            </button>
+            <button
               onClick={() => handleDirectPublish('facebook')}
-              size="lg"
               disabled={isPublishing !== null}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white w-full"
+              className="w-full text-white text-[11px] font-black uppercase py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
+              style={{
+                backgroundColor: 'var(--viola)',
+                border: '1px solid var(--viola)',
+                letterSpacing: '0.5px',
+              }}
             >
-              <>
-                <Send className="mr-2 h-5 w-5" />
-                Pubblica ora su Facebook
-              </>
-            </Button>
+              <Send className="h-3.5 w-3.5" />
+              Pubblica su Facebook
+            </button>
           </div>
         </div>
       )}
 
       <Collapsible open={manualOpen} onOpenChange={setManualOpen}>
         <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground text-xs">
-            ✋ Metodo manuale (copia & incolla)
+          <button
+            className="w-full flex items-center justify-between text-[11px] font-black uppercase py-2 transition-colors"
+            style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}
+          >
+            Metodo manuale (copia & incolla)
             <ChevronDown className={`h-4 w-4 transition-transform ${manualOpen ? 'rotate-180' : ''}`} />
-          </Button>
+          </button>
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-2 space-y-2">
           <div className="grid grid-cols-2 gap-2">
-            <Button onClick={handleCopyText} variant={copiedText ? "default" : "outline"} size="sm"
-              className={copiedText ? "bg-green-600 hover:bg-green-700 text-white" : ""}>
-              {copiedText ? <Check className="mr-1.5 h-4 w-4" /> : <Copy className="mr-1.5 h-4 w-4" />}
+            <button
+              onClick={handleCopyText}
+              className="text-[10px] font-black uppercase py-2.5 rounded-lg flex items-center justify-center gap-1.5 transition-colors"
+              style={copiedText
+                ? { backgroundColor: '#16a34a', color: 'white', border: '1px solid #16a34a' }
+                : { border: '1px solid var(--line)', color: 'var(--ink3)', backgroundColor: 'transparent' }
+              }
+            >
+              {copiedText ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               {copiedText ? "Copiato!" : "Copia Testo"}
-            </Button>
+            </button>
             {hasImages && (
-              <Button onClick={downloadAllImages} variant="outline" size="sm">
-                <Download className="mr-1.5 h-4 w-4" />
+              <button
+                onClick={downloadAllImages}
+                className="text-[10px] font-black uppercase py-2.5 rounded-lg flex items-center justify-center gap-1.5"
+                style={{ border: '1px solid var(--line)', color: 'var(--ink3)', backgroundColor: 'transparent' }}
+              >
+                <Download className="h-3.5 w-3.5" />
                 Scarica Immagini
-              </Button>
+              </button>
             )}
-            <Button onClick={() => handleOpenPlatform('instagram')} variant="outline" size="sm">
-              <ExternalLink className="mr-1.5 h-4 w-4" />
+            <button
+              onClick={() => handleOpenPlatform('instagram')}
+              className="text-[10px] font-black uppercase py-2.5 rounded-lg flex items-center justify-center gap-1.5"
+              style={{ border: '1px solid var(--line)', color: 'var(--ink3)', backgroundColor: 'transparent' }}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
               Apri Instagram
-            </Button>
-            <Button onClick={() => handleOpenPlatform('facebook')} variant="outline" size="sm">
-              <ExternalLink className="mr-1.5 h-4 w-4" />
+            </button>
+            <button
+              onClick={() => handleOpenPlatform('facebook')}
+              className="text-[10px] font-black uppercase py-2.5 rounded-lg flex items-center justify-center gap-1.5"
+              style={{ border: '1px solid var(--line)', color: 'var(--ink3)', backgroundColor: 'transparent' }}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
               Apri Facebook
-            </Button>
+            </button>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[11px]" style={{ color: 'var(--ink3)' }}>
             Copia il testo, scarica le immagini, poi apri l'app social e incolla manualmente.
           </p>
         </CollapsibleContent>

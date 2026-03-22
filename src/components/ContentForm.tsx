@@ -1,13 +1,8 @@
+
 import React from 'react';
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Sparkles, User } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import PhotoUpload from './PhotoUpload';
 import CanvaTemplateSelector, { CanvaTemplate } from './CanvaTemplateSelector';
 import { BlotatoService } from '@/services/blotatoService';
@@ -38,6 +33,45 @@ interface ContentFormProps {
   onPublish?: (platforms: string[]) => void;
 }
 
+/* ── Shared field label ─────────────────────────────────────── */
+const FieldLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="label-field mb-1.5">{children}</div>
+);
+
+/* ── Styled input / textarea base classes ───────────────────── */
+const inputStyle: React.CSSProperties = {
+  backgroundColor: 'var(--bg)',
+  border: '1px solid var(--line)',
+  borderRadius: '9px',
+  color: 'var(--ink)',
+  fontSize: '12px',
+  fontWeight: 500,
+  width: '100%',
+  padding: '8px 12px',
+  outline: 'none',
+  fontFamily: 'Montserrat, sans-serif',
+  transition: 'border-color 0.15s, background-color 0.15s',
+};
+
+const InputField: React.FC<React.InputHTMLAttributes<HTMLInputElement>> = (props) => (
+  <input
+    {...props}
+    style={inputStyle}
+    className={`min-h-[40px] ${props.className || ''}`}
+    onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(230,0,126,0.35)'; e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
+    onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.backgroundColor = 'var(--bg)'; }}
+  />
+);
+
+const TextareaField: React.FC<React.TextareaHTMLAttributes<HTMLTextAreaElement>> = (props) => (
+  <textarea
+    {...props}
+    style={{ ...inputStyle, minHeight: '100px', resize: 'vertical' }}
+    onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(230,0,126,0.35)'; e.currentTarget.style.backgroundColor = 'var(--surface)'; }}
+    onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--line)'; e.currentTarget.style.backgroundColor = 'var(--bg)'; }}
+  />
+);
+
 const ContentForm: React.FC<ContentFormProps> = ({
   formData,
   onInputChange,
@@ -50,58 +84,66 @@ const ContentForm: React.FC<ContentFormProps> = ({
 }) => {
   const supportedPlatforms = BlotatoService.getSupportedPlatforms();
 
-  const handlePlatformToggle = (platformId: string, checked: boolean) => {
-    const currentPlatforms = formData.selectedPlatforms || [];
-    if (checked) {
-      onInputChange('selectedPlatforms', [...currentPlatforms, platformId]);
+  const handlePlatformToggle = (platformId: string) => {
+    const current = formData.selectedPlatforms || [];
+    const isActive = current.includes(platformId);
+    if (isActive) {
+      onInputChange('selectedPlatforms', current.filter(id => id !== platformId));
     } else {
-      onInputChange('selectedPlatforms', currentPlatforms.filter(id => id !== platformId));
+      onInputChange('selectedPlatforms', [...current, platformId]);
     }
   };
 
   return (
-    <Card className="backdrop-blur-enhanced">
-      <CardHeader>
-        <CardTitle className="text-foreground">
-          Crea il Tuo Contenuto
-        </CardTitle>
+    <Card className="panel-card">
+      <CardHeader style={{ padding: '22px 24px', borderBottom: '1px solid var(--line)' }}>
+        <div className="flex items-center justify-between">
+          <CardTitle style={{ fontSize: '13px', fontWeight: 800, color: 'var(--ink)' }}>
+            Crea il Tuo Contenuto
+          </CardTitle>
+          <span
+            className="text-[9px] font-black uppercase px-2 py-1 rounded"
+            style={{
+              backgroundColor: 'var(--viola-dim)',
+              color: 'var(--ink3)',
+              letterSpacing: '0.6px',
+            }}
+          >
+            AI
+          </span>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* 1. Descrivi il tuo post */}
+      <CardContent className="space-y-5" style={{ padding: '22px 24px' }}>
+
+        {/* 1. Descrizione */}
         <div>
-          <Label className="text-foreground text-lg font-medium">1. Descrivi il Tuo Post</Label>
-          <Textarea
+          <FieldLabel>1. Descrivi il tuo post</FieldLabel>
+          <TextareaField
             value={formData.description}
             onChange={(e) => onInputChange('description', e.target.value)}
             placeholder="es. mal di schiena da scrivania"
-            className="bg-input border-border text-foreground mt-2 min-h-[100px] focus:border-primary focus:ring-primary"
           />
         </div>
 
-        {/* 2. Definisci il Pubblico */}
+        {/* 2. Pubblico */}
         <div>
-          <Label className="text-foreground text-lg font-medium flex items-center">
-            <User className="h-4 w-4 mr-2 text-primary" />
-            2. Definisci il Tuo Pubblico (Opzionale)
-          </Label>
-          <Input
+          <FieldLabel>2. Definisci il tuo pubblico (opzionale)</FieldLabel>
+          <InputField
             value={formData.audience}
             onChange={(e) => onInputChange('audience', e.target.value)}
             placeholder="es. lavoratori in ufficio"
-            className="bg-input border-border text-foreground mt-2 focus:border-primary focus:ring-primary"
           />
         </div>
 
         {/* Options grid */}
         <div className="grid grid-cols-2 gap-4">
-          {/* Lunghezza */}
           <div>
-            <Label className="text-foreground">Lunghezza</Label>
-            <Select value={formData.length} onValueChange={(value) => onInputChange('length', value)}>
-              <SelectTrigger className="bg-input border-border text-foreground">
+            <FieldLabel>Lunghezza</FieldLabel>
+            <Select value={formData.length} onValueChange={(v) => onInputChange('length', v)}>
+              <SelectTrigger className="h-10 text-xs font-medium" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '9px', color: 'var(--ink)' }}>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-popover border-border">
+              <SelectContent>
                 <SelectItem value="corto">Corto</SelectItem>
                 <SelectItem value="medio">Medio</SelectItem>
                 <SelectItem value="lungo">Lungo</SelectItem>
@@ -109,14 +151,13 @@ const ContentForm: React.FC<ContentFormProps> = ({
             </Select>
           </div>
 
-          {/* Tono */}
           <div>
-            <Label className="text-foreground">Tono</Label>
-            <Select value={formData.tone} onValueChange={(value) => onInputChange('tone', value)}>
-              <SelectTrigger className="bg-input border-border text-foreground">
+            <FieldLabel>Tono</FieldLabel>
+            <Select value={formData.tone} onValueChange={(v) => onInputChange('tone', v)}>
+              <SelectTrigger className="h-10 text-xs font-medium" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '9px', color: 'var(--ink)' }}>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-popover border-border">
+              <SelectContent>
                 <SelectItem value="professionale">Professionale</SelectItem>
                 <SelectItem value="informale">Informale</SelectItem>
                 <SelectItem value="divertente">Divertente</SelectItem>
@@ -125,14 +166,13 @@ const ContentForm: React.FC<ContentFormProps> = ({
             </Select>
           </div>
 
-          {/* Piattaforma */}
           <div>
-            <Label className="text-foreground">Piattaforma</Label>
-            <Select value={formData.platform} onValueChange={(value) => onInputChange('platform', value)}>
-              <SelectTrigger className="bg-input border-border text-foreground">
+            <FieldLabel>Piattaforma</FieldLabel>
+            <Select value={formData.platform} onValueChange={(v) => onInputChange('platform', v)}>
+              <SelectTrigger className="h-10 text-xs font-medium" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '9px', color: 'var(--ink)' }}>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-popover border-border">
+              <SelectContent>
                 <SelectItem value="instagram">Instagram</SelectItem>
                 <SelectItem value="linkedin">LinkedIn</SelectItem>
                 <SelectItem value="facebook">Facebook</SelectItem>
@@ -140,14 +180,13 @@ const ContentForm: React.FC<ContentFormProps> = ({
             </Select>
           </div>
 
-          {/* Tipo di Post */}
           <div>
-            <Label className="text-foreground">Tipo di Post</Label>
-            <Select value={formData.postType} onValueChange={(value) => onInputChange('postType', value)}>
-              <SelectTrigger className="bg-input border-border text-foreground">
+            <FieldLabel>Tipo di post</FieldLabel>
+            <Select value={formData.postType} onValueChange={(v) => onInputChange('postType', v)}>
+              <SelectTrigger className="h-10 text-xs font-medium" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '9px', color: 'var(--ink)' }}>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-popover border-border">
+              <SelectContent>
                 <SelectItem value="carosello">Carosello</SelectItem>
                 <SelectItem value="post-singolo">Post Singolo</SelectItem>
                 <SelectItem value="storia">Storia</SelectItem>
@@ -156,14 +195,13 @@ const ContentForm: React.FC<ContentFormProps> = ({
             </Select>
           </div>
 
-          {/* Numero di Slide */}
           <div>
-            <Label className="text-foreground">Numero di Slide</Label>
-            <Select value={formData.numSlides} onValueChange={(value) => onInputChange('numSlides', value)}>
-              <SelectTrigger className="bg-input border-border text-foreground">
+            <FieldLabel>Numero di slide</FieldLabel>
+            <Select value={formData.numSlides} onValueChange={(v) => onInputChange('numSlides', v)}>
+              <SelectTrigger className="h-10 text-xs font-medium" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '9px', color: 'var(--ink)' }}>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-popover border-border">
+              <SelectContent>
                 <SelectItem value="3">3 Slide</SelectItem>
                 <SelectItem value="5">5 Slide</SelectItem>
                 <SelectItem value="7">7 Slide</SelectItem>
@@ -172,14 +210,13 @@ const ContentForm: React.FC<ContentFormProps> = ({
             </Select>
           </div>
 
-          {/* Numero di Immagini */}
           <div>
-            <Label className="text-foreground">Numero di Immagini</Label>
-            <Select value={formData.numImages} onValueChange={(value) => onInputChange('numImages', value)}>
-              <SelectTrigger className="bg-input border-border text-foreground">
+            <FieldLabel>Numero di immagini</FieldLabel>
+            <Select value={formData.numImages} onValueChange={(v) => onInputChange('numImages', v)}>
+              <SelectTrigger className="h-10 text-xs font-medium" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '9px', color: 'var(--ink)' }}>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="bg-popover border-border">
+              <SelectContent>
                 <SelectItem value="1">1 Immagine</SelectItem>
                 <SelectItem value="2">2 Immagini</SelectItem>
                 <SelectItem value="3">3 Immagini</SelectItem>
@@ -202,77 +239,81 @@ const ContentForm: React.FC<ContentFormProps> = ({
           }}
         />
 
-        {/* Base photo upload */}
+        {/* Base photo */}
         <PhotoUpload
           basePhoto={basePhoto}
           onPhotoUpload={onPhotoUpload}
           onPhotoRemove={onPhotoRemove}
         />
 
-        {/* Selezione Piattaforme */}
-        <div className="space-y-3">
-          <Label className="text-foreground text-lg font-medium">Piattaforme di Pubblicazione</Label>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {supportedPlatforms.map((platform) => (
-              <div key={platform.id} className="flex items-center space-x-2 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors">
-                <Checkbox
-                  id={platform.id}
-                  checked={formData.selectedPlatforms?.includes(platform.id) || false}
-                  onCheckedChange={(checked) => handlePlatformToggle(platform.id, checked as boolean)}
-                />
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">{platform.icon}</span>
-                  <Label htmlFor={platform.id} className="text-xs font-medium cursor-pointer text-foreground">
-                    {platform.name}
-                  </Label>
-                </div>
-              </div>
-            ))}
+        {/* Piattaforme di pubblicazione */}
+        <div>
+          <FieldLabel>Piattaforme di pubblicazione</FieldLabel>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {supportedPlatforms.map((platform) => {
+              const isActive = formData.selectedPlatforms?.includes(platform.id) || false;
+              return (
+                <button
+                  key={platform.id}
+                  type="button"
+                  onClick={() => handlePlatformToggle(platform.id)}
+                  className="text-[10px] font-black uppercase px-3 py-1.5 rounded transition-all"
+                  style={{
+                    border: isActive ? '1px solid var(--rosa)' : '1px solid var(--line)',
+                    backgroundColor: isActive ? 'var(--rosa-dim)' : 'var(--bg)',
+                    color: isActive ? 'var(--rosa)' : 'var(--ink3)',
+                    borderRadius: '6px',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  {platform.name}
+                </button>
+              );
+            })}
           </div>
-          {formData.selectedPlatforms?.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {formData.selectedPlatforms.map(platformId => {
-                const platform = supportedPlatforms.find(p => p.id === platformId);
-                return platform ? (
-                  <Badge key={platformId} variant="secondary" className="text-xs">
-                    {platform.icon} {platform.name}
-                  </Badge>
-                ) : null;
-              })}
-            </div>
-          )}
         </div>
 
-        {/* Pianifica Pubblicazione */}
-        <div className="space-y-2">
-          <Label htmlFor="scheduleDate" className="text-foreground">Pianifica Pubblicazione (Opzionale)</Label>
-          <Input
-            id="scheduleDate"
+        {/* Pianifica pubblicazione */}
+        <div>
+          <FieldLabel>Pianifica pubblicazione (opzionale)</FieldLabel>
+          <InputField
             type="datetime-local"
             value={formData.scheduleDate || ''}
             onChange={(e) => onInputChange('scheduleDate', e.target.value)}
             min={new Date().toISOString().slice(0, 16)}
-            className="bg-input border-border text-foreground focus:border-primary focus:ring-primary"
           />
         </div>
 
-        <Button 
-          onClick={onGenerate} 
-          disabled={isGenerating}
-          className="w-full bg-purple-600 hover:bg-purple-700 text-lg py-6"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Generazione in corso...
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 h-5 w-5" />
-              3. Genera Contenuto
-            </>
-          )}
-        </Button>
+        {/* Generate button */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={onGenerate}
+            disabled={isGenerating}
+            className="w-full text-white text-[12px] font-black uppercase py-3.5 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            style={{
+              backgroundColor: 'var(--ink)',
+              borderRadius: '10px',
+              letterSpacing: '0.6px',
+              paddingLeft: '20px',
+              borderLeft: '3px solid var(--rosa)',
+            }}
+            onMouseEnter={(e) => { if (!isGenerating) (e.currentTarget as HTMLElement).style.backgroundColor = '#2d2a44'; }}
+            onMouseLeave={(e) => { if (!isGenerating) (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--ink)'; }}
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Generazione in corso...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" />
+                3. Genera Contenuto
+              </>
+            )}
+          </button>
+        </div>
 
       </CardContent>
     </Card>

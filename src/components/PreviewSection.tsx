@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Copy, Download, Loader2, RefreshCw, Sparkles, Upload, X } from "lucide-react";
+import { Copy, Download, Loader2, RefreshCw, Save, Send, Upload, X } from "lucide-react";
 import CarouselImageManager from "@/components/CarouselImageManager";
 import SmartCopyActions from "@/components/SmartCopyActions";
 import FeedbackWidget from "@/components/FeedbackWidget";
@@ -62,7 +62,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: "Copiato! 📋", description: "Contenuto copiato negli appunti" });
+    toast({ title: "Copiato!", description: "Contenuto copiato negli appunti" });
   };
 
   const downloadImage = async (imageUrl: string, slideIndex: number) => {
@@ -77,7 +77,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      toast({ title: "Download completato! 📥", description: `Slide ${slideIndex + 1} scaricata` });
+      toast({ title: "Download completato!", description: `Slide ${slideIndex + 1} scaricata` });
     } catch {
       toast({ title: "Errore download", description: "Impossibile scaricare l'immagine", variant: "destructive" });
     }
@@ -89,7 +89,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
       const updatedSlides = [...carouselSlides];
       updatedSlides[slideIndex].userImageUrl = reader.result as string;
       setCarouselSlides(updatedSlides);
-      toast({ title: "Immagine caricata! 📸", description: `Immagine caricata per la slide ${slideIndex + 1}` });
+      toast({ title: "Immagine caricata!", description: `Immagine caricata per la slide ${slideIndex + 1}` });
     };
     reader.readAsDataURL(file);
   };
@@ -98,7 +98,6 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
     if (canvaTemplate) {
       const tz = canvaTemplate.text_zones as any;
       const hasNewFormat = tz?.background && tz?.layers && Array.isArray(tz.layers);
-      
       if (hasNewFormat) {
         return {
           id: canvaTemplate.id,
@@ -156,12 +155,14 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
           slide.userImageUrl ? (
             <img src={slide.userImageUrl} className="w-full h-full object-cover" alt="user" />
           ) : (
-            <div className="w-full h-full bg-muted/30 flex items-center justify-center text-muted-foreground text-xs">📷</div>
+            <div className="w-full h-full bg-muted/30 flex items-center justify-center text-muted-foreground text-xs">
+              <Upload className="w-4 h-4" />
+            </div>
           )
         ) : (
           <span
             style={{
-              fontFamily: layer.fontFamily || 'Arial, sans-serif',
+              fontFamily: layer.fontFamily || 'Montserrat, sans-serif',
               fontSize: `${Math.max(6, (layer.fontSize || 16) * SCALE)}px`,
               fontWeight: layer.fontWeight as any,
               color: layer.color || '#FFFFFF',
@@ -206,11 +207,14 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
     }
 
     return (
-      <div key={index} className="relative aspect-square rounded-lg overflow-hidden group border border-border" style={bgStyle}>
+      <div
+        key={index}
+        className="relative aspect-square rounded-lg overflow-hidden group"
+        style={{ border: '1px solid var(--line)', ...bgStyle }}
+      >
         {slide.imageUrl && (
           <img src={slide.imageUrl} alt={`Slide ${index + 1}`} className="absolute inset-0 w-full h-full object-cover" />
         )}
-
         {designTemplate.photoZone && slide.userImageUrl && (
           <img
             src={slide.userImageUrl}
@@ -226,89 +230,154 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
             }}
           />
         )}
-
         {designTemplate.overlayColor && (
           <div className="absolute inset-0" style={{ backgroundColor: designTemplate.overlayColor }} />
         )}
-
         {slideLayers.map(layer => renderLayer(layer, slideData, slide))}
 
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
-          <Button onClick={() => onImageEdit(slide.userImageUrl || slide.imageUrl || '', index)} size="sm" className="p-1 h-6 w-6 bg-primary hover:bg-primary/90">✏️</Button>
-          <Button onClick={() => downloadImage(slide.userImageUrl || slide.imageUrl || '', index)} size="sm" className="p-1 h-6 w-6 bg-accent hover:bg-accent/90"><Download className="w-3 h-3" /></Button>
-          <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadImageToSlide(index, file); }} className="hidden" id={`upload-${index}`} />
-          <Button asChild size="sm" className="p-1 h-6 w-6 bg-secondary hover:bg-secondary/90 cursor-pointer"><label htmlFor={`upload-${index}`}><Upload className="w-3 h-3" /></label></Button>
+          <Button
+            onClick={() => onImageEdit(slide.userImageUrl || slide.imageUrl || '', index)}
+            size="sm"
+            className="p-1 h-6 w-6 text-white border-0"
+            style={{ backgroundColor: 'var(--rosa)' }}
+          >
+            <Copy className="w-3 h-3" />
+          </Button>
+          <Button
+            onClick={() => downloadImage(slide.userImageUrl || slide.imageUrl || '', index)}
+            size="sm"
+            className="p-1 h-6 w-6 text-white border-0"
+            style={{ backgroundColor: 'var(--viola)' }}
+          >
+            <Download className="w-3 h-3" />
+          </Button>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadImageToSlide(index, file); }}
+            className="hidden"
+            id={`upload-${index}`}
+          />
+          <Button asChild size="sm" className="p-1 h-6 w-6 text-white border-0 cursor-pointer" style={{ backgroundColor: 'var(--ink2)' }}>
+            <label htmlFor={`upload-${index}`}><Upload className="w-3 h-3" /></label>
+          </Button>
         </div>
-        <div className="absolute top-2 left-2 bg-background/70 text-foreground text-xs px-2 py-1 rounded-full font-bold z-10">{index + 1}</div>
+        <div
+          className="absolute top-2 left-2 text-white text-xs px-2 py-1 rounded-full font-bold z-10"
+          style={{ backgroundColor: 'rgba(24,21,46,0.7)' }}
+        >
+          {index + 1}
+        </div>
       </div>
     );
   };
 
   return (
-    <Card className="bg-card/50 border-border backdrop-blur-sm">
-      <CardHeader>
-        <CardTitle className="text-card-foreground">Anteprima</CardTitle>
+    <Card className="panel-card">
+      <CardHeader
+        style={{
+          padding: '22px 24px',
+          borderBottom: '1px solid var(--line)',
+        }}
+      >
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <CardTitle style={{ fontSize: '13px', fontWeight: 800, color: 'var(--ink)' }}>
+            Anteprima Contenuto
+          </CardTitle>
+          {generatedContent && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => copyToClipboard(generatedContent)}
+                className="text-[10px] font-black uppercase px-2.5 py-1.5 rounded-lg transition-colors"
+                style={{
+                  border: '1px solid var(--line)',
+                  color: 'var(--ink3)',
+                  backgroundColor: 'transparent',
+                }}
+              >
+                Copia
+              </button>
+              <button
+                onClick={onSaveContent}
+                className="text-[10px] font-black uppercase px-2.5 py-1.5 rounded-lg text-white transition-colors"
+                style={{
+                  backgroundColor: 'var(--rosa)',
+                  border: '1px solid var(--rosa)',
+                }}
+              >
+                Salva
+              </button>
+            </div>
+          )}
+        </div>
       </CardHeader>
-      <CardContent>
+      <CardContent style={{ padding: '22px 24px' }}>
         {generatedContent ? (
           <div className="space-y-4">
             {isGeneratingImages && carouselSlides.length === 0 && (
               <div className="mb-4">
-                <h3 className="text-card-foreground font-semibold mb-3">
-                  {{
-                    'post-singolo': 'Immagine Post',
-                    'storia': 'Immagine Storia',
-                    'reel': 'Immagine Reel',
-                  }[postType || ''] || 'Slide Carosello'}
+                <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--ink)' }}>
+                  { { 'post-singolo': 'Immagine Post', 'storia': 'Immagine Storia', 'reel': 'Immagine Reel' }[postType || ''] || 'Slide Carosello' }
                 </h3>
-                <ImageGenerationProgress
-                  totalSlides={imageGenProgress?.total || 1}
-                  currentSlide={imageGenProgress?.current || 0}
-                  isGenerating={true}
-                />
+                <ImageGenerationProgress totalSlides={imageGenProgress?.total || 1} currentSlide={imageGenProgress?.current || 0} isGenerating={true} />
               </div>
             )}
             {carouselSlides.length > 0 && (
               <div className="mb-4">
-                <h3 className="text-card-foreground font-semibold mb-3">
-                  {{
-                    'post-singolo': 'Immagine Post',
-                    'storia': 'Immagine Storia',
-                    'reel': 'Immagine Reel',
-                  }[postType || ''] || 'Slide Carosello'}
+                <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--ink)' }}>
+                  { { 'post-singolo': 'Immagine Post', 'storia': 'Immagine Storia', 'reel': 'Immagine Reel' }[postType || ''] || 'Slide Carosello' }
                 </h3>
                 {isGeneratingImages && imageGenProgress && (
-                  <ImageGenerationProgress
-                    totalSlides={imageGenProgress.total}
-                    currentSlide={imageGenProgress.current}
-                    isGenerating={true}
-                  />
+                  <ImageGenerationProgress totalSlides={imageGenProgress.total} currentSlide={imageGenProgress.current} isGenerating={true} />
                 )}
                 <div className={`grid gap-3 mb-4 ${carouselSlides.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : 'grid-cols-2 md:grid-cols-3'}`}>
                   {carouselSlides.map((slide, index) => renderSlide(slide, index))}
                 </div>
                 {carouselSlides.some(s => !s.imageUrl) && !isGeneratingImages && onRegenerateImages && (
-                  <Button onClick={onRegenerateImages} variant="outline" size="sm" className="w-full">
-                    <RefreshCw className="mr-2 h-4 w-4" /> Rigenera Immagini
-                  </Button>
+                  <button
+                    onClick={onRegenerateImages}
+                    className="w-full text-[11px] font-black uppercase py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    style={{
+                      border: '1px solid var(--line)',
+                      color: 'var(--ink3)',
+                      backgroundColor: 'transparent',
+                    }}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" /> Rigenera Immagini
+                  </button>
                 )}
               </div>
             )}
-            
+
             {appliedHook && (
-              <div className="bg-accent/20 border border-accent rounded-lg p-3 mb-4">
+              <div
+                className="p-3 rounded-lg"
+                style={{
+                  backgroundColor: 'var(--rosa-dim)',
+                  border: '1px solid rgba(230,0,126,0.2)',
+                }}
+              >
                 <div className="flex items-center justify-between">
-                  <span className="text-accent-foreground text-sm font-medium">Hook applicato:</span>
-                  <Button onClick={onRemoveHook} size="sm" variant="ghost" className="text-accent-foreground hover:text-accent-foreground/80 p-1 h-auto">
-                    <X className="w-4 h-4" />
-                  </Button>
+                  <span className="text-xs font-bold" style={{ color: 'var(--rosa)' }}>Hook applicato:</span>
+                  <button onClick={onRemoveHook} className="p-1" style={{ color: 'var(--rosa)' }}>
+                    <X className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-                <p className="text-accent-foreground text-sm mt-1">{appliedHook}</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--ink2)' }}>{appliedHook}</p>
               </div>
             )}
-            
-            <div className="bg-muted/50 p-4 rounded-lg border border-border">
-              <pre className="text-foreground whitespace-pre-wrap text-sm">{generatedContent}</pre>
+
+            <div
+              className="p-4 rounded-lg"
+              style={{
+                backgroundColor: 'var(--bg)',
+                border: '1px solid var(--line)',
+              }}
+            >
+              <pre className="whitespace-pre-wrap text-sm" style={{ color: 'var(--ink)', fontFamily: 'Montserrat, sans-serif' }}>
+                {generatedContent}
+              </pre>
             </div>
 
             <FeedbackWidget generatedContent={generatedContent} />
@@ -317,25 +386,34 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
               <ImageFeedbackWidget imageContext={generatedContent.substring(0, 150)} />
             )}
 
-            <div className="flex gap-2">
-              <Button onClick={onSaveContent} className="flex-1 bg-fisio hover:bg-fisio/90">
-                <Download className="mr-2 h-4 w-4" /> Salva
-              </Button>
-              <Button onClick={() => copyToClipboard(generatedContent)} variant="outline" className="flex-1">
-                <Copy className="mr-2 h-4 w-4" /> Copia
-              </Button>
-            </div>
-
-            <SmartCopyActions generatedContent={generatedContent} carouselSlides={carouselSlides} onPublishDirect={onPublishDirect} isGeneratingImages={isGeneratingImages} />
+            <SmartCopyActions
+              generatedContent={generatedContent}
+              carouselSlides={carouselSlides}
+              onPublishDirect={onPublishDirect}
+              isGeneratingImages={isGeneratingImages}
+            />
 
             {carouselSlides.length > 0 && (
               <CarouselImageManager slides={carouselSlides} onSlidesUpdate={setCarouselSlides} onImageEdit={onImageEdit} />
             )}
           </div>
         ) : (
-          <div className="text-center py-12 text-muted-foreground">
-            <Sparkles className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Il tuo contenuto generato apparirà qui</p>
+          /* ── Empty state ── */
+          <div className="text-center py-16 flex flex-col items-center gap-4">
+            <div
+              className="w-16 h-16 flex items-center justify-center rounded-2xl"
+              style={{ border: '1px solid var(--line)', borderRadius: '14px' }}
+            >
+              <Send className="w-7 h-7" style={{ color: 'var(--ink3)' }} />
+            </div>
+            <div>
+              <p className="text-[13px] font-bold mb-1" style={{ color: 'var(--ink2)' }}>
+                Il tuo contenuto apparirà qui
+              </p>
+              <p className="text-[11px]" style={{ color: 'var(--ink3)' }}>
+                Compila il form e premi Genera Contenuto
+              </p>
+            </div>
           </div>
         )}
       </CardContent>

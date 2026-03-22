@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,6 +24,13 @@ import { useHookManager } from "@/hooks/useHookManager";
 import { useImageManager } from "@/hooks/useImageManager";
 import { usePhotoManager } from "@/hooks/usePhotoManager";
 import { MetaService } from '@/services/metaService';
+import {
+  PenLine,
+  Image,
+  Cpu,
+  TrendingUp,
+  Flame,
+} from 'lucide-react';
 
 interface MainContentProps {
   user: any;
@@ -33,7 +41,7 @@ interface MainContentProps {
 const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImprover, onCopyImproved }) => {
   const loadingState = useGlobalLoading();
   const { toast } = useToast();
-  
+
   const [ideaInput, setIdeaInput] = useState('');
   const [formData, setFormData] = useState({
     description: '',
@@ -49,7 +57,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
     selectedPlatforms: ['instagram'] as string[],
     scheduleDate: '',
   });
-  
+
   const [selectedImageForEdit, setSelectedImageForEdit] = useState<string | null>(null);
   const [editingSlideIndex, setEditingSlideIndex] = useState<number | null>(null);
   const [showHookGenerator, setShowHookGenerator] = useState(false);
@@ -83,16 +91,16 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
 
   const handleUseTrend = (topic: string) => {
     setFormData(prev => ({ ...prev, description: topic }));
-    toast({ title: '🔥 Trend selezionato!', description: `"${topic}" inserito nel form. Genera il post!` });
+    toast({ title: 'Trend selezionato!', description: `"${topic}" inserito nel form. Genera il post!` });
   };
 
   const handlePublish = async (platforms: string[]) => {
     if (!generatedContent) {
-      toast({ title: "❌ Errore", description: "Genera prima il contenuto prima di pubblicare", variant: "destructive" });
+      toast({ title: "Errore", description: "Genera prima il contenuto prima di pubblicare", variant: "destructive" });
       return;
     }
     if (isGeneratingImages) {
-      toast({ title: "⏳ Attendi", description: "Le immagini sono ancora in fase di creazione. Riprova tra qualche secondo." });
+      toast({ title: "Attendi", description: "Le immagini sono ancora in fase di creazione. Riprova tra qualche secondo." });
       return;
     }
 
@@ -102,7 +110,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
     try {
       const isMetaConnected = await MetaService.isConnected();
       if (!isMetaConnected) {
-        toast({ title: "📋 Usa Smart Copy", description: "Copia il testo e scarica le immagini dall'anteprima per pubblicare manualmente." });
+        toast({ title: "Usa Smart Copy", description: "Copia il testo e scarica le immagini dall'anteprima per pubblicare manualmente." });
         loadingState.finishLoading(false, 'Nessuna connessione attiva');
         return;
       }
@@ -139,7 +147,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
           const carouselUrls = carouselSlides
             .map(s => s.userImageUrl || s.imageUrl)
             .filter((url): url is string => !!url);
-          
+
           const result = await MetaService.publishToInstagram(
             connection.id, generatedContent, imageUrl,
             carouselUrls.length > 1 ? carouselUrls : undefined
@@ -151,64 +159,133 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
       loadingState.updateProgress(90, 'Finalizzazione...');
 
       if (publishedCount > 0) {
-        toast({ title: "🎉 Pubblicato!", description: `Contenuto pubblicato su ${publishedCount} piattaform${publishedCount > 1 ? 'e' : 'a'}` });
+        toast({ title: "Pubblicato!", description: `Contenuto pubblicato su ${publishedCount} piattaform${publishedCount > 1 ? 'e' : 'a'}` });
         loadingState.finishLoading(true, 'Pubblicazione completata!');
       } else if (errors.length > 0) {
-        toast({ title: "❌ Pubblicazione fallita", description: errors.join(' | '), variant: "destructive" });
+        toast({ title: "Pubblicazione fallita", description: errors.join(' | '), variant: "destructive" });
         loadingState.finishLoading(false, errors.join(' | '));
       }
     } catch (error) {
-      toast({ title: "❌ Errore di pubblicazione", description: error instanceof Error ? error.message : 'Errore sconosciuto', variant: "destructive" });
+      toast({ title: "Errore di pubblicazione", description: error instanceof Error ? error.message : 'Errore sconosciuto', variant: "destructive" });
       loadingState.finishLoading(false, error instanceof Error ? error.message : 'Errore sconosciuto');
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-4 sm:py-8">
-      <div className="text-center mb-6 sm:mb-8 space-y-2">
-        <h1 className="text-3xl sm:text-5xl font-extrabold text-foreground mb-2 sm:mb-4 leading-tight">
-          <span className="gradient-text">Social Post Generator</span> ✨
+    <div className="max-w-7xl mx-auto px-4 py-8" style={{ paddingTop: '52px' }}>
+
+      {/* ── Hero ──────────────────────────────────────────── */}
+      <div className="text-center mb-10 space-y-3">
+        {/* Eyebrow pill */}
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border"
+          style={{
+            backgroundColor: 'var(--viola-dim)',
+            borderColor: 'rgba(85,70,151,0.15)',
+          }}>
+          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--rosa)' }} />
+          <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--viola)' }}>
+            AI Social Generator
+          </span>
+        </div>
+
+        {/* Title */}
+        <h1
+          className="text-[38px] leading-tight"
+          style={{
+            fontWeight: 900,
+            color: 'var(--ink)',
+            letterSpacing: '-2px',
+            lineHeight: '1.1',
+          }}
+        >
+          Crea contenuti{' '}
+          <span style={{ color: 'var(--rosa)' }}>virali</span>{' '}
+          in secondi
         </h1>
-        <p className="text-base sm:text-lg text-muted-foreground px-4 max-w-2xl mx-auto">
-          Crea contenuti coinvolgenti per i tuoi social media con l'intelligenza artificiale
+
+        {/* Subtitle */}
+        <p className="text-[13px] font-medium" style={{ color: 'var(--ink3)' }}>
+          Copywriting AI + immagini generate automaticamente per i tuoi social
         </p>
       </div>
 
+      {/* ── Loading progress ──────────────────────────────── */}
       {loadingState.isLoading && (
-        <div className="mb-6 animate-fade-in">
-          <Card><CardContent className="p-6">
-            <EnhancedProgress value={loadingState.progress} status={loadingState.status} message={loadingState.message} size="md" />
-          </CardContent></Card>
+        <div className="mb-6">
+          <Card>
+            <CardContent className="p-6">
+              <EnhancedProgress
+                value={loadingState.progress}
+                status={loadingState.status}
+                message={loadingState.message}
+                size="md"
+              />
+            </CardContent>
+          </Card>
         </div>
       )}
 
       {showCopyImprover && (
-        <div className="mb-6 sm:mb-8"><LazyCopyImprover onCopyImproved={onCopyImproved} /></div>
-      )}
-
-      {showViralGenerator && (
-        <div className="mb-6 sm:mb-8">
-          <ViralFormatGenerator topic={formData.description} audience={formData.audience} user={user} onContentGenerated={handleViralContentGenerated} />
+        <div className="mb-6">
+          <LazyCopyImprover onCopyImproved={onCopyImproved} />
         </div>
       )}
 
+      {showViralGenerator && (
+        <div className="mb-6">
+          <ViralFormatGenerator
+            topic={formData.description}
+            audience={formData.audience}
+            user={user}
+            onContentGenerated={handleViralContentGenerated}
+          />
+        </div>
+      )}
+
+      {/* ── Tabs ──────────────────────────────────────────── */}
       <Tabs defaultValue="genera" className="mb-6">
-        <TabsList className="grid grid-cols-5 w-full">
-          <TabsTrigger value="genera">✍️ Genera</TabsTrigger>
-          <TabsTrigger value="foto">📸 Foto</TabsTrigger>
-          <TabsTrigger value="memoria">🧠 AI Memory</TabsTrigger>
-          <TabsTrigger value="virale">🔍 Virale</TabsTrigger>
-          <TabsTrigger value="trend">🔥 Trend</TabsTrigger>
+        <TabsList
+          className="tab-underline-list w-full justify-start rounded-none bg-transparent h-auto p-0 mb-0"
+          style={{ borderBottom: '1.5px solid var(--line)' }}
+        >
+          {[
+            { value: 'genera', label: 'Genera', Icon: PenLine },
+            { value: 'foto', label: 'Foto', Icon: Image },
+            { value: 'memoria', label: 'AI Memory', Icon: Cpu },
+            { value: 'virale', label: 'Virale', Icon: TrendingUp },
+            { value: 'trend', label: 'Trend', Icon: Flame },
+          ].map(({ value, label, Icon }) => (
+            <TabsTrigger
+              key={value}
+              value={value}
+              className="relative rounded-none border-0 bg-transparent px-4 pb-2.5 pt-2 text-[11px] font-black uppercase tracking-wider shadow-none
+                data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-[var(--ink)]
+                data-[state=inactive]:text-[var(--ink3)]
+                hover:text-[var(--viola)]
+                data-[state=active]:[&::after]:content-[''] data-[state=active]:[&::after]:absolute data-[state=active]:[&::after]:bottom-[-1.5px] data-[state=active]:[&::after]:left-0 data-[state=active]:[&::after]:right-0 data-[state=active]:[&::after]:h-[2px] data-[state=active]:[&::after]:bg-[var(--rosa)] data-[state=active]:[&::after]:rounded-t"
+              style={{ letterSpacing: '0.6px' }}
+            >
+              <Icon className="h-3.5 w-3.5 mr-1.5 inline-block" />
+              {label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
-        <TabsContent value="genera" className="mt-4">
+        <TabsContent value="genera" className="mt-6">
           <div className="mb-6">
-            <IdeaGenerator ideaInput={ideaInput} setIdeaInput={setIdeaInput} onIdeaGenerated={handleIdeaGenerated} />
+            <IdeaGenerator
+              ideaInput={ideaInput}
+              setIdeaInput={setIdeaInput}
+              onIdeaGenerated={handleIdeaGenerated}
+            />
           </div>
-          <div className="grid lg:grid-cols-2 gap-6 sm:gap-8">
+          <div className="grid lg:grid-cols-2 gap-6">
             <div className="space-y-4">
               {loadingState.isLoading ? (
-                <Card><CardHeader><CardTitle>Configurazione Post</CardTitle></CardHeader><CardContent><SkeletonLoader type="form" /></CardContent></Card>
+                <Card>
+                  <CardHeader><CardTitle>Configurazione Post</CardTitle></CardHeader>
+                  <CardContent><SkeletonLoader type="form" /></CardContent>
+                </Card>
               ) : (
                 <>
                   <ContentForm
@@ -222,8 +299,12 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
                     onPublish={handlePublish}
                   />
                   <div className="text-center">
-                    <button onClick={() => setShowViralGenerator(!showViralGenerator)} className="text-accent hover:text-accent/80 underline text-sm font-medium transition-colors">
-                      {showViralGenerator ? '🔥 Nascondi Formati Virali' : '🔥 Mostra Formati Virali'}
+                    <button
+                      onClick={() => setShowViralGenerator(!showViralGenerator)}
+                      className="text-sm font-semibold transition-colors underline"
+                      style={{ color: 'var(--viola)' }}
+                    >
+                      {showViralGenerator ? 'Nascondi Formati Virali' : 'Mostra Formati Virali'}
                     </button>
                   </div>
                 </>
@@ -231,7 +312,13 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
             </div>
             <div>
               {loadingState.isLoading && !generatedContent ? (
-                <Card><CardHeader><CardTitle>Anteprima Contenuto</CardTitle></CardHeader><CardContent><SkeletonLoader type="content" /><div className="mt-6"><SkeletonLoader type="carousel" /></div></CardContent></Card>
+                <Card>
+                  <CardHeader><CardTitle>Anteprima Contenuto</CardTitle></CardHeader>
+                  <CardContent>
+                    <SkeletonLoader type="content" />
+                    <div className="mt-6"><SkeletonLoader type="carousel" /></div>
+                  </CardContent>
+                </Card>
               ) : (
                 <>
                   <PreviewSection
@@ -249,14 +336,18 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
                     onRegenerateImages={regenerateImages}
                     imageGenProgress={imageGenProgress}
                   />
-                  {generatedContent && <div className="mt-3"><FeedbackWidget generatedContent={generatedContent} /></div>}
+                  {generatedContent && (
+                    <div className="mt-3">
+                      <FeedbackWidget generatedContent={generatedContent} />
+                    </div>
+                  )}
                 </>
               )}
             </div>
           </div>
         </TabsContent>
 
-        <TabsContent value="foto" className="mt-4">
+        <TabsContent value="foto" className="mt-6">
           <PhotoLibrary
             selectable
             selectedPhotos={selectedPhotos}
@@ -265,20 +356,22 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
           />
         </TabsContent>
 
-        <TabsContent value="memoria" className="mt-4">
+        <TabsContent value="memoria" className="mt-6">
           <AIMemoryPanel />
         </TabsContent>
 
-        <TabsContent value="virale" className="mt-4">
+        <TabsContent value="virale" className="mt-6">
           <ViralAnalyzer />
         </TabsContent>
 
-        <TabsContent value="trend" className="mt-4">
+        <TabsContent value="trend" className="mt-6">
           <TrendExplorer onUseTrend={handleUseTrend} />
         </TabsContent>
       </Tabs>
 
-      <div className="mt-8"><MetaConnection /></div>
+      <div className="mt-8">
+        <MetaConnection />
+      </div>
 
       <HookGenerator
         showHookGenerator={showHookGenerator}

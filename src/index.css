@@ -1,120 +1,118 @@
 
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. */
+/* ============================================================
+   DESIGN SYSTEM — Rosa / Viola / Ink palette
+   ============================================================ */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* ── Brand palette ──────────────────────────────────── */
+    --rosa: #e6007e;
+    --viola: #554697;
+    --viola-deep: #3d3270;
+    --rosa-dim: rgba(230, 0, 126, 0.08);
+    --viola-dim: rgba(85, 70, 151, 0.07);
+    --ink: #18152e;
+    --ink2: #5a5478;
+    --ink3: #a099c0;
+    --line: rgba(85, 70, 151, 0.12);
+    --bg: #f9f8fc;
+    --surface: #ffffff;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    /* ── Tailwind semantic tokens (HSL) ─────────────────── */
+    --background: 260 43% 98%;       /* #f9f8fc  */
+    --foreground: 249 33% 13%;       /* #18152e  */
+
+    --card: 0 0% 100%;               /* #ffffff  */
+    --card-foreground: 249 33% 13%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 249 33% 13%;
 
-    --primary: 217 91% 60%; /* Blu vibrante #3B82F6 */
+    --primary: 325 100% 45%;         /* #e6007e  */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 258 90% 66%; /* Viola elettrico #8B5CF6 */
+    --secondary: 249 37% 43%;        /* #554697  */
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 249 37% 95%;
+    --muted-foreground: 247 19% 68%; /* #a099c0  */
 
-    --accent: 160 84% 39%; /* Verde lime #10B981 */
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 217 91% 60%;
-
-    --radius: 0.75rem;
-
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(258 90% 66%));
-    --gradient-accent: linear-gradient(135deg, hsl(258 90% 66%), hsl(217 91% 60%));
-    --gradient-success: linear-gradient(135deg, hsl(160 84% 39%), hsl(142 76% 36%));
-
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217 91% 60%;
-
-    /* Fisioaccordo Design System */
-    --fisio-primary: 340 82% 52%;
-    --fisio-primary-foreground: 0 0% 100%;
-    --fisio-secondary: 0 0% 20%;
-    --fisio-secondary-foreground: 0 0% 100%;
-    --fisio-accent: 0 0% 95%;
-    --fisio-accent-foreground: 0 0% 20%;
-    --fisio-background: 0 0% 100%;
-    --fisio-surface: 0 0% 98%;
-  }
-
-  .dark {
-    --background: 222 47% 7%; /* Blu scuro profondo */
-    --foreground: 0 0% 100%; /* Bianco puro */
-
-    --card: 217 50% 12% / 0.7; /* Blu scuro semi-trasparente */
-    --card-foreground: 0 0% 100%;
-
-    --popover: 217 50% 12%;
-    --popover-foreground: 0 0% 100%;
-
-    --primary: 217 91% 60%; /* Blu vibrante */
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 258 90% 66%; /* Viola elettrico */
-    --secondary-foreground: 0 0% 100%;
-
-    --muted: 217 70% 25%; /* Blu intenso al posto del grigio */
-    --muted-foreground: 217 80% 80%; /* Blu chiaro luminoso */
-
-    --accent: 160 84% 39%; /* Verde lime */
+    --accent: 249 37% 43%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 217 70% 35% / 0.6; /* Blu con trasparenza */
-    --input: 217 60% 18%; /* Blu scuro per input */
-    --ring: 217 91% 60%;
+    --border: 249 37% 90%;
+    --input: 260 43% 98%;
+    --ring: 325 100% 45%;
 
-    /* Gradients dark mode */
-    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(258 90% 66%));
-    --gradient-accent: linear-gradient(135deg, hsl(258 90% 66%), hsl(217 91% 60%));
-    --gradient-success: linear-gradient(135deg, hsl(160 84% 39%), hsl(142 76% 36%));
-    --gradient-bg: linear-gradient(180deg, hsl(222 47% 7%), hsl(222 47% 5%));
-    
-    --sidebar-background: 222 47% 9%;
-    --sidebar-foreground: 240 5% 96%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 32% 17%;
-    --sidebar-accent-foreground: 240 5% 96%;
-    --sidebar-border: 217 32% 20%;
-    --sidebar-ring: 217 91% 60%;
+    --radius: 0.75rem;
 
-    /* Fisioaccordo Design System - Dark Mode */
-    --fisio-primary: 340 82% 52%;
+    /* ── Fisioaccordo tokens ────────────────────────────── */
+    --fisio-primary: 325 100% 45%;
     --fisio-primary-foreground: 0 0% 100%;
-    --fisio-secondary: 0 0% 90%; 
-    --fisio-secondary-foreground: 0 0% 10%;
-    --fisio-accent: 0 0% 15%;
-    --fisio-accent-foreground: 0 0% 90%;
-    --fisio-background: 222 47% 7%;
-    --fisio-surface: 222 47% 11%;
+    --fisio-secondary: 249 37% 43%;
+    --fisio-secondary-foreground: 0 0% 100%;
+    --fisio-accent: 0 0% 95%;
+    --fisio-accent-foreground: 249 33% 13%;
+    --fisio-background: 260 43% 98%;
+    --fisio-surface: 0 0% 100%;
+
+    /* ── Sidebar ────────────────────────────────────────── */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 249 33% 13%;
+    --sidebar-primary: 325 100% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 260 43% 97%;
+    --sidebar-accent-foreground: 249 33% 13%;
+    --sidebar-border: 249 37% 90%;
+    --sidebar-ring: 325 100% 45%;
+  }
+
+  /* No dark mode — use light only */
+  .dark {
+    --background: 260 43% 98%;
+    --foreground: 249 33% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 249 33% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 249 33% 13%;
+    --primary: 325 100% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 249 37% 43%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 249 37% 95%;
+    --muted-foreground: 247 19% 68%;
+    --accent: 249 37% 43%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 249 37% 90%;
+    --input: 260 43% 98%;
+    --ring: 325 100% 45%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 249 33% 13%;
+    --sidebar-primary: 325 100% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 260 43% 97%;
+    --sidebar-accent-foreground: 249 33% 13%;
+    --sidebar-border: 249 37% 90%;
+    --sidebar-ring: 325 100% 45%;
+    --fisio-primary: 325 100% 45%;
+    --fisio-primary-foreground: 0 0% 100%;
+    --fisio-secondary: 249 37% 43%;
+    --fisio-secondary-foreground: 0 0% 100%;
+    --fisio-accent: 0 0% 95%;
+    --fisio-accent-foreground: 249 33% 13%;
+    --fisio-background: 260 43% 98%;
+    --fisio-surface: 0 0% 100%;
   }
 }
 
@@ -125,41 +123,104 @@
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Montserrat', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Miglioramenti per contrasto e visibilità */
-  .bg-popover {
-    background: hsl(var(--popover));
-  }
-  
-  .text-popover-foreground {
-    color: hsl(var(--popover-foreground));
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Montserrat', sans-serif;
   }
 }
 
-/* Utility classes moderne */
+/* ============================================================
+   UTILITY CLASSES
+   ============================================================ */
 @layer utilities {
+  /* Field label: 10px / 800 / uppercase / ink2 + dot rosa */
+  .label-field {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--ink2);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .label-field::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background-color: var(--rosa);
+    flex-shrink: 0;
+  }
+
+  /* Card / panel container */
+  .panel-card {
+    background-color: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(85, 70, 151, 0.07);
+  }
+
+  /* Underline tab container */
+  .tab-underline-list {
+    border-bottom: 1.5px solid var(--line);
+    background: transparent;
+    height: auto;
+    padding: 0;
+    gap: 0;
+    display: flex;
+  }
+
+  /* Light shadow only */
+  .shadow-light {
+    box-shadow: 0 2px 12px rgba(85, 70, 151, 0.07);
+  }
+
+  /* Legacy classes — remapped to light theme */
+  .backdrop-blur-enhanced {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .shadow-enhanced {
+    box-shadow: 0 2px 12px rgba(85, 70, 151, 0.07);
+  }
+
+  .glow-effect {
+    box-shadow: 0 2px 12px rgba(85, 70, 151, 0.07);
+  }
+
+  .gradient-text {
+    color: var(--ink);
+    background: none;
+    -webkit-background-clip: unset;
+    -webkit-text-fill-color: unset;
+    background-clip: unset;
+  }
+
   .focus-visible-enhanced {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2;
   }
-  
-  .backdrop-blur-enhanced {
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+
+  /* Active tab indicator */
+  .tab-active-indicator {
+    position: relative;
   }
-  
-  .shadow-enhanced {
-    box-shadow: 0 20px 40px -10px hsl(var(--primary) / 0.2), 0 0 60px -15px hsl(var(--primary) / 0.1);
-  }
-  
-  .glow-effect {
-    box-shadow: 0 0 20px hsl(var(--primary) / 0.3), 0 0 40px hsl(var(--primary) / 0.1);
-  }
-  
-  .gradient-text {
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+
+  .tab-active-indicator::after {
+    content: '';
+    position: absolute;
+    bottom: -1.5px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: var(--rosa);
+    border-radius: 2px 2px 0 0;
   }
 }
