@@ -2,6 +2,8 @@
 import React, { useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useGlobalLoading } from "@/contexts/GlobalLoadingContext";
 import { useToast } from "@/hooks/use-toast";
 import IdeaGenerator from "./IdeaGenerator";
@@ -24,19 +26,17 @@ import { useHookManager } from "@/hooks/useHookManager";
 import { useImageManager } from "@/hooks/useImageManager";
 import { usePhotoManager } from "@/hooks/usePhotoManager";
 import { MetaService } from '@/services/metaService';
-import {
-  PenLine,
-  Image,
-  Cpu,
-  TrendingUp,
-  Flame,
-} from 'lucide-react';
+import { ChevronDown, Lightbulb, PenLine, Image, Cpu, TrendingUp, Flame } from 'lucide-react';
 
 interface MainContentProps {
   user: any;
   showCopyImprover: boolean;
   onCopyImproved: (improvedCopy: string) => void;
+  onOpenSocialModal?: () => void;
 }
+
+// Expose openSocialModal via a simple callback for AppHeader
+export type { MainContentProps };
 
 const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImprover, onCopyImproved }) => {
   const loadingState = useGlobalLoading();
@@ -66,6 +66,8 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
   const [basePhoto, setBasePhoto] = useState<string | null>(null);
   const [showViralGenerator, setShowViralGenerator] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
+  const [ideaOpen, setIdeaOpen] = useState(false);
+  const [socialModalOpen, setSocialModalOpen] = useState(false);
 
   const { carouselSlides, setCarouselSlides, generateCarouselSlides, isGeneratingImages, regenerateImages, imageGenProgress } = useCarouselSlides(formData, user, basePhoto);
   const { generatedContent, setGeneratedContent, generateContent, saveContent } = useContentGeneration(user, formData, generateCarouselSlides);
@@ -80,6 +82,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
 
   const handleIdeaGenerated = useCallback((idea: string) => {
     setFormData(prev => ({ ...prev, description: idea }));
+    setIdeaOpen(false);
   }, []);
 
   const handleSaveContent = () => saveContent(carouselSlides);
@@ -124,7 +127,6 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
       }
 
       loadingState.updateProgress(30, 'Preparazione contenuto...');
-
       const imageUrl = basePhoto
         || carouselSlides.find(s => s.userImageUrl)?.userImageUrl
         || carouselSlides.find(s => s.imageUrl)?.imageUrl
@@ -135,29 +137,18 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
 
       for (const platform of platforms) {
         loadingState.updateProgress(50, `Pubblicazione su ${platform}...`);
-
         if (platform === 'facebook') {
           const result = await MetaService.publishToFacebook(connection.id, generatedContent, imageUrl);
           if (result.success) { publishedCount++; } else { errors.push(`Facebook: ${result.error}`); }
         } else if (platform === 'instagram') {
-          if (!imageUrl) {
-            errors.push("Generazione immagine fallita. Carica una foto manualmente o riprova a generare il contenuto.");
-            continue;
-          }
-          const carouselUrls = carouselSlides
-            .map(s => s.userImageUrl || s.imageUrl)
-            .filter((url): url is string => !!url);
-
-          const result = await MetaService.publishToInstagram(
-            connection.id, generatedContent, imageUrl,
-            carouselUrls.length > 1 ? carouselUrls : undefined
-          );
+          if (!imageUrl) { errors.push("Generazione immagine fallita. Carica una foto manualmente o riprova a generare il contenuto."); continue; }
+          const carouselUrls = carouselSlides.map(s => s.userImageUrl || s.imageUrl).filter((url): url is string => !!url);
+          const result = await MetaService.publishToInstagram(connection.id, generatedContent, imageUrl, carouselUrls.length > 1 ? carouselUrls : undefined);
           if (result.success) { publishedCount++; } else { errors.push(`Instagram: ${result.error}`); }
         }
       }
 
       loadingState.updateProgress(90, 'Finalizzazione...');
-
       if (publishedCount > 0) {
         toast({ title: "Pubblicato!", description: `Contenuto pubblicato su ${publishedCount} piattaform${publishedCount > 1 ? 'e' : 'a'}` });
         loadingState.finishLoading(true, 'Pubblicazione completata!');
@@ -172,30 +163,16 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8" style={{ paddingTop: '52px' }}>
+    <div className="max-w-7xl mx-auto px-4 py-8" style={{ paddingTop: '44px' }}>
 
-      {/* ── Hero ──────────────────────────────────────────── */}
-      <div className="text-center mb-10 space-y-3">
-
-        {/* Title */}
+      {/* ── Hero (compact, 1 line) ─────────────────────────── */}
+      <div className="text-center mb-8">
         <h1
-          className="text-[38px] leading-tight"
-          style={{
-            fontWeight: 900,
-            color: 'var(--ink)',
-            letterSpacing: '-2px',
-            lineHeight: '1.1',
-          }}
+          className="text-[32px] leading-tight"
+          style={{ fontWeight: 900, color: 'var(--ink)', letterSpacing: '-1.5px', lineHeight: '1.1' }}
         >
-          Crea contenuti{' '}
-          <span style={{ color: 'var(--rosa)' }}>virali</span>{' '}
-          in secondi
+          Crea contenuti <span style={{ color: 'var(--rosa)' }}>virali</span> in secondi
         </h1>
-
-        {/* Subtitle */}
-        <p className="text-[13px] font-medium" style={{ color: 'var(--ink3)' }}>
-          Copywriting AI + immagini generate automaticamente per i tuoi social
-        </p>
       </div>
 
       {/* ── Loading progress ──────────────────────────────── */}
@@ -203,12 +180,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
         <div className="mb-6">
           <Card>
             <CardContent className="p-6">
-              <EnhancedProgress
-                value={loadingState.progress}
-                status={loadingState.status}
-                message={loadingState.message}
-                size="md"
-              />
+              <EnhancedProgress value={loadingState.progress} status={loadingState.status} message={loadingState.message} size="md" />
             </CardContent>
           </Card>
         </div>
@@ -222,12 +194,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
 
       {showViralGenerator && (
         <div className="mb-6">
-          <ViralFormatGenerator
-            topic={formData.description}
-            audience={formData.audience}
-            user={user}
-            onContentGenerated={handleViralContentGenerated}
-          />
+          <ViralFormatGenerator topic={formData.description} audience={formData.audience} user={user} onContentGenerated={handleViralContentGenerated} />
         </div>
       )}
 
@@ -261,13 +228,31 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
         </TabsList>
 
         <TabsContent value="genera" className="mt-6">
-          <div className="mb-6">
-            <IdeaGenerator
-              ideaInput={ideaInput}
-              setIdeaInput={setIdeaInput}
-              onIdeaGenerated={handleIdeaGenerated}
-            />
-          </div>
+
+          {/* ── Collapsible Idea Generator ─────────────────── */}
+          <Collapsible open={ideaOpen} onOpenChange={setIdeaOpen} className="mb-5">
+            <CollapsibleTrigger asChild>
+              <button
+                className="flex items-center gap-2 text-[11px] font-black uppercase transition-colors"
+                style={{ color: ideaOpen ? 'var(--rosa)' : 'var(--ink3)', letterSpacing: '0.5px' }}
+              >
+                <Lightbulb className="h-3.5 w-3.5" />
+                Ispirazione rapida
+                <ChevronDown
+                  className="h-3 w-3 transition-transform duration-200"
+                  style={{ transform: ideaOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3">
+              <IdeaGenerator
+                ideaInput={ideaInput}
+                setIdeaInput={setIdeaInput}
+                onIdeaGenerated={handleIdeaGenerated}
+              />
+            </CollapsibleContent>
+          </Collapsible>
+
           <div className="grid lg:grid-cols-2 gap-6">
             <div className="space-y-4">
               {loadingState.isLoading ? (
@@ -286,6 +271,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
                     onPhotoUpload={photoManager.handlePhotoUpload}
                     onPhotoRemove={photoManager.handlePhotoRemove}
                     onPublish={handlePublish}
+                    onShowHookGenerator={() => setShowHookGenerator(!showHookGenerator)}
                   />
                   <div className="text-center">
                     <button
@@ -358,10 +344,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
         </TabsContent>
       </Tabs>
 
-      <div className="mt-8">
-        <MetaConnection />
-      </div>
-
+      {/* ── Hook Generator (floating) ────────────────────── */}
       <HookGenerator
         showHookGenerator={showHookGenerator}
         setShowHookGenerator={setShowHookGenerator}
@@ -372,10 +355,32 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
         tone={formData.tone}
         platform={formData.platform}
       />
+
+      {/* ── Social connection link ────────────────────────── */}
+      <div className="mt-6 text-center">
+        <button
+          onClick={() => setSocialModalOpen(true)}
+          className="text-[10px] font-black uppercase transition-colors"
+          style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}
+        >
+          Connessioni Social →
+        </button>
+      </div>
+
+      {/* ── Social Modal ──────────────────────────────────── */}
+      <Dialog open={socialModalOpen} onOpenChange={setSocialModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle style={{ fontSize: '13px', fontWeight: 800, color: 'var(--ink)' }}>
+              Connessioni Social
+            </DialogTitle>
+          </DialogHeader>
+          <MetaConnection />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });
 
 MainContent.displayName = 'MainContent';
-
 export default MainContent;

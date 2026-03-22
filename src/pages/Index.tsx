@@ -120,27 +120,6 @@ const Index = () => {
         <ErrorBoundary>
           <SavedContents savedContents={savedContents} isLoading={loadingSavedContents} />
         </ErrorBoundary>
-
-        {/* Footer */}
-        <div
-          className="mt-10 p-5 rounded-xl"
-          style={{
-            backgroundColor: 'var(--surface)',
-            border: '1px solid var(--line)',
-          }}
-        >
-          <div className="text-center space-y-1.5">
-            <p className="text-[11px] font-medium" style={{ color: 'var(--ink3)' }}>
-              © {new Date().getFullYear()} Cimmi LLC. Tutti i diritti riservati. |{' '}
-              <a href="/privacy" className="underline" style={{ color: 'var(--viola)' }}>Privacy Policy</a> |{' '}
-              <a href="/terms" className="underline" style={{ color: 'var(--viola)' }}>Termini di Servizio</a>
-            </p>
-            <p className="text-[10px]" style={{ color: 'var(--ink3)' }}>
-              POST PER I SOCIAL 2-IG è di proprietà esclusiva di Cimmi LLC.
-              È vietata la copia, riproduzione o replica di questa piattaforma senza autorizzazione scritta.
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   );
