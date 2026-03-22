@@ -2,6 +2,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Brain, LogOut } from "lucide-react";
+import logo from "@/assets/logo-fisioaccordo.png";
 
 interface AppHeaderProps {
   user: any;
