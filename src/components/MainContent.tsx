@@ -176,17 +176,6 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
 
       {/* ── Hero ──────────────────────────────────────────── */}
       <div className="text-center mb-10 space-y-3">
-        {/* Eyebrow pill */}
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border"
-          style={{
-            backgroundColor: 'var(--viola-dim)',
-            borderColor: 'rgba(85,70,151,0.15)',
-          }}>
-          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--rosa)' }} />
-          <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: 'var(--viola)' }}>
-            AI Social Generator
-          </span>
-        </div>
 
         {/* Title */}
         <h1
