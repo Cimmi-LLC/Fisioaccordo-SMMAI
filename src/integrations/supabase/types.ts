@@ -3081,7 +3081,87 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      google_calendar_connections_safe: {
+        Row: {
+          calendar_id: string | null
+          calendar_name: string | null
+          created_at: string | null
+          email: string | null
+          google_user_id: string | null
+          id: string | null
+          is_active: boolean | null
+          token_expires_at: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          calendar_id?: string | null
+          calendar_name?: string | null
+          created_at?: string | null
+          email?: string | null
+          google_user_id?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          calendar_id?: string | null
+          calendar_name?: string | null
+          created_at?: string | null
+          email?: string | null
+          google_user_id?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      meta_connections_safe: {
+        Row: {
+          created_at: string | null
+          facebook_user_id: string | null
+          id: string | null
+          instagram_business_id: string | null
+          instagram_username: string | null
+          is_active: boolean | null
+          page_id: string | null
+          page_name: string | null
+          token_expires_at: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          facebook_user_id?: string | null
+          id?: string | null
+          instagram_business_id?: string | null
+          instagram_username?: string | null
+          is_active?: boolean | null
+          page_id?: string | null
+          page_name?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          facebook_user_id?: string | null
+          id?: string | null
+          instagram_business_id?: string | null
+          instagram_username?: string | null
+          is_active?: boolean | null
+          page_id?: string | null
+          page_name?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       create_appointment_tag: {
