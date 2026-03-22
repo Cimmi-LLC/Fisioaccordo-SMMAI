@@ -1,10 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,7 +13,7 @@ const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('signin');
+  const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -33,76 +31,44 @@ const Auth = () => {
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        navigate('/');
-      }
+      if (session) navigate('/');
     };
     checkAuth();
   }, [navigate]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!agreedToTerms) {
-      toast({
-        title: "Termini e Condizioni",
-        description: "Devi accettare i termini e condizioni per registrarti",
-        variant: "destructive"
-      });
+      toast({ title: "Termini e Condizioni", description: "Devi accettare i termini e condizioni per registrarti", variant: "destructive" });
       return;
     }
-
     setLoading(true);
-
     try {
       const redirectUrl = `${window.location.origin}/`;
-      
       const { error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           emailRedirectTo: redirectUrl,
-          data: {
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            clinic_name: formData.clinicName
-          }
+          data: { first_name: formData.firstName, last_name: formData.lastName, clinic_name: formData.clinicName }
         }
       });
-
       if (error) {
         if (error.message.includes('already registered') || (error as any).code === 'user_already_exists') {
-          toast({
-            title: "📧 Email già registrata",
-            description: "Hai già un account! Ti portiamo al Login.",
-          });
+          toast({ title: "Email già registrata", description: "Hai già un account! Ti portiamo al Login." });
           setActiveTab('signin');
           return;
         }
-        toast({
-          title: "Errore di registrazione",
-          description: error.message,
-          variant: "destructive"
-        });
+        toast({ title: "Errore di registrazione", description: error.message, variant: "destructive" });
       } else {
-        toast({
-          title: "🎉 Registrazione completata!",
-          description: "Controlla la tua email per attivare l'account"
-        });
+        toast({ title: "Registrazione completata!", description: "Controlla la tua email per attivare l'account" });
       }
-    } catch (error) {
-      toast({
-        title: "Errore",
-        description: "Errore durante la registrazione",
-        variant: "destructive"
-      });
+    } catch {
+      toast({ title: "Errore", description: "Errore durante la registrazione", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -111,224 +77,276 @@ const Auth = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password
-      });
-
+      const { error } = await supabase.auth.signInWithPassword({ email: formData.email, password: formData.password });
       if (error) {
-        toast({
-          title: "Errore di accesso",
-          description: "Email o password non corretti. Usa 'Password dimenticata?' per reimpostarla.",
-          variant: "destructive"
-        });
+        toast({ title: "Errore di accesso", description: "Email o password non corretti. Usa 'Password dimenticata?' per reimpostarla.", variant: "destructive" });
       } else {
-        if (rememberMe) {
-          await supabase.auth.refreshSession();
-        }
-        
-        toast({
-          title: "🚀 Benvenuto!",
-          description: "Accesso effettuato con successo"
-        });
+        if (rememberMe) await supabase.auth.refreshSession();
+        toast({ title: "Benvenuto!", description: "Accesso effettuato con successo" });
         navigate('/');
       }
-    } catch (error) {
-      toast({
-        title: "Errore",
-        description: "Errore durante il login",
-        variant: "destructive"
-      });
+    } catch {
+      toast({ title: "Errore", description: "Errore durante il login", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
+  /* ── Shared field label ── */
+  const FieldLabel: React.FC<{ children: React.ReactNode; htmlFor?: string }> = ({ children, htmlFor }) => (
+    <label
+      htmlFor={htmlFor}
+      className="block text-[10px] font-black uppercase mb-1.5"
+      style={{ color: 'var(--ink2)', letterSpacing: '0.8px' }}
+    >
+      {children}
+    </label>
+  );
+
+  const inputStyle: React.CSSProperties = {
+    backgroundColor: 'var(--bg)',
+    border: '1px solid var(--line)',
+    borderRadius: '9px',
+    color: 'var(--ink)',
+    fontSize: '12px',
+    fontWeight: 500,
+    fontFamily: 'Montserrat, sans-serif',
+  };
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent -z-10" />
-      <div className="w-full max-w-md relative z-10">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg)' }}>
+      <div className="w-full max-w-md">
+
+        {/* ── Logo / brand ── */}
         <div className="text-center mb-8">
-          <div className="flex justify-center items-center mb-4">
-            <img 
-              src="/lovable-uploads/217c8d5c-ce96-40c5-ab52-ff057f4b0d15.png" 
-              alt="FisioAccordo Logo" 
-              className="h-16 w-auto"
-            />
+          <div className="flex justify-center mb-4">
+            <div className="p-2 rounded-xl" style={{ backgroundColor: 'var(--viola)' }}>
+              <img
+                src="/lovable-uploads/217c8d5c-ce96-40c5-ab52-ff057f4b0d15.png"
+                alt="FisioAccordo Logo"
+                className="h-12 w-auto"
+              />
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            FisioAccordo<span className="text-fisio">(VIRAL)</span>ContentAI
+          <h1 className="text-2xl leading-tight mb-1" style={{ fontWeight: 900, color: 'var(--ink)', letterSpacing: '-1px' }}>
+            FisioAccordo<span style={{ color: 'var(--rosa)' }}>(VIRAL)</span>ContentAI
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-[13px] font-medium" style={{ color: 'var(--ink3)' }}>
             Genera contenuti professionali per i tuoi social media
           </p>
         </div>
 
-        <Card className="bg-card/90 border-border backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-card-foreground text-center">
-              Accedi alla Piattaforma
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-2 bg-muted">
-                <TabsTrigger value="signin" className="data-[state=active]:bg-fisio data-[state=active]:text-fisio-foreground">
-                  Accedi
-                </TabsTrigger>
-                <TabsTrigger value="signup" className="data-[state=active]:bg-fisio data-[state=active]:text-fisio-foreground">
-                  Registrati
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="signin">
-                <form onSubmit={handleSignIn} className="space-y-4">
-                  <div>
-                    <Label className="text-muted-foreground">Email</Label>
-                    <Input type="email" name="email" value={formData.email} onChange={handleInputChange} className="bg-muted border-border" placeholder="your-email@example.com" required />
+        {/* ── Card ── */}
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{
+            backgroundColor: 'var(--surface)',
+            border: '1px solid var(--line)',
+            boxShadow: '0 2px 12px rgba(85,70,151,0.07)',
+          }}
+        >
+          {/* Tab switcher */}
+          <div style={{ borderBottom: '1.5px solid var(--line)' }} className="flex">
+            {(['signin', 'signup'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className="flex-1 py-3 text-[11px] font-black uppercase relative transition-colors"
+                style={{
+                  color: activeTab === tab ? 'var(--ink)' : 'var(--ink3)',
+                  letterSpacing: '0.6px',
+                  background: 'transparent',
+                  border: 'none',
+                }}
+              >
+                {tab === 'signin' ? 'Accedi' : 'Registrati'}
+                {activeTab === tab && (
+                  <span
+                    className="absolute bottom-[-1.5px] left-0 right-0 h-[2px] rounded-t"
+                    style={{ backgroundColor: 'var(--rosa)' }}
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="p-6">
+            {activeTab === 'signin' && (
+              <form onSubmit={handleSignIn} className="space-y-4">
+                <div>
+                  <FieldLabel htmlFor="email-signin">Email</FieldLabel>
+                  <Input id="email-signin" type="email" name="email" value={formData.email} onChange={handleInputChange} style={inputStyle} placeholder="tua-email@esempio.com" required />
+                </div>
+                <div>
+                  <FieldLabel htmlFor="pwd-signin">Password</FieldLabel>
+                  <div className="relative">
+                    <Input id="pwd-signin" type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleInputChange} style={{ ...inputStyle, paddingRight: '40px' }} placeholder="••••••••" required />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--ink3)' }}>
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
                   </div>
-                   <div>
-                     <Label className="text-muted-foreground">Password</Label>
-                     <div className="relative">
-                       <Input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleInputChange} className="bg-muted border-border pr-10" placeholder="••••••••" required />
-                       <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                       </button>
-                     </div>
-                   </div>
-                  
+                </div>
+
+                <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="rememberMe" checked={rememberMe} onCheckedChange={(checked) => setRememberMe(checked as boolean)} />
-                    <Label htmlFor="rememberMe" className="text-sm text-muted-foreground cursor-pointer">
-                      🔒 Ricordami
-                    </Label>
+                    <Checkbox id="rememberMe" checked={rememberMe} onCheckedChange={(c) => setRememberMe(c as boolean)} />
+                    <label htmlFor="rememberMe" className="text-[11px] font-medium cursor-pointer" style={{ color: 'var(--ink3)' }}>
+                      Ricordami
+                    </label>
                   </div>
-                   
-                   <button type="button" onClick={() => setShowForgotPassword(true)} className="text-sm text-fisio hover:underline w-full text-right">
-                     Password dimenticata?
-                   </button>
+                  <button type="button" onClick={() => setShowForgotPassword(true)} className="text-[11px] font-semibold underline" style={{ color: 'var(--viola)' }}>
+                    Password dimenticata?
+                  </button>
+                </div>
 
-                   <Button type="submit" disabled={loading} className="w-full bg-fisio hover:bg-fisio/90 text-fisio-foreground">
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Accesso in corso...
-                      </>
-                    ) : (
-                      'Accedi'
-                    )}
-                  </Button>
-                </form>
-              </TabsContent>
-              
-              <TabsContent value="signup">
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-muted-foreground">Nome</Label>
-                      <Input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} className="bg-muted border-border" placeholder="Mario" required />
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground">Cognome</Label>
-                      <Input type="text" name="lastName" value={formData.lastName} onChange={handleInputChange} className="bg-muted border-border" placeholder="Rossi" required />
-                    </div>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full text-white text-[12px] font-black uppercase py-3.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
+                  style={{ backgroundColor: 'var(--rosa)', letterSpacing: '0.6px' }}
+                >
+                  {loading ? <><Loader2 className="h-4 w-4 animate-spin" />Accesso in corso...</> : 'Accedi'}
+                </button>
+              </form>
+            )}
+
+            {activeTab === 'signup' && (
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <FieldLabel>Nome</FieldLabel>
+                    <Input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} style={inputStyle} placeholder="Mario" required />
                   </div>
                   <div>
-                    <Label className="text-muted-foreground">Studio/Clinica</Label>
-                    <Input type="text" name="clinicName" value={formData.clinicName} onChange={handleInputChange} className="bg-muted border-border" placeholder="Studio di Fisioterapia XYZ" />
+                    <FieldLabel>Cognome</FieldLabel>
+                    <Input type="text" name="lastName" value={formData.lastName} onChange={handleInputChange} style={inputStyle} placeholder="Rossi" required />
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground">Email</Label>
-                    <Input type="email" name="email" value={formData.email} onChange={handleInputChange} className="bg-muted border-border" placeholder="tua-email@esempio.com" required />
+                </div>
+                <div>
+                  <FieldLabel>Studio / Clinica</FieldLabel>
+                  <Input type="text" name="clinicName" value={formData.clinicName} onChange={handleInputChange} style={inputStyle} placeholder="Studio di Fisioterapia XYZ" />
+                </div>
+                <div>
+                  <FieldLabel>Email</FieldLabel>
+                  <Input type="email" name="email" value={formData.email} onChange={handleInputChange} style={inputStyle} placeholder="tua-email@esempio.com" required />
+                </div>
+                <div>
+                  <FieldLabel>Password</FieldLabel>
+                  <div className="relative">
+                    <Input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleInputChange} style={{ ...inputStyle, paddingRight: '40px' }} placeholder="••••••••" required />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--ink3)' }}>
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
                   </div>
-                   <div>
-                     <Label className="text-muted-foreground">Password</Label>
-                     <div className="relative">
-                       <Input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleInputChange} className="bg-muted border-border pr-10" placeholder="••••••••" required />
-                       <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                       </button>
-                     </div>
-                   </div>
-                  
-                  <div className="space-y-3 p-4 bg-muted/50 rounded-lg border border-border">
-                    <div className="flex items-start space-x-2">
-                      <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(checked) => setAgreedToTerms(checked as boolean)} />
-                      <Label htmlFor="terms" className="text-xs text-muted-foreground leading-relaxed cursor-pointer">
-                        Accetto i <a href="/terms" className="text-fisio underline">Termini di Servizio</a>, la{' '}
-                        <a href="/privacy" className="text-fisio underline">Privacy Policy</a> e autorizzo
-                        Cimmi LLC a trattare i miei dati personali per l'erogazione del servizio,
-                        comunicazioni commerciali e analisi statistica dei contenuti generati.
-                        Comprendo che i miei dati saranno trattati in conformità al GDPR e che posso
-                        revocare il consenso in qualsiasi momento.
-                      </Label>
-                    </div>
-                  </div>
+                </div>
 
-                  <Button type="submit" disabled={loading || !agreedToTerms} className="w-full bg-fisio hover:bg-fisio/90 text-fisio-foreground disabled:opacity-50">
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Registrazione in corso...
-                      </>
-                    ) : (
-                      'Crea Account'
-                    )}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+                <div
+                  className="p-4 rounded-xl space-y-2"
+                  style={{ backgroundColor: 'var(--viola-dim)', border: '1px solid var(--line)' }}
+                >
+                  <div className="flex items-start space-x-2">
+                    <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(c) => setAgreedToTerms(c as boolean)} />
+                    <label htmlFor="terms" className="text-[11px] leading-relaxed cursor-pointer" style={{ color: 'var(--ink3)' }}>
+                      Accetto i <a href="/terms" className="underline font-semibold" style={{ color: 'var(--viola)' }}>Termini di Servizio</a>, la{' '}
+                      <a href="/privacy" className="underline font-semibold" style={{ color: 'var(--viola)' }}>Privacy Policy</a> e autorizzo
+                      Cimmi LLC a trattare i miei dati personali per l'erogazione del servizio,
+                      comunicazioni commerciali e analisi statistica dei contenuti generati.
+                    </label>
+                  </div>
+                </div>
 
-        <div className="text-center mt-6 text-foreground/70 text-sm">
-          <p>Crea contenuti professionali per Instagram, LinkedIn e Facebook</p>
-          <p className="mt-2">✨ Copywriting AI + immagini generate automaticamente</p>
+                <button
+                  type="submit"
+                  disabled={loading || !agreedToTerms}
+                  className="w-full text-white text-[12px] font-black uppercase py-3.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
+                  style={{ backgroundColor: 'var(--rosa)', letterSpacing: '0.6px' }}
+                >
+                  {loading ? <><Loader2 className="h-4 w-4 animate-spin" />Registrazione in corso...</> : 'Crea Account'}
+                </button>
+              </form>
+            )}
+          </div>
         </div>
 
-        <div className="mt-8 p-4 bg-card/50 rounded-lg border border-border">
-          <p className="text-xs text-muted-foreground text-center leading-relaxed">
-            © {new Date().getFullYear()} Cimmi LLC. Tutti i diritti riservati. | <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a> | <a href="/terms" className="text-primary hover:underline">Termini di Servizio</a><br/>
-            POST PER I SOCIAL 2-IG è di proprietà esclusiva di Cimmi LLC.<br/>
-            È vietata la copia, riproduzione o replica di questa piattaforma senza autorizzazione scritta.
+        {/* ── Footer note ── */}
+        <div className="text-center mt-6 space-y-1">
+          <p className="text-[12px] font-medium" style={{ color: 'var(--ink3)' }}>
+            Crea contenuti professionali per Instagram, LinkedIn e Facebook
+          </p>
+          <p className="text-[11px]" style={{ color: 'var(--ink3)' }}>
+            Copywriting AI + immagini generate automaticamente
           </p>
         </div>
 
+        <div
+          className="mt-6 p-4 rounded-xl"
+          style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)' }}
+        >
+          <p className="text-[10px] text-center leading-relaxed" style={{ color: 'var(--ink3)' }}>
+            © {new Date().getFullYear()} Cimmi LLC. Tutti i diritti riservati. |{' '}
+            <a href="/privacy" className="underline" style={{ color: 'var(--viola)' }}>Privacy Policy</a> |{' '}
+            <a href="/terms" className="underline" style={{ color: 'var(--viola)' }}>Termini di Servizio</a>
+          </p>
+        </div>
+
+        {/* ── Forgot password dialog ── */}
         <Dialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
-          <DialogContent className="bg-card border-border">
+          <DialogContent style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)' }}>
             <DialogHeader>
-              <DialogTitle className="text-card-foreground">Reimposta Password</DialogTitle>
-              <DialogDescription>Inserisci la tua email e ti invieremo un link per reimpostare la password.</DialogDescription>
+              <DialogTitle style={{ color: 'var(--ink)', fontWeight: 800 }}>Reimposta Password</DialogTitle>
+              <DialogDescription style={{ color: 'var(--ink3)' }}>
+                Inserisci la tua email e ti invieremo un link per reimpostare la password.
+              </DialogDescription>
             </DialogHeader>
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              setForgotLoading(true);
-              try {
-                const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-                  redirectTo: `${window.location.origin}/reset-password`
-                });
-                if (error) {
-                  toast({ title: "Errore", description: error.message, variant: "destructive" });
-                } else {
-                  toast({ title: "📧 Email inviata!", description: "Controlla la tua casella di posta per il link di recupero" });
-                  setShowForgotPassword(false);
-                  setForgotEmail('');
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setForgotLoading(true);
+                try {
+                  const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+                    redirectTo: `${window.location.origin}/reset-password`
+                  });
+                  if (error) {
+                    toast({ title: "Errore", description: error.message, variant: "destructive" });
+                  } else {
+                    toast({ title: "Email inviata!", description: "Controlla la tua casella di posta per il link di recupero" });
+                    setShowForgotPassword(false);
+                    setForgotEmail('');
+                  }
+                } catch {
+                  toast({ title: "Errore", description: "Errore nell'invio dell'email", variant: "destructive" });
+                } finally {
+                  setForgotLoading(false);
                 }
-              } catch {
-                toast({ title: "Errore", description: "Errore nell'invio dell'email", variant: "destructive" });
-              } finally {
-                setForgotLoading(false);
-              }
-            }} className="space-y-4">
+              }}
+              className="space-y-4 mt-2"
+            >
               <div>
-                <Label className="text-muted-foreground">Email</Label>
-                <Input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} className="bg-muted border-border" placeholder="tua-email@esempio.com" required />
+                <label className="block text-[10px] font-black uppercase mb-1.5" style={{ color: 'var(--ink2)', letterSpacing: '0.8px' }}>Email</label>
+                <Input
+                  type="email"
+                  value={forgotEmail}
+                  onChange={e => setForgotEmail(e.target.value)}
+                  placeholder="tua-email@esempio.com"
+                  required
+                  style={{
+                    backgroundColor: 'var(--bg)',
+                    border: '1px solid var(--line)',
+                    borderRadius: '9px',
+                    color: 'var(--ink)',
+                    fontSize: '12px',
+                  }}
+                />
               </div>
-              <Button type="submit" disabled={forgotLoading} className="w-full bg-fisio hover:bg-fisio/90 text-fisio-foreground">
-                {forgotLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Invio in corso...</> : 'Invia Link di Recupero'}
-              </Button>
+              <button
+                type="submit"
+                disabled={forgotLoading}
+                className="w-full text-white text-[12px] font-black uppercase py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60"
+                style={{ backgroundColor: 'var(--rosa)' }}
+              >
+                {forgotLoading ? <><Loader2 className="h-4 w-4 animate-spin" />Invio in corso...</> : 'Invia Link di Recupero'}
+              </button>
             </form>
           </DialogContent>
         </Dialog>
