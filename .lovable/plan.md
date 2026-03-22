@@ -1,81 +1,116 @@
 
-## Traduzione completa del sito in italiano
+## Redesign estetico completo — Piano di implementazione
 
-Tutti i file UI contengono testo in inglese (alcuni misti inglese/italiano). Ecco il piano completo.
+### Obiettivo
+Sostituire il design system attuale (dark mode blu/viola/verde) con il nuovo sistema cromatico bianco/rosa/viola richiesto, applicando Montserrat, nuove variabili CSS, e tutti gli stili componente per componente. Nessuna modifica alla logica.
 
-### File da modificare
+### File da modificare (in ordine)
 
-| File | Cosa tradurre |
-|------|--------------|
-| `src/pages/Auth.tsx` | "Access the Platform", "Login", "Sign Up", "Remember me", "Forgot password?", "Sign In", "Create Account", "Reset Password", messaggi toast, footer |
-| `src/components/AppHeader.tsx` | "Hi,", "Log Out", "Copy AI Pro", "Hide" |
-| `src/components/MainContent.tsx` | "Generate", "Photos", "AI Memory", "Viral", "Trends", "Post Configuration", "Content Preview", "Trend selected!", "Error", "Wait", toast messaggi |
-| `src/components/IdeaGenerator.tsx` | "Need inspiration?", placeholder, "Find Ideas", array ideas |
-| `src/components/ContentForm.tsx` | "Create Your Content", "Describe Your Post", "Define Your Audience", "Length", "Tone", "Platform", "Post Type", "Number of Slides", "Number of Images", "Publishing Platforms", "Schedule Publication", "Generate Content", tutti i SelectItem |
-| `src/components/PreviewSection.tsx` | "Preview", "Post Image", "Story Image", "Reel Image", "Carousel Slides", "Regenerate Images", "Applied hook:", "Save", "Copy", "Your generated content will appear here", toast messaggi |
-| `src/components/SmartCopyActions.tsx` | "Publish Your Content", "Automatic publishing", "Publish Now on Instagram/Facebook", "Manual method", "Copy Text", "Download Images", "Open Instagram/Facebook", pipeline steps labels, toast messaggi |
-| `src/components/MetaConnection.tsx` | "Social Connection", "Connected", "Disconnect", "Connect Instagram Business", "Requirements:", consent text, username warning, toast messaggi |
-| `src/components/PersonalAccountGuide.tsx` | Tutto il contenuto del dialog |
-| `src/components/PhotoUpload.tsx` | "Carica una foto base" → già in italiano, "Foto caricata" → già italiano; aggiustare il mix |
-| `src/components/PhotoLibrary.tsx` | "Le Mie Foto" → ok; "Carica", "Tutte", "Nessuna foto" → già italiano; uniformare |
-| `src/components/FeedbackWidget.tsx` | "How does it look?", "What would you improve?", "Feedback saved!" |
-| `src/components/ImageFeedbackWidget.tsx` | "How do the images look?", "Image feedback saved!" |
-| `src/components/AIMemoryPanel.tsx` | "memorie", "correzioni", "preferenze" → già italiano; MEMORY_TYPES già in italiano; uniformare |
-| `src/pages/ResetPassword.tsx` | Già in italiano — nessuna modifica necessaria |
+**1. `src/index.css`** — cuore del redesign
+- Sostituire tutte le variabili CSS `:root` con le nuove (--rosa, --viola, --ink, --bg, --surface, etc.)
+- Mappare le variabili Tailwind (--primary → rosa, --secondary → viola, --background → --bg, etc.)
+- Rimuovere dark mode o renderla uguale a light (l'app userà solo light)
+- Aggiungere utility classes: `.label-field`, `.panel-card`, `.tab-underline`
+- Rimuovere `.shadow-enhanced` (sostituire con ombra leggera max `0 2px 12px rgba(85,70,151,0.07)`)
+- Rimuovere `.gradient-text` e `.glow-effect`
+- Aggiungere font Montserrat come font base del body
 
-### Traduzioni chiave
+**2. `index.html`** — già ha Montserrat importato, verificare pesi 400-900 ✓
 
-**Auth.tsx:**
-- "Access the Platform" → "Accedi alla Piattaforma"
-- "Login" → "Accedi" | "Sign Up" → "Registrati"  
-- "Remember me" → "Ricordami"
-- "Forgot password?" → "Password dimenticata?"
-- "Sign In" → "Accedi" | "Create Account" → "Crea Account"
-- "Reset Password" → "Reimposta Password"
-- "Generate professional content for your social media" → "Genera contenuti professionali per i tuoi social media"
-- "AI copywriting + automatically generated images" → "Copywriting AI + immagini generate automaticamente"
+**3. `tailwind.config.ts`** — aggiornare colori custom fisio con nuovi valori hex
 
-**ContentForm.tsx:**
-- "Create Your Content" → "Crea il Tuo Contenuto"
-- "Describe Your Post" → "Descrivi il Tuo Post"
-- "Define Your Audience" → "Definisci il Tuo Pubblico"
-- "Length" → "Lunghezza" | Short/Medium/Long → Corto/Medio/Lungo
-- "Tone" → "Tono" | Professional/Casual/Fun/Motivational → Professionale/Informale/Divertente/Motivazionale
-- "Post Type" → "Tipo di Post" | Carousel/Single Post/Story/Reel → Carosello/Post Singolo/Storia/Reel
-- "Number of Slides/Images" → "Numero di Slide/Immagini"
-- "Publishing Platforms" → "Piattaforme di Pubblicazione"
-- "Schedule Publication" → "Pianifica Pubblicazione"
-- "Generate Content" → "Genera Contenuto"
+**4. `src/components/AppHeader.tsx`**
+- `bg-gray-900/90` → `bg-white border-b border-[var(--line)]` h-[58px]
+- Logo: aggiungere box viola `bg-[#554697] rounded-lg p-1`
+- Brand name: `font-extrabold text-[var(--ink)]`
+- Separatore verticale `w-px h-6 bg-[var(--line)]`
+- Bottone Pro: `bg-[#e6007e] text-white uppercase font-black text-xs rounded-[7px]`
+- Bottone Esci: `border border-[var(--line)] text-[var(--ink3)] bg-transparent`
+- Rimuovere icone emoji (già rimosso in traduzione)
 
-**SmartCopyActions.tsx:**
-- "Publish Your Content" → "Pubblica il Tuo Contenuto"
-- "Automatic publishing" → "Pubblicazione automatica"
-- "Publish Now on Instagram/Facebook" → "Pubblica ora su Instagram/Facebook"
-- "Manual method (copy & paste)" → "Metodo manuale (copia & incolla)"
-- Pipeline steps → in italiano
+**5. `src/components/MainContent.tsx`**
+- Hero section: padding-top 52px, eyebrow pill viola-dim, titolo 38px/900/--ink, keyword rosa
+- Tabs: stile underline (rimuovere pillola), tab attivo pseudo-after rosa, nessuna emoji, font 11px/700/uppercase
+- Rimuovere emoji dai TabsTrigger (già fatto in traduzione — verificare)
+- Bottone "Mostra Formati Virali": restyling link viola
 
-**AppHeader.tsx:**
-- "Hi," → "Ciao,"
-- "Log Out" → "Esci"
-- "Copy AI Pro" → "Copy AI Pro" (lasciare invariato — è il nome del prodotto)
-- "Hide" → "Nascondi"
+**6. `src/components/IdeaGenerator.tsx`**
+- Card: bg viola-dim, border var(--line), border-radius 12px
+- Label: 10px/800/--viola/uppercase
+- Input: bg white, border var(--line), radius 8px
+- Bottone: bg #554697, hover #3d3270, testo bianco 11px/800
 
-**MainContent.tsx:**
-- Tab "Generate" → "Genera" | "Photos" → "Foto" | "Trends" → "Trend"
-- "Post Configuration" → "Configurazione Post"
-- "Content Preview" → "Anteprima Contenuto"
-- "Trend selected!" → "🔥 Trend selezionato!"
-- Toast errors in italiano
+**7. `src/components/ContentForm.tsx`**
+- Card: white, border var(--line), radius 16px
+- Tutte le Label: 10px/800/uppercase/--ink2, dot rosa
+- Input/Textarea/Select: bg #f9f8fc, border var(--line), radius 9px, 12px/500/--ink, focus border rosa
+- Chip piattaforme: stato attivo border rosa, bg rosa-dim, testo rosa
+- Bottone Genera: bg #18152e, testo white 12px/800, radius 10px, barra sinistra 3px rosa
 
-**MetaConnection.tsx:**
-- "Social Connection" → "Connessione Social"
-- "Connected" → "Connesso"
-- "Connect Instagram Business" → invariato (nome proprio)
-- "Requirements:" → "Requisiti:"
-- Consent text e instructions in italiano
+**8. `src/components/PreviewSection.tsx`**
+- Card: white, border var(--line), radius 16px
+- Header: bottoni "Copia"/"Esporta" outline var(--line) testo --ink3; "Salva" bg rosa
+- Stato vuoto: icona in box border var(--line) radius 14px, testo --ink2/13px/700
+- Nessuna emoji nei testi
 
-**PersonalAccountGuide.tsx:**
-- Tutto il contenuto in italiano
+**9. `src/components/SmartCopyActions.tsx`**
+- Container: bg white, border var(--line), radius 16px
+- Titolo: --ink/13px/800
+- Bottone Instagram: bg #e6007e (non gradient)
+- Bottone Facebook: bg #554697 (non gradient blu)
+- Bottone metodo manuale: outline var(--line), testo --ink3
+- Rimuovere emoji
 
-### Approccio
-Modifica diretta di tutti i file — solo i testi visibili all'utente, senza toccare la logica, i valori delle variabili (es. `value="corto"`), o i nomi dei componenti.
+**10. `src/components/MetaConnection.tsx`**
+- Card: white, border var(--line), radius 16px
+- Badge connesso: verde sobrio, no emoji
+- Bottone connetti: bg #e6007e (no gradient), testo white
+
+**11. `src/pages/Auth.tsx`**
+- Background: bg-[var(--bg)] no gradient overlay
+- Card: white, border var(--line), shadow leggera
+- Tabs: stile underline come nelle tab principali
+- Bottoni: bg #e6007e per azioni primarie
+- Input: stesso stile form (bg #f9f8fc)
+
+**12. `src/pages/Index.tsx`**
+- Footer: border var(--line), bg white, testo --ink3, rimuovere emoji, tradurre in italiano
+
+**13. `src/components/ui/card.tsx`** — aggiornare classi default per matchare nuovo design
+
+**14. `src/components/FeedbackWidget.tsx`** — rimuovere emoji dal testo
+
+### Variabili CSS da definire in `:root`
+
+```css
+--rosa: #e6007e;
+--viola: #554697;
+--viola-deep: #3d3270;
+--rosa-dim: rgba(230,0,126,0.08);
+--viola-dim: rgba(85,70,151,0.07);
+--ink: #18152e;
+--ink2: #5a5478;
+--ink3: #a099c0;
+--line: rgba(85,70,151,0.12);
+--bg: #f9f8fc;
+--surface: #ffffff;
+```
+
+Mappatura variabili Tailwind:
+- `--background` → #f9f8fc (bg)
+- `--foreground` → #18152e (ink)
+- `--card` → #ffffff (surface)
+- `--primary` → #e6007e (rosa)
+- `--secondary` → #554697 (viola)
+- `--border` → rgba(85,70,151,0.12) (line)
+- `--input` → #f9f8fc
+- `--muted` → rgba(85,70,151,0.07)
+- `--muted-foreground` → #a099c0 (ink3)
+
+### Note implementative
+- Rimuovere classe `dark` — il tema è solo light
+- Tutti i box-shadow: max `0 2px 12px rgba(85,70,151,0.07)`
+- `font-family: 'Montserrat', sans-serif` sul body
+- Nessun `background-clip: text` / gradient su testo
+- Bottoni primari uniformi: `bg-[#e6007e]` ovunque tranne bottone Genera (`bg-[#18152e]`) e viola dove specificato
+- Tab attive: pseudo-elemento `::after` 2px rosa — implementato via CSS custom class + inline style override dove necessario
