@@ -15,7 +15,6 @@ interface BlotatoPostRequest {
   platforms: string[];
   images?: string[];
   scheduleFor?: string;
-  user_id: string;
 }
 
 serve(async (req) => {
@@ -25,6 +24,32 @@ serve(async (req) => {
   }
 
   try {
+    // --- JWT Authentication ---
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Non autorizzato' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    const token = authHeader.replace('Bearer ', '')
+
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    )
+
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Non autorizzato' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    // Use verified user ID from JWT — never trust client-supplied user_id
+    const verified_user_id = user.id
+
     console.log('🚀 Blotato Publish Function - Avvio');
 
     if (!BLOTATO_API_KEY) {
@@ -37,7 +62,7 @@ serve(async (req) => {
       hasContent: !!requestData.content,
       hasImages: requestData.images?.length || 0,
       isScheduled: !!requestData.scheduleFor,
-      userId: requestData.user_id
+      userId: verified_user_id
     });
 
     // Valida i dati richiesti
@@ -73,7 +98,7 @@ serve(async (req) => {
     console.log('📡 Risposta Blotato API:', {
       status: response.status,
       statusText: response.statusText,
-      body: responseText.substring(0, 500) // Log primi 500 caratteri
+      body: responseText.substring(0, 500)
     });
 
     if (!response.ok) {
@@ -92,14 +117,14 @@ serve(async (req) => {
     const blotatoResult = JSON.parse(responseText);
     console.log('✅ Pubblicazione completata:', blotatoResult.id || 'ID non disponibile');
 
-    // Salva il risultato nel database (opzionale)
+    // Salva il risultato nel database usando l'ID verificato dal JWT
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     try {
       await supabase.from('published_posts').insert({
-        user_id: requestData.user_id,
+        user_id: verified_user_id,
         content: requestData.content,
         platforms: requestData.platforms,
         blotato_post_id: blotatoResult.id,

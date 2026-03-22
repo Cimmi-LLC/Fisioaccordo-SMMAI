@@ -13,21 +13,46 @@ serve(async (req) => {
   }
 
   try {
+    // --- JWT Authentication ---
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ success: false, error: 'Non autorizzato' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    const token = authHeader.replace('Bearer ', '')
+
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    )
+
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
+    if (authError || !user) {
+      return new Response(JSON.stringify({ success: false, error: 'Non autorizzato' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+    // Use verified user ID from JWT — never trust client-supplied user_id
+    const verified_user_id = user.id
+
     console.log('🚀 Instagram Business Auth Edge Function chiamata')
     
-    const { code, redirect_uri, user_id } = await req.json()
+    const { code, redirect_uri } = await req.json()
     console.log('📝 Parametri ricevuti:', { 
       code: code?.substring(0, 10) + '...', 
       redirect_uri,
-      user_id: user_id?.substring(0, 8) + '...'
+      user_id: verified_user_id.substring(0, 8) + '...'
     })
     
     if (!code) {
       throw new Error('Codice di autorizzazione mancante')
-    }
-
-    if (!user_id) {
-      throw new Error('ID utente mancante')
     }
 
     // App centralizzata per Instagram Business
@@ -117,12 +142,7 @@ serve(async (req) => {
       throw new Error('Errore caricamento profilo Instagram: ' + (profileData.error?.message || 'Errore sconosciuto'))
     }
 
-    // Step 5: Salva nel database
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
+    // Step 5: Salva nel database usando l'ID verificato dal JWT
     console.log('💾 Salvo connessione nel database...')
 
     const profileDataToSave = {
@@ -133,7 +153,7 @@ serve(async (req) => {
     }
 
     const { error: saveError } = await supabaseAdmin.rpc('upsert_instagram_connection', {
-      p_user_id: user_id,
+      p_user_id: verified_user_id,
       p_instagram_user_id: profileData.id,
       p_username: profileData.username,
       p_access_token: instagramAccount.page_access_token,
