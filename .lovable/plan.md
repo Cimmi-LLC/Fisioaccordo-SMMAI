@@ -1,116 +1,97 @@
 
-## Redesign estetico completo — Piano di implementazione
+## Layout Semplificazione — Piano di Implementazione
 
 ### Obiettivo
-Sostituire il design system attuale (dark mode blu/viola/verde) con il nuovo sistema cromatico bianco/rosa/viola richiesto, applicando Montserrat, nuove variabili CSS, e tutti gli stili componente per componente. Nessuna modifica alla logica.
+Ridurre il cognitive load della pagina principale organizzando il form in 3 step chiari, spostando elementi secondari e compattando l'interfaccia. Zero modifiche alla logica.
 
-### File da modificare (in ordine)
+### Struttura finale
 
-**1. `src/index.css`** — cuore del redesign
-- Sostituire tutte le variabili CSS `:root` con le nuove (--rosa, --viola, --ink, --bg, --surface, etc.)
-- Mappare le variabili Tailwind (--primary → rosa, --secondary → viola, --background → --bg, etc.)
-- Rimuovere dark mode o renderla uguale a light (l'app userà solo light)
-- Aggiungere utility classes: `.label-field`, `.panel-card`, `.tab-underline`
-- Rimuovere `.shadow-enhanced` (sostituire con ombra leggera max `0 2px 12px rgba(85,70,151,0.07)`)
-- Rimuovere `.gradient-text` e `.glow-effect`
-- Aggiungere font Montserrat come font base del body
-
-**2. `index.html`** — già ha Montserrat importato, verificare pesi 400-900 ✓
-
-**3. `tailwind.config.ts`** — aggiornare colori custom fisio con nuovi valori hex
-
-**4. `src/components/AppHeader.tsx`**
-- `bg-gray-900/90` → `bg-white border-b border-[var(--line)]` h-[58px]
-- Logo: aggiungere box viola `bg-[#554697] rounded-lg p-1`
-- Brand name: `font-extrabold text-[var(--ink)]`
-- Separatore verticale `w-px h-6 bg-[var(--line)]`
-- Bottone Pro: `bg-[#e6007e] text-white uppercase font-black text-xs rounded-[7px]`
-- Bottone Esci: `border border-[var(--line)] text-[var(--ink3)] bg-transparent`
-- Rimuovere icone emoji (già rimosso in traduzione)
-
-**5. `src/components/MainContent.tsx`**
-- Hero section: padding-top 52px, eyebrow pill viola-dim, titolo 38px/900/--ink, keyword rosa
-- Tabs: stile underline (rimuovere pillola), tab attivo pseudo-after rosa, nessuna emoji, font 11px/700/uppercase
-- Rimuovere emoji dai TabsTrigger (già fatto in traduzione — verificare)
-- Bottone "Mostra Formati Virali": restyling link viola
-
-**6. `src/components/IdeaGenerator.tsx`**
-- Card: bg viola-dim, border var(--line), border-radius 12px
-- Label: 10px/800/--viola/uppercase
-- Input: bg white, border var(--line), radius 8px
-- Bottone: bg #554697, hover #3d3270, testo bianco 11px/800
-
-**7. `src/components/ContentForm.tsx`**
-- Card: white, border var(--line), radius 16px
-- Tutte le Label: 10px/800/uppercase/--ink2, dot rosa
-- Input/Textarea/Select: bg #f9f8fc, border var(--line), radius 9px, 12px/500/--ink, focus border rosa
-- Chip piattaforme: stato attivo border rosa, bg rosa-dim, testo rosa
-- Bottone Genera: bg #18152e, testo white 12px/800, radius 10px, barra sinistra 3px rosa
-
-**8. `src/components/PreviewSection.tsx`**
-- Card: white, border var(--line), radius 16px
-- Header: bottoni "Copia"/"Esporta" outline var(--line) testo --ink3; "Salva" bg rosa
-- Stato vuoto: icona in box border var(--line) radius 14px, testo --ink2/13px/700
-- Nessuna emoji nei testi
-
-**9. `src/components/SmartCopyActions.tsx`**
-- Container: bg white, border var(--line), radius 16px
-- Titolo: --ink/13px/800
-- Bottone Instagram: bg #e6007e (non gradient)
-- Bottone Facebook: bg #554697 (non gradient blu)
-- Bottone metodo manuale: outline var(--line), testo --ink3
-- Rimuovere emoji
-
-**10. `src/components/MetaConnection.tsx`**
-- Card: white, border var(--line), radius 16px
-- Badge connesso: verde sobrio, no emoji
-- Bottone connetti: bg #e6007e (no gradient), testo white
-
-**11. `src/pages/Auth.tsx`**
-- Background: bg-[var(--bg)] no gradient overlay
-- Card: white, border var(--line), shadow leggera
-- Tabs: stile underline come nelle tab principali
-- Bottoni: bg #e6007e per azioni primarie
-- Input: stesso stile form (bg #f9f8fc)
-
-**12. `src/pages/Index.tsx`**
-- Footer: border var(--line), bg white, testo --ink3, rimuovere emoji, tradurre in italiano
-
-**13. `src/components/ui/card.tsx`** — aggiornare classi default per matchare nuovo design
-
-**14. `src/components/FeedbackWidget.tsx`** — rimuovere emoji dal testo
-
-### Variabili CSS da definire in `:root`
-
-```css
---rosa: #e6007e;
---viola: #554697;
---viola-deep: #3d3270;
---rosa-dim: rgba(230,0,126,0.08);
---viola-dim: rgba(85,70,151,0.07);
---ink: #18152e;
---ink2: #5a5478;
---ink3: #a099c0;
---line: rgba(85,70,151,0.12);
---bg: #f9f8fc;
---surface: #ffffff;
+```text
+┌─ Hero (1 riga, 32px) ─────────────────────────────────────┐
+│  "Crea contenuti virali in secondi"                       │
+└───────────────────────────────────────────────────────────┘
+┌─ Tabs (Genera / Foto / AI Memory / Virale / Trend) ───────┐
+└───────────────────────────────────────────────────────────┘
+┌─ Colonna sx: ContentForm 3 Step ─┐ ┌─ Colonna dx: Preview ─┐
+│ [Step 1] [Step 2] [Step 3]       │ │  Skeleton animato     │
+│ ─────── progress bar ─────────  │ │  quando vuoto         │
+│                                  │ │                       │
+│ Step 1: textarea + pubblico      │ │  Contenuto generato   │
+│ Step 2: formato (6 select)       │ └───────────────────────┘
+│ Step 3: template chip + foto +   │
+│         piattaforme (4+altro) +  │
+│         data + [Genera] button   │
+│                                  │
+│ Link discreto "Hook AI" sopra    │
+│ il bottone Genera (solo step 3)  │
+└──────────────────────────────────┘
+Footer social settings: spostato in modale da AppHeader
 ```
 
-Mappatura variabili Tailwind:
-- `--background` → #f9f8fc (bg)
-- `--foreground` → #18152e (ink)
-- `--card` → #ffffff (surface)
-- `--primary` → #e6007e (rosa)
-- `--secondary` → #554697 (viola)
-- `--border` → rgba(85,70,151,0.12) (line)
-- `--input` → #f9f8fc
-- `--muted` → rgba(85,70,151,0.07)
-- `--muted-foreground` → #a099c0 (ink3)
+### Cambiamenti per file
 
-### Note implementative
-- Rimuovere classe `dark` — il tema è solo light
-- Tutti i box-shadow: max `0 2px 12px rgba(85,70,151,0.07)`
-- `font-family: 'Montserrat', sans-serif` sul body
-- Nessun `background-clip: text` / gradient su testo
-- Bottoni primari uniformi: `bg-[#e6007e]` ovunque tranne bottone Genera (`bg-[#18152e]`) e viola dove specificato
-- Tab attive: pseudo-elemento `::after` 2px rosa — implementato via CSS custom class + inline style override dove necessario
+**1. `src/components/ContentForm.tsx`** — riscrittura principale
+- Aggiungere stato locale `currentStep: 1|2|3`
+- Progress bar orizzontale in cima alla card (3 segmenti colorati con label)
+- Mostrare solo i campi del step corrente
+- Step 1: textarea descrizione + input pubblico
+- Step 2: grid 2-col con Lunghezza, Tono, Piattaforma, Tipo post, N. Slide, N. Immagini
+- Step 3: CanvaTemplateSelector (compattato come chip radio), PhotoUpload, chip piattaforme (4 visibili + "altro" collassabile), datetime, bottone Genera
+- Bottoni Avanti/Indietro tra step; Genera solo al step 3
+- Chip template: sostituire `CanvaTemplateSelector` grandi card con radio chip testuali inline (Default | nome template | + Aggiungi) — nessuna emoji, nessun bordo card
+- Chip piattaforme: prime 4 (Instagram, Facebook, LinkedIn, TikTok), poi link "+ 5 altri" che espande Pinterest, Threads, Bluesky, X, YouTube
+- Aggiungere prop `onShowHookGenerator` e renderizzare link "Genera Hook AI" discreto sopra il bottone Genera (solo step 3)
+
+**2. `src/components/MainContent.tsx`**
+- Hero: ridurre a `text-[32px]`, rimuovere `<p>` sottotitolo
+- `IdeaGenerator`: spostare da posizione visibile a collassabile. Aggiungere un link/bottone "Ispirazione rapida" cliccabile che apre/chiude la sezione IdeaGenerator. Default collapsed.
+- `MetaConnection`: spostare fuori dal flusso principale. Renderizzare dentro un `<Dialog>` modale attivato da un bottone "Connessioni Social" nell'`AppHeader` o in un link nel footer della pagina (non nel body principale).
+- `HookGenerator`: rimuovere come sezione separata — la sua visibilità è già controllata da `showHookGenerator`. Passare `onShowHookGenerator={() => setShowHookGenerator(!showHookGenerator)}` al `ContentForm`.
+- Il `showViralGenerator`/`ViralFormatGenerator` rimane invariato
+- Footer copyright (`Index.tsx`): rimuovere il paragrafo `© ...` dalla pagina principale
+
+**3. `src/components/PreviewSection.tsx`** — empty state
+- Sostituire il `py-16` statico con uno skeleton loader animato (3 rettangoli shimmer + barre di testo) quando `!generatedContent`
+- Ridurre padding dell'empty state da `py-16` a `py-8`
+
+**4. `src/components/AppHeader.tsx`**
+- Aggiungere bottone "Social" o icona `Link` che apre un `<Dialog>` contenente `<MetaConnection />`
+
+**5. `src/pages/Index.tsx`**
+- Rimuovere il blocco footer con `© FisioAccordo`
+
+### Dettagli tecnici step form
+
+```text
+Progress bar:
+┌──[1 Contenuto]──[2 Formato]──[3 Pubblica]──┐
+Segmenti: width 33% ciascuno
+Attivo: bg --rosa  |  Futuro: bg --line
+Label sotto: testo 9px --ink3, attivo --ink
+```
+
+Step 3 template chip (sostituisce CanvaTemplateSelector visualmente):
+```text
+Template: [Default] [FisioAccordo] [+ Aggiungi]
+Chip radio style: border var(--line), selezionato border --rosa bg --rosa-dim
+```
+
+Chip piattaforme collassabili:
+```text
+[Instagram] [Facebook] [LinkedIn] [TikTok]  + altri 5...
+            ↓ expanded:
+[Pinterest] [Threads] [Bluesky] [X] [YouTube]
+```
+
+HookGenerator trigger (solo step 3, sopra bottone Genera):
+```text
+link: "Genera Hook AI per questo contenuto →"
+font: 11px --viola, cursor pointer, onclick toggle HookGenerator
+```
+
+### File modificati
+- `src/components/ContentForm.tsx` — step form, chip template, chip piattaforme, hook link
+- `src/components/MainContent.tsx` — hero compatto, IdeaGenerator collassabile, MetaConnection in Dialog, HookGenerator collegato al form
+- `src/components/PreviewSection.tsx` — skeleton animato empty state
+- `src/components/AppHeader.tsx` — bottone Social per aprire Dialog MetaConnection
+- `src/pages/Index.tsx` — rimozione footer copyright
