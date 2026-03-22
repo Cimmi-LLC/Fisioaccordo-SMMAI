@@ -68,8 +68,8 @@ export class BlotatoService {
 
       const response = await supabase.functions.invoke('blotato-publish', {
         body: {
-          ...postData,
-          user_id: user.id
+          ...postData
+          // user_id is determined server-side from JWT — not sent by client
         }
       });
 

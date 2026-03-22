@@ -13,6 +13,35 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // --- JWT Authentication ---
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Non autorizzato' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    const token = authHeader.replace('Bearer ', '')
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    const supabaseAuth = createClient(
+      supabaseUrl,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    )
+
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Non autorizzato' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    const verified_user_id = user.id
+
     const body = await req.json()
     const { connection_id, platform, content, image_url, carousel_urls } = body
     console.log('meta-publish request:', JSON.stringify({ connection_id, platform, has_image: !!image_url, carousel_count: carousel_urls?.length }))
@@ -23,10 +52,6 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     const { data: connection, error: connError } = await supabase
       .from('meta_connections')
@@ -39,6 +64,14 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ success: false, error: 'Connessione non trovata o non attiva' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Verify the connection belongs to the authenticated user
+    if (connection.user_id !== verified_user_id) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Non autorizzato' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 

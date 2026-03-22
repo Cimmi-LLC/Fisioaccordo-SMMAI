@@ -13,9 +13,35 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { code, redirect_uri, user_id } = await req.json()
+    // --- JWT Authentication ---
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Non autorizzato' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    const token = authHeader.replace('Bearer ', '')
 
-    if (!code || !redirect_uri || !user_id) {
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    )
+
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Non autorizzato' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    // Use verified user ID from JWT — never trust client-supplied user_id
+    const verified_user_id = user.id
+
+    const { code, redirect_uri } = await req.json()
+
+    if (!code || !redirect_uri) {
       return new Response(
         JSON.stringify({ success: false, error: 'Parametri mancanti' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -149,7 +175,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Step 4: Save to database
+    // Step 4: Save to database using verified user ID from JWT
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -158,13 +184,13 @@ Deno.serve(async (req) => {
     await supabase
       .from('meta_connections')
       .update({ is_active: false })
-      .eq('user_id', user_id)
+      .eq('user_id', verified_user_id)
 
     // Insert new connection
     const { error: insertError } = await supabase
       .from('meta_connections')
       .insert({
-        user_id,
+        user_id: verified_user_id,
         facebook_user_id: null,
         page_id: null,
         page_name: null,
