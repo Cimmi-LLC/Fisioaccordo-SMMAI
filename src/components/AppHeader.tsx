@@ -25,16 +25,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({
       <div className="max-w-7xl mx-auto px-4 h-[58px] flex items-center justify-between gap-4">
         {/* Left: logo + brand */}
         <div className="flex items-center gap-3">
-          <div
-            className="flex items-center justify-center rounded-lg p-1.5 flex-shrink-0"
-            style={{ backgroundColor: 'var(--viola)' }}
-          >
-            <img
-              src="/lovable-uploads/217c8d5c-ce96-40c5-ab52-ff057f4b0d15.png"
-              alt="FisioAccordo Logo"
-              className="h-7 w-auto"
-            />
-          </div>
+          <img
+            src={logo}
+            alt="FisioAccordo PoliPartner Logo"
+            className="h-9 w-auto flex-shrink-0"
+          />
 
           {/* Separator */}
           <div className="w-px h-6 hidden sm:block" style={{ backgroundColor: 'var(--line)' }} />
