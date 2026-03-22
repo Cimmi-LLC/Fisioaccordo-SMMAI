@@ -66,8 +66,8 @@ export class InstagramService {
       const response = await supabase.functions.invoke('instagram-auth', {
         body: { 
           code, 
-          redirect_uri: this.REDIRECT_URI,
-          user_id: user.user.id 
+          redirect_uri: this.REDIRECT_URI
+          // user_id is determined server-side from JWT — not sent by client
         }
       });
 
