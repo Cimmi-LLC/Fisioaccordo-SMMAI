@@ -1,7 +1,8 @@
 
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { Brain, LogOut } from "lucide-react";
+import { Brain, LogOut, Settings } from "lucide-react";
 import logo from "@/assets/logo-fisioaccordo.png";
 
 interface AppHeaderProps {
