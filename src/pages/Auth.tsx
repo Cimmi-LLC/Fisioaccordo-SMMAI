@@ -2,11 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff, MailCheck, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const Auth = () => {
@@ -20,6 +19,12 @@ const Auth = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
+  // post-signup state
+  const [emailSent, setEmailSent] = useState(false);
+  const [sentToEmail, setSentToEmail] = useState('');
+  // email-not-confirmed state
+  const [emailNotConfirmed, setEmailNotConfirmed] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -38,6 +43,10 @@ const Auth = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+    // reset error state on typing
+    if (e.target.name === 'email' || e.target.name === 'password') {
+      setEmailNotConfirmed(false);
+    }
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -65,7 +74,8 @@ const Auth = () => {
         }
         toast({ title: "Errore di registrazione", description: error.message, variant: "destructive" });
       } else {
-        toast({ title: "Registrazione completata!", description: "Controlla la tua email per attivare l'account" });
+        setSentToEmail(formData.email);
+        setEmailSent(true);
       }
     } catch {
       toast({ title: "Errore", description: "Errore durante la registrazione", variant: "destructive" });
@@ -77,10 +87,15 @@ const Auth = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setEmailNotConfirmed(false);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: formData.email, password: formData.password });
       if (error) {
-        toast({ title: "Errore di accesso", description: "Email o password non corretti. Usa 'Password dimenticata?' per reimpostarla.", variant: "destructive" });
+        if (error.message.includes('Email not confirmed') || (error as any).code === 'email_not_confirmed') {
+          setEmailNotConfirmed(true);
+        } else {
+          toast({ title: "Errore di accesso", description: "Email o password non corretti. Usa 'Password dimenticata?' per reimpostarla.", variant: "destructive" });
+        }
       } else {
         if (rememberMe) await supabase.auth.refreshSession();
         toast({ title: "Benvenuto!", description: "Accesso effettuato con successo" });
@@ -90,6 +105,25 @@ const Auth = () => {
       toast({ title: "Errore", description: "Errore durante il login", variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    setResendLoading(true);
+    try {
+      const { error } = await supabase.auth.resend({ type: 'signup', email: formData.email });
+      if (error) {
+        toast({ title: "Errore", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "Email inviata!", description: "Controlla la tua casella di posta e la cartella spam." });
+        setEmailNotConfirmed(false);
+        setSentToEmail(formData.email);
+        setEmailSent(true);
+      }
+    } catch {
+      toast({ title: "Errore", description: "Impossibile inviare l'email", variant: "destructive" });
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -146,127 +180,198 @@ const Auth = () => {
             boxShadow: '0 2px 12px rgba(85,70,151,0.07)',
           }}
         >
-          {/* Tab switcher */}
-          <div style={{ borderBottom: '1.5px solid var(--line)' }} className="flex">
-            {(['signin', 'signup'] as const).map((tab) => (
+          {/* ── Email sent state ── */}
+          {emailSent ? (
+            <div className="p-8 text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: 'var(--viola-dim)' }}>
+                  <MailCheck className="w-7 h-7" style={{ color: 'var(--viola)' }} />
+                </div>
+              </div>
+              <div>
+                <h2 className="text-[16px] font-black mb-1" style={{ color: 'var(--ink)' }}>Controlla la tua email</h2>
+                <p className="text-[12px] leading-relaxed" style={{ color: 'var(--ink3)' }}>
+                  Abbiamo inviato un link di conferma a<br />
+                  <span className="font-semibold" style={{ color: 'var(--ink)' }}>{sentToEmail}</span>
+                </p>
+              </div>
+              <div className="p-3 rounded-xl text-[11px] leading-relaxed" style={{ backgroundColor: 'var(--viola-dim)', color: 'var(--ink3)' }}>
+                Clicca il link nell'email per attivare l'account. Controlla anche la cartella <strong>spam</strong> o <strong>promozioni</strong>.
+              </div>
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className="flex-1 py-3 text-[11px] font-black uppercase relative transition-colors"
-                style={{
-                  color: activeTab === tab ? 'var(--ink)' : 'var(--ink3)',
-                  letterSpacing: '0.6px',
-                  background: 'transparent',
-                  border: 'none',
-                }}
+                onClick={() => { setEmailSent(false); setActiveTab('signin'); }}
+                className="w-full text-white text-[12px] font-black uppercase py-3.5 rounded-xl"
+                style={{ backgroundColor: 'var(--rosa)' }}
               >
-                {tab === 'signin' ? 'Accedi' : 'Registrati'}
-                {activeTab === tab && (
-                  <span
-                    className="absolute bottom-[-1.5px] left-0 right-0 h-[2px] rounded-t"
-                    style={{ backgroundColor: 'var(--rosa)' }}
-                  />
-                )}
+                Torna al Login
               </button>
-            ))}
-          </div>
-
-          <div className="p-6">
-            {activeTab === 'signin' && (
-              <form onSubmit={handleSignIn} className="space-y-4">
-                <div>
-                  <FieldLabel htmlFor="email-signin">Email</FieldLabel>
-                  <Input id="email-signin" type="email" name="email" value={formData.email} onChange={handleInputChange} style={inputStyle} placeholder="tua-email@esempio.com" required />
-                </div>
-                <div>
-                  <FieldLabel htmlFor="pwd-signin">Password</FieldLabel>
-                  <div className="relative">
-                    <Input id="pwd-signin" type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleInputChange} style={{ ...inputStyle, paddingRight: '40px' }} placeholder="••••••••" required />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--ink3)' }}>
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox id="rememberMe" checked={rememberMe} onCheckedChange={(c) => setRememberMe(c as boolean)} />
-                    <label htmlFor="rememberMe" className="text-[11px] font-medium cursor-pointer" style={{ color: 'var(--ink3)' }}>
-                      Ricordami
-                    </label>
-                  </div>
-                  <button type="button" onClick={() => setShowForgotPassword(true)} className="text-[11px] font-semibold underline" style={{ color: 'var(--viola)' }}>
-                    Password dimenticata?
+              <button
+                onClick={async () => {
+                  setResendLoading(true);
+                  try {
+                    await supabase.auth.resend({ type: 'signup', email: sentToEmail });
+                    toast({ title: "Email reinviata!", description: "Controlla la tua casella di posta." });
+                  } catch {
+                    toast({ title: "Errore", description: "Impossibile reinviare", variant: "destructive" });
+                  } finally {
+                    setResendLoading(false);
+                  }
+                }}
+                disabled={resendLoading}
+                className="w-full text-[11px] font-semibold flex items-center justify-center gap-1.5 py-2 disabled:opacity-50"
+                style={{ color: 'var(--ink3)', background: 'transparent', border: 'none' }}
+              >
+                {resendLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                Non hai ricevuto l'email? Reinvia
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Tab switcher */}
+              <div style={{ borderBottom: '1.5px solid var(--line)' }} className="flex">
+                {(['signin', 'signup'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => { setActiveTab(tab); setEmailNotConfirmed(false); }}
+                    className="flex-1 py-3 text-[11px] font-black uppercase relative transition-colors"
+                    style={{
+                      color: activeTab === tab ? 'var(--ink)' : 'var(--ink3)',
+                      letterSpacing: '0.6px',
+                      background: 'transparent',
+                      border: 'none',
+                    }}
+                  >
+                    {tab === 'signin' ? 'Accedi' : 'Registrati'}
+                    {activeTab === tab && (
+                      <span
+                        className="absolute bottom-[-1.5px] left-0 right-0 h-[2px] rounded-t"
+                        style={{ backgroundColor: 'var(--rosa)' }}
+                      />
+                    )}
                   </button>
-                </div>
+                ))}
+              </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full text-white text-[12px] font-black uppercase py-3.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
-                  style={{ backgroundColor: 'var(--rosa)', letterSpacing: '0.6px' }}
-                >
-                  {loading ? <><Loader2 className="h-4 w-4 animate-spin" />Accesso in corso...</> : 'Accedi'}
-                </button>
-              </form>
-            )}
+              <div className="p-6">
+                {activeTab === 'signin' && (
+                  <form onSubmit={handleSignIn} className="space-y-4">
+                    <div>
+                      <FieldLabel htmlFor="email-signin">Email</FieldLabel>
+                      <Input id="email-signin" type="email" name="email" value={formData.email} onChange={handleInputChange} style={inputStyle} placeholder="tua-email@esempio.com" required />
+                    </div>
+                    <div>
+                      <FieldLabel htmlFor="pwd-signin">Password</FieldLabel>
+                      <div className="relative">
+                        <Input id="pwd-signin" type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleInputChange} style={{ ...inputStyle, paddingRight: '40px' }} placeholder="••••••••" required />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--ink3)' }}>
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
 
-            {activeTab === 'signup' && (
-              <form onSubmit={handleSignUp} className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <FieldLabel>Nome</FieldLabel>
-                    <Input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} style={inputStyle} placeholder="Mario" required />
-                  </div>
-                  <div>
-                    <FieldLabel>Cognome</FieldLabel>
-                    <Input type="text" name="lastName" value={formData.lastName} onChange={handleInputChange} style={inputStyle} placeholder="Rossi" required />
-                  </div>
-                </div>
-                <div>
-                  <FieldLabel>Studio / Clinica</FieldLabel>
-                  <Input type="text" name="clinicName" value={formData.clinicName} onChange={handleInputChange} style={inputStyle} placeholder="Studio di Fisioterapia XYZ" />
-                </div>
-                <div>
-                  <FieldLabel>Email</FieldLabel>
-                  <Input type="email" name="email" value={formData.email} onChange={handleInputChange} style={inputStyle} placeholder="tua-email@esempio.com" required />
-                </div>
-                <div>
-                  <FieldLabel>Password</FieldLabel>
-                  <div className="relative">
-                    <Input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleInputChange} style={{ ...inputStyle, paddingRight: '40px' }} placeholder="••••••••" required />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--ink3)' }}>
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {/* Email not confirmed banner */}
+                    {emailNotConfirmed && (
+                      <div className="p-3 rounded-xl space-y-2" style={{ backgroundColor: 'var(--viola-dim)', border: '1px solid var(--line)' }}>
+                        <p className="text-[11px] font-semibold" style={{ color: 'var(--ink)' }}>
+                          ✉️ Email non ancora confermata
+                        </p>
+                        <p className="text-[11px]" style={{ color: 'var(--ink3)' }}>
+                          Controlla la tua casella di posta (anche spam) e clicca il link di conferma.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleResendConfirmation}
+                          disabled={resendLoading}
+                          className="flex items-center gap-1.5 text-[11px] font-semibold underline disabled:opacity-50"
+                          style={{ color: 'var(--viola)', background: 'transparent', border: 'none', padding: 0 }}
+                        >
+                          {resendLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                          Reinvia email di conferma
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox id="rememberMe" checked={rememberMe} onCheckedChange={(c) => setRememberMe(c as boolean)} />
+                        <label htmlFor="rememberMe" className="text-[11px] font-medium cursor-pointer" style={{ color: 'var(--ink3)' }}>
+                          Ricordami
+                        </label>
+                      </div>
+                      <button type="button" onClick={() => setShowForgotPassword(true)} className="text-[11px] font-semibold underline" style={{ color: 'var(--viola)' }}>
+                        Password dimenticata?
+                      </button>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full text-white text-[12px] font-black uppercase py-3.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60 transition-opacity"
+                      style={{ backgroundColor: 'var(--rosa)', letterSpacing: '0.6px' }}
+                    >
+                      {loading ? <><Loader2 className="h-4 w-4 animate-spin" />Accesso in corso...</> : 'Accedi'}
                     </button>
-                  </div>
-                </div>
+                  </form>
+                )}
 
-                <div
-                  className="p-4 rounded-xl space-y-2"
-                  style={{ backgroundColor: 'var(--viola-dim)', border: '1px solid var(--line)' }}
-                >
-                  <div className="flex items-start space-x-2">
-                    <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(c) => setAgreedToTerms(c as boolean)} />
-                    <label htmlFor="terms" className="text-[11px] leading-relaxed cursor-pointer" style={{ color: 'var(--ink3)' }}>
-                      Accetto i <a href="/terms" className="underline font-semibold" style={{ color: 'var(--viola)' }}>Termini di Servizio</a>, la{' '}
-                      <a href="/privacy" className="underline font-semibold" style={{ color: 'var(--viola)' }}>Privacy Policy</a> e autorizzo
-                      Cimmi LLC a trattare i miei dati personali per l'erogazione del servizio,
-                      comunicazioni commerciali e analisi statistica dei contenuti generati.
-                    </label>
-                  </div>
-                </div>
+                {activeTab === 'signup' && (
+                  <form onSubmit={handleSignUp} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <FieldLabel>Nome</FieldLabel>
+                        <Input type="text" name="firstName" value={formData.firstName} onChange={handleInputChange} style={inputStyle} placeholder="Mario" required />
+                      </div>
+                      <div>
+                        <FieldLabel>Cognome</FieldLabel>
+                        <Input type="text" name="lastName" value={formData.lastName} onChange={handleInputChange} style={inputStyle} placeholder="Rossi" required />
+                      </div>
+                    </div>
+                    <div>
+                      <FieldLabel>Studio / Clinica</FieldLabel>
+                      <Input type="text" name="clinicName" value={formData.clinicName} onChange={handleInputChange} style={inputStyle} placeholder="Studio di Fisioterapia XYZ" />
+                    </div>
+                    <div>
+                      <FieldLabel>Email</FieldLabel>
+                      <Input type="email" name="email" value={formData.email} onChange={handleInputChange} style={inputStyle} placeholder="tua-email@esempio.com" required />
+                    </div>
+                    <div>
+                      <FieldLabel>Password</FieldLabel>
+                      <div className="relative">
+                        <Input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleInputChange} style={{ ...inputStyle, paddingRight: '40px' }} placeholder="Min. 6 caratteri" required />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--ink3)' }}>
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
 
-                <button
-                  type="submit"
-                  disabled={loading || !agreedToTerms}
-                  className="w-full text-white text-[12px] font-black uppercase py-3.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
-                  style={{ backgroundColor: 'var(--rosa)', letterSpacing: '0.6px' }}
-                >
-                  {loading ? <><Loader2 className="h-4 w-4 animate-spin" />Registrazione in corso...</> : 'Crea Account'}
-                </button>
-              </form>
-            )}
-          </div>
+                    <div
+                      className="p-4 rounded-xl space-y-2"
+                      style={{ backgroundColor: 'var(--viola-dim)', border: '1px solid var(--line)' }}
+                    >
+                      <div className="flex items-start space-x-2">
+                        <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(c) => setAgreedToTerms(c as boolean)} />
+                        <label htmlFor="terms" className="text-[11px] leading-relaxed cursor-pointer" style={{ color: 'var(--ink3)' }}>
+                          Accetto i <a href="/terms" className="underline font-semibold" style={{ color: 'var(--viola)' }}>Termini di Servizio</a>, la{' '}
+                          <a href="/privacy" className="underline font-semibold" style={{ color: 'var(--viola)' }}>Privacy Policy</a> e autorizzo
+                          Cimmi LLC a trattare i miei dati personali per l'erogazione del servizio,
+                          comunicazioni commerciali e analisi statistica dei contenuti generati.
+                        </label>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading || !agreedToTerms}
+                      className="w-full text-white text-[12px] font-black uppercase py-3.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
+                      style={{ backgroundColor: 'var(--rosa)', letterSpacing: '0.6px' }}
+                    >
+                      {loading ? <><Loader2 className="h-4 w-4 animate-spin" />Registrazione in corso...</> : 'Crea Account'}
+                    </button>
+                  </form>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* ── Footer note ── */}
