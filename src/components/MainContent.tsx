@@ -66,7 +66,6 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
   const [showViralGenerator, setShowViralGenerator] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
   const [ideaOpen, setIdeaOpen] = useState(false);
-  const [socialModalOpen, setSocialModalOpen] = useState(false);
 
   const { carouselSlides, setCarouselSlides, generateCarouselSlides, isGeneratingImages, regenerateImages, imageGenProgress } = useCarouselSlides(formData, user, basePhoto);
   const { generatedContent, setGeneratedContent, generateContent, saveContent } = useContentGeneration(user, formData, generateCarouselSlides);
