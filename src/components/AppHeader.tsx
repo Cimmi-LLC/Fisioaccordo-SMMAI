@@ -65,6 +65,21 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             Ciao, {user?.user_metadata?.first_name || 'Utente'}
           </span>
 
+          <Link to="/settings">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs bg-transparent hover:bg-transparent"
+              style={{
+                border: '1px solid var(--line)',
+                color: 'var(--ink3)',
+              }}
+            >
+              <Settings className="h-3.5 w-3.5 mr-1.5" />
+              <span className="hidden sm:inline">Impostazioni</span>
+            </Button>
+          </Link>
+
           <Button
             variant="ghost"
             size="sm"
