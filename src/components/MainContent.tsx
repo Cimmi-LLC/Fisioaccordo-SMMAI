@@ -1,8 +1,8 @@
 
 import React, { useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useGlobalLoading } from "@/contexts/GlobalLoadingContext";
 import { useToast } from "@/hooks/use-toast";
@@ -12,7 +12,6 @@ import PreviewSection from "./PreviewSection";
 import HookGenerator from "./HookGenerator";
 import LazyCopyImprover from "./LazyCopyImprover";
 import ViralFormatGenerator from "./ViralFormatGenerator";
-import MetaConnection from "./MetaConnection";
 import PhotoLibrary from "./PhotoLibrary";
 import AIMemoryPanel from "./AIMemoryPanel";
 import ViralAnalyzer from "./ViralAnalyzer";
