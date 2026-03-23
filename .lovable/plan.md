@@ -1,97 +1,34 @@
 
-## Layout Semplificazione — Piano di Implementazione
+## Fix Sistema Login / Registrazione
 
-### Obiettivo
-Ridurre il cognitive load della pagina principale organizzando il form in 3 step chiari, spostando elementi secondari e compattando l'interfaccia. Zero modifiche alla logica.
+### Problemi identificati
 
-### Struttura finale
+1. **Ordine listener errato** in `AuthContext.tsx`: `onAuthStateChange` e `getSession()` vengono chiamati quasi in parallelo. Le best practice Supabase richiedono che il listener venga impostato PRIMA di chiamare `getSession()`, altrimenti eventi come `SIGNED_IN` post-conferma email possono essere persi.
 
-```text
-┌─ Hero (1 riga, 32px) ─────────────────────────────────────┐
-│  "Crea contenuti virali in secondi"                       │
-└───────────────────────────────────────────────────────────┘
-┌─ Tabs (Genera / Foto / AI Memory / Virale / Trend) ───────┐
-└───────────────────────────────────────────────────────────┘
-┌─ Colonna sx: ContentForm 3 Step ─┐ ┌─ Colonna dx: Preview ─┐
-│ [Step 1] [Step 2] [Step 3]       │ │  Skeleton animato     │
-│ ─────── progress bar ─────────  │ │  quando vuoto         │
-│                                  │ │                       │
-│ Step 1: textarea + pubblico      │ │  Contenuto generato   │
-│ Step 2: formato (6 select)       │ └───────────────────────┘
-│ Step 3: template chip + foto +   │
-│         piattaforme (4+altro) +  │
-│         data + [Genera] button   │
-│                                  │
-│ Link discreto "Hook AI" sopra    │
-│ il bottone Genera (solo step 3)  │
-└──────────────────────────────────┘
-Footer social settings: spostato in modale da AppHeader
-```
+2. **Nessun feedback post-registrazione**: dopo il signup, l'utente vede solo un toast "controlla la tua email" ma la UI rimane sul form. Se l'utente ricarica la pagina o chiude il browser, non sa cosa fare. Serve uno stato "email inviata" con istruzioni chiare.
 
-### Cambiamenti per file
+3. **Sessione non persistente esplicitamente**: `createClient` usa di default `localStorage` ma senza `autoRefreshToken: true` e `persistSession: true` espliciti, in alcuni browser/contesti la sessione si perde.
 
-**1. `src/components/ContentForm.tsx`** — riscrittura principale
-- Aggiungere stato locale `currentStep: 1|2|3`
-- Progress bar orizzontale in cima alla card (3 segmenti colorati con label)
-- Mostrare solo i campi del step corrente
-- Step 1: textarea descrizione + input pubblico
-- Step 2: grid 2-col con Lunghezza, Tono, Piattaforma, Tipo post, N. Slide, N. Immagini
-- Step 3: CanvaTemplateSelector (compattato come chip radio), PhotoUpload, chip piattaforme (4 visibili + "altro" collassabile), datetime, bottone Genera
-- Bottoni Avanti/Indietro tra step; Genera solo al step 3
-- Chip template: sostituire `CanvaTemplateSelector` grandi card con radio chip testuali inline (Default | nome template | + Aggiungi) — nessuna emoji, nessun bordo card
-- Chip piattaforme: prime 4 (Instagram, Facebook, LinkedIn, TikTok), poi link "+ 5 altri" che espande Pinterest, Threads, Bluesky, X, YouTube
-- Aggiungere prop `onShowHookGenerator` e renderizzare link "Genera Hook AI" discreto sopra il bottone Genera (solo step 3)
+4. **Nessun auto-redirect dopo conferma email**: quando l'utente clicca sul link di conferma, il `emailRedirectTo` punta a `/` ma l'`AuthContext` potrebbe non intercettare l'evento `SIGNED_IN` se il listener non è attivo nel momento giusto.
 
-**2. `src/components/MainContent.tsx`**
-- Hero: ridurre a `text-[32px]`, rimuovere `<p>` sottotitolo
-- `IdeaGenerator`: spostare da posizione visibile a collassabile. Aggiungere un link/bottone "Ispirazione rapida" cliccabile che apre/chiude la sezione IdeaGenerator. Default collapsed.
-- `MetaConnection`: spostare fuori dal flusso principale. Renderizzare dentro un `<Dialog>` modale attivato da un bottone "Connessioni Social" nell'`AppHeader` o in un link nel footer della pagina (non nel body principale).
-- `HookGenerator`: rimuovere come sezione separata — la sua visibilità è già controllata da `showHookGenerator`. Passare `onShowHookGenerator={() => setShowHookGenerator(!showHookGenerator)}` al `ContentForm`.
-- Il `showViralGenerator`/`ViralFormatGenerator` rimane invariato
-- Footer copyright (`Index.tsx`): rimuovere il paragrafo `© ...` dalla pagina principale
+5. **Messaggio errore login generico**: `invalid_credentials` viene mostrato con un messaggio che menziona "Password dimenticata?" ma non distingue tra "email non confermata" e "password errata".
 
-**3. `src/components/PreviewSection.tsx`** — empty state
-- Sostituire il `py-16` statico con uno skeleton loader animato (3 rettangoli shimmer + barre di testo) quando `!generatedContent`
-- Ridurre padding dell'empty state da `py-16` a `py-8`
+### Modifiche
 
-**4. `src/components/AppHeader.tsx`**
-- Aggiungere bottone "Social" o icona `Link` che apre un `<Dialog>` contenente `<MetaConnection />`
+**1. `src/integrations/supabase/client.ts`**
+- Aggiungere `auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true }` al `createClient`
 
-**5. `src/pages/Index.tsx`**
-- Rimuovere il blocco footer con `© FisioAccordo`
+**2. `src/contexts/AuthContext.tsx`**
+- Correggere l'ordine: impostare `onAuthStateChange` PRIMA di chiamare `getSession()`
+- Rimuovere la chiamata duplicata a `setLoading(false)` — affidarsi solo al listener
+- Gestire esplicitamente gli eventi `SIGNED_IN`, `SIGNED_OUT`, `TOKEN_REFRESHED`
 
-### Dettagli tecnici step form
-
-```text
-Progress bar:
-┌──[1 Contenuto]──[2 Formato]──[3 Pubblica]──┐
-Segmenti: width 33% ciascuno
-Attivo: bg --rosa  |  Futuro: bg --line
-Label sotto: testo 9px --ink3, attivo --ink
-```
-
-Step 3 template chip (sostituisce CanvaTemplateSelector visualmente):
-```text
-Template: [Default] [FisioAccordo] [+ Aggiungi]
-Chip radio style: border var(--line), selezionato border --rosa bg --rosa-dim
-```
-
-Chip piattaforme collassabili:
-```text
-[Instagram] [Facebook] [LinkedIn] [TikTok]  + altri 5...
-            ↓ expanded:
-[Pinterest] [Threads] [Bluesky] [X] [YouTube]
-```
-
-HookGenerator trigger (solo step 3, sopra bottone Genera):
-```text
-link: "Genera Hook AI per questo contenuto →"
-font: 11px --viola, cursor pointer, onclick toggle HookGenerator
-```
+**3. `src/pages/Auth.tsx`**
+- Dopo signup riuscito: mostrare uno **stato "email inviata"** inline (niente più form, solo un pannello con istruzioni e bottone "Torna al Login")
+- Gestire l'errore Supabase `email_not_confirmed` con un messaggio specifico: "Email non ancora confermata. Controlla la tua casella di posta."
+- Aggiungere un bottone **"Reinvia email di conferma"** se il login fallisce per email non confermata (via `supabase.auth.resend`)
 
 ### File modificati
-- `src/components/ContentForm.tsx` — step form, chip template, chip piattaforme, hook link
-- `src/components/MainContent.tsx` — hero compatto, IdeaGenerator collassabile, MetaConnection in Dialog, HookGenerator collegato al form
-- `src/components/PreviewSection.tsx` — skeleton animato empty state
-- `src/components/AppHeader.tsx` — bottone Social per aprire Dialog MetaConnection
-- `src/pages/Index.tsx` — rimozione footer copyright
+- `src/integrations/supabase/client.ts` — persistenza sessione
+- `src/contexts/AuthContext.tsx` — ordine corretto listener + getSession
+- `src/pages/Auth.tsx` — stato post-signup + gestione errore email non confermata + resend
