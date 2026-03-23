@@ -355,28 +355,16 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, showCopyImpr
         platform={formData.platform}
       />
 
-      {/* ── Social connection link ────────────────────────── */}
+      {/* ── Settings link ──────────────────────────────────── */}
       <div className="mt-6 text-center">
-        <button
-          onClick={() => setSocialModalOpen(true)}
-          className="text-[10px] font-black uppercase transition-colors"
+        <Link
+          to="/settings"
+          className="text-[10px] font-black uppercase transition-colors hover:opacity-70"
           style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}
         >
-          Connessioni Social →
-        </button>
+          Connessioni Social & Impostazioni →
+        </Link>
       </div>
-
-      {/* ── Social Modal ──────────────────────────────────── */}
-      <Dialog open={socialModalOpen} onOpenChange={setSocialModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle style={{ fontSize: '13px', fontWeight: 800, color: 'var(--ink)' }}>
-              Connessioni Social
-            </DialogTitle>
-          </DialogHeader>
-          <MetaConnection />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 });
