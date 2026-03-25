@@ -44,9 +44,9 @@ const Auth = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    // reset error state on typing
     if (e.target.name === 'email' || e.target.name === 'password') {
       setEmailNotConfirmed(false);
+      setLoginError(null);
     }
   };
 
