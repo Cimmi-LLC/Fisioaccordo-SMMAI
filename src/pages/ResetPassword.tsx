@@ -16,14 +16,49 @@ const ResetPassword = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  // null = loading/waiting, true = valid recovery session, false = invalid
+  const [isValidRecovery, setIsValidRecovery] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (!hash.includes('type=recovery')) {
-      toast({ title: "Link non valido", description: "Questo link di recupero non è valido.", variant: "destructive" });
+    // Listen for PASSWORD_RECOVERY event — Supabase fires this after processing
+    // the token in the URL hash automatically (detectSessionInUrl: true)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsValidRecovery(true);
+      }
+    });
+
+    // Also check if there's already an active session with recovery type
+    // Give Supabase up to 3 seconds to process the URL token
+    const timeout = setTimeout(() => {
+      // If still null after 3s, check if there's a session (fallback)
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setIsValidRecovery((prev) => {
+          if (prev === null) {
+            // Only mark invalid if there's genuinely no recovery context
+            return session ? true : false;
+          }
+          return prev;
+        });
+      });
+    }, 3000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isValidRecovery === false) {
+      toast({
+        title: "Link non valido o scaduto",
+        description: "Richiedi un nuovo link di recupero dalla pagina di login.",
+        variant: "destructive",
+      });
       navigate('/auth');
     }
-  }, [navigate, toast]);
+  }, [isValidRecovery, navigate, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +86,18 @@ const ResetPassword = () => {
     }
   };
 
+  // Loading state while waiting for Supabase to process the URL token
+  if (isValidRecovery === null) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Verifica del link in corso...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent -z-10" />
@@ -60,14 +107,27 @@ const ResetPassword = () => {
           <h1 className="text-3xl font-bold text-foreground">Reimposta Password</h1>
         </div>
         <Card className="bg-card/90 border-border backdrop-blur-sm">
-          <CardHeader><CardTitle className="text-card-foreground text-center">Inserisci la nuova password</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-card-foreground text-center">Inserisci la nuova password</CardTitle>
+          </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label className="text-muted-foreground">Nuova password</Label>
                 <div className="relative">
-                  <Input type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} className="bg-muted border-border pr-10" placeholder="••••••••" required />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className="bg-muted border-border pr-10"
+                    placeholder="••••••••"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
@@ -75,14 +135,32 @@ const ResetPassword = () => {
               <div>
                 <Label className="text-muted-foreground">Conferma password</Label>
                 <div className="relative">
-                  <Input type={showConfirmPassword ? "text" : "password"} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="bg-muted border-border pr-10" placeholder="••••••••" required />
-                  <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <Input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    className="bg-muted border-border pr-10"
+                    placeholder="••••••••"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
                     {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
-              <Button type="submit" disabled={loading} className="w-full bg-fisio hover:bg-fisio/90 text-fisio-foreground">
-                {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Aggiornamento...</> : 'Aggiorna Password'}
+              <Button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-fisio hover:bg-fisio/90 text-fisio-foreground"
+              >
+                {loading
+                  ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Aggiornamento...</>
+                  : 'Aggiorna Password'
+                }
               </Button>
             </form>
           </CardContent>
