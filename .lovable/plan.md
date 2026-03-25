@@ -1,34 +1,36 @@
 
-## Fix Sistema Login / Registrazione
+## Problema identificato
 
-### Problemi identificati
+L'account è confermato e attivo (ultimo accesso 23/03). La password inserita (`germain2002`) è semplicemente errata. Il problema UX è che il toast sparisce in 3 secondi e l'utente non vede l'invito a usare "Password dimenticata?".
 
-1. **Ordine listener errato** in `AuthContext.tsx`: `onAuthStateChange` e `getSession()` vengono chiamati quasi in parallelo. Le best practice Supabase richiedono che il listener venga impostato PRIMA di chiamare `getSession()`, altrimenti eventi come `SIGNED_IN` post-conferma email possono essere persi.
+## Fix
 
-2. **Nessun feedback post-registrazione**: dopo il signup, l'utente vede solo un toast "controlla la tua email" ma la UI rimane sul form. Se l'utente ricarica la pagina o chiude il browser, non sa cosa fare. Serve uno stato "email inviata" con istruzioni chiare.
+**`src/pages/Auth.tsx`** — sostituire il toast di errore con un banner inline persistente che:
+- Mostra il messaggio di errore direttamente sotto i campi (non scompare)
+- Include un bottone "Reimposta Password" che apre direttamente il dialog "Password dimenticata"
+- Include anche un link secondario "Reinvia email di conferma" per coprire l'altro caso
 
-3. **Sessione non persistente esplicitamente**: `createClient` usa di default `localStorage` ma senza `autoRefreshToken: true` e `persistSession: true` espliciti, in alcuni browser/contesti la sessione si perde.
+### Stato aggiunto
+```ts
+const [loginError, setLoginError] = useState<'invalid_credentials' | 'email_not_confirmed' | null>(null);
+```
 
-4. **Nessun auto-redirect dopo conferma email**: quando l'utente clicca sul link di conferma, il `emailRedirectTo` punta a `/` ma l'`AuthContext` potrebbe non intercettare l'evento `SIGNED_IN` se il listener non è attivo nel momento giusto.
+### Logica `handleSignIn` aggiornata
+- Invece di `toast(...)` per `invalid_credentials` → `setLoginError('invalid_credentials')`
+- Reset `loginError` quando l'utente modifica email/password
+- Il banner persiste finché l'utente non riprova o modifica i campi
 
-5. **Messaggio errore login generico**: `invalid_credentials` viene mostrato con un messaggio che menziona "Password dimenticata?" ma non distingue tra "email non confermata" e "password errata".
-
-### Modifiche
-
-**1. `src/integrations/supabase/client.ts`**
-- Aggiungere `auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true }` al `createClient`
-
-**2. `src/contexts/AuthContext.tsx`**
-- Correggere l'ordine: impostare `onAuthStateChange` PRIMA di chiamare `getSession()`
-- Rimuovere la chiamata duplicata a `setLoading(false)` — affidarsi solo al listener
-- Gestire esplicitamente gli eventi `SIGNED_IN`, `SIGNED_OUT`, `TOKEN_REFRESHED`
-
-**3. `src/pages/Auth.tsx`**
-- Dopo signup riuscito: mostrare uno **stato "email inviata"** inline (niente più form, solo un pannello con istruzioni e bottone "Torna al Login")
-- Gestire l'errore Supabase `email_not_confirmed` con un messaggio specifico: "Email non ancora confermata. Controlla la tua casella di posta."
-- Aggiungere un bottone **"Reinvia email di conferma"** se il login fallisce per email non confermata (via `supabase.auth.resend`)
+### Banner inline (tra il bottone login e i link inferiori)
+```
+┌─────────────────────────────────────────┐
+│  Password non corretta                  │
+│  [Reimposta Password →]                 │
+│  Oppure: Reinvia email di conferma      │
+└─────────────────────────────────────────┘
+```
+- Background `var(--rosa-dim)`, border `rgba(230,0,126,0.2)`
+- Bottone "Reimposta Password" apre direttamente il dialog forgot password
+- Link "Reinvia email di conferma" chiama `supabase.auth.resend`
 
 ### File modificati
-- `src/integrations/supabase/client.ts` — persistenza sessione
-- `src/contexts/AuthContext.tsx` — ordine corretto listener + getSession
-- `src/pages/Auth.tsx` — stato post-signup + gestione errore email non confermata + resend
+- `src/pages/Auth.tsx` — sostituire toast con banner inline + auto-open forgot password
