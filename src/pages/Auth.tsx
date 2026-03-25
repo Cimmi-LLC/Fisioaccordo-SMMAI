@@ -88,14 +88,16 @@ const Auth = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setLoginError(null);
     setEmailNotConfirmed(false);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: formData.email, password: formData.password });
       if (error) {
         if (error.message.includes('Email not confirmed') || (error as any).code === 'email_not_confirmed') {
           setEmailNotConfirmed(true);
+          setLoginError('email_not_confirmed');
         } else {
-          toast({ title: "Errore di accesso", description: "Email o password non corretti. Usa 'Password dimenticata?' per reimpostarla.", variant: "destructive" });
+          setLoginError('invalid_credentials');
         }
       } else {
         if (rememberMe) await supabase.auth.refreshSession();
@@ -103,7 +105,7 @@ const Auth = () => {
         navigate('/');
       }
     } catch {
-      toast({ title: "Errore", description: "Errore durante il login", variant: "destructive" });
+      setLoginError('invalid_credentials');
     } finally {
       setLoading(false);
     }
