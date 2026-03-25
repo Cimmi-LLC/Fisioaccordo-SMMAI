@@ -24,6 +24,7 @@ const Auth = () => {
   const [sentToEmail, setSentToEmail] = useState('');
   // email-not-confirmed state
   const [emailNotConfirmed, setEmailNotConfirmed] = useState(false);
+  const [loginError, setLoginError] = useState<'invalid_credentials' | 'email_not_confirmed' | null>(null);
   const [resendLoading, setResendLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -43,9 +44,9 @@ const Auth = () => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    // reset error state on typing
     if (e.target.name === 'email' || e.target.name === 'password') {
       setEmailNotConfirmed(false);
+      setLoginError(null);
     }
   };
 
@@ -87,14 +88,16 @@ const Auth = () => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setLoginError(null);
     setEmailNotConfirmed(false);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: formData.email, password: formData.password });
       if (error) {
         if (error.message.includes('Email not confirmed') || (error as any).code === 'email_not_confirmed') {
           setEmailNotConfirmed(true);
+          setLoginError('email_not_confirmed');
         } else {
-          toast({ title: "Errore di accesso", description: "Email o password non corretti. Usa 'Password dimenticata?' per reimpostarla.", variant: "destructive" });
+          setLoginError('invalid_credentials');
         }
       } else {
         if (rememberMe) await supabase.auth.refreshSession();
@@ -102,7 +105,7 @@ const Auth = () => {
         navigate('/');
       }
     } catch {
-      toast({ title: "Errore", description: "Errore durante il login", variant: "destructive" });
+      setLoginError('invalid_credentials');
     } finally {
       setLoading(false);
     }
@@ -269,25 +272,59 @@ const Auth = () => {
                       </div>
                     </div>
 
-                    {/* Email not confirmed banner */}
-                    {emailNotConfirmed && (
-                      <div className="p-3 rounded-xl space-y-2" style={{ backgroundColor: 'var(--viola-dim)', border: '1px solid var(--line)' }}>
-                        <p className="text-[11px] font-semibold" style={{ color: 'var(--ink)' }}>
-                          ✉️ Email non ancora confermata
-                        </p>
-                        <p className="text-[11px]" style={{ color: 'var(--ink3)' }}>
-                          Controlla la tua casella di posta (anche spam) e clicca il link di conferma.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={handleResendConfirmation}
-                          disabled={resendLoading}
-                          className="flex items-center gap-1.5 text-[11px] font-semibold underline disabled:opacity-50"
-                          style={{ color: 'var(--viola)', background: 'transparent', border: 'none', padding: 0 }}
-                        >
-                          {resendLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-                          Reinvia email di conferma
-                        </button>
+                    {/* Persistent error banner */}
+                    {loginError && (
+                      <div
+                        className="p-3 rounded-xl space-y-2"
+                        style={{
+                          backgroundColor: loginError === 'email_not_confirmed' ? 'var(--viola-dim)' : 'rgba(230,0,126,0.07)',
+                          border: `1px solid ${loginError === 'email_not_confirmed' ? 'var(--line)' : 'rgba(230,0,126,0.2)'}`,
+                        }}
+                      >
+                        {loginError === 'invalid_credentials' ? (
+                          <>
+                            <p className="text-[11px] font-semibold" style={{ color: 'var(--ink)' }}>
+                              🔑 Email o password non corretti
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setShowForgotPassword(true)}
+                              className="flex items-center gap-1.5 text-[11px] font-black uppercase py-2 px-3 rounded-lg w-full justify-center"
+                              style={{ backgroundColor: 'var(--rosa)', color: 'white' }}
+                            >
+                              Reimposta Password →
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleResendConfirmation}
+                              disabled={resendLoading}
+                              className="flex items-center gap-1.5 text-[11px] font-semibold underline w-full justify-center disabled:opacity-50"
+                              style={{ color: 'var(--ink3)', background: 'transparent', border: 'none', padding: 0 }}
+                            >
+                              {resendLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                              Oppure: reinvia email di conferma
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-[11px] font-semibold" style={{ color: 'var(--ink)' }}>
+                              ✉️ Email non ancora confermata
+                            </p>
+                            <p className="text-[11px]" style={{ color: 'var(--ink3)' }}>
+                              Controlla la tua casella di posta (anche spam) e clicca il link di conferma.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={handleResendConfirmation}
+                              disabled={resendLoading}
+                              className="flex items-center gap-1.5 text-[11px] font-semibold underline disabled:opacity-50"
+                              style={{ color: 'var(--viola)', background: 'transparent', border: 'none', padding: 0 }}
+                            >
+                              {resendLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                              Reinvia email di conferma
+                            </button>
+                          </>
+                        )}
                       </div>
                     )}
 
