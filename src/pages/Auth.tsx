@@ -24,6 +24,7 @@ const Auth = () => {
   const [sentToEmail, setSentToEmail] = useState('');
   // email-not-confirmed state
   const [emailNotConfirmed, setEmailNotConfirmed] = useState(false);
+  const [loginError, setLoginError] = useState<'invalid_credentials' | 'email_not_confirmed' | null>(null);
   const [resendLoading, setResendLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
