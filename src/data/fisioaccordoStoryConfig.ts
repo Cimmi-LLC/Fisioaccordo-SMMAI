@@ -1,0 +1,17 @@
+export const fisioaccordoClient = {
+  id: "fisioaccordo-default",
+  name: "FisioAccordo",
+  city: "Italia",
+  tone: "professionale",
+  focus: "fisioterapia, riabilitazione, benessere",
+  brandFont: "Montserrat",
+  brandColors: ["#554697", "#E6007E", "#ffffff"],
+  bgIsLight: false,
+  selectedTypes: ["quiz", "curiosita", "mito_verita", "consiglio", "sapevi_che", "domanda_aperta", "mini_esercizio", "prima_dopo"],
+  templateDataUrl: null,
+  viDataUrl: null,
+  viBase64: null,
+  viMime: null,
+  clientInfo: null,
+  clientNotes: null,
+};

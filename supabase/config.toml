@@ -1,4 +1,4 @@
-project_id = "tdufnmakqssyycbblmut"
+project_id = "cktdoqvyyvjlkpahbjyi"
 
 [functions.generate-hooks]
 verify_jwt = false
@@ -7,6 +7,18 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.generate-carousel-images]
+verify_jwt = false
+
+[functions.save-slide-image]
+verify_jwt = false
+
+[functions.process-scheduled-posts]
+verify_jwt = false
+
+[functions.schedule-post]
+verify_jwt = false
+
+[functions.expand-topic]
 verify_jwt = false
 
 [functions.blotato-publish]

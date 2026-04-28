@@ -12,7 +12,7 @@ serve(async (req) => {
 
   try {
     const { topic, audience, tone, platform } = await req.json();
-    
+
     if (!topic) {
       return new Response(
         JSON.stringify({ error: 'Topic is required' }),
@@ -20,9 +20,9 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY not configured');
     }
 
     const systemPrompt = `Sei un esperto di copywriting virale con specializzazione in contenuti per social media.
@@ -38,7 +38,7 @@ CARATTERISTICHE HOOK EFFICACI:
 STILI DI HOOK DA GENERARE:
 1. Emotional Hooks (paura, desiderio, frustrazione)
 2. Curiosity Gaps (segreti, verità nascoste, metodi sconosciuti)
-3. Controversy Hooks (contro-intuitivio, shock, breaking beliefs)
+3. Controversy Hooks (contro-intuitivo, shock, breaking beliefs)
 4. Storytelling Hooks (trasformazione, prima/dopo, case study)
 5. Authority Hooks (dati scientifici, expert reveal, statistiche)
 6. Urgency Hooks (time-sensitive, limited, esclusività)
@@ -76,54 +76,45 @@ FORMATO RISPOSTA (JSON):
   ]
 }`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        response_format: { type: 'json_object' }
-      }),
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+          },
+        }),
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('AI Gateway error:', response.status, errorText);
-      
+      console.error('Gemini API error:', response.status, errorText);
+
       if (response.status === 429) {
         return new Response(
           JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: 'Payment required. Please add credits to your Lovable workspace.' }),
-          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      throw new Error(`AI Gateway error: ${response.status}`);
+
+      throw new Error(`Gemini API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const content = data.choices[0].message.content;
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
     const parsedContent = JSON.parse(content);
 
-    // Sort hooks by virality score
-    const sortedHooks = parsedContent.hooks.sort((a: any, b: any) => 
+    const sortedHooks = parsedContent.hooks.sort((a: any, b: any) =>
       (b.virality_score || 0) - (a.virality_score || 0)
     );
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         hooks: sortedHooks,
         metadata: {
           topic,
@@ -133,7 +124,7 @@ FORMATO RISPOSTA (JSON):
           generated_at: new Date().toISOString()
         }
       }),
-      { 
+      {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
@@ -142,11 +133,11 @@ FORMATO RISPOSTA (JSON):
   } catch (error) {
     console.error('Error in generate-hooks function:', error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: error instanceof Error ? error.message : 'Unknown error',
         fallback_hooks: generateFallbackHooks()
       }),
-      { 
+      {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }

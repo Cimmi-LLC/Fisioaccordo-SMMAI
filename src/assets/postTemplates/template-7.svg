@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 27.5.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 4000 4000" style="enable-background:new 0 0 4000 4000;" xml:space="preserve">
+<g>
+	<defs>
+		<rect id="SVGID_1_" width="4000" height="4000"/>
+	</defs>
+	<clipPath id="SVGID_00000124866474123403496650000010720378297360560514_">
+		<use xlink:href="#SVGID_1_"  style="overflow:visible;"/>
+	</clipPath>
+	
+		<rect x="4.158" y="4.156" style="clip-path:url(#SVGID_00000124866474123403496650000010720378297360560514_);fill-rule:evenodd;clip-rule:evenodd;fill:#FFFFFF;" width="3991.684" height="3989.535"/>
+	<g style="clip-path:url(#SVGID_00000124866474123403496650000010720378297360560514_);">
+		<defs>
+			<path id="SVGID_00000150810518336657571500000002853088649931969467_" d="M2366.607,2758.038
+				C395.715,3231.79,4.158,1025.083,4.158,1025.083v2968.607h3991.684V2538.084
+				c-409.314,1530.411-2065.765,1053.83-1374.283,717.881C2993.277,3075.369,2577.428,2707.362,2366.607,2758.038"/>
+		</defs>
+		<clipPath id="SVGID_00000150087301804834533000000005755737699905674392_">
+			<use xlink:href="#SVGID_00000150810518336657571500000002853088649931969467_"  style="overflow:visible;"/>
+		</clipPath>
+		
+			<linearGradient id="SVGID_00000164495318978834016050000017103234118341096076_" gradientUnits="userSpaceOnUse" x1="-716.9916" y1="4181.4141" x2="3775.7222" y2="1478.4603">
+			<stop  offset="0" style="stop-color:#666666"/>
+			<stop  offset="0.48" style="stop-color:#E6E6E6"/>
+			<stop  offset="1" style="stop-color:#4D4D4D"/>
+		</linearGradient>
+		
+			<rect x="4.158" y="1025.083" style="clip-path:url(#SVGID_00000150087301804834533000000005755737699905674392_);fill:url(#SVGID_00000164495318978834016050000017103234118341096076_);" width="3991.684" height="3043.411"/>
+	</g>
+	
+		<path style="opacity:0.36;clip-path:url(#SVGID_00000124866474123403496650000010720378297360560514_);fill-rule:evenodd;clip-rule:evenodd;" d="
+		M1888.622,3245.063c-870.28-513.465-1225.567,1038.801-1884.464-694.12v1442.748c2179.77,0,3675.527-0.017,3674.573,0
+		C1597.149,4032.359,2390.438,3541.148,1888.622,3245.063"/>
+	
+		<path style="opacity:0.15;clip-path:url(#SVGID_00000124866474123403496650000010720378297360560514_);fill-rule:evenodd;clip-rule:evenodd;" d="
+		M4.158,2752.638c635.231,1578.665,993.382,94.738,1847.042,598.397c338.244,199.573,88.085,487.796,526.511,642.649
+		c0.006,0,0.011,0,0.017,0c361.795-0.001,658.151-0.002,876.136-0.002c-1544.101-34.527-901.389-474.933-1365.242-748.619
+		c-870.28-513.465-1225.567,1038.801-1884.464-694.12V2752.638z"/>
+</g>
+</svg>

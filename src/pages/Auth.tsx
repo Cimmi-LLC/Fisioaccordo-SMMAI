@@ -5,12 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Loader2, Eye, EyeOff, MailCheck, RefreshCw } from "lucide-react";
+import logo from "@/assets/logo-fisioaccordo.png";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -34,13 +37,10 @@ const Auth = () => {
     clinicName: ''
   });
 
+  // Redirect to home if already authenticated (reactive via AuthContext)
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) navigate('/');
-    };
-    checkAuth();
-  }, [navigate]);
+    if (!authLoading && user) navigate('/');
+  }, [user, authLoading, navigate]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -59,7 +59,7 @@ const Auth = () => {
     setLoading(true);
     try {
       const redirectUrl = `${window.location.origin}/`;
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
@@ -74,6 +74,10 @@ const Auth = () => {
           return;
         }
         toast({ title: "Errore di registrazione", description: error.message, variant: "destructive" });
+      } else if (data.user && data.user.identities && data.user.identities.length === 0) {
+        // Supabase returns a fake user with no identities when email already exists
+        toast({ title: "Email già registrata", description: "Hai già un account! Ti portiamo al Login." });
+        setActiveTab('signin');
       } else {
         setSentToEmail(formData.email);
         setEmailSent(true);
@@ -100,9 +104,8 @@ const Auth = () => {
           setLoginError('invalid_credentials');
         }
       } else {
-        if (rememberMe) await supabase.auth.refreshSession();
         toast({ title: "Benvenuto!", description: "Accesso effettuato con successo" });
-        navigate('/');
+        // Navigation happens automatically via useEffect when AuthContext updates
       }
     } catch {
       setLoginError('invalid_credentials');
@@ -151,6 +154,15 @@ const Auth = () => {
     fontFamily: 'Montserrat, sans-serif',
   };
 
+  // Show loading spinner while checking auth state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg)' }}>
+        <Loader2 className="h-8 w-8 animate-spin" style={{ color: 'var(--viola)' }} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg)' }}>
       <div className="w-full max-w-md">
@@ -158,17 +170,8 @@ const Auth = () => {
         {/* ── Logo / brand ── */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <div className="p-2 rounded-xl" style={{ backgroundColor: 'var(--viola)' }}>
-              <img
-                src="/lovable-uploads/217c8d5c-ce96-40c5-ab52-ff057f4b0d15.png"
-                alt="FisioAccordo Logo"
-                className="h-12 w-auto"
-              />
-            </div>
+            <img src={logo} alt="FisioAccordo PoliPartner Logo" className="h-14 w-auto" />
           </div>
-          <h1 className="text-2xl leading-tight mb-1" style={{ fontWeight: 900, color: 'var(--ink)', letterSpacing: '-1px' }}>
-            FisioAccordo<span style={{ color: 'var(--rosa)' }}>(VIRAL)</span>ContentAI
-          </h1>
           <p className="text-[13px] font-medium" style={{ color: 'var(--ink3)' }}>
             Genera contenuti professionali per i tuoi social media
           </p>

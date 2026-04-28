@@ -47,6 +47,9 @@ export const useViralAnalysis = () => {
     try {
       const { data, error } = await supabase.functions.invoke('analyze-viral-post', { body: input });
       if (error) throw error;
+      if (data?.requires_text) {
+        throw new Error("Instagram/TikTok bloccano la lettura automatica. Incolla la caption del post nel campo di testo per analizzarlo.");
+      }
       if (data?.error) throw new Error(data.error);
 
       const { data: saved, error: saveErr } = await supabase.from('viral_analysis').insert({

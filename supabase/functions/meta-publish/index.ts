@@ -1,11 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { publishSingleImage, publishCarousel } from '../_shared/instagramPublish.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 }
-
-const API_VERSION = 'v22.0'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -96,7 +95,12 @@ Deno.serve(async (req) => {
 
     // Carousel post
     if (carousel_urls && carousel_urls.length > 1) {
-      return await publishCarousel(igId, accessToken, content, carousel_urls)
+      const result = await publishCarousel(igId, accessToken, content, carousel_urls)
+      if (!result.success) return errorResponse(result.error || 'Pubblicazione fallita')
+      return new Response(
+        JSON.stringify({ success: true, post_id: result.postId }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Single image post
@@ -104,7 +108,12 @@ Deno.serve(async (req) => {
       return errorResponse('Instagram richiede almeno un\'immagine', 400)
     }
 
-    return await publishSingleImage(igId, accessToken, content, image_url)
+    const result = await publishSingleImage(igId, accessToken, content, image_url)
+    if (!result.success) return errorResponse(result.error || 'Pubblicazione fallita')
+    return new Response(
+      JSON.stringify({ success: true, post_id: result.postId }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
 
   } catch (error) {
     console.error('Meta publish error:', error)
@@ -114,112 +123,6 @@ Deno.serve(async (req) => {
     )
   }
 })
-
-async function igFetch(url: string, token: string, method: string = 'GET', body?: Record<string, any>): Promise<any> {
-  const separator = url.includes('?') ? '&' : '?'
-  const fullUrl = `${url}${separator}access_token=${token}`
-  
-  const options: RequestInit = { method }
-  if (body && method === 'POST') {
-    options.headers = { 'Content-Type': 'application/json' }
-    options.body = JSON.stringify(body)
-  }
-
-  console.log(`igFetch ${method} ${url.substring(0, 80)}...`)
-  const res = await fetch(fullUrl, options)
-  const data = await res.json()
-  console.log(`igFetch response:`, JSON.stringify(data).substring(0, 300))
-  return data
-}
-
-async function publishSingleImage(igId: string, token: string, caption: string, imageUrl: string) {
-  console.log('publishSingleImage - igId:', igId, 'imageUrl:', imageUrl)
-
-  const containerData = await igFetch(
-    `https://graph.instagram.com/${API_VERSION}/${igId}/media`,
-    token,
-    'POST',
-    { image_url: imageUrl, caption }
-  )
-
-  if (containerData.error) {
-    console.error('Container creation failed:', containerData.error)
-    return errorResponse(containerData.error.message)
-  }
-
-  return await publishContainer(igId, token, containerData.id)
-}
-
-async function publishCarousel(igId: string, token: string, caption: string, urls: string[]) {
-  console.log('publishCarousel - igId:', igId, 'urls:', urls.length)
-  const childIds: string[] = []
-
-  for (const url of urls) {
-    const data = await igFetch(
-      `https://graph.instagram.com/${API_VERSION}/${igId}/media`,
-      token,
-      'POST',
-      { image_url: url, is_carousel_item: true }
-    )
-    if (data.error) {
-      return errorResponse(`Errore carousel item: ${data.error.message}`)
-    }
-    childIds.push(data.id)
-  }
-
-  const containerData = await igFetch(
-    `https://graph.instagram.com/${API_VERSION}/${igId}/media`,
-    token,
-    'POST',
-    { media_type: 'CAROUSEL', caption, children: childIds }
-  )
-
-  if (containerData.error) {
-    return errorResponse(containerData.error.message)
-  }
-
-  return await publishContainer(igId, token, containerData.id)
-}
-
-async function waitForMediaReady(containerId: string, token: string, maxAttempts = 30, delayMs = 2000): Promise<{ ready: boolean; error?: string }> {
-  for (let i = 0; i < maxAttempts; i++) {
-    const data = await igFetch(
-      `https://graph.instagram.com/${API_VERSION}/${containerId}?fields=status_code`,
-      token
-    )
-    console.log(`Polling attempt ${i + 1}: status_code = ${data.status_code}`)
-
-    if (data.status_code === 'FINISHED') return { ready: true }
-    if (data.status_code === 'ERROR') return { ready: false, error: data.status || 'Media processing failed' }
-    if (data.error) return { ready: false, error: data.error.message }
-
-    await new Promise(r => setTimeout(r, delayMs))
-  }
-  return { ready: false, error: 'Timeout: Instagram non ha finito di elaborare il media entro 60 secondi' }
-}
-
-async function publishContainer(igId: string, token: string, creationId: string) {
-  const status = await waitForMediaReady(creationId, token)
-  if (!status.ready) {
-    return errorResponse(status.error || 'Media not ready')
-  }
-
-  const publishData = await igFetch(
-    `https://graph.instagram.com/${API_VERSION}/${igId}/media_publish`,
-    token,
-    'POST',
-    { creation_id: creationId }
-  )
-
-  if (publishData.error) {
-    return errorResponse(publishData.error.message)
-  }
-
-  return new Response(
-    JSON.stringify({ success: true, post_id: publishData.id }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  )
-}
 
 function errorResponse(message: string, status = 400) {
   return new Response(

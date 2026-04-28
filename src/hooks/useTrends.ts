@@ -41,30 +41,53 @@ export const useTrends = () => {
 
   useEffect(() => { fetchTrends(); }, [fetchTrends]);
 
-  const findTrends = useCallback(async (niche: string, platform: string) => {
+  const findTrends = useCallback(async (niche: string, platform: string, append = false) => {
     if (!user) return null;
     setSearching(true);
     try {
+      const excludeTopics = append ? trends.map(t => t.topic) : [];
+
       const { data, error } = await supabase.functions.invoke('find-trends', {
-        body: { niche, platform }
+        body: { niche, platform, count: 10, excludeTopics }
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
       const newTrends = data.trends || [];
+
+      // Save to DB (non-blocking)
       for (const trend of newTrends) {
-        await supabase.from('trending_topics').insert({
-          user_id: user.id,
-          topic: trend.topic,
-          category: niche,
-          trend_score: trend.trend_score,
-          source: trend.why_trending,
-          suggested_content: trend.content_idea
-        } as any);
+        try {
+          await supabase.from('trending_topics').insert({
+            user_id: user.id,
+            topic: trend.topic,
+            category: niche,
+            trend_score: trend.trend_score,
+            source: trend.why_trending,
+            suggested_content: trend.content_idea
+          } as any);
+        } catch {}
       }
 
-      await fetchTrends();
-      toast({ title: '🔥 Trend trovati!', description: `${newTrends.length} trend per ${niche}` });
+      const enrichedTrends = newTrends.map((t: any) => ({
+        id: Math.random().toString(36).slice(2),
+        topic: t.topic,
+        category: niche,
+        trend_score: t.trend_score,
+        source: t.why_trending,
+        suggested_content: t.content_idea,
+        suggested_format: t.suggested_format,
+        expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+        created_at: new Date().toISOString(),
+      }));
+
+      if (append) {
+        setTrends(prev => [...prev, ...enrichedTrends]);
+      } else {
+        setTrends(enrichedTrends);
+      }
+
+      toast({ title: 'Trend trovati!', description: `${newTrends.length} trend per ${niche}` });
       return newTrends;
     } catch (err: any) {
       toast({ title: '❌ Errore', description: err.message, variant: 'destructive' });

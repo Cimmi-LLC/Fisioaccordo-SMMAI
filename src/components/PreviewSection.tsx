@@ -1,22 +1,23 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Copy, Download, RefreshCw, Upload, X } from "lucide-react";
-import CarouselImageManager from "@/components/CarouselImageManager";
-import SmartCopyActions from "@/components/SmartCopyActions";
-import FeedbackWidget from "@/components/FeedbackWidget";
-import ImageFeedbackWidget from "@/components/ImageFeedbackWidget";
-import ImageGenerationProgress from "@/components/ImageGenerationProgress";
+import { Card, CardContent } from "@/components/ui/card";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Copy, Download, RefreshCw, Upload, X, Shuffle, Loader2, CalendarClock } from "lucide-react";
+import MinimalProgressBar from "@/components/carousel/MinimalProgressBar";
+import SchedulePostDialog from "@/components/schedule/SchedulePostDialog";
 import { useToast } from "@/hooks/use-toast";
 import { DEFAULT_TEMPLATES, generateSlideLayers, type DesignTemplate, type DesignTemplateLayer } from "@/data/defaultTemplates";
 import type { ImageGenProgress } from "@/hooks/useCarouselSlides";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface CarouselSlide {
   type: string;
   content: string;
   imageUrl?: string;
   userImageUrl?: string;
+  imageAlternatives?: string[];
 }
 
 interface CanvaTemplateData {
@@ -52,17 +53,78 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
   onImageEdit,
   onSaveContent,
   canvaTemplate,
-  onPublishDirect,
   isGeneratingImages,
   postType,
   onRegenerateImages,
   imageGenProgress
 }) => {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const [swappingIndex, setSwappingIndex] = useState<number | null>(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+
+  const prepareImagesForSchedule = async (): Promise<string[]> => {
+    const urls = carouselSlides
+      .map((s) => s.userImageUrl || s.imageUrl)
+      .filter((u): u is string => !!u);
+    if (urls.length === 0) throw new Error('Nessuna immagine disponibile');
+    return urls;
+  };
+
+  const swapSlideImage = async (
+    slideIndex: number,
+    source: { imageUrl?: string; dataUrl?: string }
+  ) => {
+    setSwappingIndex(slideIndex);
+    try {
+      const { data, error } = await supabase.functions.invoke('save-slide-image', {
+        body: {
+          imageUrl: source.imageUrl,
+          dataUrl: source.dataUrl,
+          userId: user?.id,
+          slideIndex,
+        },
+      });
+      if (error || data?.error || !data?.url) {
+        throw new Error(data?.error || error?.message || 'Errore sconosciuto');
+      }
+      const newUrl = data.url as string;
+      const updated = [...carouselSlides];
+      const previous = updated[slideIndex].imageUrl;
+      const oldAlternatives = updated[slideIndex].imageAlternatives || [];
+      // Rotate alternatives: drop the one just chosen, push the previous default at the end
+      const nextAlternatives = source.imageUrl
+        ? [...oldAlternatives.filter(u => u !== source.imageUrl), ...(previous ? [previous] : [])]
+        : oldAlternatives;
+      updated[slideIndex] = {
+        ...updated[slideIndex],
+        imageUrl: newUrl,
+        imageAlternatives: nextAlternatives,
+      };
+      setCarouselSlides(updated);
+      toast({ title: 'Immagine cambiata' });
+    } catch (e) {
+      toast({
+        title: 'Errore cambio immagine',
+        description: e instanceof Error ? e.message : 'Riprova',
+        variant: 'destructive',
+      });
+    } finally {
+      setSwappingIndex(null);
+    }
+  };
+
+  const handleSwapUpload = (slideIndex: number, file: File) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      swapSlideImage(slideIndex, { dataUrl: reader.result as string });
+    };
+    reader.readAsDataURL(file);
+  };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: "Copiato!", description: "Contenuto copiato negli appunti" });
+    toast({ title: "Copiato!", description: "Testo copiato negli appunti" });
   };
 
   const downloadImage = async (imageUrl: string, slideIndex: number) => {
@@ -77,9 +139,15 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      toast({ title: "Download completato!", description: `Slide ${slideIndex + 1} scaricata` });
     } catch {
-      toast({ title: "Errore download", description: "Impossibile scaricare l'immagine", variant: "destructive" });
+      toast({ title: "Errore download", variant: "destructive" });
+    }
+  };
+
+  const downloadAllImages = async () => {
+    for (let i = 0; i < carouselSlides.length; i++) {
+      const url = carouselSlides[i].userImageUrl || carouselSlides[i].imageUrl;
+      if (url) await downloadImage(url, i);
     }
   };
 
@@ -89,7 +157,6 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
       const updatedSlides = [...carouselSlides];
       updatedSlides[slideIndex].userImageUrl = reader.result as string;
       setCarouselSlides(updatedSlides);
-      toast({ title: "Immagine caricata!", description: `Immagine caricata per la slide ${slideIndex + 1}` });
     };
     reader.readAsDataURL(file);
   };
@@ -118,17 +185,13 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
     if (!text && !isImageLayer) return null;
     const shadow = layer.shadow?.enabled ? `${layer.shadow.offsetX || 0}px ${layer.shadow.offsetY || 0}px ${layer.shadow.blur || 0}px ${layer.shadow.color || '#000'}` : undefined;
     return (
-      <div
-        key={layer.id}
-        className="absolute flex items-center justify-center overflow-hidden"
-        style={{
-          left: `${layer.x}%`, top: `${layer.y}%`, width: `${layer.width}%`, height: `${layer.height}%`,
-          backgroundColor: layer.backgroundColor || 'transparent',
-          borderRadius: layer.borderRadius ? `${layer.borderRadius * SCALE}px` : undefined,
-          padding: layer.padding ? `${layer.padding * SCALE}px` : '2px',
-          opacity: layer.opacity ?? 1,
-        }}
-      >
+      <div key={layer.id} className="absolute flex items-center justify-center overflow-hidden" style={{
+        left: `${layer.x}%`, top: `${layer.y}%`, width: `${layer.width}%`, height: `${layer.height}%`,
+        backgroundColor: layer.backgroundColor || 'transparent',
+        borderRadius: layer.borderRadius ? `${layer.borderRadius * SCALE}px` : undefined,
+        padding: layer.padding ? `${layer.padding * SCALE}px` : '2px',
+        opacity: layer.opacity ?? 1,
+      }}>
         {isImageLayer ? (
           slide.userImageUrl ? <img src={slide.userImageUrl} className="w-full h-full object-cover" alt="user" /> : (
             <div className="w-full h-full bg-muted/30 flex items-center justify-center text-muted-foreground text-xs"><Upload className="w-4 h-4" /></div>
@@ -142,9 +205,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
             textShadow: shadow, lineHeight: layer.lineHeight ? `${layer.lineHeight}` : '1.2',
             letterSpacing: layer.letterSpacing ? `${layer.letterSpacing * SCALE}px` : undefined,
             width: '100%', display: 'block',
-          }}>
-            {text}
-          </span>
+          }}>{text}</span>
         )}
       </div>
     );
@@ -155,7 +216,7 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
     try { slideData = JSON.parse(slide.content); }
     catch {
       const lines = slide.content.split('\n').filter(l => l.trim());
-      slideData = { title: lines[0] || `Slide ${index + 1}`, subtitle: lines[1] || '', body: lines.slice(2).join('\n') || '', footer: 'Studio Fisioterapico' };
+      slideData = { title: lines[0] || `Slide ${index + 1}`, subtitle: lines[1] || '', body: lines.slice(2).join('\n') || '' };
     }
     const designTemplate = resolveDesignTemplate();
     const slideLayers = generateSlideLayers(index, carouselSlides.length, designTemplate);
@@ -171,8 +232,60 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
         )}
         {designTemplate.overlayColor && <div className="absolute inset-0" style={{ backgroundColor: designTemplate.overlayColor }} />}
         {slideLayers.map(layer => renderLayer(layer, slideData, slide))}
+        {/* Hover actions */}
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 z-10">
-          <Button onClick={() => onImageEdit(slide.userImageUrl || slide.imageUrl || '', index)} size="sm" className="p-1 h-6 w-6 text-white border-0" style={{ backgroundColor: 'var(--rosa)' }}><Copy className="w-3 h-3" /></Button>
+          {slide.imageUrl && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  size="sm"
+                  className="p-1 h-6 w-6 text-white border-0"
+                  style={{ backgroundColor: 'var(--rosa)' }}
+                  title="Cambia immagine"
+                >
+                  {swappingIndex === index ? <Loader2 className="w-3 h-3 animate-spin" /> : <Shuffle className="w-3 h-3" />}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-3" align="end">
+                <div className="text-[11px] font-bold uppercase mb-2" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>
+                  Cambia immagine
+                </div>
+                {slide.imageAlternatives && slide.imageAlternatives.length > 0 ? (
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {slide.imageAlternatives.slice(0, 3).map((altUrl, ai) => (
+                      <button
+                        key={ai}
+                        onClick={() => swapSlideImage(index, { imageUrl: altUrl })}
+                        disabled={swappingIndex !== null}
+                        className="aspect-square rounded-md overflow-hidden border-2 hover:opacity-80 disabled:opacity-50"
+                        style={{ borderColor: 'var(--line)', cursor: swappingIndex !== null ? 'wait' : 'pointer' }}
+                      >
+                        <img src={altUrl} alt={`Alternativa ${ai + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-[11px] mb-3 py-3 text-center rounded-md" style={{ color: 'var(--ink3)', backgroundColor: 'var(--bg)' }}>
+                    Nessuna alternativa disponibile
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleSwapUpload(index, f); }}
+                  className="hidden"
+                  id={`swap-upload-${index}`}
+                />
+                <label
+                  htmlFor={`swap-upload-${index}`}
+                  className="flex items-center justify-center gap-2 py-2 text-[11px] font-bold uppercase rounded-lg cursor-pointer"
+                  style={{ backgroundColor: 'var(--viola)', color: '#fff', letterSpacing: '0.5px' }}
+                >
+                  <Upload className="w-3 h-3" /> Carica una tua foto
+                </label>
+              </PopoverContent>
+            </Popover>
+          )}
           <Button onClick={() => downloadImage(slide.userImageUrl || slide.imageUrl || '', index)} size="sm" className="p-1 h-6 w-6 text-white border-0" style={{ backgroundColor: 'var(--viola)' }}><Download className="w-3 h-3" /></Button>
           <input type="file" accept="image/*" onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadImageToSlide(index, file); }} className="hidden" id={`upload-${index}`} />
           <Button asChild size="sm" className="p-1 h-6 w-6 text-white border-0 cursor-pointer" style={{ backgroundColor: 'var(--ink2)' }}><label htmlFor={`upload-${index}`}><Upload className="w-3 h-3" /></label></Button>
@@ -182,78 +295,123 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
     );
   };
 
-  return (
-    <Card className="panel-card">
-      <CardHeader style={{ padding: '22px 24px', borderBottom: '1px solid var(--line)' }}>
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <CardTitle style={{ fontSize: '13px', fontWeight: 800, color: 'var(--ink)' }}>Anteprima Contenuto</CardTitle>
-          {generatedContent && (
-            <div className="flex items-center gap-2">
-              <button onClick={() => copyToClipboard(generatedContent)} className="text-[10px] font-black uppercase px-2.5 py-1.5 rounded-lg transition-colors" style={{ border: '1px solid var(--line)', color: 'var(--ink3)', backgroundColor: 'transparent' }}>Copia</button>
-              <button onClick={onSaveContent} className="text-[10px] font-black uppercase px-2.5 py-1.5 rounded-lg text-white transition-colors" style={{ backgroundColor: 'var(--rosa)', border: '1px solid var(--rosa)' }}>Salva</button>
-            </div>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent style={{ padding: '22px 24px' }}>
-        {generatedContent ? (
-          <div className="space-y-4">
-            {isGeneratingImages && carouselSlides.length === 0 && (
-              <div className="mb-4">
-                <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--ink)' }}>{{ 'post-singolo': 'Immagine Post', 'storia': 'Immagine Storia', 'reel': 'Immagine Reel' }[postType || ''] || 'Slide Carosello'}</h3>
-                <ImageGenerationProgress totalSlides={imageGenProgress?.total || 1} currentSlide={imageGenProgress?.current || 0} isGenerating={true} />
-              </div>
-            )}
-            {carouselSlides.length > 0 && (
-              <div className="mb-4">
-                <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--ink)' }}>{{ 'post-singolo': 'Immagine Post', 'storia': 'Immagine Storia', 'reel': 'Immagine Reel' }[postType || ''] || 'Slide Carosello'}</h3>
-                {isGeneratingImages && imageGenProgress && <ImageGenerationProgress totalSlides={imageGenProgress.total} currentSlide={imageGenProgress.current} isGenerating={true} />}
-                <div className={`grid gap-3 mb-4 ${carouselSlides.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : 'grid-cols-2 md:grid-cols-3'}`}>
-                  {carouselSlides.map((slide, index) => renderSlide(slide, index))}
-                </div>
-                {carouselSlides.some(s => !s.imageUrl) && !isGeneratingImages && onRegenerateImages && (
-                  <button onClick={onRegenerateImages} className="w-full text-[11px] font-black uppercase py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2" style={{ border: '1px solid var(--line)', color: 'var(--ink3)', backgroundColor: 'transparent' }}>
-                    <RefreshCw className="h-3.5 w-3.5" /> Rigenera Immagini
-                  </button>
-                )}
-              </div>
-            )}
-            {appliedHook && (
-              <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--rosa-dim)', border: '1px solid rgba(230,0,126,0.2)' }}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold" style={{ color: 'var(--rosa)' }}>Hook applicato:</span>
-                  <button onClick={onRemoveHook} className="p-1" style={{ color: 'var(--rosa)' }}><X className="w-3.5 h-3.5" /></button>
-                </div>
-                <p className="text-xs mt-1" style={{ color: 'var(--ink2)' }}>{appliedHook}</p>
-              </div>
-            )}
-            <div className="p-4 rounded-lg" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)' }}>
-              <pre className="whitespace-pre-wrap text-sm" style={{ color: 'var(--ink)', fontFamily: 'Montserrat, sans-serif' }}>{generatedContent}</pre>
-            </div>
-            <FeedbackWidget generatedContent={generatedContent} />
-            {carouselSlides.length > 0 && !isGeneratingImages && <ImageFeedbackWidget imageContext={generatedContent.substring(0, 150)} />}
-            <SmartCopyActions generatedContent={generatedContent} carouselSlides={carouselSlides} onPublishDirect={onPublishDirect} isGeneratingImages={isGeneratingImages} />
-            {carouselSlides.length > 0 && <CarouselImageManager slides={carouselSlides} onSlidesUpdate={setCarouselSlides} onImageEdit={onImageEdit} />}
-          </div>
-        ) : (
-          /* ── Animated skeleton empty state ── */
-          <div className="py-8">
-            <div className="space-y-3 animate-pulse">
-              <div className="h-5 rounded-lg w-2/3" style={{ backgroundColor: 'var(--line)' }} />
+  if (!generatedContent) {
+    return (
+      <Card className="panel-card">
+        <CardContent style={{ padding: '24px' }}>
+          <div className="py-12 text-center">
+            <div className="space-y-3 animate-pulse mb-4">
+              <div className="h-5 rounded-lg w-2/3 mx-auto" style={{ backgroundColor: 'var(--line)' }} />
               <div className="h-4 rounded-lg w-full" style={{ backgroundColor: 'var(--line)' }} />
               <div className="h-4 rounded-lg w-5/6" style={{ backgroundColor: 'var(--line)' }} />
-              <div className="h-4 rounded-lg w-4/5" style={{ backgroundColor: 'var(--line)' }} />
-              <div className="h-4 rounded-lg w-3/4 mt-2" style={{ backgroundColor: 'var(--line)' }} />
-              <div className="h-20 rounded-lg w-full mt-2" style={{ backgroundColor: 'var(--line)' }} />
               <div className="grid grid-cols-3 gap-3 mt-4">
                 {[1, 2, 3].map(i => <div key={i} className="aspect-square rounded-lg" style={{ backgroundColor: 'var(--line)' }} />)}
               </div>
             </div>
-            <p className="text-center text-[11px] mt-5" style={{ color: 'var(--ink3)' }}>
-              Il tuo contenuto apparirà qui
+            <p className="text-[12px]" style={{ color: 'var(--ink3)' }}>
+              Scrivi un argomento e clicca "Genera Contenuto"
             </p>
           </div>
-        )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="panel-card">
+      <CardContent style={{ padding: '24px' }}>
+        <div className="space-y-4">
+          {/* Carousel slides */}
+          {isGeneratingImages && carouselSlides.length === 0 && (
+            <MinimalProgressBar current={imageGenProgress?.current || 0} total={imageGenProgress?.total || 1} />
+          )}
+          {carouselSlides.length > 0 && (
+            <div>
+              {isGeneratingImages && imageGenProgress && <MinimalProgressBar current={imageGenProgress.current} total={imageGenProgress.total} />}
+              <div className={`grid gap-3 ${carouselSlides.length === 1 ? 'grid-cols-1 max-w-sm mx-auto' : 'grid-cols-2 md:grid-cols-3'}`}>
+                {carouselSlides.map((slide, index) => renderSlide(slide, index))}
+              </div>
+            </div>
+          )}
+
+          {/* Applied hook */}
+          {appliedHook && (
+            <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--rosa-dim)', border: '1px solid rgba(230,0,126,0.2)' }}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold" style={{ color: 'var(--rosa)' }}>Hook applicato:</span>
+                <button onClick={onRemoveHook} className="p-1" style={{ color: 'var(--rosa)' }}><X className="w-3.5 h-3.5" /></button>
+              </div>
+              <p className="text-xs mt-1" style={{ color: 'var(--ink2)' }}>{appliedHook}</p>
+            </div>
+          )}
+
+          {/* Generated text */}
+          <div className="p-4 rounded-xl" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)' }}>
+            <pre className="whitespace-pre-wrap text-sm leading-relaxed" style={{ color: 'var(--ink)', fontFamily: 'Montserrat, sans-serif' }}>{generatedContent}</pre>
+          </div>
+
+          {/* Action buttons — clean and clear */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => copyToClipboard(generatedContent)}
+              className="flex-1 flex items-center justify-center gap-2 py-3 text-[12px] font-black uppercase rounded-xl transition-colors"
+              style={{ backgroundColor: 'var(--rosa)', color: '#fff', border: 'none', cursor: 'pointer', letterSpacing: '0.5px' }}
+            >
+              <Copy className="h-4 w-4" /> Copia Testo
+            </button>
+            <button
+              onClick={onSaveContent}
+              className="flex-1 flex items-center justify-center gap-2 py-3 text-[12px] font-black uppercase rounded-xl transition-colors"
+              style={{ backgroundColor: 'var(--viola)', color: '#fff', border: 'none', cursor: 'pointer', letterSpacing: '0.5px' }}
+            >
+              <Download className="h-4 w-4" /> Salva
+            </button>
+          </div>
+
+          {/* Secondary actions */}
+          <div className="flex gap-2">
+            {carouselSlides.length > 0 && (
+              <button
+                onClick={downloadAllImages}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[11px] font-semibold rounded-lg"
+                style={{ border: '1px solid var(--line)', color: 'var(--ink3)', background: 'transparent', cursor: 'pointer' }}
+              >
+                <Download className="h-3 w-3" /> Scarica Immagini
+              </button>
+            )}
+            {carouselSlides.some(s => !s.imageUrl) && !isGeneratingImages && onRegenerateImages && (
+              <button
+                onClick={onRegenerateImages}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[11px] font-semibold rounded-lg"
+                style={{ border: '1px solid var(--line)', color: 'var(--ink3)', background: 'transparent', cursor: 'pointer' }}
+              >
+                <RefreshCw className="h-3 w-3" /> Rigenera Immagini
+              </button>
+            )}
+          </div>
+
+          {/* Programma su Instagram */}
+          {carouselSlides.length > 0 && carouselSlides.some(s => s.imageUrl || s.userImageUrl) && (
+            <button
+              onClick={() => setScheduleOpen(true)}
+              className="w-full flex items-center justify-center gap-2 py-3 text-[12px] font-black uppercase rounded-xl"
+              style={{
+                background: 'linear-gradient(135deg, var(--viola) 0%, var(--rosa) 100%)',
+                color: '#fff', border: 'none', cursor: 'pointer', letterSpacing: '0.5px',
+                boxShadow: '0 4px 12px rgba(230,0,126,0.25)',
+              }}
+            >
+              <CalendarClock className="h-4 w-4" /> Programma su Instagram
+            </button>
+          )}
+        </div>
+
+        <SchedulePostDialog
+          open={scheduleOpen}
+          onClose={() => setScheduleOpen(false)}
+          content={generatedContent}
+          prepareImages={prepareImagesForSchedule}
+        />
       </CardContent>
     </Card>
   );

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { logGeneration } from "../_shared/historyLogger.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,189 +14,271 @@ serve(async (req) => {
   }
 
   try {
-    const { topic, audience, platform, tone, postType, numSlides, userPhotos } = await req.json();
+    const { topic, numSlides, postType, brandId } = await req.json();
 
     if (!topic || typeof topic !== "string" || topic.trim().length < 2) {
       return new Response(JSON.stringify({ error: "Topic is required (min 2 chars)" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
     const slidesCount = Math.min(Math.max(parseInt(numSlides) || 5, 2), 10);
 
-    // Load user AI memories if auth token is present
-    let memoriesContext = "";
+    // ── Load brand kit from Supabase ──
+    let brandContext = "";
+    let brandData: any = null;
+    let resolvedUserId: string | null = null;
     const authHeader = req.headers.get("authorization");
-    if (authHeader) {
-      try {
-        const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-        const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-        if (supabaseUrl && supabaseKey) {
-          const supabase = createClient(supabaseUrl, supabaseKey);
-          const token = authHeader.replace("Bearer ", "");
-          const { data: { user } } = await supabase.auth.getUser(token);
-          
-          if (user) {
-            const { data: memories } = await supabase
-              .from("user_ai_memory")
-              .select("memory_type, content, importance")
-              .eq("user_id", user.id)
-              .order("importance", { ascending: false })
-              .limit(20);
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
-            if (memories && memories.length > 0) {
-              memoriesContext = "\n\nMEMORIA UTENTE - Rispetta SEMPRE queste preferenze:\n" +
-                memories.map((m: any) => {
-                  const typeLabel: Record<string, string> = {
-                    correction: "CORREZIONE",
-                    preference: "PREFERENZA", 
-                    style: "STILE",
-                    brand_voice: "BRAND",
-                    feedback: "FEEDBACK"
-                  };
-                  const label = typeLabel[m.memory_type] || m.memory_type.toUpperCase();
-                  return "- [" + label + "] " + m.content;
-                }).join("\n");
-            }
+    if (authHeader && supabaseUrl && supabaseKey) {
+      try {
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        const token = authHeader.replace("Bearer ", "");
+        const { data: { user } } = await supabase.auth.getUser(token);
+
+        if (user) {
+          resolvedUserId = user.id;
+          // Load brand: prefer explicit brandId (must belong to user), fallback to first brand
+          let brandQuery = supabase.from("brands").select("*").eq("user_id", user.id);
+          if (brandId) {
+            brandQuery = brandQuery.eq("id", brandId);
+          }
+          const { data: brand } = await brandQuery.limit(1).maybeSingle();
+
+          if (brand) {
+            brandData = brand;
+            brandContext = `\n\n=== BRAND KIT (usa SEMPRE queste info) ===
+NOME STUDIO: ${brand.nome_business || "Studio"}
+DESCRIZIONE: ${brand.descrizione || ""}
+SERVIZI: ${(brand.servizi || []).join(", ")}
+TARGET PAZIENTI: ${brand.target_pazienti || "pubblico generale"}
+TONO DI VOCE: ${brand.tono_voce || "professionale"}
+PERSONA DI SCRITTURA: ${brand.persona_scrittura === "io" ? "Prima persona singolare (io)" : "Prima persona plurale (noi)"}
+VANTAGGI COMPETITIVI: ${(brand.vantaggi_competitivi || []).join(", ")}
+MISSION: ${brand.mission || ""}
+IDENTITÀ CORE: ${brand.identita_core || ""}
+CATEGORIE: ${(brand.categorie || []).join(", ")}
+CTA PREFERITE: ${(brand.cta_suggerite || []).join(", ")}
+TEMI CHIAVE: ${(brand.temi_chiave || []).join(", ")}
+PAROLE DA EVITARE: ${(brand.parole_da_evitare || []).join(", ") || "nessuna"}
+COLORE PRIMARIO: ${brand.colore_primario || "#554697"}
+COLORE SECONDARIO: ${brand.colore_secondario || "#E6007E"}
+
+REGOLA FONDAMENTALE: Ogni contenuto DEVE sembrare scritto da "${brand.nome_business || "lo studio"}". Usa il tono "${brand.tono_voce || "professionale"}" e scrivi in ${brand.persona_scrittura === "io" ? "prima persona singolare" : "prima persona plurale"}. Non usare mai le parole da evitare.`;
+          }
+
+          // Load AI memories
+          const { data: memories } = await supabase
+            .from("user_ai_memory")
+            .select("memory_type, content, importance")
+            .eq("user_id", user.id)
+            .order("importance", { ascending: false })
+            .limit(10);
+
+          if (memories && memories.length > 0) {
+            brandContext += "\n\nMEMORIA AI:\n" + memories.map((m: any) => `- [${m.memory_type}] ${m.content}`).join("\n");
           }
         }
-      } catch (memErr) {
-        console.error("Error loading memories:", memErr);
+      } catch (err) {
+        console.error("Error loading brand/memories:", err);
       }
     }
 
-    // Build photos context
-    let photosContext = "";
-    if (userPhotos && Array.isArray(userPhotos) && userPhotos.length > 0) {
-      photosContext = "\n\nFOTO UTENTE DISPONIBILI:\n" +
-        userPhotos.map((p: string, i: number) => "- Foto " + (i + 1) + ": " + p).join("\n") +
-        "\nSuggerisci quale foto usare per ogni slide nel campo 'suggested_photo_index'.";
+    const brandName = brandData?.nome_business || "Studio";
+    const brandColor = brandData?.colore_primario || "#554697";
+
+    const systemPrompt = `Sei un copywriter d'élite specializzato in contenuti social per il settore sanitario (fisioterapia, osteopatia, poliambulatori). Formazione: $100M Playbook di Alex Hormozi.
+${brandContext}
+
+=== FRAMEWORK HOOK ===
+Usa i 7 tipi di hook di Hormozi:
+1) LABELS - Chiama direttamente il target
+2) DOMANDE SÌ - "Vorresti [risultato] in [tempo]?"
+3) DOMANDE APERTE - "Quale preferiresti?"
+4) CONDIZIONALI - "Se [situazione], stai facendo [errore]"
+5) COMANDI - "Smetti di fare X. Leggi questo."
+6) AFFERMAZIONI AUDACI - Statement con numeri concreti
+7) STORIE - "Un giorno nel mio studio arriva..."
+
+=== LIMITI ASSOLUTI PER OGNI SLIDE ===
+- Titolo: massimo 6 parole. Mai di più.
+- Testo body: massimo 2 frasi. Stop. Non spiegare, non approfondire, non aggiungere contesto.
+- Se hai più cose da dire, mettile in slide separate.
+- Ogni slide comunica UN solo concetto in modo fulmineo.
+
+ESEMPIO CORRETTO:
+Titolo: "Il dolore alla spalla non sparisce da solo."
+Testo: "Ignorarlo lo peggiora. Il tuo corpo sta chiedendo aiuto."
+
+ESEMPIO SBAGLIATO:
+Titolo: "Il Tuo Corpo Ti Sta Parlando?"
+Testo: "Ogni giorno, il mal di schiena limita milioni di persone, impedendo movimenti fluidi, un sonno ristoratore e una vita di qualità. Spesso si cercano soluzioni temporanee..."
+
+=== REGOLE DI SCRITTURA ===
+- Ogni contenuto DEVE essere 100% specifico per il topic
+- Hook potente nei primi 3 secondi
+- Numeri concreti, fatti reali
+- Parla direttamente al lettore con "tu"
+- CTA forte e specifica
+- NO emoji nel titolo e testo delle slide (solo nella caption Instagram)
+- NO frasi fatte generiche
+- Usa CONTRASTO drammatico (prima/dopo)
+- Stile conversazionale e diretto
+- Cliffhanger tra una slide e l'altra
+
+=== STRUTTURA CAROSELLO ===
+- Slide 1 (tipo "cover"): HOOK + SOTTOTITOLO + IMMAGINE STOCK. Campi: hook, sottotitolo, keywords_stock.
+- Slide 2 (tipo "content"): PROBLEMA specifico e identificabile
+- Slide 3 a N-1 (tipo "content"): SOLUZIONE con proof, numeri, step concreti
+- Ultima Slide (tipo "cta"): CTA IRRESISTIBILE + riassunto valore. NO immagine generata.
+
+=== REGOLE keywords_stock (FONDAMENTALE) ===
+Per ogni slide di tipo "content", il campo "keywords_stock" DEVE essere:
+- Un array di 3-4 parole chiave in INGLESE
+- Specifiche e concrete, ottimizzate per ricerca foto stock
+- Usa sostantivi concreti e visivi, NO concetti astratti
+- Specifiche per il settore fisioterapia/osteopatia/salute
+- Descrivono esattamente cosa deve apparire nella foto
+- DIVERSE per ogni slide (mai le stesse keywords per due slide)
+
+Esempi:
+- Slide su mal di schiena → ["back pain", "physiotherapy", "spine treatment"]
+- Slide su cervicale → ["neck pain", "physiotherapist", "cervical treatment"]
+- Slide su postura → ["posture correction", "spine alignment", "clinic"]
+- Slide su esercizi → ["rehabilitation exercise", "physiotherapy gym"]
+- Slide su osteopatia → ["osteopathy", "manual therapy", "clinic"]
+- Slide su dolore → ["pain relief", "patient treatment", "healthcare"]
+- Slide su prevenzione → ["prevention", "healthy lifestyle", "stretching"]
+
+Rispondi SOLO con JSON valido.`;
+
+    const isSinglePost = postType === 'post-singolo' || postType === 'reel';
+
+    const userPrompt = isSinglePost
+      ? `Genera un post singolo Instagram su: "${topic.trim()}"
+
+Rispondi con questo JSON esatto:
+{
+  "titolo_carosello": "Titolo del post",
+  "hook_principale": "La frase hook che cattura",
+  "slides": [
+    {
+      "numero": 1,
+      "tipo": "content",
+      "titolo": "TITOLO (max 6 parole, impattante)",
+      "testo": "Massimo 2 frasi brevi. Stop.",
+      "keywords_stock": ["keyword1 in inglese", "keyword2", "keyword3"]
     }
+  ],
+  "cta_finale": "",
+  "caption_instagram": "Hook fortissimo\\n\\nParagrafo 1.\\n\\nParagrafo 2.\\n\\n👉 CTA\\n\\n#hashtag1 #hashtag2",
+  "hashtag_suggeriti": ["hashtag1", "hashtag2", "hashtag3"]
+}
 
-    const systemPrompt = "Sei un copywriter d'élite con 20+ anni di esperienza, formato sui $100M Playbook di Alex Hormozi.\n" +
-"Il tuo stile combina: Iman Gadzhi (diretto, carismatico, orientato ai risultati), Mr.Beast (retention e viralità), Alex Hormozi (hook scientifici e proof-based marketing).\n\n" +
-"=== FRAMEWORK HOOK ($100M HOOKS PLAYBOOK) ===\n" +
-"Usa i 7 tipi di hook di Hormozi in OGNI contenuto:\n" +
-'1) LABELS - Chiama direttamente il target ("Fisioterapisti, devo dirvi una cosa...")\n' +
-'2) DOMANDE SÌ - "Vorresti [risultato desiderato] in [tempo specifico]?"\n' +
-'3) DOMANDE APERTE - "Quale preferiresti essere?"\n' +
-'4) CONDIZIONALI - "Se [situazione del target], stai facendo [errore specifico]"\n' +
-'5) COMANDI - "Smetti di fare X. Leggi questo."\n' +
-"6) AFFERMAZIONI AUDACI - Statement con numeri concreti\n" +
-'7) STORIE - "Un giorno nel mio studio arriva questo paziente..."\n' +
-"REGOLA: Spendi l'80% del tuo sforzo sull'hook. L'hook determina TUTTO.\n\n" +
-"=== FRAMEWORK PROOF ($100M PROOF CHECKLIST) ===\n" +
-'"La tua promessa NON è un differenziatore. La tua PROVA lo è."\n' +
-"- 80% degli ads vincenti sono basati su PROOF, non educazione\n" +
-"- RAW > PRODOTTO (video iPhone batte produzione Hollywood)\n" +
-"- MOSTRA > RACCONTA (fai vedere, non descrivere)\n" +
-'- NUMERI SPECIFICI > GENERICO ("171 nuovi pazienti a 500€" batte "tanti nuovi pazienti")\n' +
-"- PERSONALE > GENERICO (dolore specifico, non frasi fatte)\n" +
-"- Usa la formula: NON provare la tua promessa → PROMETTI la tua prova\n\n" +
-"=== FRAMEWORK BRANDING ($100M BRANDING) ===\n" +
-"- Buon branding = associare il business con cose che il pubblico AMA\n" +
-"- Ogni contenuto deve costruire: REACH + INFLUENCE + DIRECTION (verso di te)\n" +
-'- Il contenuto deve far pensare "questo è per ME" e "questa persona MI capisce"\n\n' +
-"=== FRAMEWORK LTV ($100M LIFETIME VALUE) ===\n" +
-"- Ogni contenuto deve implicitamente posizionare per UPSELL e fidelizzazione\n" +
-"- Mostra il valore del percorso completo, non solo della singola seduta\n" +
-'- "Chi rende il cliente più prezioso della concorrenza, VINCE"\n\n' +
-"=== FRAMEWORK LEAD NURTURE ($100M LEAD NURTURE) ===\n" +
-"- CTA deve ridurre l'attrito: più slot, risposta veloce, personalizzazione\n" +
-"- Volume di touchpoint: mai un solo CTA, costruisci una sequenza\n" +
-'- "Se non si presentano, non possono comprare"\n\n' +
-"=== REGOLE ASSOLUTE DI SCRITTURA ===\n" +
-"- Ogni contenuto DEVE essere 100% specifico per il topic. MAI frasi generiche.\n" +
-"- Hook potente nei primi 3 secondi che ferma lo scroll\n" +
-"- Numeri concreti, fatti reali, statistiche verificabili\n" +
-'- Parla direttamente al lettore con "tu"\n' +
-"- CTA forte e specifica con basso attrito\n" +
-"- Emojis strategici (non casuali, max 2-3 per slide)\n" +
-'- NO frasi fatte come "Solo 5 posti disponibili" o "87% delle persone"\n' +
-"- Ogni frase deve aggiungere valore specifico al topic\n" +
-"- Usa CONTRASTO drammatico (prima/dopo, problema/soluzione)\n" +
-'- Ogni slide deve contenere un "momento WOW" o insight unico\n' +
-"- Lo stile deve essere conversazionale e diretto, come parlare a un amico\n" +
-"- Usa la tecnica del cliffhanger: ogni slide deve far venire voglia di leggere la successiva\n" +
-"- Alterna tra dati/fatti e storie/emozioni per mantenere engagement alto\n\n" +
-"=== STRUTTURA NARRATIVA AVANZATA ===\n" +
-"Per caroselli usa questa struttura:\n" +
-"- Slide 1: HOOK ESPLOSIVO (usa uno dei 7 tipi Hormozi) + promessa di valore\n" +
-'- Slide 2: PROBLEMA con dolore specifico e identificabile (il lettore deve pensare "questo sono IO")\n' +
-"- Slide 3-N: SOLUZIONE con proof, numeri, storie brevi, step concreti (ogni slide = 1 concetto chiaro)\n" +
-"- Ultima Slide: CTA con urgenza naturale + riassunto del valore + prossimo step chiarissimo" +
-memoriesContext + photosContext + "\n\n" +
-"Rispondi SOLO con un JSON valido, nessun altro testo.";
+REGOLE:
+1. UNA sola slide di tipo "content" con titolo, testo e keywords_stock
+2. Il contenuto deve essere SPECIFICO sul topic "${topic.trim()}"
+3. Scrivi dal punto di vista di "${brandName}"
+4. Testo: MASSIMO 2 frasi brevi
+5. keywords_stock: 3-4 parole inglesi concrete per foto stock`
 
-    const photoIndexHint = userPhotos?.length ? ',\n      "suggested_photo_index": 0' : '';
+      : `Genera un carosello Instagram su: "${topic.trim()}"
+Numero slide: ${slidesCount}
 
-    const userPrompt = "Genera un contenuto " + (postType || "carosello") + " per " + (platform || "Instagram") + ' su: "' + topic.trim() + '"\n\n' +
-"Target: " + (audience || "pubblico generale") + "\n" +
-"Tono: " + (tone || "professionale") + "\n" +
-"Numero slide: " + slidesCount + "\n\n" +
-"Rispondi con questo JSON esatto:\n" +
-"{\n" +
-'  "content": "Il testo completo del post (copy principale con hook esplosivo, corpo ricco di valore, CTA forte)",\n' +
-'  "slides": [\n' +
-"    {\n" +
-'      "title": "TITOLO SLIDE (max 6 parole, impattante, usa contrasto o numeri)",\n' +
-'      "subtitle": "Sottotitolo specifico che espande il titolo con un insight unico",\n' +
-'      "body": "Corpo slide con contenuto di valore concreto - numeri, storie, proof, step actionable",\n' +
-'      "cta": "Call to action (solo ultima slide, le altre null)"' + photoIndexHint + "\n" +
-"    }\n" +
-"  ]\n" +
-"}\n\n" +
-"STRUTTURA NARRATIVA OBBLIGATORIA:\n" +
-"- Slide 1: HOOK ESPLOSIVO - Usa uno dei 7 tipi di Hormozi. Fatto scioccante O domanda impossibile da ignorare O storia che cattura\n" +
-'- Slide 2: IL PROBLEMA - Dolore specifico e identificabile. Il lettore deve pensare "questo sono IO". Dettagli concreti, non generici.\n' +
-"- Slide 3-" + (slidesCount - 1) + ": LA SOLUZIONE - Ogni slide = 1 concetto chiaro con proof. Usa numeri, case study brevi, step actionable. Alterna dati e storie. Ogni slide deve avere un \"momento WOW\".\n" +
-"- Slide " + slidesCount + ": CTA IRRESISTIBILE - Riassumi il valore. CTA con basso attrito. Urgenza naturale (non finta).\n\n" +
-"REGOLE CRITICHE:\n" +
-'1. Ogni slide deve contenere informazioni SPECIFICHE e UNICHE sul topic "' + topic.trim() + '"\n' +
-"2. Zero frasi generiche. Se potrebbe applicarsi a qualsiasi settore, RISCRIVILA.\n" +
-"3. Usa la tecnica del cliffhanger tra una slide e l'altra\n" +
-"4. Il body di ogni slide deve essere sostanzioso (3-5 frasi minimo con valore reale)\n" +
-"5. Scrivi come Hormozi: diretto, con numeri, prove concrete, e un pizzico di provocazione";
+Rispondi con questo JSON esatto:
+{
+  "titolo_carosello": "Titolo principale del carosello",
+  "hook_principale": "La frase hook che cattura nei primi 3 secondi",
+  "slides": [
+    {
+      "numero": 1,
+      "tipo": "cover",
+      "hook": "Titolo d'impatto max 5 parole",
+      "sottotitolo": "Frase breve di supporto, max 10 parole",
+      "keywords_stock": ["keyword coerente col tema", "keyword2", "keyword3"]
+    },
+    {
+      "numero": 2,
+      "tipo": "content",
+      "titolo": "TITOLO SLIDE (max 6 parole)",
+      "testo": "Massimo 2 frasi brevi. Stop.",
+      "keywords_stock": ["keyword1 in inglese", "keyword2", "keyword3"]
+    },
+    {
+      "numero": ${slidesCount},
+      "tipo": "cta",
+      "titolo": "TITOLO CTA",
+      "testo_cta": "Frase che spinge all'azione",
+      "bottone_cta": "Testo del bottone CTA"
+    }
+  ],
+  "cta_finale": "Call to action finale",
+  "caption_instagram": "Hook fortissimo\\n\\nParagrafo 1 breve.\\nSeconda riga.\\n\\nParagrafo 2 breve.\\n\\n👉 CTA chiara e diretta\\n\\n#hashtag1 #hashtag2 #hashtag3",
+  "hashtag_suggeriti": ["hashtag1", "hashtag2", "hashtag3"]
+}
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: "Bearer " + LOVABLE_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        temperature: 0.85,
-      }),
-    });
+REGOLE CRITICHE:
+1. La slide 1 DEVE essere tipo "cover" con "hook" (max 5 parole), "sottotitolo" (max 10 parole), e "keywords_stock"
+2. L'ultima slide DEVE essere tipo "cta"
+3. Tutte le slide intermedie DEVONO essere tipo "content" con "keywords_stock"
+4. Ogni keywords_stock deve essere DIVERSO e specifico per quella slide
+5. keywords_stock: array di 3-4 parole inglesi concrete e visive
+6. Il testo di ogni slide content: MASSIMO 2 frasi brevi
+7. Il contenuto deve essere SPECIFICO sul topic "${topic.trim()}"
+8. Scrivi dal punto di vista di "${brandName}"
+9. Usa cliffhanger tra una slide e l'altra
+10. L'ultima slide deve usare una CTA del brand`;
+
+    const captionRules = `
+
+FORMATTAZIONE CAPTION INSTAGRAM:
+La caption_instagram DEVE essere formattata così:
+- Prima riga: hook fortissimo
+- Riga vuota (usa \\n\\n)
+- 2-3 paragrafi brevi separati da \\n\\n (max 2 frasi per paragrafo)
+- Riga vuota
+- CTA chiara e diretta con emoji 👉
+- Riga vuota
+- Hashtag su riga separata
+- Usa \\n\\n per separare i paragrafi. MAI un blocco unico di testo.`;
+
+    const fullUserPrompt = userPrompt + captionRules;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: "user", parts: [{ text: fullUserPrompt }] }],
+          generationConfig: {
+            temperature: 0.85,
+            responseMimeType: "application/json",
+          },
+        }),
+      }
+    );
 
     if (!response.ok) {
       const status = response.status;
-      if (status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Riprova tra qualche secondo." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (status === 402) {
-        return new Response(JSON.stringify({ error: "Crediti AI esauriti. Aggiungi crediti al workspace." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const errText = await response.text();
-      console.error("AI gateway error:", status, errText);
-      throw new Error("AI gateway error: " + status);
+      console.error("Gemini API error:", status, errText);
+      if (status === 429) {
+        return new Response(JSON.stringify({ error: "Rate limit. Riprova tra qualche secondo." }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw new Error("Gemini API error: " + status);
     }
 
     const data = await response.json();
-    const rawContent = data.choices?.[0]?.message?.content;
+    const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!rawContent) throw new Error("No content returned from AI");
 
@@ -204,25 +287,59 @@ memoriesContext + photosContext + "\n\n" +
       const jsonStr = rawContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       parsed = JSON.parse(jsonStr);
     } catch {
+      // Fallback: try to build from raw text
       parsed = {
-        content: rawContent,
+        titolo_carosello: topic,
+        hook_principale: rawContent.substring(0, 100),
         slides: Array.from({ length: slidesCount }, (_, i) => ({
-          title: i === 0 ? "SCOPRI DI PIÙ" : "PUNTO " + i,
-          subtitle: topic,
-          body: i === 0 ? rawContent.substring(0, 200) : "",
-          cta: i === slidesCount - 1 ? "Contattaci ora" : null,
+          numero: i + 1,
+          tipo: i === 0 ? "cover" : i === slidesCount - 1 ? "cta" : "content",
+          ...(i === 0 ? { hook: topic, sottotitolo: "Scopri di più", keywords_stock: ["physiotherapy", "wellness", "healthy lifestyle"] } : {}),
+          ...(i > 0 ? { titolo: `PUNTO ${i}`, testo: rawContent.substring(i * 200, (i + 1) * 200) } : {}),
+          ...(i > 0 && i < slidesCount - 1 ? { keywords_stock: ["physiotherapy", "clinic", "treatment"] } : {}),
+          ...(i === slidesCount - 1 ? { testo_cta: "Contattaci", bottone_cta: "Prenota ora" } : {}),
         })),
+        cta_finale: "Contattaci ora",
+        caption_instagram: rawContent.substring(0, 500),
+        hashtag_suggeriti: [],
       };
     }
 
-    return new Response(JSON.stringify(parsed), {
+    if (resolvedUserId) {
+      const firstSlide = parsed.slides?.[0] || {};
+      const isCarousel = (parsed.slides?.length || 0) > 1;
+      await logGeneration({
+        userId: resolvedUserId,
+        brandId: brandData?.id || null,
+        type: isCarousel ? "carousel" : "post",
+        topic,
+        title: parsed.titolo_carosello || firstSlide.titolo || topic.substring(0, 80),
+        preview: {
+          first_title: firstSlide.titolo || firstSlide.title || "",
+          first_text: (firstSlide.testo || firstSlide.body || "").substring(0, 160),
+          caption_preview: (parsed.caption_instagram || "").substring(0, 200),
+          hashtags: parsed.hashtag_suggeriti || [],
+          slides_count: parsed.slides?.length || 0,
+        },
+        metadata: {
+          postType: postType || "carosello",
+          numSlides: slidesCount,
+        },
+        status: "success",
+      });
+    }
+
+    return new Response(JSON.stringify({
+      ...parsed,
+      content: parsed.caption_instagram || "",
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("generate-content error:", e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

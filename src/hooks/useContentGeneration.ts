@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useGlobalLoading } from "@/contexts/GlobalLoadingContext";
 import { useContentCache } from "@/contexts/ContentCacheContext";
+import { useActiveBrand } from "@/hooks/useActiveBrand";
 import { contentService } from "@/services/contentService";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -15,13 +16,17 @@ interface FormData {
   postType: string;
   numSlides: string;
   numImages: string;
+  numVariations?: string;
 }
 
 export const useContentGeneration = (user: any, formData: FormData, generateCarouselSlides: () => void) => {
   const { toast } = useToast();
   const loadingState = useGlobalLoading();
   const { cacheContent, getCachedContent } = useContentCache();
+  const { activeBrandId } = useActiveBrand();
   const [generatedContent, setGeneratedContent] = useState('');
+  const [lastRawResponse, setLastRawResponse] = useState<any>(null);
+  const [lastRawResponses, setLastRawResponses] = useState<any[]>([]);
 
   const generateContent = useCallback(async () => {
     if (!formData.description.trim()) {
@@ -33,64 +38,93 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
       return;
     }
 
-    // Check cache
-    const cacheKey = `${formData.description}-${formData.platform}-${formData.tone}`;
-    const cached = getCachedContent(cacheKey);
-    
-    if (cached) {
-      setGeneratedContent(cached.content);
-      generateCarouselSlides();
-      toast({
-        title: "⚡ Contenuto dalla cache!",
-        description: "Contenuto caricato istantaneamente dalla cache"
-      });
-      return;
-    }
+    const numVariations = Math.max(1, Math.min(4, parseInt(formData.numVariations || '1', 10) || 1));
+    const cacheKey = `${formData.description}-${formData.postType}-${formData.numSlides}-v${numVariations}`;
 
     try {
-      loadingState.startLoading('🚀 Generazione contenuto AI in corso...');
-      loadingState.updateProgress(30, '🧠 AI sta analizzando il topic...');
+      loadingState.startLoading(numVariations > 1
+        ? `🚀 Genero ${numVariations} post diversi sullo stesso topic...`
+        : '🚀 Generazione contenuto AI in corso...'
+      );
 
-      const { data, error } = await supabase.functions.invoke('generate-content', {
-        body: {
-          topic: formData.description,
-          audience: formData.audience,
-          platform: formData.platform,
-          tone: formData.tone,
-          postType: formData.postType,
-          numSlides: formData.numSlides
+      // Step 1: if multi-variation, expand the macro-topic into N distinct ideas.
+      // Otherwise use the user input as-is.
+      let topicsForGeneration: string[] = [formData.description];
+      if (numVariations > 1) {
+        loadingState.updateProgress(15, '💡 Trovo angoli diversi sul topic...');
+        const { data: expand, error: expandErr } = await supabase.functions.invoke('expand-topic', {
+          body: { topic: formData.description, count: numVariations }
+        });
+        if (expandErr || expand?.error || !expand?.ideas?.length) {
+          throw new Error(expand?.error || expandErr?.message || 'Errore espansione topic');
+        }
+        topicsForGeneration = expand.ideas.map((i: any) => {
+          const parts = [i.titolo];
+          if (i.hook) parts.push(`Hook: ${i.hook}`);
+          if (i.focus) parts.push(`Focus: ${i.focus}`);
+          return parts.join('. ');
+        });
+      }
+
+      loadingState.updateProgress(40, '🧠 AI sta scrivendo i post...');
+
+      const promises = topicsForGeneration.map((specificTopic) =>
+        supabase.functions.invoke('generate-content', {
+          body: {
+            topic: specificTopic,
+            postType: formData.postType,
+            numSlides: formData.numSlides,
+            brandId: activeBrandId,
+          }
+        })
+      );
+
+      const settled = await Promise.allSettled(promises);
+      const successful: any[] = [];
+      const errors: string[] = [];
+      settled.forEach((res, i) => {
+        if (res.status === 'fulfilled') {
+          const { data, error } = res.value;
+          if (data?.error) errors.push(`Variante ${i + 1}: ${data.error}`);
+          else if (error && !data) errors.push(`Variante ${i + 1}: ${error.message || 'errore'}`);
+          else successful.push(data);
+        } else {
+          errors.push(`Variante ${i + 1}: ${res.reason}`);
         }
       });
 
-      if (data?.error) {
-        throw new Error(data.error);
+      if (successful.length === 0) {
+        throw new Error(errors.join(' | ') || 'Nessuna variante generata');
       }
 
-      if (error && !data) {
-        throw new Error(error.message || 'Errore nella chiamata AI');
-      }
+      const first = successful[0];
+      const personalizedContent = first?.content || first?.caption_instagram || '';
 
-      const personalizedContent = data?.content || '';
-      
-      loadingState.updateProgress(80, '🎨 Ottimizzazione per viralità...');
+      loadingState.updateProgress(80, 'Ottimizzazione per viralità...');
 
       setGeneratedContent(personalizedContent);
+      setLastRawResponse(first);
+      setLastRawResponses(successful);
       generateCarouselSlides();
-      
-      // Cache the content
+
       cacheContent(cacheKey, personalizedContent, [], formData);
-      
-      loadingState.finishLoading(true, '🎉 Copy personalizzato generato!');
-      
+
+      loadingState.finishLoading(true, successful.length > 1
+        ? `🎉 ${successful.length} varianti generate!`
+        : '🎉 Copy personalizzato generato!'
+      );
+
       toast({
-        title: "🔥 Copy AI generato!",
-        description: "Contenuto 100% personalizzato basato sul tuo topic specifico"
+        title: successful.length > 1 ? `🔥 ${successful.length} varianti generate!` : "🔥 Copy AI generato!",
+        description: successful.length < numVariations
+          ? `${successful.length}/${numVariations} riuscite. ${errors.length} fallite.`
+          : "Contenuto 100% personalizzato basato sul tuo topic"
       });
 
     } catch (error: any) {
       console.error('Errore durante la generazione:', error);
       loadingState.finishLoading(false, '❌ Errore durante la generazione');
-      
+
       const message = error?.message || 'Errore durante la generazione del contenuto. Riprova.';
       toast({
         title: "❌ Errore",
@@ -143,6 +177,8 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
   return {
     generatedContent,
     setGeneratedContent,
+    lastRawResponse,
+    lastRawResponses,
     generateContent,
     saveContent
   };

@@ -8,6 +8,7 @@ interface CarouselSlide {
   content: string;
   imageUrl?: string;
   userImageUrl?: string;
+  imageAlternatives?: string[];
 }
 
 interface FormData {
@@ -159,7 +160,8 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
 
         setCarouselSlides(prev => prev.map((slide, i) => ({
           ...slide,
-          imageUrl: data.images[i]?.url || slide.imageUrl
+          imageUrl: data.images[i]?.url || slide.imageUrl,
+          imageAlternatives: data.images[i]?.alternatives || slide.imageAlternatives
         })));
 
         if (successCount === 0) {
