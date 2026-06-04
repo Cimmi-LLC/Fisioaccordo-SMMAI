@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { logGeneration } from "../_shared/historyLogger.ts";
+import { requireWithinRateLimit } from "../_shared/auth.ts";
+import { callGeminiWithRetry } from "../_shared/gemini.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,6 +41,17 @@ serve(async (req) => {
         const { data: { user } } = await supabase.auth.getUser(token);
         if (user) {
           resolvedUserId = user.id;
+
+          // Rate limit: max 20 scripts/min (each call generates one script;
+          // the UI may parallelize up to 10 in a batch → leaves headroom)
+          const rl = await requireWithinRateLimit(supabase, user.id, "generate-reel-script", 20, 60);
+          if (!rl.ok) {
+            return new Response(JSON.stringify({ error: rl.error }), {
+              status: 429,
+              headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(rl.retryAfter ?? 60) },
+            });
+          }
+
           let brandQuery = supabase.from("brands").select("*").eq("user_id", user.id);
           if (brandId) brandQuery = brandQuery.eq("id", brandId);
           const { data: brand } = await brandQuery.limit(1).maybeSingle();
@@ -136,31 +149,27 @@ Rispondi con questo JSON:
   "hashtag_suggeriti": ["hashtag1", "hashtag2", "hashtag3"]
 }`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-          generationConfig: { temperature: 0.85, responseMimeType: "application/json" },
-        }),
-      }
-    );
+    const geminiResult = await callGeminiWithRetry({
+      apiKey: GEMINI_API_KEY,
+      body: {
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+        generationConfig: { temperature: 0.85, responseMimeType: "application/json" },
+      },
+    });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Gemini error:", response.status, errText);
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit. Riprova tra qualche secondo." }), {
-          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error("Gemini API error: " + response.status);
+    if (!geminiResult.ok) {
+      const userMsg = geminiResult.status === 503
+        ? "Gemini è temporaneamente sovraccarico. Riprova tra 30 secondi."
+        : geminiResult.status === 429
+        ? "Quota Gemini superata. Riprova tra qualche minuto."
+        : `Gemini API error: ${geminiResult.status}`;
+      return new Response(JSON.stringify({ error: userMsg }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const data = await response.json();
+    const data = geminiResult.data;
     const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!raw) throw new Error("No content returned");
 

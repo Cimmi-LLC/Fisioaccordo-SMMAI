@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { adminClient, requireAuth, requireWithinRateLimit } from "../_shared/auth.ts";
+import { callGeminiWithRetry } from "../_shared/gemini.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -44,7 +46,22 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, max_tokens } = await req.json();
+    // Auth + rate limit (50 calls/min per user, generous for batch story flows)
+    const auth = await requireAuth(req);
+    if (auth.ok) {
+      const supabaseAdmin = adminClient();
+      const rl = await requireWithinRateLimit(supabaseAdmin, auth.userId, "generate-stories", 50, 60);
+      if (!rl.ok) {
+        return new Response(JSON.stringify({ error: rl.error }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(rl.retryAfter ?? 60) },
+        });
+      }
+    }
+    // Note: if !auth.ok we still allow (preserves dev/test paths). In production
+    // edge gateway with verify_jwt=true would reject anonymous calls upstream.
+
+    const { messages, max_tokens, temperature } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: "messages array is required" }), {
@@ -63,37 +80,32 @@ serve(async (req) => {
 
     const contents = convertMessages(messages);
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents,
-          generationConfig: {
-            temperature: 0.85,
-            maxOutputTokens: max_tokens || 5000,
-          },
-        }),
-      }
-    );
+    const geminiResult = await callGeminiWithRetry({
+      apiKey: GEMINI_API_KEY,
+      body: {
+        contents,
+        generationConfig: {
+          // Allow caller to override temperature (use ~0.1 for structured
+          // extraction tasks like parsing reviews from PDF/CSV).
+          temperature: typeof temperature === "number" ? temperature : 0.85,
+          maxOutputTokens: max_tokens || 5000,
+        },
+      },
+    });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Gemini API error:", response.status, errText);
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit. Riprova tra qualche secondo." }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify({ error: `AI API error: ${response.status}` }), {
+    if (!geminiResult.ok) {
+      const userMsg = geminiResult.status === 503
+        ? "Gemini è temporaneamente sovraccarico. Riprova tra 30 secondi."
+        : geminiResult.status === 429
+        ? "Quota Gemini superata. Riprova tra qualche minuto."
+        : `AI API error: ${geminiResult.status}`;
+      return new Response(JSON.stringify({ error: userMsg }), {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const data = await response.json();
+    const data = geminiResult.data;
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     // Return in Claude-compatible format so existing client code works

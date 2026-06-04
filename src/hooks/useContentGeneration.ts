@@ -132,7 +132,10 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
         variant: "destructive"
       });
     }
-  }, [formData, toast, loadingState, getCachedContent, cacheContent, generateCarouselSlides]);
+  // CRITICAL: activeBrandId MUST be in deps. Without it the callback caches
+  // the brandId from the moment it was first created → switching brand in the
+  // sidebar didn't update the generation context → leaked posts across brands.
+  }, [formData, activeBrandId, toast, loadingState, getCachedContent, cacheContent, generateCarouselSlides]);
 
   const saveContent = async (carouselSlides: any[]) => {
     if (!generatedContent) return;

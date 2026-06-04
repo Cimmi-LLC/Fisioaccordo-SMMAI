@@ -48,9 +48,15 @@ Deno.serve(async (req) => {
       )
     }
 
-    const appId = '1685995206180695'
+    const appId = Deno.env.get('META_APP_ID') || Deno.env.get('INSTAGRAM_APP_ID')
     const appSecret = Deno.env.get('INSTAGRAM_APP_SECRET')
 
+    if (!appId) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'META_APP_ID non configurato' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
     if (!appSecret) {
       return new Response(
         JSON.stringify({ success: false, error: 'App Secret non configurato' }),
@@ -175,34 +181,26 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Step 4: Save to database using verified user ID from JWT
+    // Step 4: Save to database via RPC that encrypts the token at rest.
+    // NEVER write tokens through the table directly — always via upsert_meta_connection.
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Deactivate existing connections for this user
-    await supabase
-      .from('meta_connections')
-      .update({ is_active: false })
-      .eq('user_id', verified_user_id)
+    const { error: rpcError } = await supabase.rpc('upsert_meta_connection', {
+      p_user_id: verified_user_id,
+      p_page_access_token: finalToken,
+      p_instagram_business_id: igBusinessId,
+      p_instagram_username: igUsername,
+      p_token_expires_at: tokenExpiresAt,
+      p_facebook_user_id: null,
+      p_page_id: null,
+      p_page_name: null,
+    })
 
-    // Insert new connection
-    const { error: insertError } = await supabase
-      .from('meta_connections')
-      .insert({
-        user_id: verified_user_id,
-        facebook_user_id: null,
-        page_id: null,
-        page_name: null,
-        page_access_token: finalToken,
-        instagram_business_id: igBusinessId,
-        instagram_username: igUsername,
-        token_expires_at: tokenExpiresAt,
-        is_active: true
-      })
-
-    if (insertError) {
-      console.error('Database insert error:', insertError)
+    if (rpcError) {
+      // Log message WITHOUT the token; never leak secrets in logs.
+      console.error('Database insert error:', rpcError.message)
       return new Response(
         JSON.stringify({ success: false, error: 'Errore salvataggio connessione' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

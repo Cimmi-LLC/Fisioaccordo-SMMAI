@@ -3,10 +3,9 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Link2, Brain, User } from 'lucide-react';
+import { ArrowLeft, Link2, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import MetaConnection from '@/components/MetaConnection';
-import AIMemoryPanel from '@/components/AIMemoryPanel';
 import AccountPreferences from '@/components/settings/AccountPreferences';
 
 const Settings: React.FC = () => {
@@ -47,7 +46,6 @@ const Settings: React.FC = () => {
           >
             {[
               { value: 'social', label: 'Connessioni Social', Icon: Link2 },
-              { value: 'memory', label: 'AI Memory', Icon: Brain },
               { value: 'account', label: 'Account', Icon: User },
             ].map(({ value, label, Icon }) => (
               <TabsTrigger
@@ -70,10 +68,6 @@ const Settings: React.FC = () => {
             <div className="max-w-md">
               <MetaConnection />
             </div>
-          </TabsContent>
-
-          <TabsContent value="memory">
-            <AIMemoryPanel />
           </TabsContent>
 
           <TabsContent value="account">

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TrendingUp, Loader2, Sparkles } from 'lucide-react';
+import { TrendingUp, Loader2, Sparkles, Search } from 'lucide-react';
 import { useTrends } from '@/hooks/useTrends';
 
 interface TrendExplorerProps {
@@ -54,7 +54,7 @@ const TrendExplorer: React.FC<TrendExplorerProps> = ({ onUseTrend }) => {
             </SelectContent>
           </Select>
           <Button onClick={handleSearch} disabled={searching || !niche.trim()}>
-            {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
           </Button>
         </div>
 

@@ -26,6 +26,24 @@ function hexToPlaceholder(hex: string): string {
   return `rgb(${Math.round(r * 0.62 + 200 * 0.38)}, ${Math.round(g * 0.62 + 210 * 0.38)}, ${Math.round(b * 0.62 + 195 * 0.38)})`;
 }
 
+/** Darken a hex color by `amount` (0-1). If the input is already dark
+ *  (luminance < 0.3) returns it unchanged. Used to ensure CTA button is
+ *  always dark enough for white text to be legible. */
+function ensureDark(hex: string, amount = 0.25): string {
+  if (!hex || hex.length < 7) return '#1a1a2e';
+  let r = parseInt(hex.slice(1, 3), 16);
+  let g = parseInt(hex.slice(3, 5), 16);
+  let b = parseInt(hex.slice(5, 7), 16);
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return '#1a1a2e';
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  if (luminance < 0.35) return hex; // already dark enough
+  // Mix toward black by `amount`
+  r = Math.max(0, Math.round(r * (1 - amount)));
+  g = Math.max(0, Math.round(g * (1 - amount)));
+  b = Math.max(0, Math.round(b * (1 - amount)));
+  return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`;
+}
+
 function loadGoogleFont(font: string) {
   const family = font.replace(/'/g, '').split(',')[0].trim();
   const elId = `gfont-${family.replace(/\s+/g, '-')}`;
@@ -282,22 +300,22 @@ const SlideTemplate: React.FC<SlideTemplateProps> = ({
               </div>
 
               {/* Bottone "LEGGI LA DESCRIZIONE" per post singolo —
-                  usa colore terziario (scuro) per contrasto sicuro contro
-                  l'overlay SVG e gli sfondi colorati. */}
+                  usa il colore PRIMARIO del brand garantito scuro abbastanza
+                  per testo bianco leggibile (ensureDark se troppo chiaro). */}
               {totalSlides === 1 && (
                 <div style={{ padding: '0 6% 6%', flexShrink: 0, position: 'relative', zIndex: 3 }}>
                   <div style={{
                     width: '100%',
                     padding: '24px 0',
                     borderRadius: 100,
-                    backgroundColor: colorTerziario || '#1a1a2e',
+                    backgroundColor: ensureDark(colorPrimary, 0.3),
                     color: '#ffffff',
                     fontSize: 30,
                     fontWeight: 700,
                     textAlign: 'center',
                     letterSpacing: '0.06em',
                     textTransform: 'uppercase',
-                    boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
+                    boxShadow: '0 8px 20px rgba(0,0,0,0.2)',
                   }}>
                     LEGGI LA DESCRIZIONE
                   </div>

@@ -4,139 +4,154 @@ import { ArrowLeft, Shield } from 'lucide-react';
 
 const Privacy = () => {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg)' }}>
       <div className="max-w-3xl mx-auto px-4 py-12">
-        <Link to="/" className="inline-flex items-center text-primary hover:text-primary/80 mb-8 text-sm">
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back to App
+        <Link to="/" className="inline-flex items-center mb-8 text-sm" style={{ color: 'var(--viola)' }}>
+          <ArrowLeft className="h-4 w-4 mr-1" /> Torna all'app
         </Link>
 
         <div className="flex items-center gap-3 mb-8">
-          <Shield className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold text-foreground">Privacy Policy</h1>
+          <Shield className="h-8 w-8" style={{ color: 'var(--rosa)' }} />
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--ink)' }}>Informativa Privacy</h1>
         </div>
 
-        <div className="prose prose-invert max-w-none space-y-8 text-muted-foreground">
-          <p className="text-sm">Last updated: March 3, 2026</p>
+        <div className="space-y-6 text-[14px] leading-relaxed" style={{ color: 'var(--ink2)' }}>
+          <p className="text-sm" style={{ color: 'var(--ink3)' }}>Ultimo aggiornamento: 31 maggio 2026</p>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">1. Introduction</h2>
+            <h2 className="text-xl font-semibold mb-3" style={{ color: 'var(--ink)' }}>1. Titolare del trattamento</h2>
             <p>
-              This Privacy Policy describes how <strong className="text-foreground">POST PER I SOCIAL 2-IG</strong> 
-              (the "App"), developed and operated by <strong className="text-foreground">Cimmi LLC</strong> ("we", "us", "our"), 
-              collects, uses, stores, and protects your personal data when you use our application.
+              Il Titolare del trattamento dei dati personali è <strong>Cimmi LLC</strong> ("Titolare", "noi"), che gestisce
+              l'applicazione <strong>Fisioaccordo Social Media Manager AI</strong> ("App", "Servizio").
+            </p>
+            <p>Per qualsiasi richiesta in materia di privacy puoi contattarci all'indirizzo: <a href="mailto:teamcimmi@gmail.com" style={{ color: 'var(--rosa)' }}>teamcimmi@gmail.com</a>.</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold mb-3" style={{ color: 'var(--ink)' }}>2. Tipologie di dati raccolti</h2>
+            <p>Trattiamo le seguenti categorie di dati personali:</p>
+            <ul className="list-disc pl-6 space-y-2 mt-2">
+              <li><strong>Dati di registrazione:</strong> nome, cognome, email, password (in forma cifrata).</li>
+              <li><strong>Dati del Brand Kit:</strong> nome attività, descrizione, città, servizi, target, colori, font, mission, logo, foto della tua struttura.</li>
+              <li><strong>Contenuti generati:</strong> post, caroselli, storie e script video prodotti dall'AI in base ai tuoi input.</li>
+              <li><strong>Token di accesso Meta:</strong> token OAuth necessari per pubblicare su Instagram, conservati cifrati at-rest tramite Supabase Vault.</li>
+              <li><strong>Dati di pubblicazione:</strong> data, ora e stato dei contenuti pubblicati o programmati su Instagram.</li>
+              <li><strong>Recensioni importate:</strong> testo e metadati delle recensioni che decidi di importare da Google Maps o MioDottore.</li>
+              <li><strong>Dati di utilizzo:</strong> log tecnici delle chiamate API (es. errori, prestazioni) anonimizzati o pseudonimizzati.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold mb-3" style={{ color: 'var(--ink)' }}>3. Finalità del trattamento</h2>
+            <p>Utilizziamo i tuoi dati per:</p>
+            <ul className="list-disc pl-6 space-y-2 mt-2">
+              <li>Erogare il Servizio e consentirti di generare contenuti tramite AI.</li>
+              <li>Pubblicare contenuti su Instagram tramite l'integrazione Meta Graph API, su tua autorizzazione esplicita.</li>
+              <li>Memorizzare le tue preferenze e i contenuti creati.</li>
+              <li>Migliorare il Servizio e prevenire abusi.</li>
+              <li>Adempiere a obblighi di legge.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold mb-3" style={{ color: 'var(--ink)' }}>4. Base giuridica</h2>
+            <p>Trattiamo i tuoi dati sulla base di:</p>
+            <ul className="list-disc pl-6 space-y-2 mt-2">
+              <li><strong>Esecuzione del contratto</strong> (art. 6.1.b GDPR): per fornirti il Servizio.</li>
+              <li><strong>Consenso</strong> (art. 6.1.a GDPR): per la connessione a Meta/Instagram e per cookie non essenziali.</li>
+              <li><strong>Interesse legittimo</strong> (art. 6.1.f GDPR): per sicurezza, prevenzione frodi e miglioramento del Servizio.</li>
+              <li><strong>Obblighi di legge</strong> (art. 6.1.c GDPR): per adempimenti fiscali o richieste delle autorità.</li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold mb-3" style={{ color: 'var(--ink)' }}>5. Servizi di terze parti e trasferimenti</h2>
+            <p>Per fornire il Servizio utilizziamo i seguenti fornitori (Responsabili del trattamento ex art. 28 GDPR):</p>
+            <ul className="list-disc pl-6 space-y-2 mt-2">
+              <li><strong>Supabase Inc.</strong> (USA, con server EU): autenticazione, database PostgreSQL, storage. <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>Privacy Supabase</a>.</li>
+              <li><strong>Google LLC / Google Cloud (Gemini AI)</strong>: generazione testuale dei contenuti tramite Gemini 2.5 Flash. I prompt vengono inviati per l'elaborazione. <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>Privacy Google</a>.</li>
+              <li><strong>Pixabay GmbH</strong> (Germania): ricerca di immagini stock. Inviamo solo le keyword di ricerca, mai dati personali. <a href="https://pixabay.com/it/service/privacy/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>Privacy Pixabay</a>.</li>
+              <li><strong>Apify (Apify Technologies s.r.o.)</strong> (UE - Repubblica Ceca): scraping di recensioni pubbliche di Google Maps quando lo richiedi esplicitamente. <a href="https://apify.com/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>Privacy Apify</a>.</li>
+              <li><strong>Meta Platforms Ireland Limited</strong>: pubblicazione su Instagram Business via Graph API. <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>Privacy Meta</a>.</li>
+              <li><strong>Vercel Inc.</strong> (USA): hosting dell'applicazione frontend. <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>Privacy Vercel</a>.</li>
+              <li><strong>Functional Software, Inc. dba Sentry</strong> (USA, server EU - Francoforte): monitoraggio errori run-time per migliorare stabilità. Raccoglie stack trace e contesto tecnico SENZA dati personali (PII disabilitati). <a href="https://sentry.io/privacy/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>Privacy Sentry</a>.</li>
+            </ul>
+            <p className="mt-2">
+              Alcuni di questi fornitori sono situati al di fuori dello Spazio Economico Europeo. In tali casi, ci affidiamo
+              alle <strong>Clausole Contrattuali Standard</strong> approvate dalla Commissione Europea e ai meccanismi previsti
+              dal Capo V del GDPR per garantire un livello di protezione adeguato.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">2. Data We Collect</h2>
-            <p>When you use the App and connect your Instagram Business or Facebook account, we collect and store the following data:</p>
+            <h2 className="text-xl font-semibold mb-3" style={{ color: 'var(--ink)' }}>6. Periodo di conservazione</h2>
             <ul className="list-disc pl-6 space-y-2">
-              <li><strong className="text-foreground">Account information:</strong> Your email address, first name, last name, and clinic/studio name provided during registration.</li>
-              <li><strong className="text-foreground">Instagram username:</strong> Your Instagram Business account username.</li>
-              <li><strong className="text-foreground">Access tokens:</strong> OAuth access tokens provided by Meta (Instagram/Facebook) to authorize publishing on your behalf.</li>
-              <li><strong className="text-foreground">Published content:</strong> Text and image content that you create and publish through the App.</li>
-              <li><strong className="text-foreground">Facebook Page information:</strong> Page ID and Page name associated with your Instagram Business account.</li>
+              <li><strong>Dati dell'account:</strong> per tutta la durata del rapporto contrattuale + 12 mesi dopo la chiusura.</li>
+              <li><strong>Contenuti generati e Brand Kit:</strong> finché non li elimini o chiudi l'account.</li>
+              <li><strong>Token Meta:</strong> finché non revochi l'autorizzazione (su Instagram o dal pannello App).</li>
+              <li><strong>Log tecnici:</strong> 90 giorni, poi cancellati o anonimizzati.</li>
+              <li><strong>Recensioni importate:</strong> finché non le elimini.</li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">3. Permissions We Request</h2>
-            <p>When you connect your Instagram Business account, we request the following Meta API permissions:</p>
-            <ul className="list-disc pl-6 space-y-2">
-              <li><strong className="text-foreground">instagram_business_basic:</strong> To read your Instagram Business account username and basic profile information.</li>
-              <li><strong className="text-foreground">instagram_business_content_publish:</strong> To publish content (images and text) to your Instagram Business account on your behalf.</li>
-              <li><strong className="text-foreground">pages_show_list:</strong> To list the Facebook Pages associated with your account.</li>
-              <li><strong className="text-foreground">pages_read_engagement:</strong> To read engagement data from your connected Facebook Page.</li>
-              <li><strong className="text-foreground">pages_manage_posts:</strong> To manage and publish posts on your connected Facebook Page.</li>
+            <h2 className="text-xl font-semibold mb-3" style={{ color: 'var(--ink)' }}>7. I tuoi diritti (artt. 15-22 GDPR)</h2>
+            <p>Hai il diritto di:</p>
+            <ul className="list-disc pl-6 space-y-2 mt-2">
+              <li>Accedere ai tuoi dati personali e ottenerne copia.</li>
+              <li>Rettificare dati inesatti o incompleti.</li>
+              <li>Richiedere la cancellazione ("diritto all'oblio").</li>
+              <li>Limitare o opporti al trattamento.</li>
+              <li>Ricevere i tuoi dati in formato strutturato (portabilità).</li>
+              <li>Revocare il consenso in qualsiasi momento.</li>
+              <li>Proporre reclamo al <strong>Garante per la protezione dei dati personali</strong> (<a href="https://www.gpdp.it" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>www.gpdp.it</a>).</li>
             </ul>
-            <p>We only request permissions that are strictly necessary for the App's functionality. You can revoke these permissions at any time by disconnecting your account within the App or through your Meta account settings.</p>
+            <p className="mt-2">Per esercitare i tuoi diritti scrivi a <a href="mailto:teamcimmi@gmail.com" style={{ color: 'var(--rosa)' }}>teamcimmi@gmail.com</a>. Risponderemo entro 30 giorni.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">4. How We Use Your Data</h2>
-            <p>Your data is used exclusively for the following purposes:</p>
-            <ul className="list-disc pl-6 space-y-2">
-              <li><strong className="text-foreground">Content creation:</strong> To generate AI-powered social media posts based on your inputs.</li>
-              <li><strong className="text-foreground">Publishing:</strong> To publish content directly to your connected Instagram Business and/or Facebook Page on your behalf.</li>
-              <li><strong className="text-foreground">Account management:</strong> To manage your connection to Instagram/Facebook and allow you to disconnect at any time.</li>
+            <h2 className="text-xl font-semibold mb-3" style={{ color: 'var(--ink)' }}>8. Sicurezza</h2>
+            <p>Adottiamo misure tecniche e organizzative adeguate per proteggere i tuoi dati, tra cui:</p>
+            <ul className="list-disc pl-6 space-y-2 mt-2">
+              <li>Connessioni cifrate HTTPS/TLS.</li>
+              <li>Password salvate in forma cifrata (bcrypt).</li>
+              <li>Token Meta cifrati at-rest tramite Supabase Vault (pgcrypto).</li>
+              <li>Row Level Security (RLS) sul database per isolare i dati di ciascun utente.</li>
+              <li>JWT per autenticazione, autorizzazione granulare sulle Edge Functions.</li>
+              <li>Validazione e sanificazione input contro injection (SQL, XSS, SSRF).</li>
+              <li>CORS whitelist e rate limiting sulle API.</li>
+              <li>Backup automatici del database.</li>
             </ul>
-            <p>We do <strong className="text-foreground">not</strong> sell, share, or transfer your data to third parties for advertising or any other purpose.</p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">5. Data Storage</h2>
+            <h2 className="text-xl font-semibold mb-3" style={{ color: 'var(--ink)' }}>9. Cookie</h2>
             <p>
-              All data is stored securely on <strong className="text-foreground">Supabase</strong>, a cloud infrastructure platform with 
-              enterprise-grade security, including encryption at rest and in transit. Access tokens are stored in a secure database 
-              with Row Level Security (RLS) policies ensuring that only you can access your own data.
+              Utilizziamo cookie tecnici essenziali per il funzionamento del Servizio (es. mantenimento della sessione).
+              Per maggiori dettagli consulta la nostra <Link to="/cookie-policy" style={{ color: 'var(--rosa)' }}>Cookie Policy</Link>.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">6. Data Retention</h2>
+            <h2 className="text-xl font-semibold mb-3" style={{ color: 'var(--ink)' }}>10. Minori</h2>
+            <p>Il Servizio è rivolto a professionisti maggiorenni. Non raccogliamo intenzionalmente dati di minori di 18 anni.</p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold mb-3" style={{ color: 'var(--ink)' }}>11. Modifiche all'informativa</h2>
             <p>
-              We retain your data for as long as your account is active. When you disconnect your Instagram/Facebook account, 
-              the associated access tokens are immediately deleted from our database. Generated content is retained until you 
-              delete it or request account deletion.
+              Potremmo aggiornare questa informativa in caso di modifiche legali o operative. La data di "Ultimo aggiornamento"
+              in cima alla pagina indica la versione attuale. Per modifiche sostanziali ti notificheremo via email.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground">7. Data Deletion</h2>
-            <p>You can request deletion of your data at any time through the following methods:</p>
-            <ul className="list-disc pl-6 space-y-2">
-              <li><strong className="text-foreground">Disconnect account:</strong> Use the "Disconnect" button in the App to immediately remove your Instagram/Facebook connection and associated tokens.</li>
-              <li><strong className="text-foreground">Email request:</strong> Contact us at <a href="mailto:privacy@fisioaccordo.com" className="text-primary hover:underline">privacy@fisioaccordo.com</a> to request complete deletion of all your data, including your account and all generated content.</li>
-            </ul>
-            <p>We will process deletion requests within 30 days of receipt.</p>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-semibold text-foreground">8. Third-Party Services</h2>
-            <p>The App integrates with the following third-party services:</p>
-            <ul className="list-disc pl-6 space-y-2">
-              <li><strong className="text-foreground">Meta (Instagram/Facebook):</strong> For OAuth authentication and content publishing. Subject to <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Meta's Privacy Policy</a>.</li>
-              <li><strong className="text-foreground">Supabase:</strong> For secure data storage and authentication. Subject to <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Supabase's Privacy Policy</a>.</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-semibold text-foreground">9. Children's Privacy</h2>
+            <h2 className="text-xl font-semibold mb-3" style={{ color: 'var(--ink)' }}>12. Contatti</h2>
             <p>
-              The App is not intended for use by individuals under the age of 13. We do not knowingly collect personal data 
-              from children under 13. If we become aware that we have collected personal data from a child under 13 without 
-              verification of parental consent, we will take steps to delete that information promptly. If you believe we may 
-              have collected information from a child under 13, please contact us at{' '}
-              <a href="mailto:privacy@fisioaccordo.com" className="text-primary hover:underline">privacy@fisioaccordo.com</a>.
+              Per qualsiasi domanda relativa al trattamento dei tuoi dati personali contattaci all'indirizzo
+              <a href="mailto:teamcimmi@gmail.com" style={{ color: 'var(--rosa)' }}> teamcimmi@gmail.com</a>.
             </p>
           </section>
-
-          <section>
-            <h2 className="text-xl font-semibold text-foreground">10. Your Rights</h2>
-            <p>Under applicable data protection laws (including GDPR), you have the right to:</p>
-            <ul className="list-disc pl-6 space-y-2">
-              <li>Access your personal data</li>
-              <li>Correct inaccurate data</li>
-              <li>Request deletion of your data</li>
-              <li>Withdraw consent at any time</li>
-              <li>Export your data in a portable format</li>
-            </ul>
-          </section>
-
-          <section>
-            <h2 className="text-xl font-semibold text-foreground">11. Contact Us</h2>
-            <p>
-              For any questions or requests regarding this Privacy Policy or your personal data, please contact us at:
-            </p>
-            <p className="text-foreground">
-              <strong>Cimmi LLC</strong><br />
-              Email: <a href="mailto:privacy@fisioaccordo.com" className="text-primary hover:underline">privacy@fisioaccordo.com</a>
-            </p>
-          </section>
-        </div>
-
-        <div className="mt-12 pt-8 border-t border-border text-center text-xs text-muted-foreground">
-          © {new Date().getFullYear()} Cimmi LLC. All rights reserved.
         </div>
       </div>
     </div>

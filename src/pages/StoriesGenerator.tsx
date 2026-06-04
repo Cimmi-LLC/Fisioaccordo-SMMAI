@@ -15,10 +15,8 @@ const isLightHex = (hex: string): boolean => {
 };
 
 const StoriesGenerator = () => {
-  const { activeBrand, loading } = useActiveBrand();
+  const { activeBrand } = useActiveBrand();
 
-  // Build the StoriesApp client from the currently active brand,
-  // falling back to fisioaccordoClient if no brand is loaded yet.
   const client = useMemo(() => {
     if (!activeBrand) return fisioaccordoClient;
     const colors = [
@@ -47,11 +45,27 @@ const StoriesGenerator = () => {
     };
   }, [activeBrand]);
 
+  // Warn the user explicitly when brand colors are missing (fallback Fisioaccordo)
+  const usingFallbackColors = !!activeBrand && (
+    !activeBrand.colore_primario || !activeBrand.colore_secondario
+  );
+
   return (
     <div style={{ backgroundColor: 'var(--bg)', minHeight: '100%' }}>
+      {usingFallbackColors && (
+        <div style={{
+          margin: '12px 24px 0', padding: '10px 14px', borderRadius: 10,
+          background: 'rgba(230,0,126,0.08)', border: '1px solid rgba(230,0,126,0.3)',
+          color: 'var(--ink)', fontSize: 12, fontWeight: 500,
+        }}>
+          ⚠️ Questo brand non ha i colori configurati. Stai vedendo i colori di default (Fisioaccordo).
+          {' '}<a href="/brand" style={{ color: 'var(--rosa)', textDecoration: 'underline', fontWeight: 700 }}>Configurali nel Brand Kit →</a>
+        </div>
+      )}
       <ErrorBoundary>
-        {/* key forces re-mount when brand changes so all internal state resets */}
-        <StoriesApp key={activeBrand?.id || 'default'} client={client} />
+        {/* key changes only on actual brand switch — initial null→brand transition
+            keeps the same key to avoid wiping state mid-load */}
+        <StoriesApp key={activeBrand?.id || 'pending'} client={client} />
       </ErrorBoundary>
     </div>
   );

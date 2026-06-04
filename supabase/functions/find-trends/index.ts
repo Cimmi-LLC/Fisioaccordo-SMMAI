@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { adminClient, requireAuth, requireWithinRateLimit } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -56,6 +57,19 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Auth + rate limit: trend search is expensive (Apify), 10/min per user
+    const auth = await requireAuth(req);
+    if (auth.ok) {
+      const supabaseAdmin = adminClient();
+      const rl = await requireWithinRateLimit(supabaseAdmin, auth.userId, "find-trends", 10, 60);
+      if (!rl.ok) {
+        return new Response(JSON.stringify({ error: rl.error }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(rl.retryAfter ?? 60) },
+        });
+      }
+    }
+
     const { niche, platform, count, excludeTopics } = await req.json();
     if (!niche) {
       return new Response(JSON.stringify({ error: "Specifica una nicchia" }), {

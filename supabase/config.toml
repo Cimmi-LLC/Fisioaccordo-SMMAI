@@ -1,5 +1,17 @@
 project_id = "cktdoqvyyvjlkpahbjyi"
 
+# Auth model:
+#   `verify_jwt = false` means the Supabase Edge Functions gateway does NOT
+#   reject calls without a JWT — but each function below must still call
+#   `requireAuth(req)` (or `requireCronSecret(req)` for scheduled jobs) from
+#   `_shared/auth.ts`. This is intentional: it lets `process-scheduled-posts`
+#   accept the cron secret, and lets some functions accept anonymous calls
+#   for the OAuth callback flow (instagram-auth/meta-auth still validate JWT
+#   internally, but allow OPTIONS preflight without it).
+#
+# DO NOT flip these to `true` without verifying the cron + OAuth flows still
+# work — the gateway returns 401 BEFORE the function code runs.
+
 [functions.generate-hooks]
 verify_jwt = false
 

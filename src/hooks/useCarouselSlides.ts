@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useActiveBrand } from "@/hooks/useActiveBrand";
 
 interface CarouselSlide {
   type: string;
@@ -27,6 +28,10 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
   const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [imageGenProgress, setImageGenProgress] = useState<ImageGenProgress>({ current: 0, total: 0 });
   const { toast } = useToast();
+  // CRITICAL: must pass activeBrandId to generate-content / generate-carousel-images
+  // edge functions, otherwise they fall back to the user's FIRST brand and
+  // generate content with the wrong brand context.
+  const { activeBrandId } = useActiveBrand();
 
   const generateCarouselSlides = useCallback(async () => {
     setIsGeneratingImages(true);
@@ -44,7 +49,7 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
 
     try {
       const { data, error } = await supabase.functions.invoke('generate-content', {
-        body: { topic, audience: '', platform: 'instagram', tone: 'professionale', postType, numSlides }
+        body: { topic, audience: '', platform: 'instagram', tone: 'professionale', postType, numSlides, brandId: activeBrandId }
       });
 
       if (data?.error || (error && !data)) {
@@ -98,7 +103,7 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
       setCarouselSlides(fallbackSlides);
       generateImagesForSlides(fallbackSlides, topic);
     }
-  }, [formData.numSlides, formData.description, formData.postType, user, basePhoto]);
+  }, [formData.numSlides, formData.description, formData.postType, user, basePhoto, activeBrandId]);
 
   const generateImagesForSlides = async (slides: CarouselSlide[], topic: string) => {
     setIsGeneratingImages(true);
@@ -106,21 +111,6 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
     const postType = formData.postType || 'carosello';
     const imageFormat = ['storia', 'reel'].includes(postType) ? 'vertical' : 'square';
     
-    let imagePreferences = '';
-    try {
-      const { data: memories } = await supabase
-        .from('user_ai_memory')
-        .select('content')
-        .eq('memory_type', 'image_feedback' as any)
-        .order('importance', { ascending: false })
-        .limit(10);
-      if (memories && memories.length > 0) {
-        imagePreferences = memories.map((m: any) => m.content).join('; ');
-      }
-    } catch (err) {
-      console.error('Error loading image preferences:', err);
-    }
-
     try {
       const slideData = slides.map(slide => {
         let parsed;
@@ -139,7 +129,7 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
       }, 2000);
 
       const { data, error } = await supabase.functions.invoke('generate-carousel-images', {
-        body: { slides: slideData, style: 'modern, clean, professional healthcare', format: imageFormat, imagePreferences }
+        body: { slides: slideData, style: 'modern, clean, professional healthcare', format: imageFormat, brandId: activeBrandId }
       });
 
       clearInterval(progressInterval);

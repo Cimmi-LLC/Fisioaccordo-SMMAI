@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { adminClient, requireAuth, requireWithinRateLimit } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,15 +16,25 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Rate limit: scraping is expensive (Apify/external fetch), 5/min per user
+    const auth = await requireAuth(req);
+    if (auth.ok) {
+      const supabaseAdmin = adminClient();
+      const rl = await requireWithinRateLimit(supabaseAdmin, auth.userId, "scrape-reviews", 5, 60);
+      if (!rl.ok) {
+        return new Response(JSON.stringify({ error: rl.error }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(rl.retryAfter ?? 60) },
+        });
+      }
+    }
+
     const { url } = await req.json();
     if (!url) {
       return new Response(JSON.stringify({ error: "URL richiesto" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const APIFY_API_TOKEN = Deno.env.get("APIFY_API_TOKEN");
-    if (!APIFY_API_TOKEN) throw new Error("APIFY_API_TOKEN not configured");
 
     // Dispatch per dominio
     const lower = url.toLowerCase();
@@ -32,11 +43,15 @@ serve(async (req) => {
     let filteredOut = 0;
 
     if (lower.includes("miodottore.it")) {
-      const r = await scrapeMiodottore(url, APIFY_API_TOKEN);
+      // MioDottore: fetch HTML diretto + regex, NO Apify
+      const r = await scrapeMiodottore("", url);
       totalSeen = r.totalSeen;
       filteredOut = r.filteredOut;
       reviews = r.reviews;
     } else if (lower.includes("google.com/maps") || lower.includes("maps.google") || lower.includes("g.page")) {
+      // Google Maps: serve Apify (no API pubblica gratuita)
+      const APIFY_API_TOKEN = Deno.env.get("APIFY_API_TOKEN");
+      if (!APIFY_API_TOKEN) throw new Error("APIFY_API_TOKEN not configured");
       const r = await scrapeGoogleMaps(url, APIFY_API_TOKEN);
       totalSeen = r.totalSeen;
       filteredOut = r.filteredOut;
@@ -111,129 +126,122 @@ async function scrapeGoogleMaps(url: string, apifyToken: string) {
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// MioDottore (Puppeteer via apify/web-scraper, scrolla per caricare tutto)
+// MioDottore — fetch HTML diretto + parse regex sui blocchi schema.org
+//
+// Le recensioni sono server-side rendered nell'HTML iniziale (le prime ~10).
+// Apify/Puppeteer è eccessivo (richiede approvazione + 3 minuti + spesso
+// viene bloccato come headless). Un semplice fetch con User-Agent reale
+// estrae 10 recensioni complete in 1-2 secondi.
+//
+// Trade-off accettato: 184 totali → 10 estraibili senza JS. Per il use case
+// "stories da recensioni" 10 buone bastano abbondantemente.
 // ─────────────────────────────────────────────────────────────────────
-const MIODOTTORE_PAGE_FUNCTION = `
-async function pageFunction(context) {
-  const { page, log } = context;
+const REALISTIC_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
-  // Aspetta che le prime recensioni siano caricate
-  try { await page.waitForSelector('[itemprop="reviewBody"]', { timeout: 20000 }); }
-  catch { return { reviews: [] }; }
-
-  // Scroll progressivo per caricare tutte le recensioni (infinite scroll)
-  const seenStable = { value: 0, prev: 0 };
-  for (let i = 0; i < 40; i++) {
-    const count = await page.$$eval('[itemprop="reviewBody"]', els => els.length);
-    if (count === seenStable.prev) {
-      seenStable.value++;
-      if (seenStable.value >= 4) break; // 4 cicli senza nuove → stop
-    } else {
-      seenStable.value = 0;
-      seenStable.prev = count;
-    }
-    // Try clicking "Mostra altre" / "Mostra altre recensioni" if present
-    try {
-      const clicked = await page.evaluate(() => {
-        const btns = Array.from(document.querySelectorAll('button, a'));
-        const target = btns.find(b => /mostra\\s+altr[ie]|carica\\s+altr[ie]|altre\\s+recensioni|opinions/i.test(b.innerText || ''));
-        if (target) { target.click(); return true; }
-        return false;
-      });
-      if (clicked) await page.waitForTimeout(2000);
-    } catch {}
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-    await page.waitForTimeout(1500);
-  }
-
-  // Estrai tutte le recensioni
-  const reviews = await page.evaluate(() => {
-    const results = [];
-    const blocks = Array.from(document.querySelectorAll('[itemprop="reviewBody"]'));
-    blocks.forEach(p => {
-      const text = (p.innerText || p.textContent || '').trim();
-      if (!text) return;
-
-      // Cerca il rating risalendo nei nodi parent
-      let parent = p;
-      let ratingValue = 5;
-      let dateStr = '';
-      for (let depth = 0; depth < 8 && parent; depth++) {
-        parent = parent.parentElement;
-        if (!parent) break;
-        const ratingEl = parent.querySelector('[itemprop="ratingValue"]');
-        if (ratingEl && ratingValue === 5) {
-          const v = ratingEl.getAttribute('content') || ratingEl.getAttribute('data-score') || ratingEl.textContent;
-          const n = parseFloat(v || '5');
-          if (!isNaN(n)) ratingValue = n;
-        }
-        const timeEl = parent.querySelector('[itemprop="datePublished"]');
-        if (timeEl && !dateStr) {
-          dateStr = timeEl.getAttribute('datetime') || timeEl.textContent || '';
-        }
-        if (ratingValue !== 5 && dateStr) break;
-      }
-
-      results.push({ text, stars: ratingValue, date: dateStr });
-    });
-    return results;
-  });
-
-  return { reviews };
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&nbsp;/g, " ");
 }
-`.trim();
 
-async function scrapeMiodottore(url: string, apifyToken: string) {
-  const startResponse = await fetch(
-    `https://api.apify.com/v2/acts/apify~web-scraper/runs?token=${apifyToken}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        startUrls: [{ url }],
-        pageFunction: MIODOTTORE_PAGE_FUNCTION,
-        proxyConfiguration: { useApifyProxy: true },
-        maxRequestsPerCrawl: 1,
-        maxPagesPerCrawl: 1,
-        runMode: "PRODUCTION",
-        waitUntil: ["networkidle2"],
-      }),
-    }
+function stripTags(html: string): string {
+  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/** Extract a single review block field by itemprop name. */
+function extractField(block: string, itemprop: string): string {
+  // Prefer content="..." attribute when present (schema.org canonical form)
+  const reContent = new RegExp(
+    `itemprop=["']${itemprop}["'][^>]*content=["']([^"']+)["']`,
+    "i"
   );
-  if (!startResponse.ok) {
-    const errText = await startResponse.text();
-    console.error("Apify MioDottore start error:", startResponse.status, errText);
-    throw new Error(`Apify MioDottore start error: ${startResponse.status}`);
-  }
-  const runData = await startResponse.json();
-  const runId = runData.data?.id;
-  if (!runId) throw new Error("No run ID returned from Apify");
+  const mc = block.match(reContent);
+  if (mc) return mc[1].trim();
 
-  const items = await pollForResults(runId, apifyToken);
+  // Fallback: text content between opening and closing tag
+  const reText = new RegExp(
+    `itemprop=["']${itemprop}["'][^>]*>([\\s\\S]*?)<\\/`,
+    "i"
+  );
+  const mt = block.match(reText);
+  if (mt) return decodeHtmlEntities(stripTags(mt[1]));
+  return "";
+}
+
+/**
+ * Extract the author name from a review block. MioDottore embeds both an
+ * <span itemprop="name"> (the author) AND a <meta itemprop="name"
+ * content="..."> later in the block for the reviewed service. A naive
+ * "first content= match" picks the service. We isolate the author sub-block
+ * first.
+ */
+function extractAuthorName(block: string): string {
+  // Match `itemprop="author" ... itemprop="name">...</`
+  const reAuthor = /itemprop=["']author["'][\s\S]*?itemprop=["']name["'][^>]*>([\s\S]*?)<\//i;
+  const m = block.match(reAuthor);
+  if (m) return decodeHtmlEntities(stripTags(m[1]));
+  return "";
+}
+
+async function scrapeMiodottore(_apifyToken: string, url: string) {
+  console.log(`scrapeMiodottore: fetching ${url}`);
+  const resp = await fetch(url, {
+    headers: {
+      "User-Agent": REALISTIC_UA,
+      "Accept-Language": "it-IT,it;q=0.9,en;q=0.5",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    },
+    redirect: "follow",
+  });
+  if (!resp.ok) {
+    throw new Error(`MioDottore HTTP ${resp.status}`);
+  }
+  const html = await resp.text();
+
+  // Split by review blocks. Each block opens with `itemprop="review"` and we
+  // capture up to the next opening of the same tag (or end of container).
+  const blockRegex = /itemprop=["']review["'][\s\S]*?(?=itemprop=["']review["']|<\/ul>|<\/section>|<\/body>)/gi;
+  const blocks = html.match(blockRegex) || [];
+  console.log(`scrapeMiodottore: found ${blocks.length} review blocks`);
 
   const reviews: any[] = [];
   let totalSeen = 0;
   let filteredOut = 0;
 
-  for (const item of items) {
-    const list = Array.isArray(item.reviews) ? item.reviews : [];
-    for (const r of list) {
-      totalSeen++;
-      const stars = Number(r.stars ?? r.rating ?? 5);
-      const text = (r.text || "").trim();
-      if (stars < MIN_STARS || !text) {
-        filteredOut++;
-        continue;
-      }
-      reviews.push({
-        name: "Recensione presente su MioDottore",
-        text,
-        stars,
-        date: r.date || "",
-        source: "miodottore",
-      });
+  for (const block of blocks) {
+    totalSeen++;
+    const text = extractField(block, "reviewBody");
+    const name = extractAuthorName(block);
+    const date = extractField(block, "datePublished");
+    const ratingRaw = extractField(block, "ratingValue");
+    const stars = Number(ratingRaw) || 5;
+
+    if (!text || text.length < 10) {
+      filteredOut++;
+      continue;
     }
+    if (stars < MIN_STARS) {
+      filteredOut++;
+      continue;
+    }
+
+    reviews.push({
+      name: name || "Paziente",
+      text,
+      stars,
+      date,
+      source: "miodottore",
+    });
   }
+
+  console.log(`scrapeMiodottore: ${reviews.length} kept, ${filteredOut} filtered from ${totalSeen}`);
   return { reviews, totalSeen, filteredOut };
 }
 

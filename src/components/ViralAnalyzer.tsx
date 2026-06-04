@@ -35,7 +35,7 @@ const ViralAnalyzer: React.FC = () => {
               className="flex-1"
             />
             <Button onClick={handleAnalyze} disabled={analyzing || !url.trim()}>
-              {analyzing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
+              {analyzing && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
               Analizza
             </Button>
           </div>

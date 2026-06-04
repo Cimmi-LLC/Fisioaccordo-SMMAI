@@ -55,13 +55,16 @@ serve(async (req) => {
       throw new Error('Codice di autorizzazione mancante')
     }
 
-    // App centralizzata per Instagram Business
-    const INSTAGRAM_APP_ID = '1261520952551293'
+    // App ID + secret entrambi da env (no hardcoded credentials)
+    const INSTAGRAM_APP_ID = Deno.env.get('INSTAGRAM_APP_ID')
     const INSTAGRAM_APP_SECRET = Deno.env.get('INSTAGRAM_APP_SECRET')
-    
-    console.log('🔑 App ID centralizzata:', INSTAGRAM_APP_ID)
+
+    console.log('🔑 App ID configurato:', !!INSTAGRAM_APP_ID)
     console.log('🔑 App Secret presente:', !!INSTAGRAM_APP_SECRET)
-    
+
+    if (!INSTAGRAM_APP_ID) {
+      throw new Error('INSTAGRAM_APP_ID non configurato nelle variabili di ambiente')
+    }
     if (!INSTAGRAM_APP_SECRET) {
       throw new Error('INSTAGRAM_APP_SECRET non configurato nelle variabili di ambiente')
     }

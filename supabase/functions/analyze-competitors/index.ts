@@ -3,6 +3,7 @@ import { scrapeInstagramPosts, scrapeInstagramProfile } from "./apify.ts";
 import { computeMetrics, InsufficientDataError } from "./metrics.ts";
 import { buildLegacyContext, LEGACY_SYSTEM_PROMPT, buildLegacyUserPrompt } from "./prompt.ts";
 import { callGemini } from "./llm.ts";
+import { adminClient, requireAuth, requireWithinRateLimit } from "../_shared/auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +15,20 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Rate limit: competitor analysis is very expensive (multiple Apify runs),
+    // 5/min per user
+    const auth = await requireAuth(req);
+    if (auth.ok) {
+      const supabaseAdmin = adminClient();
+      const rl = await requireWithinRateLimit(supabaseAdmin, auth.userId, "analyze-competitors", 5, 60);
+      if (!rl.ok) {
+        return new Response(JSON.stringify({ error: rl.error }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(rl.retryAfter ?? 60) },
+        });
+      }
+    }
+
     const { username, platform, manualInfo } = await req.json();
 
     if (!username && !manualInfo) {

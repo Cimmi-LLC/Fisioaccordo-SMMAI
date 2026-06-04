@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { logGeneration } from "../_shared/historyLogger.ts";
+import { requireWithinRateLimit } from "../_shared/auth.ts";
+import { callGeminiWithRetry } from "../_shared/gemini.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -43,10 +45,24 @@ serve(async (req) => {
 
         if (user) {
           resolvedUserId = user.id;
-          // Load brand: prefer explicit brandId (must belong to user), fallback to first brand
+
+          // Rate limit: max 20 content generations per minute per user
+          const rl = await requireWithinRateLimit(supabase, user.id, "generate-content", 20, 60);
+          if (!rl.ok) {
+            return new Response(JSON.stringify({ error: rl.error }), {
+              status: 429,
+              headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(rl.retryAfter ?? 60) },
+            });
+          }
+
+          // Load brand: REQUIRE explicit brandId (must belong to user). The
+          // previous "fallback to first brand" silently leaked content across
+          // brands when the client forgot to pass brandId — never again.
           let brandQuery = supabase.from("brands").select("*").eq("user_id", user.id);
           if (brandId) {
             brandQuery = brandQuery.eq("id", brandId);
+          } else {
+            console.warn("generate-content called WITHOUT brandId — falling back to first brand for backwards compat");
           }
           const { data: brand } = await brandQuery.limit(1).maybeSingle();
 
@@ -72,20 +88,9 @@ COLORE SECONDARIO: ${brand.colore_secondario || "#E6007E"}
 REGOLA FONDAMENTALE: Ogni contenuto DEVE sembrare scritto da "${brand.nome_business || "lo studio"}". Usa il tono "${brand.tono_voce || "professionale"}" e scrivi in ${brand.persona_scrittura === "io" ? "prima persona singolare" : "prima persona plurale"}. Non usare mai le parole da evitare.`;
           }
 
-          // Load AI memories
-          const { data: memories } = await supabase
-            .from("user_ai_memory")
-            .select("memory_type, content, importance")
-            .eq("user_id", user.id)
-            .order("importance", { ascending: false })
-            .limit(10);
-
-          if (memories && memories.length > 0) {
-            brandContext += "\n\nMEMORIA AI:\n" + memories.map((m: any) => `- [${m.memory_type}] ${m.content}`).join("\n");
-          }
         }
       } catch (err) {
-        console.error("Error loading brand/memories:", err);
+        console.error("Error loading brand:", err);
       }
     }
 
@@ -138,22 +143,37 @@ Testo: "Ogni giorno, il mal di schiena limita milioni di persone, impedendo movi
 - Ultima Slide (tipo "cta"): CTA IRRESISTIBILE + riassunto valore. NO immagine generata.
 
 === REGOLE keywords_stock (FONDAMENTALE) ===
-Per ogni slide di tipo "content", il campo "keywords_stock" DEVE essere:
-- Un array di 3-4 parole chiave in INGLESE
-- Specifiche e concrete, ottimizzate per ricerca foto stock
-- Usa sostantivi concreti e visivi, NO concetti astratti
-- Specifiche per il settore fisioterapia/osteopatia/salute
-- Descrivono esattamente cosa deve apparire nella foto
-- DIVERSE per ogni slide (mai le stesse keywords per due slide)
+Per ogni slide ragiona in QUESTO ORDINE prima di scrivere "keywords_stock":
 
-Esempi:
-- Slide su mal di schiena → ["back pain", "physiotherapy", "spine treatment"]
-- Slide su cervicale → ["neck pain", "physiotherapist", "cervical treatment"]
-- Slide su postura → ["posture correction", "spine alignment", "clinic"]
-- Slide su esercizi → ["rehabilitation exercise", "physiotherapy gym"]
-- Slide su osteopatia → ["osteopathy", "manual therapy", "clinic"]
-- Slide su dolore → ["pain relief", "patient treatment", "healthcare"]
-- Slide su prevenzione → ["prevention", "healthy lifestyle", "stretching"]
+1. MESSAGGIO EMOTIVO della slide: qual è il sentimento o intento?
+   (es. "prevenzione" → un paziente che si prende cura di sé PRIMA che arrivi il dolore)
+2. SCENA VISIVA più rappresentativa di quel messaggio:
+   (es. NON "uomo muscoloso" ma "persona che fa stretching preventivo in uno studio medico")
+3. Traduci quella scena in 3 keywords inglesi CONCRETE e FOTOGRAFABILI per Pixabay.
+
+REGOLE keywords:
+- Devono descrivere una SCENA FOTOGRAFABILE, non un concetto astratto
+- Sempre in INGLESE (Pixabay risponde meglio)
+- Specifiche per fisioterapia/salute/benessere
+- EVITA parole troppo generiche: "health", "wellness", "people", "man", "woman", "person", "fitness", "lifestyle"
+- Preferisci soggetti specifici CON contesto clinico
+
+ESEMPI CORRETTI:
+- Slide "prevenzione dolore" → ["physiotherapy prevention", "spine checkup clinic", "back care specialist"]
+- Slide "mal di schiena cronico" → ["chronic back pain office", "lower back pain treatment", "physiotherapist spine therapy"]
+- Slide "postura corretta" → ["posture correction therapy", "spine alignment physiotherapy", "posture assessment clinic"]
+- Slide "cervicale" → ["neck pain physiotherapy", "cervical treatment specialist", "neck massage therapy clinic"]
+- Slide "osteopatia" → ["osteopathy manual therapy", "osteopath treatment session", "holistic spine treatment"]
+- Slide "esercizi riabilitativi" → ["rehabilitation exercise clinic", "therapeutic exercise physiotherapy", "guided recovery exercise"]
+- Slide "mal di schiena da scrivania" → ["lower back pain desk", "office ergonomic chair therapy", "physiotherapist back assessment"]
+- Slide "cervicale e cellulare" → ["tech neck physiotherapy", "cervical strain smartphone", "neck pain therapy specialist"]
+- Slide "ginocchio dello sportivo" → ["sport knee injury clinic", "knee rehabilitation specialist", "athlete knee therapy"]
+
+ESEMPI SBAGLIATI da evitare:
+- "prevenzione" → NO: ["prevention", "healthy man", "muscular person", "fitness"] (concetti, non scene)
+- "dolore" → NO: ["pain", "sad person", "stress"] (troppo astratto)
+- "benessere" → NO: ["wellness", "happy people", "nature"] (off-topic)
+- "esercizio" → NO: ["exercise", "gym", "fitness man"] (manca contesto medical)
 
 Rispondi SOLO con JSON valido.`;
 
@@ -249,35 +269,30 @@ La caption_instagram DEVE essere formattata così:
 
     const fullUserPrompt = userPrompt + captionRules;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: "user", parts: [{ text: fullUserPrompt }] }],
-          generationConfig: {
-            temperature: 0.85,
-            responseMimeType: "application/json",
-          },
-        }),
-      }
-    );
+    const geminiResult = await callGeminiWithRetry({
+      apiKey: GEMINI_API_KEY,
+      body: {
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: "user", parts: [{ text: fullUserPrompt }] }],
+        generationConfig: {
+          temperature: 0.85,
+          responseMimeType: "application/json",
+        },
+      },
+    });
 
-    if (!response.ok) {
-      const status = response.status;
-      const errText = await response.text();
-      console.error("Gemini API error:", status, errText);
-      if (status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit. Riprova tra qualche secondo." }), {
-          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error("Gemini API error: " + status);
+    if (!geminiResult.ok) {
+      const userMsg = geminiResult.status === 503
+        ? "Gemini è temporaneamente sovraccarico. Riprova tra 30 secondi."
+        : geminiResult.status === 429
+        ? "Quota Gemini superata. Riprova tra qualche minuto."
+        : `Gemini API error: ${geminiResult.status}`;
+      return new Response(JSON.stringify({ error: userMsg }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const data = await response.json();
+    const data = geminiResult.data;
     const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!rawContent) throw new Error("No content returned from AI");

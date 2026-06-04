@@ -147,6 +147,8 @@ export const useCarouselPreview = (initialData: CarouselData | null) => {
                   ...s,
                   imageUrl: img.url,
                   imageAlternatives: img.alternatives || [],
+                  sourceId: img.sourceId ?? null,
+                  alternativeIds: img.alternativeIds || [],
                   immagine: {
                     promptUsed: img.queryUsed || (s.keywords_stock || []).join(' '),
                     url: img.url,
@@ -185,17 +187,32 @@ export const useCarouselPreview = (initialData: CarouselData | null) => {
       const slide = carousel.slides[index];
       const keywords = customPrompt ? customPrompt.split(/[,\s]+/).filter(Boolean) : (slide.keywords_stock || []);
 
+      // Tell backend NOT to return any Pixabay ID we've already shown
+      // for this slide (current + all previously-shown alternatives).
+      const slideAny = slide as any;
+      const excludeIds: number[] = [
+        slideAny.sourceId,
+        ...(slideAny.alternativeIds || []),
+      ].filter((n: any) => typeof n === "number" && Number.isFinite(n));
+
       const { data, error } = await supabase.functions.invoke('generate-carousel-images', {
         body: {
-          slides: carousel.slides.map(s => ({
+          slides: carousel.slides.map((s, i) => ({
             tipo: s.tipo,
-            keywords_stock: customPrompt ? customPrompt.split(/[,\s]+/).filter(Boolean) : (s.keywords_stock || []),
+            titolo: s.titolo,
+            testo: s.testo,
+            hook: s.hook,
+            sottotitolo: s.sottotitolo,
+            keywords_stock: i === index && customPrompt
+              ? customPrompt.split(/[,\s]+/).filter(Boolean)
+              : (s.keywords_stock || []),
             numero: s.numero,
           })),
           userId: user.id,
           carouselId: Date.now().toString(),
           singleIndex: index,
           brandId: activeBrandId || undefined,
+          excludeIds,
         }
       });
 
@@ -211,6 +228,8 @@ export const useCarouselPreview = (initialData: CarouselData | null) => {
               ...s,
               imageUrl: img.url,
               imageAlternatives: img.alternatives || [],
+              sourceId: img.sourceId ?? null,
+              alternativeIds: img.alternativeIds || [],
               keywords_stock: customPrompt ? customPrompt.split(/[,\s]+/).filter(Boolean) : s.keywords_stock,
               immagine: {
                 promptUsed: img.promptUsed || prompt,

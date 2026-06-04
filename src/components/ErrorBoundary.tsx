@@ -1,5 +1,6 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import * as Sentry from '@sentry/react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, RefreshCw } from "lucide-react";
@@ -27,6 +28,13 @@ class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
+
+    // Report to Sentry with React component stack context
+    Sentry.withScope((scope) => {
+      scope.setContext('react', { componentStack: errorInfo.componentStack });
+      scope.setTag('errorBoundary', 'global');
+      Sentry.captureException(error);
+    });
     
     // Detect specific error types
     const isRadixSelectError = error.message.includes('Select.Item') || 

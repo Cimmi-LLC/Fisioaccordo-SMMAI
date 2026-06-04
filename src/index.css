@@ -250,3 +250,16 @@ label[style*="var(--rosa)"]:not([style*="rosa-dim"]):active,
   transform: scale(0.97);
   filter: brightness(0.96);
 }
+
+/* ────────────────────────────────────────────────────────
+   Mobile responsive — sidebar drawer + content layout
+   ──────────────────────────────────────────────────────── */
+.main-content {
+  margin-left: 220px;
+}
+@media (max-width: 767px) {
+  .main-content {
+    margin-left: 0;
+    padding-top: 60px; /* room for the floating hamburger button */
+  }
+}

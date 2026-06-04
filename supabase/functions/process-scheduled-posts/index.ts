@@ -1,29 +1,23 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { publishToInstagram, publishStory } from "../_shared/instagramPublish.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { adminClient, requireCronSecret } from "../_shared/auth.ts";
+import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
 
 const MAX_ATTEMPTS = 3;
 const BATCH_SIZE = 10;
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
 
   try {
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      return new Response(JSON.stringify({ error: "Supabase config missing" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // ── Cron secret check: this endpoint must NOT be callable anonymously.
+    // The Supabase cron schedules it with header `x-cron-secret`.
+    const cron = requireCronSecret(req);
+    if (!cron.ok) return jsonResponse(req, { error: cron.error }, cron.status);
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const supabase = adminClient();
     const nowIso = new Date().toISOString();
 
     const { data: posts, error: selErr } = await supabase
@@ -37,15 +31,11 @@ serve(async (req) => {
 
     if (selErr) {
       console.error("Select error:", selErr);
-      return new Response(JSON.stringify({ error: selErr.message }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse(req, { error: "Errore lettura posts" }, 500);
     }
 
     if (!posts || posts.length === 0) {
-      return new Response(JSON.stringify({ processed: 0, message: "Nessun post pronto" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse(req, { processed: 0, message: "Nessun post pronto" });
     }
 
     const results = [];
@@ -54,15 +44,10 @@ serve(async (req) => {
       results.push(result);
     }
 
-    return new Response(JSON.stringify({ processed: posts.length, results }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse(req, { processed: posts.length, results });
   } catch (e) {
     console.error("process-scheduled-posts error:", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse(req, { error: "Errore interno" }, 500);
   }
 });
 
@@ -82,18 +67,18 @@ async function processPost(
     if (!post.connection_id) throw new Error("connection_id mancante");
     if (!post.image_urls || post.image_urls.length === 0) throw new Error("image_urls mancante");
 
-    const { data: conn, error: connErr } = await supabase
-      .from("meta_connections")
-      .select("page_access_token, instagram_business_id, token_expires_at, is_active")
-      .eq("id", post.connection_id)
-      .single();
+    // Read token via security-definer RPC (decrypted from Vault-protected key)
+    const { data: connRows, error: connErr } = await supabase
+      .rpc("get_meta_connection_token", { p_connection_id: post.connection_id });
 
+    const conn = Array.isArray(connRows) ? connRows[0] : null;
     if (connErr || !conn) throw new Error("Connessione Meta non trovata");
     if (!conn.is_active) throw new Error("Connessione Meta disattivata");
     if (conn.token_expires_at && new Date(conn.token_expires_at) < new Date()) {
       throw new Error("Token Meta scaduto");
     }
     if (!conn.instagram_business_id) throw new Error("Account Instagram non collegato");
+    if (!conn.page_access_token) throw new Error("Token non disponibile (Vault non configurato)");
 
     const fullCaption = post.hashtags
       ? `${post.content}\n\n${post.hashtags}`

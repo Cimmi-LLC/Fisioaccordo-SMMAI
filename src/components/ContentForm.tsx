@@ -55,7 +55,7 @@ const ContentForm: React.FC<ContentFormProps> = ({
       <CardContent style={{ padding: '24px' }}>
         <div className="space-y-4">
           {/* Main input */}
-          <div>
+          <div data-tour="post-input">
             <label className="block text-[13px] font-bold mb-2" style={{ color: 'var(--ink)' }}>
               Di cosa vuoi parlare?
             </label>
@@ -80,7 +80,7 @@ const ContentForm: React.FC<ContentFormProps> = ({
           </div>
 
           {/* Variations selector */}
-          <div>
+          <div data-tour="post-quantity">
             <label className="block text-[12px] font-bold mb-2" style={{ color: 'var(--ink)' }}>
               Quanti post diversi generare?
             </label>
@@ -112,6 +112,7 @@ const ContentForm: React.FC<ContentFormProps> = ({
 
           {/* Generate button */}
           <button
+            data-tour="post-generate"
             type="button"
             onClick={onGenerate}
             disabled={isGenerating || !formData.description.trim()}
@@ -124,7 +125,7 @@ const ContentForm: React.FC<ContentFormProps> = ({
             {isGenerating ? (
               <><Loader2 className="h-4 w-4 animate-spin" /> Generazione in corso...</>
             ) : (
-              <><Sparkles className="h-4 w-4" /> Genera {parseInt(formData.numVariations || '1') > 1 ? `${formData.numVariations} Post Diversi` : 'Contenuto'}</>
+              <>Genera {parseInt(formData.numVariations || '1') > 1 ? `${formData.numVariations} Post Diversi` : 'Contenuto'}</>
             )}
           </button>
 

@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import Sidebar from './Sidebar';
+import OnboardingTour from './OnboardingTour';
 
 const AppLayout: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
@@ -36,9 +37,13 @@ const AppLayout: React.FC = () => {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg)' }}>
       <Sidebar />
-      <main style={{ flex: 1, marginLeft: 220, minHeight: '100vh' }}>
+      <main
+        className="main-content"
+        style={{ flex: 1, minHeight: '100vh' }}
+      >
         <Outlet />
       </main>
+      <OnboardingTour />
     </div>
   );
 };

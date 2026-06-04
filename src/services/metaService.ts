@@ -15,8 +15,11 @@ export interface MetaConnectionData {
 }
 
 export class MetaService {
-  private static readonly META_APP_ID = '1685995206180695';
-  private static readonly REDIRECT_URI = 'https://social-generator-fisioaccordo.lovable.app/auth/instagram/callback';
+  // Public OAuth App ID — not secret, but read from env for consistency with backend.
+  // Falls back to the legacy literal so existing deployments don't break before .env is set.
+  private static readonly META_APP_ID = import.meta.env.VITE_META_APP_ID || '1685995206180695';
+  private static readonly REDIRECT_URI = import.meta.env.VITE_META_REDIRECT_URI
+    || 'https://social-generator-fisioaccordo.lovable.app/auth/instagram/callback';
 
   static initiateAuth(): void {
     const scopes = [
@@ -24,7 +27,6 @@ export class MetaService {
       'instagram_business_content_publish'
     ].join(',');
 
-    // Instagram Business Login uses instagram.com OAuth, not facebook.com
     const authUrl = `https://www.instagram.com/oauth/authorize?client_id=${this.META_APP_ID}&redirect_uri=${encodeURIComponent(this.REDIRECT_URI)}&scope=${scopes}&response_type=code&state=meta_auth&enable_fb_login=0`;
 
     const popup = window.open(
@@ -32,35 +34,61 @@ export class MetaService {
       'meta-auth',
       'width=600,height=700,scrollbars=yes,resizable=yes,toolbar=no,menubar=no,location=no,status=no'
     );
-
     if (!popup) {
       throw new Error('Popup bloccato dal browser. Abilita i popup per questo sito.');
     }
 
-    // Listen for postMessage from popup for immediate feedback
-    const messageHandler = (event: MessageEvent) => {
-      if (event.data?.type === 'meta-auth-success' || event.data?.type === 'meta-auth-error') {
-        window.removeEventListener('message', messageHandler);
-        clearInterval(checkClosed);
-        window.location.reload();
+    let exchangeInProgress = false;
+
+    const messageHandler = async (event: MessageEvent) => {
+      // Only accept messages from same origin
+      if (event.origin !== window.location.origin) return;
+      const data = event.data;
+      if (!data?.type) return;
+
+      // POPUP forwarded the OAuth code → we do the exchange here (we have the session)
+      if (data.type === 'meta-auth-code' && data.code && !exchangeInProgress) {
+        exchangeInProgress = true;
+        console.log('[MetaService] received code from popup, exchanging...');
+        const result = await MetaService.exchangeCodeForToken(data.code);
+        cleanup();
+        if (result.success) {
+          // soft success — reload to refresh connection state in UI
+          window.dispatchEvent(new CustomEvent('meta-auth-completed', { detail: { success: true } }));
+          window.location.reload();
+        } else {
+          window.dispatchEvent(new CustomEvent('meta-auth-completed', {
+            detail: { success: false, error: result.error },
+          }));
+          alert('Errore collegamento Instagram: ' + (result.error || 'sconosciuto'));
+        }
+        return;
+      }
+
+      // Errors directly from popup
+      if (data.type === 'meta-auth-error') {
+        cleanup();
+        alert('Autenticazione Instagram annullata o fallita: ' + (data.error || ''));
       }
     };
-    window.addEventListener('message', messageHandler);
 
     const checkClosed = setInterval(() => {
       if (popup.closed) {
-        clearInterval(checkClosed);
-        window.removeEventListener('message', messageHandler);
-        window.location.reload();
+        // If popup closed without sending us a code AND no exchange running → user cancelled
+        if (!exchangeInProgress) cleanup();
       }
-    }, 1000);
+    }, 800);
 
-    setTimeout(() => {
-      if (!popup.closed) {
-        popup.close();
-        clearInterval(checkClosed);
-      }
-    }, 300000);
+    const cleanup = () => {
+      window.removeEventListener('message', messageHandler);
+      clearInterval(checkClosed);
+      try { if (!popup.closed) popup.close(); } catch { /* ignore */ }
+    };
+
+    window.addEventListener('message', messageHandler);
+
+    // Safety timeout 5 min
+    setTimeout(() => { cleanup(); }, 300000);
   }
 
   static async exchangeCodeForToken(code: string): Promise<{ success: boolean; error?: string }> {

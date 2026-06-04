@@ -1,10 +1,12 @@
-import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { LayoutGrid, BookImage, TrendingUp, Users, BarChart3, Settings, LogOut, Building2, Video, Shield, CalendarClock, Briefcase } from 'lucide-react';
-import logo from '@/assets/logo-fisioaccordo.png';
+import { LayoutGrid, BookImage, TrendingUp, Users, BarChart3, Settings, LogOut, Building2, Video, Shield, CalendarClock, Briefcase, Menu, X } from 'lucide-react';
+import logo from '@/assets/logo-full.png';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import BrandSwitcher from './BrandSwitcher';
+
+const MOBILE_BREAKPOINT = 768;
 
 const NAV_ITEMS = [
   { to: '/posts', label: 'Post', icon: LayoutGrid },
@@ -28,7 +30,29 @@ const BOTTOM_ITEMS = [
 const Sidebar: React.FC = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const isAdmin = useIsAdmin();
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Track viewport: mobile if < 768px
+  useEffect(() => {
+    const update = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  // Close drawer when route changes
+  useEffect(() => { if (isMobile) setMobileOpen(false); }, [location.pathname, isMobile]);
+
+  // Lock body scroll when drawer is open on mobile
+  useEffect(() => {
+    if (isMobile && mobileOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [isMobile, mobileOpen]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -38,23 +62,75 @@ const Sidebar: React.FC = () => {
   const firstName = user?.user_metadata?.first_name || 'Utente';
 
   return (
-    <aside
-      style={{
-        width: 220,
-        minHeight: '100vh',
-        backgroundColor: 'var(--surface)',
-        borderRight: '1px solid var(--line)',
-        display: 'flex',
-        flexDirection: 'column',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        zIndex: 50,
-      }}
-    >
-      {/* Logo */}
-      <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--line)' }}>
-        <img src={logo} alt="Logo" style={{ height: 32, width: 'auto' }} />
+    <>
+      {/* Mobile hamburger (visible only on mobile when drawer closed) */}
+      {isMobile && !mobileOpen && (
+        <button
+          onClick={() => setMobileOpen(true)}
+          aria-label="Apri menu"
+          style={{
+            position: 'fixed', top: 12, left: 12, zIndex: 49,
+            width: 40, height: 40, borderRadius: 10,
+            background: 'var(--surface)', border: '1px solid var(--line)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          }}
+        >
+          <Menu style={{ width: 20, height: 20, color: 'var(--ink)' }} />
+        </button>
+      )}
+
+      {/* Backdrop overlay (mobile only) */}
+      {isMobile && mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 49,
+            background: 'rgba(15,15,30,0.45)',
+            transition: 'opacity 0.2s',
+          }}
+        />
+      )}
+
+      <aside
+        style={{
+          width: 220,
+          height: '100vh',
+          backgroundColor: 'var(--surface)',
+          borderRight: '1px solid var(--line)',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          zIndex: 50,
+          // Mobile: slide in/out
+          transform: isMobile && !mobileOpen ? 'translateX(-100%)' : 'translateX(0)',
+          transition: 'transform 0.25s ease',
+          overflowY: 'auto',
+        }}
+      >
+      {/* Logo + close button (mobile) */}
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <img
+          src={logo}
+          alt="Fisioaccordo Polipartner — Social Media Manager AI"
+          style={{ width: isMobile ? '78%' : '88%', height: 'auto', display: 'block', objectFit: 'contain' }}
+        />
+        {isMobile && (
+          <button
+            onClick={() => setMobileOpen(false)}
+            aria-label="Chiudi menu"
+            style={{
+              width: 32, height: 32, borderRadius: 8,
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <X style={{ width: 18, height: 18, color: 'var(--ink3)' }} />
+          </button>
+        )}
       </div>
 
       {/* Brand switcher (admin only) */}
@@ -84,28 +160,35 @@ const Sidebar: React.FC = () => {
           </NavLink>
         ))}
         {isAdmin && <div style={{ height: 1, backgroundColor: 'var(--line)', margin: '6px 4px' }} />}
-        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            style={({ isActive }) => ({
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              padding: '10px 12px',
-              borderRadius: 10,
-              textDecoration: 'none',
-              fontSize: 13,
-              fontWeight: isActive ? 700 : 500,
-              color: isActive ? 'var(--viola)' : 'var(--ink3)',
-              backgroundColor: isActive ? 'var(--viola-dim)' : 'transparent',
-              transition: 'all 0.15s',
-            })}
-          >
-            <Icon style={{ width: 18, height: 18 }} />
-            {label}
-          </NavLink>
-        ))}
+        {NAV_ITEMS.map(({ to, label, icon: Icon }) => {
+          const tourKey = to === '/posts' ? 'nav-post'
+            : to === '/storie' ? 'nav-storie'
+            : to === '/reel' ? 'nav-reel'
+            : undefined;
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              data-tour={tourKey}
+              style={({ isActive }) => ({
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '10px 12px',
+                borderRadius: 10,
+                textDecoration: 'none',
+                fontSize: 13,
+                fontWeight: isActive ? 700 : 500,
+                color: isActive ? 'var(--viola)' : 'var(--ink3)',
+                backgroundColor: isActive ? 'var(--viola-dim)' : 'transparent',
+                transition: 'all 0.15s',
+              })}
+            >
+              <Icon style={{ width: 18, height: 18 }} />
+              {label}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Bottom section */}
@@ -127,28 +210,32 @@ const Sidebar: React.FC = () => {
             Admin
           </NavLink>
         )}
-        {BOTTOM_ITEMS.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            style={({ isActive }) => ({
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              padding: '10px 12px',
-              borderRadius: 10,
-              textDecoration: 'none',
-              fontSize: 13,
-              fontWeight: isActive ? 700 : 500,
-              color: isActive ? 'var(--viola)' : 'var(--ink3)',
-              backgroundColor: isActive ? 'var(--viola-dim)' : 'transparent',
-              transition: 'all 0.15s',
-            })}
-          >
-            <Icon style={{ width: 18, height: 18 }} />
-            {label}
-          </NavLink>
-        ))}
+        {BOTTOM_ITEMS.map(({ to, label, icon: Icon }) => {
+          const tourKey = to === '/brand' ? 'nav-brand' : undefined;
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              data-tour={tourKey}
+              style={({ isActive }) => ({
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '10px 12px',
+                borderRadius: 10,
+                textDecoration: 'none',
+                fontSize: 13,
+                fontWeight: isActive ? 700 : 500,
+                color: isActive ? 'var(--viola)' : 'var(--ink3)',
+                backgroundColor: isActive ? 'var(--viola-dim)' : 'transparent',
+                transition: 'all 0.15s',
+              })}
+            >
+              <Icon style={{ width: 18, height: 18 }} />
+              {label}
+            </NavLink>
+          );
+        })}
 
         {/* User + Logout */}
         <div style={{ marginTop: 8, padding: '10px 12px', borderRadius: 10, backgroundColor: 'var(--bg)' }}>
@@ -176,6 +263,7 @@ const Sidebar: React.FC = () => {
         </div>
       </div>
     </aside>
+    </>
   );
 };
 

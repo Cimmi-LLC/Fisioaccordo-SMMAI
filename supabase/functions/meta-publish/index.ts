@@ -52,21 +52,27 @@ Deno.serve(async (req) => {
       )
     }
 
-    const { data: connection, error: connError } = await supabase
-      .from('meta_connections')
-      .select('*')
-      .eq('id', connection_id)
-      .eq('is_active', true)
-      .single()
+    // Read decrypted token via security-definer RPC (token is encrypted at rest).
+    const { data: connRows, error: connError } = await supabase
+      .rpc('get_meta_connection_token', { p_connection_id: connection_id })
+
+    const connection = Array.isArray(connRows) ? connRows[0] : null
 
     if (connError || !connection) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Connessione non trovata o non attiva' }),
+        JSON.stringify({ success: false, error: 'Connessione non trovata' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Verify the connection belongs to the authenticated user
+    if (!connection.is_active) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Connessione non attiva' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Verify the connection belongs to the authenticated user (IDOR protection)
     if (connection.user_id !== verified_user_id) {
       return new Response(
         JSON.stringify({ success: false, error: 'Non autorizzato' }),
@@ -80,6 +86,10 @@ Deno.serve(async (req) => {
 
     const accessToken = connection.page_access_token
     const igId = connection.instagram_business_id
+
+    if (!accessToken) {
+      return errorResponse('Token non disponibile (configurazione Vault mancante)', 500)
+    }
 
     if (platform === 'facebook') {
       return errorResponse('La pubblicazione su Facebook non è supportata con Instagram Business Login.', 400)

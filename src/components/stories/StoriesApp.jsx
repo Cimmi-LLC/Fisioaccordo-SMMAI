@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useStoryTemplates } from "@/hooks/useStoryTemplates";
 import { useStoryBatches } from "@/hooks/useStoryBatches";
@@ -46,10 +47,10 @@ function extractColors(dataUrl){
   });
 }
 
-async function callAI(msgs,max=5000){
-  const { data, error } = await supabase.functions.invoke('generate-stories', {
-    body: { messages: msgs, max_tokens: max }
-  });
+async function callAI(msgs,max=5000,opts={}){
+  const body={ messages: msgs, max_tokens: max };
+  if(typeof opts.temperature==='number') body.temperature=opts.temperature;
+  const { data, error } = await supabase.functions.invoke('generate-stories', { body });
   if(error){console.error("[API error]",error);throw new Error(error.message||"AI call failed");}
   if(data?.error){console.error("[API error]",data);throw new Error(data.error);}
   return data?.content?.map(b=>b.text||"").join("")||"";
@@ -225,10 +226,12 @@ async function parseFileReviews(file){
   // PDF -> base64 -> AI
   if(ext==="pdf"){
     const b64=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result.split(",")[1]);r.onerror=rej;r.readAsDataURL(file);});
+    // 24000 token output ≈ 150-200 recensioni. Temperature 0.1 forza estrazione deterministica
+    // senza creatività (essenziale per non saltare/inventare recensioni).
     const raw=await callAI([{role:"user",content:[
       {type:"document",source:{type:"base64",media_type:"application/pdf",data:b64}},
-      {type:"text",text:"Estrai TUTTE le recensioni da questo PDF. Rispondi SOLO con un array JSON grezzo, senza backtick, senza markdown, senza testo prima o dopo. Formato:\n[{\"name\":\"Nome Cognome\",\"text\":\"testo completo\",\"stars\":5,\"platform\":\"Trustpilot\"}]\nSe manca il nome usa \"Anonimo\". Includi ogni singola recensione."}
-    ]}],8000);
+      {type:"text",text:"Estrai TUTTE le recensioni presenti in questo PDF, nessuna esclusa. Non fermarti dopo le prime — devi leggerlo fino all'ultima pagina ed estrarre TUTTI i blocchi di recensione che trovi. Conta mentalmente quante ne hai estratte e verifica di averle prese tutte.\n\nRispondi SOLO con un array JSON grezzo, senza backtick, senza markdown, senza testo prima o dopo. Formato:\n[{\"name\":\"Nome Cognome\",\"text\":\"testo completo della recensione\",\"stars\":5,\"platform\":\"MioDottore\"}]\n\nSe manca il nome usa \"Anonimo\". Se manca il numero di stelle usa 5. Includi OGNI singola recensione del file."}
+    ]}],24000,{temperature:0.1});
     // Rimuovi backtick markdown
     const cleaned=raw.replace(/```json\s*/gi,"").replace(/```\s*/g,"").trim();
     const s=cleaned.indexOf("[");
@@ -254,8 +257,8 @@ async function parseFileReviews(file){
     // fallback: convert to CSV text and send to AI
     const wb=XLSX.read(buf,{type:"array"});
     const ws=wb.Sheets[wb.SheetNames[0]];
-    const csv=XLSX.utils.sheet_to_csv(ws).slice(0,8000);
-    const raw=await callAI([{role:"user",content:"Estrai TUTTE le recensioni da questo CSV di Google Maps. SOLO array JSON senza backtick:\n[{\"name\":\"..\",\"text\":\"testo completo\",\"stars\":5,\"platform\":\"Google Maps\"}]\n\nCSV:\n"+csv}],4000);
+    const csv=XLSX.utils.sheet_to_csv(ws).slice(0,32000);
+    const raw=await callAI([{role:"user",content:"Estrai TUTTE le recensioni da questo CSV di Google Maps. Non fermarti dopo le prime — leggi tutte le righe. SOLO array JSON senza backtick:\n[{\"name\":\"..\",\"text\":\"testo completo\",\"stars\":5,\"platform\":\"Google Maps\"}]\n\nCSV:\n"+csv}],24000,{temperature:0.1});
     const s=raw.indexOf("["),e=raw.lastIndexOf("]");
     if(s===-1||e===-1)throw new Error("No JSON");
     return JSON.parse(raw.slice(s,e+1));
@@ -263,7 +266,7 @@ async function parseFileReviews(file){
   
   // TXT/CSV -> text -> AI
   const text=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsText(file,"UTF-8");});
-  const raw=await callAI([{role:"user",content:"Estrai TUTTE le recensioni da questo testo. SOLO array JSON senza backtick:\n[{\"name\":\"..\",\"text\":\"testo completo\",\"stars\":5,\"platform\":\"..\"}]\n\nTESTO:\n"+text.slice(0,8000)}],4000);
+  const raw=await callAI([{role:"user",content:"Estrai TUTTE le recensioni da questo testo, nessuna esclusa. Leggi fino all'ultima riga. SOLO array JSON senza backtick:\n[{\"name\":\"..\",\"text\":\"testo completo\",\"stars\":5,\"platform\":\"..\"}]\n\nTESTO:\n"+text.slice(0,40000)}],24000,{temperature:0.1});
   const s=raw.indexOf("["),e=raw.lastIndexOf("]");
   if(s===-1||e===-1)throw new Error("No JSON");
   return JSON.parse(raw.slice(s,e+1));
@@ -1042,7 +1045,7 @@ function StoryItem({story,client,onRegen,idx,onZoom,withPhotos}){
       <div style={{fontSize:10,color:ACC,fontWeight:700,fontFamily:"monospace"}}>{story.emoji} {story.typeLabel}</div>
       <div style={{fontSize:11,color:T,lineHeight:1.4,fontWeight:600}}>{(story.headline||"").slice(0,50)}{(story.headline||"").length>50?"...":""}</div>
       <div style={{display:"flex",gap:5,marginTop:4}}>
-        <button onClick={()=>onRegen(idx)} style={{flex:1,background:"rgba(85,70,151,0.04)",border:GLASS_BD,borderRadius:7,color:M,fontSize:10,padding:"5px",cursor:"pointer"}}>regen</button>
+        <button onClick={()=>onRegen(idx)} title="Rigenera questa storia" aria-label="Rigenera" style={{flex:"0 0 36px",height:30,background:"rgba(85,70,151,0.10)",border:"1px solid rgba(85,70,151,0.25)",borderRadius:7,color:"#554697",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.background="rgba(85,70,151,0.20)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(85,70,151,0.10)";}}><RefreshCw size={13} strokeWidth={2.5}/></button>
         <button onClick={dl} disabled={!jpg} style={{flex:2,background:jpg?"rgba(85,70,151,0.10)":"rgba(85,70,151,0.04)",border:`1px solid ${jpg?"rgba(255,255,255,0.35)":"rgba(85,70,151,0.10)"}`,borderRadius:7,color:jpg?ACC:M,fontSize:10,padding:"5px",cursor:jpg?"pointer":"not-allowed",fontWeight:700}}>JPG</button>
       </div>
     </div>
@@ -1373,8 +1376,8 @@ export default function StoriesApp({ client: clientProp }){
             <div style={{gridColumn:"1 / -1"}}>
               <Lbl c="Immagini di sfondo"/>
               <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                <Chip sel={withPhotos} onClick={()=>setWithPhotos(true)}>📷 Con foto (dove c'è testo lungo)</Chip>
-                <Chip sel={!withPhotos} onClick={()=>setWithPhotos(false)}>✕ Solo grafica</Chip>
+                <Chip sel={withPhotos} onClick={()=>setWithPhotos(true)}>📷 Con foto</Chip>
+                <Chip sel={!withPhotos} onClick={()=>setWithPhotos(false)}>✕ Solo testo</Chip>
               </div>
               <div style={{fontSize:10,color:"var(--ink3)",marginTop:5,fontFamily:"Montserrat,sans-serif"}}>Le foto appaiono solo nelle storie con testo, mai sui quiz</div>
             </div>

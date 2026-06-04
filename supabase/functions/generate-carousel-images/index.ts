@@ -1,16 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { adminClient, assertBrandOwnership, requireAuth, requireWithinRateLimit } from "../_shared/auth.ts";
+import { corsHeaders, handlePreflight, jsonResponse } from "../_shared/cors.ts";
+import { safeFetch } from "../_shared/ssrf.ts";
 
 interface ImageResult {
   index: number;
-  url: string | null;
-  alternatives: string[];
+  url: string | null;          // PUBLIC URL to use (Supabase Storage after rehost)
+  sourceId: number | null;     // Pixabay numeric ID — used for cross-slide dedup
+  alternatives: string[];      // raw Pixabay URLs (for UI preview only)
+  alternativeIds: number[];    // Pixabay IDs of alternatives (for dedup)
   queryUsed: string;
   error: string | null;
 }
@@ -55,56 +54,89 @@ const HARD_REJECT = [
 ];
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
 
   try {
-    const body = await req.json();
-    const { slides, userId, carouselId, singleIndex, brandId, debug } = body;
+    // ── Require JWT — anonymous calls were used to enumerate other users' brand pools
+    const auth = await requireAuth(req);
+    if (!auth.ok) return jsonResponse(req, { error: auth.error }, auth.status);
+    const verifiedUserId = auth.userId;
 
-    const FREEPIK_API_KEY = Deno.env.get("FREEPIK_API_KEY");
-    if (!FREEPIK_API_KEY) throw new Error("FREEPIK_API_KEY not configured");
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return jsonResponse(req, { error: "Body invalido" }, 400);
+    }
+    // Note: client-supplied `userId` is IGNORED. We always use verifiedUserId.
+    const { slides, carouselId, singleIndex, brandId, debug, excludeIds: clientExcludeIds } = body as Record<string, any>;
+    // Client passes excludeIds as array of numbers (used by regenerate flow)
+    const excludeSet = new Set<number>(
+      Array.isArray(clientExcludeIds)
+        ? clientExcludeIds.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n))
+        : []
+    );
 
-    // DEBUG MODE: return raw Freepik response without filtering
+    const PIXABAY_API_KEY = Deno.env.get("PIXABAY_API_KEY");
+    if (!PIXABAY_API_KEY) {
+      return jsonResponse(req, { error: "PIXABAY_API_KEY non configurato" }, 500);
+    }
+
+    // DEBUG MODE: return raw Pixabay response without filtering. Admin-only.
     if (debug && body.testQuery) {
+      const adminList = (Deno.env.get("ADMIN_EMAILS") || "").split(",").map(s => s.trim()).filter(Boolean);
+      const supabaseAdmin = adminClient();
+      const { data: { user: fullUser } } = await supabaseAdmin.auth.admin.getUserById(verifiedUserId);
+      if (!fullUser?.email || !adminList.includes(fullUser.email)) {
+        return jsonResponse(req, { error: "Modalità debug riservata agli admin" }, 403);
+      }
       const params = new URLSearchParams({
-        term: body.testQuery,
-        'filters[content_type][photo]': '1',
-        locale: body.testLocale || 'en',
-        page: '1',
-        limit: '5',
+        key: PIXABAY_API_KEY,
+        q: String(body.testQuery).slice(0, 100),
+        image_type: 'photo',
+        safesearch: 'true',
+        per_page: '5',
+        lang: body.testLocale || 'en',
       });
-      const r = await fetch(`https://api.freepik.com/v1/resources?${params}`, {
-        headers: { 'x-freepik-api-key': FREEPIK_API_KEY, 'Accept-Language': body.testLocale || 'en' },
-      });
+      const r = await fetch(`https://pixabay.com/api/?${params}`);
       const status = r.status;
       const text = await r.text();
       let parsed: any = null;
       try { parsed = JSON.parse(text); } catch { /* ignore */ }
-      return new Response(JSON.stringify({
+      return jsonResponse(req, {
         debug: true,
         status,
         rawTextSample: text.slice(0, 2000),
-        dataCount: Array.isArray(parsed?.data) ? parsed.data.length : null,
-        firstItem: parsed?.data?.[0] || null,
-        meta: parsed?.meta || null,
-        message: parsed?.message || null,
-      }, null, 2), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        total: parsed?.total ?? null,
+        totalHits: parsed?.totalHits ?? null,
+        hitsCount: Array.isArray(parsed?.hits) ? parsed.hits.length : null,
+        firstHit: parsed?.hits?.[0] || null,
       });
     }
 
     if (!slides || !Array.isArray(slides) || slides.length === 0) {
-      return new Response(JSON.stringify({ error: "slides array is required" }), {
-        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse(req, { error: "slides array obbligatorio" }, 400);
+    }
+    if (slides.length > 20) {
+      return jsonResponse(req, { error: "Troppi slides (max 20)" }, 400);
     }
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) throw new Error("Supabase config missing");
+    const supabaseAdmin = adminClient();
 
-    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const storagePath = userId ? `carousels/${userId}/${carouselId || Date.now()}` : `carousels/anonymous/${Date.now()}`;
+    // Rate limit: max 40 batches per minute (a batch can be 1-20 slides)
+    const rl = await requireWithinRateLimit(supabaseAdmin, verifiedUserId, "generate-carousel-images", 40, 60);
+    if (!rl.ok) return jsonResponse(req, { error: rl.error }, rl.status);
+
+    // ── Validate brand ownership BEFORE loading the pool (IDOR protection)
+    if (brandId) {
+      const own = await assertBrandOwnership(supabaseAdmin, verifiedUserId, String(brandId));
+      if (!own.ok) return jsonResponse(req, { error: own.error }, own.status);
+    }
+
+    // Sanitize carouselId for path (prevents path traversal)
+    const safeCarouselId = (typeof carouselId === "string" || typeof carouselId === "number")
+      ? String(carouselId).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) || `c_${Date.now()}`
+      : `c_${Date.now()}`;
+    const storagePath = `carousels/${verifiedUserId}/${safeCarouselId}`;
 
     // ── BRAND POOL: pre-load brand-uploaded photos for this brand
     // If pool exists, we'll prefer those over Freepik for each slide.
@@ -136,73 +168,86 @@ serve(async (req) => {
       ? [{ slide: slides[singleIndex], originalIndex: singleIndex }]
       : contentSlides;
 
-    const promises = slidesToProcess.map(({ slide, originalIndex }) => {
-      const keywords: string[] = slide.keywords_stock || [];
+    // SEQUENTIAL processing so each slide adds its picked Pixabay ID
+    // (+ alternatives) to a cumulative exclude set — guarantees NO duplicate
+    // image across slides in the same carousel batch.
+    // We use IDs (numeric) NOT URLs because Pixabay rotates URLs per request.
+    const runUsedIds = new Set<number>(excludeSet);
+    const results: ImageResult[] = [];
 
-      // 1) Try brand pool first
+    for (const { slide, originalIndex } of slidesToProcess) {
+      const keywords: string[] = slide.keywords_stock || [];
+      const slideText = [
+        slide.titolo, slide.testo, slide.hook, slide.sottotitolo,
+        ...keywords,
+      ].filter(Boolean).join(" ");
+      const slideContext = extractContextWords(slideText);
+      const bodyPart = detectBodyPart(slideText);
+      const isCover = slide.tipo === "cover";
+
+      // 1) Brand pool first
       if (brandPool.length > 0) {
-        const brandPhoto = pickFromBrandPool(keywords, brandPool, usedBrandUrls);
+        const brandPhoto = pickFromBrandPool([...keywords, ...slideContext], brandPool, usedBrandUrls);
         if (brandPhoto) {
           usedBrandUrls.add(brandPhoto);
-          return Promise.resolve<ImageResult>({
+          results.push({
             index: originalIndex,
             url: brandPhoto,
+            sourceId: null, // brand pool photos don't have Pixabay ID
             alternatives: brandPool.filter(p => p.url !== brandPhoto).slice(0, 3).map(p => p.url),
+            alternativeIds: [],
             queryUsed: `brand_pool:${keywords.join(' ')}`,
             error: null,
           });
+          continue;
         }
       }
 
-      // 2) Fallback Freepik. Keep LLM's keywords clean; only add context if the
-      // query is empty/generic (helps fallback search find decent results).
+      // 2) Pixabay search with body-part hard filter + cumulative dedup BY ID
       const hasKeywords = keywords.length > 0;
-      const searchQuery = hasKeywords
-        ? keywords.join(' ')
-        : `${FALLBACK_QUERY} ${FALLBACK_CONTEXT}`.trim();
-      return searchFreepikStock(searchQuery, FREEPIK_API_KEY, supabaseAdmin, storagePath, originalIndex);
-    });
-
-    const settled = await Promise.allSettled(promises);
-
-    const results: ImageResult[] = settled.map((result, i) => {
-      if (result.status === 'fulfilled') return result.value;
-      return {
-        index: slidesToProcess[i].originalIndex,
-        url: null,
-        alternatives: [],
-        queryUsed: '',
-        error: 'promise_rejected',
-      };
-    });
+      const searchQuery = hasKeywords ? keywords.join(' ') : FALLBACK_QUERY;
+      let result: ImageResult;
+      try {
+        result = await searchPixabayStock(
+          searchQuery, PIXABAY_API_KEY, supabaseAdmin, storagePath,
+          originalIndex, slideContext, bodyPart?.required ?? null,
+          runUsedIds,   // ← cumulative IDs from previous slides
+          isCover,
+          bodyPart?.italianPhrase ?? null,
+        );
+      } catch (e) {
+        console.error(`Slide ${originalIndex} search exception:`, e);
+        result = { index: originalIndex, url: null, sourceId: null, alternatives: [], alternativeIds: [], queryUsed: searchQuery, error: "exception" };
+      }
+      results.push(result);
+      // Add picked Pixabay ID + alternative IDs to cumulative exclude set.
+      if (result.sourceId) runUsedIds.add(result.sourceId);
+      for (const altId of result.alternativeIds || []) runUsedIds.add(altId);
+      console.log(`Slide ${originalIndex} done. Cumulative runUsedIds size: ${runUsedIds.size}`);
+    }
 
     for (const r of results) {
       try {
         await supabaseAdmin.from("carousel_image_logs").insert({
-          user_id: userId || null,
-          carousel_id: carouselId || null,
+          user_id: verifiedUserId,
+          carousel_id: safeCarouselId,
           slide_index: r.index,
           prompt_used: r.queryUsed,
           image_url: r.url,
           error: r.error,
-          provider: r.queryUsed.startsWith("brand_pool") ? "brand_pool" : "freepik_stock",
+          provider: r.queryUsed.startsWith("brand_pool") ? "brand_pool" : "pixabay_stock",
         } as any);
       } catch { /* non-blocking */ }
     }
 
     const successCount = results.filter(r => r.url).length;
     const fromPool = results.filter(r => r.queryUsed.startsWith("brand_pool")).length;
-    console.log(`Image fetch complete: ${successCount}/${slidesToProcess.length} (${fromPool} from brand pool, ${successCount - fromPool} from Freepik)`);
+    console.log(`Image fetch complete: ${successCount}/${slidesToProcess.length} (${fromPool} from brand pool, ${successCount - fromPool} from Pixabay)`);
 
-    return new Response(JSON.stringify({ images: results }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse(req, { images: results });
   } catch (e) {
     console.error("generate-carousel-images error:", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return jsonResponse(req, { error: "Errore interno" }, 500);
   }
 });
 
@@ -235,23 +280,24 @@ function pickFromBrandPool(
   return candidates[Math.floor(Math.random() * candidates.length)].url;
 }
 
+/**
+ * Pixabay returns image URLs in:
+ *   - largeImageURL: ~1280px, high quality (preferred)
+ *   - webformatURL: ~640px, lower quality
+ *   - previewURL:   thumbnail (avoid)
+ * largeImageURL is temporary (24h cache) but we re-host via downloadAndSave.
+ */
 function pickImageUrl(item: any): string | null {
-  return item?.image?.source?.url
-    || item?.previews?.source?.url
-    || item?.image?.source_url
-    || item?.url
-    || null;
+  return item?.largeImageURL || item?.webformatURL || item?.previewURL || null;
 }
 
-/** Build a lowercase haystack from any text-bearing fields Freepik returns. */
+/** Build a lowercase haystack from text-bearing fields Pixabay returns.
+ *  Pixabay puts everything in `tags` as a comma-separated string. */
 function itemHaystack(item: any): string {
   const parts: string[] = [];
-  if (item?.title) parts.push(String(item.title));
-  if (item?.description) parts.push(String(item.description));
-  if (Array.isArray(item?.keywords)) parts.push(...item.keywords.map(String));
-  if (Array.isArray(item?.tags)) parts.push(...item.tags.map((t: any) => typeof t === 'string' ? t : t?.name || ''));
-  if (Array.isArray(item?.categories)) parts.push(...item.categories.map((c: any) => c?.name || ''));
-  if (Array.isArray(item?.related_keywords)) parts.push(...item.related_keywords.map(String));
+  if (item?.tags) parts.push(String(item.tags));
+  if (item?.user) parts.push(String(item.user));
+  if (item?.type) parts.push(String(item.type));
   return parts.join(' ').toLowerCase();
 }
 
@@ -263,6 +309,67 @@ function isHardReject(item: any): boolean {
   return false;
 }
 
+/**
+ * MEDICAL WHITELIST — every Pixabay image MUST have at least one of these
+ * tags. Without this, queries returned eagles, tattoos, gym models, landscapes.
+ * Broad enough to cover physiotherapy/wellness/anatomy, narrow enough to
+ * reject obvious off-topic noise.
+ */
+const MEDICAL_WHITELIST = [
+  'physiotherapy', 'physical therapy', 'physiotherapist',
+  'osteopathy', 'osteopath', 'chiropractic',
+  'rehabilitation', 'rehab',
+  'doctor', 'physician', 'medical', 'clinic', 'hospital',
+  'nurse', 'healthcare', 'health care',
+  'patient', 'treatment', 'therapy',
+  'spine', 'back', 'neck', 'shoulder', 'knee', 'muscle',
+  'anatomy', 'skeleton', 'x-ray', 'xray',
+  'massage', 'manual therapy',
+  'exercise', 'stretching', 'posture',
+  'pain', 'injury', 'recovery',
+  // Italian variants
+  'fisioterapia', 'fisioterapista',
+  'osteopatia', 'riabilitazione',
+  'medico', 'clinica', 'terapia', 'dolore',
+];
+
+function isMedicalImage(item: any): boolean {
+  const hay = itemHaystack(item);
+  if (!hay) return false;
+  return MEDICAL_WHITELIST.some(t => hay.includes(t));
+}
+
+/**
+ * HARD BLACKLIST — always reject. Catches noise that managed to match a
+ * medical tag incidentally (tattoo with "back" tag, bird with "wing back",
+ * etc.) or pure unrelated categories.
+ */
+const BLACKLIST = [
+  // Animals & wildlife
+  'bird','eagle','hawk','falcon','owl','parrot','pigeon','crow','raven',
+  'animal','wildlife','pet','dog','cat','horse','reptile','snake','fish',
+  // Nature / landscape
+  'nature','landscape','mountain','beach','forest','sky','sunset','sunrise',
+  // Body art
+  'tattoo','piercing',
+  // Fitness influencer / extreme
+  'bodybuilder','muscular','fitness model','gym selfie','crossfit',
+  // Other off-topic
+  'food','cooking','recipe','restaurant',
+  'travel','tourism','vacation',
+  'architecture','building',
+  'car','vehicle','transport',
+  'technology','computer screen','smartphone screen',
+  'business meeting','office generic',
+  'wedding','party','birthday',
+];
+
+function isBlacklisted(item: any): boolean {
+  const hay = itemHaystack(item);
+  if (!hay) return false;
+  return BLACKLIST.some(t => hay.includes(t));
+}
+
 /** Topic boost score: +1 per topic keyword found. 0 if no metadata. */
 function topicScore(item: any): number {
   const hay = itemHaystack(item);
@@ -272,87 +379,408 @@ function topicScore(item: any): number {
   return s;
 }
 
-interface ScoredItem { url: string; score: number; }
+/**
+ * Body-part / anatomy targets. Each entry maps an Italian/English concept to
+ * the SET of synonyms that MUST appear in the Pixabay tags for the image to
+ * be considered topical. If a slide is detected as targeting a specific body
+ * part, images that don't contain ANY of these synonyms are HARD-REJECTED.
+ *
+ * This prevents the classic stock-photo trap: query "back pain physiotherapy"
+ * returns photos of elbows/knees/cervical because they all contain
+ * "physiotherapy" — and Pixabay does partial keyword matching.
+ */
+const BODY_PART_TARGETS: { triggers: string[]; required: string[] }[] = [
+  // SCHIENA / SPINA / LOMBARE
+  { triggers: ["schiena","lombare","lombalgia","colonna vertebrale","dorsale","mal di schiena","back","spine","lumbar","lower back","dorsal"],
+    required: ["back","spine","lumbar","spinal","schiena","lombare","colonna"] },
+  // CERVICALE / COLLO
+  { triggers: ["cervicale","collo","neck","cervical","tech neck","torcicollo"],
+    required: ["neck","cervical","collo","cervicale"] },
+  // SPALLA
+  { triggers: ["spalla","spalle","shoulder","shoulders","cuffia rotatori"],
+    required: ["shoulder","spalla","spalle"] },
+  // GINOCCHIO
+  { triggers: ["ginocchio","ginocchia","knee","knees","menisco","crociato"],
+    required: ["knee","knees","ginocchio","menisco"] },
+  // ANCA
+  { triggers: ["anca","fianco","hip","hips"],
+    required: ["hip","hips","anca","fianco"] },
+  // CAVIGLIA / PIEDE
+  { triggers: ["caviglia","piede","ankle","foot","feet","distorsione"],
+    required: ["ankle","foot","feet","piede","caviglia"] },
+  // GOMITO / POLSO
+  { triggers: ["gomito","epicondilite","elbow","tennis elbow"],
+    required: ["elbow","gomito"] },
+  { triggers: ["polso","mano","carpale","wrist","hand","carpal tunnel","tunnel carpale"],
+    required: ["wrist","hand","polso","mano","carpal"] },
+  // POSTURA / ERGONOMIA (più ampio)
+  { triggers: ["postura","posturale","ergonomia","posture","ergonomic","ergonomy"],
+    required: ["posture","postural","sitting","ergonomic","postura","seduto"] },
+  // GRAVIDANZA
+  { triggers: ["gravidanza","pregnancy","pregnant","incinta"],
+    required: ["pregnancy","pregnant","gravidanza","incinta","maternity"] },
+  // SPORT / RUNNING
+  { triggers: ["running","corsa","podista","runner","podismo"],
+    required: ["running","runner","jogging","corsa","podista"] },
+];
+
+/** Italian phrase used for lang=it Pixabay queries.
+ *  Italian search returns much better "raggi x" anatomical illustrations
+ *  for medical content than the English equivalent. */
+const ITALIAN_BODY_PHRASES: Record<string, string> = {
+  "mal di schiena": "mal di schiena",
+  "schiena": "mal di schiena",
+  "lombare": "mal di schiena lombare",
+  "lombalgia": "lombalgia",
+  "colonna vertebrale": "colonna vertebrale",
+  "dorsale": "dorsale schiena",
+  "cervicale": "cervicale dolore",
+  "collo": "cervicale dolore",
+  "torcicollo": "cervicale dolore",
+  "spalla": "spalla dolore",
+  "spalle": "spalla dolore",
+  "ginocchio": "ginocchio dolore",
+  "ginocchia": "ginocchio dolore",
+  "menisco": "ginocchio menisco",
+  "anca": "anca dolore",
+  "fianco": "anca dolore",
+  "caviglia": "caviglia dolore",
+  "piede": "piede dolore",
+  "gomito": "gomito dolore",
+  "epicondilite": "gomito epicondilite",
+  "polso": "polso dolore",
+  "carpale": "tunnel carpale",
+  "postura": "postura corretta",
+  "posturale": "postura corretta",
+  "gravidanza": "gravidanza",
+  "incinta": "gravidanza",
+  "corsa": "corsa",
+};
+
+/** Detect which body part the slide is talking about. Returns null if no clear target. */
+function detectBodyPart(text: string): { required: string[]; trigger: string; italianPhrase: string | null } | null {
+  if (!text) return null;
+  const lower = text.toLowerCase();
+  for (const target of BODY_PART_TARGETS) {
+    for (const trigger of target.triggers) {
+      if (lower.includes(trigger)) {
+        // Pick the FIRST italian phrase present in text (priority match)
+        let italianPhrase: string | null = null;
+        for (const [it, phrase] of Object.entries(ITALIAN_BODY_PHRASES)) {
+          if (lower.includes(it)) { italianPhrase = phrase; break; }
+        }
+        if (!italianPhrase) italianPhrase = ITALIAN_BODY_PHRASES[trigger] || null;
+        return { required: target.required, trigger, italianPhrase };
+      }
+    }
+  }
+  return null;
+}
+
+/** Extract meaningful Italian + English noun-like tokens from slide text.
+ *  Used to re-rank Pixabay results by relevance to the actual slide content. */
+const STOPWORDS_IT_EN = new Set([
+  "il","lo","la","i","gli","le","un","uno","una","del","dello","della","dei","degli","delle",
+  "di","a","da","in","con","su","per","tra","fra","al","allo","alla","ai","agli","alle",
+  "e","o","ma","se","che","è","sei","sono","ho","hai","ha","abbiamo","avete","hanno",
+  "non","più","meno","molto","poco","come","cosa","quando","quanto","perché","dove",
+  "questo","questa","quello","quella","mio","tuo","suo","nostro","vostro","loro",
+  "the","a","an","of","to","in","for","on","with","at","by","from","is","are","was","were",
+  "be","been","being","have","has","had","do","does","did","will","would","could","should",
+  "and","or","but","not","no","yes","this","that","these","those","you","your","i","my",
+  "we","our","they","their","it","its","here","there","when","what","why","how","who",
+]);
+
+function extractContextWords(text: string): string[] {
+  if (!text) return [];
+  const lower = text.toLowerCase()
+    .replace(/[^\p{L}\s]/gu, " ")  // strip punctuation, keep letters
+    .split(/\s+/)
+    .filter(w => w.length >= 4 && !STOPWORDS_IT_EN.has(w));
+  // Dedupe + cap at 8 most informative words
+  return [...new Set(lower)].slice(0, 8);
+}
+
+/** Bonus score per match between Pixabay item tags and the slide's
+ *  context words. Each match = +2 (heavier than the generic topic score). */
+/**
+ * Pixabay tags are comma-separated, ordered by relevance (first = most relevant).
+ * This returns the first N tags as a lowercase array, used to detect
+ * what the image is PRIMARILY about (vs just incidentally tagged).
+ */
+function topTags(item: any, n = 4): string[] {
+  if (typeof item?.tags !== "string") return [];
+  return item.tags.toLowerCase().split(",").map((t: string) => t.trim()).slice(0, n);
+}
+
+/**
+ * Position-aware match: required body part appears in TOP tags = +20 bonus.
+ * Forces images that are PRIMARILY about that body part to surface.
+ */
+function topMatchBonus(item: any, requiredBodyPart: string[] | null): number {
+  if (!requiredBodyPart || requiredBodyPart.length === 0) return 0;
+  const top = topTags(item, 4);
+  for (const req of requiredBodyPart) {
+    if (top.some(t => t.includes(req))) return 20;
+  }
+  return 0;
+}
+
+/**
+ * Cross-pollution penalty: if a DIFFERENT body part is prominent (top 3 tags)
+ * and the target is NOT prominent, penalize heavily. This kills images of
+ * spine/back when the slide is about shoulder, even if "shoulder" appears
+ * as a secondary tag.
+ */
+function crossPollutionPenalty(item: any, requiredBodyPart: string[] | null): number {
+  if (!requiredBodyPart || requiredBodyPart.length === 0) return 0;
+  const top = topTags(item, 3);
+  const targetInTop = requiredBodyPart.some(req => top.some(t => t.includes(req)));
+  if (targetInTop) return 0; // target IS prominent → no penalty
+  // Target is NOT in top tags. Check if another body part is.
+  const OTHER_BODY_WORDS = [
+    "spine","lumbar","back","schiena","colonna","lombare",
+    "neck","cervical","collo","cervicale",
+    "shoulder","spalla","spalle",
+    "knee","ginocchio","menisco",
+    "hip","anca","fianco",
+    "ankle","foot","piede","caviglia",
+    "elbow","gomito",
+    "wrist","hand","polso","mano",
+  ];
+  // Remove the target's own synonyms from OTHER_BODY_WORDS for this check
+  const reqSet = new Set(requiredBodyPart);
+  const otherBodyHits = top.filter(t =>
+    OTHER_BODY_WORDS.some(w => t.includes(w) && !reqSet.has(w))
+  );
+  return otherBodyHits.length > 0 ? -25 : 0;
+}
+
+function slideMatchScore(item: any, contextWords: string[]): number {
+  if (contextWords.length === 0) return 0;
+  const hay = itemHaystack(item);
+  if (!hay) return 0;
+  let s = 0;
+  for (const w of contextWords) if (hay.includes(w)) s += 2;
+  return s;
+}
+
+interface ScoredItem {
+  id: number;        // Pixabay numeric id — STABLE across calls (URLs are not!)
+  url: string;       // largeImageURL — changes every call but we still need a URL to fetch
+  tags: string[];    // lowercase Pixabay tags (used for primary↔alt coherence check)
+  score: number;
+}
 
 // Module-level flag: set to true on first 429 so subsequent calls skip the API
-// (avoids burning more requests when we're already rate-limited).
-let freepikRateLimited = false;
-let freepikRateLimitMessage = '';
+let pixabayRateLimited = false;
+let pixabayRateLimitMessage = '';
 
-async function freepikSearch(apiKey: string, query: string, page: number, limit: number): Promise<ScoredItem[]> {
-  if (freepikRateLimited) {
-    console.warn(`Freepik rate-limited, skipping query "${query}"`);
+/**
+ * Tag patterns that mark high-impact medical visuals.
+ * Split in two tiers because user explicitly wants X-RAY style (red highlighted
+ * pain area, like a clinical illustration) over generic 3D renders.
+ */
+const XRAY_TAGS = [           // Most-wanted: +10 each
+  "x-ray","xray","x ray",
+  "highlighted","pain spot","red","glow","glowing",
+  "anatomy","anatomical","anatomy model","human body","medical illustration",
+  "skeleton","skeletal","muscular system","nervous system",
+  "infrared","thermography","thermal",
+];
+const RENDER_TAGS = [          // Acceptable but less wow: +3 each
+  "3d","3d render","3d model","render","rendering","illustration","digital",
+];
+
+/**
+ * @param coverBoost when true (e.g. slide.tipo === "cover"), multiply the
+ *                   anatomy score by 2 — covers are where x-ray visuals
+ *                   have the most impact.
+ */
+function anatomyVisualScore(item: any, coverBoost = false): number {
+  const hay = itemHaystack(item);
+  if (!hay) return 0;
+  let s = 0;
+  for (const k of XRAY_TAGS) if (hay.includes(k)) s += 10;
+  for (const k of RENDER_TAGS) if (hay.includes(k)) s += 3;
+  return coverBoost ? s * 2 : s;
+}
+
+/** Merge two scored lists, dedupe by Pixabay ID, boost anatomy-style results. */
+function mergeScored(primary: ScoredItem[], anatomy: ScoredItem[]): ScoredItem[] {
+  const map = new Map<number, ScoredItem>();
+  for (const s of primary) map.set(s.id, s);
+  for (const s of anatomy) {
+    const existing = map.get(s.id);
+    if (existing) {
+      existing.score = Math.max(existing.score, s.score) + 4;
+    } else {
+      map.set(s.id, { id: s.id, url: s.url, tags: s.tags, score: s.score + 4 });
+    }
+  }
+  return Array.from(map.values());
+}
+
+async function pixabaySearch(
+  apiKey: string,
+  query: string,
+  page: number,
+  perPage: number,
+  contextWords: string[] = [],
+  requiredBodyPart: string[] | null = null,
+  excludeIds: Set<number> = new Set(),
+  coverBoost: boolean = false,
+  lang: "en" | "it" = "en",
+): Promise<ScoredItem[]> {
+  if (pixabayRateLimited) {
+    console.warn(`Pixabay rate-limited, skipping query "${query}"`);
     return [];
   }
-  // locale=en + Accept-Language=en — our queries are in ENGLISH (the LLM's
-  // photoQuery is generated in English), so we need Freepik to search English
-  // descriptions. Using locale=it before with English queries returned 0 hits
-  // because Freepik searched Italian descriptions for English words.
+  // Pixabay max per_page is 200, min is 3. Default 20.
+  const cappedPerPage = Math.max(3, Math.min(200, perPage));
   const params = new URLSearchParams({
-    term: query,
-    'filters[content_type][photo]': '1',
-    locale: 'en',
+    key: apiKey,
+    q: query,
+    image_type: 'photo',
+    safesearch: 'true',
+    per_page: String(cappedPerPage),
     page: String(page),
-    limit: String(limit),
+    lang,
+    orientation: 'all',
   });
 
-  const response = await fetch(`https://api.freepik.com/v1/resources?${params}`, {
-    headers: { 'x-freepik-api-key': apiKey, 'Accept-Language': 'en-US' },
+  const response = await fetch(`https://pixabay.com/api/?${params}`, {
+    headers: { 'Accept': 'application/json' },
   });
 
   if (!response.ok) {
-    console.warn(`Freepik HTTP ${response.status} for "${query}"`);
+    console.warn(`Pixabay HTTP ${response.status} for "${query}"`);
     if (response.status === 429) {
       try {
         const errBody = await response.text();
-        freepikRateLimitMessage = errBody.slice(0, 200);
-        console.error(`Freepik RATE LIMIT hit: ${freepikRateLimitMessage}`);
+        pixabayRateLimitMessage = errBody.slice(0, 200);
+        console.error(`Pixabay RATE LIMIT hit: ${pixabayRateLimitMessage}`);
       } catch { /* ignore */ }
-      freepikRateLimited = true;
+      pixabayRateLimited = true;
     }
     return [];
   }
 
-  const data = await response.json();
-  const results = data?.data || [];
+  let data: any = null;
+  try {
+    data = await response.json();
+  } catch (e) {
+    console.error(`Pixabay JSON parse failed for "${query}":`, e);
+    return [];
+  }
+  const results = data?.hits || [];
 
-  // Log first item structure once per call (helps debug metadata fields)
   if (results.length > 0) {
     const first = results[0];
-    console.log(`Freepik sample item for "${query}":`,
+    console.log(`Pixabay sample item for "${query}":`,
       JSON.stringify({
-        title: first.title,
-        keywords: first.keywords?.slice?.(0, 5),
-        tags: Array.isArray(first.tags) ? first.tags.slice(0, 5) : first.tags,
-        categories: first.categories,
+        id: first.id,
+        tags: first.tags,
+        type: first.type,
+        size: `${first.imageWidth}x${first.imageHeight}`,
       })
     );
   }
 
   const scored: ScoredItem[] = [];
   let rejected = 0;
+  let rejectedByBodyPart = 0;
+  let rejectedByExclude = 0;
+  let rejectedByBlacklist = 0;
+  let rejectedByWhitelist = 0;
   for (const item of results) {
+    const id = Number(item?.id);
     const url = pickImageUrl(item);
-    if (!url) continue;
+    if (!id || !url) continue;
+
+    // 1) HARD BLACKLIST — always reject (eagles, tattoos, food, etc.)
+    if (isBlacklisted(item)) { rejectedByBlacklist++; continue; }
+
+    // 2) WHITELIST — must have at least one medical/health tag (even when body
+    //    part is detected, e.g. a "back tattoo" image has "back" tag but no
+    //    medical context — we want it out)
+    if (!isMedicalImage(item)) { rejectedByWhitelist++; continue; }
+
+    // 3) DEDUP by Pixabay ID (URLs rotate per request)
+    if (excludeIds.has(id)) { rejectedByExclude++; continue; }
+
+    // 4) Legacy hard-reject (kept as belt-and-suspenders with blacklist)
     if (isHardReject(item)) { rejected++; continue; }
-    scored.push({ url, score: topicScore(item) });
+
+    // 5) BODY-PART filter (only when target is detected)
+    if (requiredBodyPart && requiredBodyPart.length > 0) {
+      const hay = itemHaystack(item);
+      const matches = requiredBodyPart.some(req => hay.includes(req));
+      if (!matches) { rejectedByBodyPart++; continue; }
+    }
+
+    // 6) SCORING
+    const score =
+      topicScore(item) +
+      slideMatchScore(item, contextWords) +
+      anatomyVisualScore(item, coverBoost) +
+      topMatchBonus(item, requiredBodyPart) +
+      crossPollutionPenalty(item, requiredBodyPart);
+    if (score < -10) { rejectedByBodyPart++; continue; }
+    const tags = typeof item?.tags === "string"
+      ? item.tags.toLowerCase().split(",").map((t: string) => t.trim()).filter(Boolean)
+      : [];
+    scored.push({ id, url, tags, score });
   }
-  console.log(`Freepik "${query}": ${results.length} raw → ${scored.length} kept, ${rejected} rejected`);
+  console.log(`Pixabay "${query}" (lang=${lang}): ${results.length} raw → ${scored.length} kept | rej: ${rejectedByBlacklist} bl, ${rejectedByWhitelist} wl, ${rejected} hard, ${rejectedByBodyPart} body, ${rejectedByExclude} dup (total: ${data?.totalHits ?? '?'})`);
   return scored;
 }
 
-async function searchFreepikStock(
+async function searchPixabayStock(
   query: string,
   apiKey: string,
   supabaseAdmin: ReturnType<typeof createClient>,
   storagePath: string,
-  index: number
+  index: number,
+  contextWords: string[] = [],
+  requiredBodyPart: string[] | null = null,
+  excludeIds: Set<number> = new Set(),
+  isCover: boolean = false,
+  italianPhrase: string | null = null,
 ): Promise<ImageResult> {
   try {
-    console.log(`Slide ${index}: searching stock for "${query}"`);
+    console.log(`Slide ${index}: searching Pixabay for "${query}" (ctx: ${contextWords.length}, body: ${requiredBodyPart?.[0] ?? '-'}, italian: "${italianPhrase ?? '-'}", exclude: ${excludeIds.size}, cover: ${isCover})`);
 
-    // 1) Try the original (anchored) query
-    let scored = await freepikSearch(apiKey, query, 1, 24);
+    // PARALLEL SEARCH x4: when a body part is detected, fetch the main query
+    // PLUS dedicated x-ray/anatomy variants in EN, PLUS an Italian variant
+    // ("mal di schiena raggi x") with lang=it — Italian medical illustrations
+    // tend to be the high-quality anatomical x-ray style the user prefers.
+    const bodyTerm = requiredBodyPart && requiredBodyPart.length > 0 ? requiredBodyPart[0] : null;
+    const settledSearches = await Promise.allSettled([
+      pixabaySearch(apiKey, query, 1, 50, contextWords, requiredBodyPart, excludeIds, isCover, "en"),
+      bodyTerm
+        ? pixabaySearch(apiKey, `${bodyTerm} pain x-ray`, 1, 24, contextWords, requiredBodyPart, excludeIds, isCover, "en")
+        : Promise.resolve([] as ScoredItem[]),
+      bodyTerm
+        ? pixabaySearch(apiKey, `${bodyTerm} anatomy human body`, 1, 24, contextWords, requiredBodyPart, excludeIds, isCover, "en")
+        : Promise.resolve([] as ScoredItem[]),
+      italianPhrase
+        ? pixabaySearch(apiKey, `${italianPhrase} raggi x`, 1, 24, contextWords, requiredBodyPart, excludeIds, isCover, "it")
+        : Promise.resolve([] as ScoredItem[]),
+    ]);
+    const primaryResults = settledSearches[0].status === "fulfilled" ? settledSearches[0].value : [];
+    const xrayResults    = settledSearches[1].status === "fulfilled" ? settledSearches[1].value : [];
+    const anatomyResults = settledSearches[2].status === "fulfilled" ? settledSearches[2].value : [];
+    const italianResults = settledSearches[3].status === "fulfilled" ? settledSearches[3].value : [];
+    settledSearches.forEach((r, i) => {
+      if (r.status === "rejected") console.error(`Slide ${index}: search[${i}] rejected:`, r.reason);
+    });
+    // Merge all four lists. Italian results get the boost twice (appears in
+    // both italian and merged), naturally surfacing on top.
+    let scored = mergeScored(
+      mergeScored(primaryResults, italianResults),
+      mergeScored(xrayResults, anatomyResults),
+    );
     let queryUsed = query;
 
     // 2) If empty, dedupe / strip restrictive words and retry
@@ -360,62 +788,104 @@ async function searchFreepikStock(
       const stripped = query
         .toLowerCase()
         .split(/\s+/)
-        .filter((w, i, a) => w && a.indexOf(w) === i) // dedupe
-        .filter(w => !['european','professional','clinic'].includes(w)) // drop restrictive
+        .filter((w, i, a) => w && a.indexOf(w) === i)
+        .filter(w => !['european','professional','clinic'].includes(w))
         .join(' ');
       if (stripped && stripped !== query.toLowerCase()) {
         console.log(`Slide ${index}: empty for "${query}", retry simplified "${stripped}"`);
-        scored = await freepikSearch(apiKey, stripped, 1, 24);
+        scored = await pixabaySearch(apiKey, stripped, 1, 50, contextWords, requiredBodyPart, excludeIds, isCover);
         queryUsed = `${query} → ${stripped}`;
       }
     }
 
-    // 3) Last resort: take only the FIRST 2 words of the original (most relevant)
+    // 3) If still empty AND body part is required, try a query made of
+    //    just the body part synonyms (broader but topical)
+    if (scored.length === 0 && requiredBodyPart && requiredBodyPart.length > 0) {
+      const bodyQuery = requiredBodyPart.slice(0, 2).join(' ');
+      console.log(`Slide ${index}: body-part-only query "${bodyQuery}"`);
+      scored = await pixabaySearch(apiKey, bodyQuery, 1, 50, contextWords, requiredBodyPart, excludeIds, isCover);
+      queryUsed = `${query} → ${bodyQuery}`;
+    }
+
+    // 4) Try page 2 of original query (more diverse results, helps regenerate flow)
+    if (scored.length === 0) {
+      console.log(`Slide ${index}: trying page 2 of "${query}"`);
+      scored = await pixabaySearch(apiKey, query, 2, 50, contextWords, requiredBodyPart, excludeIds, isCover);
+      queryUsed = `${query} → page 2`;
+    }
+
+    // 5) Last resort: only first 2 words of original
     if (scored.length === 0) {
       const firstTwo = query.split(/\s+/).filter(Boolean).slice(0, 2).join(' ');
       if (firstTwo && firstTwo !== query) {
         console.log(`Slide ${index}: still empty, retry first 2 words "${firstTwo}"`);
-        scored = await freepikSearch(apiKey, firstTwo, 1, 24);
+        scored = await pixabaySearch(apiKey, firstTwo, 1, 50, contextWords, requiredBodyPart, excludeIds, isCover);
         queryUsed = `${query} → ${firstTwo}`;
       }
     }
 
-    // 4) Generic wellness fallback
+    // 6) Generic wellness fallback (no body-part filter, otherwise we get nothing)
     if (scored.length === 0) {
-      console.log(`Slide ${index}: pure fallback`);
-      scored = await freepikSearch(apiKey, FALLBACK_QUERY, 1, 24);
-      queryUsed = `${query} → ${FALLBACK_QUERY}`;
+      console.log(`Slide ${index}: pure fallback (dropping body-part filter)`);
+      scored = await pixabaySearch(apiKey, FALLBACK_QUERY, 1, 24, contextWords, null, excludeIds, isCover);
+      queryUsed = `${query} → ${FALLBACK_QUERY} (no body filter)`;
+    }
+
+    // 7) LAST RESORT: pure "physiotherapy clinic patient" search, completely
+    //    unfiltered. Guarantees we always return SOMETHING coherent rather
+    //    than null. This is the safety net for very specific slides where
+    //    every other query path returned 0.
+    if (scored.length === 0) {
+      console.log(`Slide ${index}: ULTIMATE fallback (physiotherapy clinic patient)`);
+      scored = await pixabaySearch(apiKey, "physiotherapy clinic patient", 1, 24, contextWords, null, excludeIds, isCover);
+      queryUsed = `${query} → physiotherapy clinic patient (last resort)`;
     }
 
     if (scored.length === 0) {
       return {
         index,
         url: null,
+        sourceId: null,
         alternatives: [],
+        alternativeIds: [],
         queryUsed,
-        error: freepikRateLimited ? "freepik_rate_limit" : "no_results_after_all_fallbacks",
+        error: pixabayRateLimited ? "pixabay_rate_limit" : "no_results_after_all_fallbacks",
       };
     }
 
     // Sort by topic score desc → topical hits float to top, neutrals follow
     const sorted = [...scored].sort((a, b) => b.score - a.score);
-    const top4 = sorted.slice(0, 4);
-    const primary = top4[0].url;
-    const alternatives = top4.slice(1).map(s => s.url);
-
-    console.log(`Slide ${index}: picked top result (score ${top4[0].score}) from ${scored.length} candidates`);
-    const savedUrl = await downloadAndSave(primary, supabaseAdmin, storagePath, index);
+    // Pick primary, then build COHERENT alternatives.
+    // An alt is "coherent" if it shares at least 1 meaningful tag with primary
+    // (e.g. both about "back/spine"). Without this check, the popup may show
+    // alts that pass filters but are tematically unrelated (e.g. primary is
+    // a spine x-ray, alt is a yoga photo).
+    const primary = sorted[0];
+    const primaryTagSet = new Set(primary.tags.filter(t => t.length >= 4));
+    const coherentAlts: ScoredItem[] = [];
+    const looseAlts: ScoredItem[] = [];
+    for (const cand of sorted.slice(1, 30)) {
+      const overlap = cand.tags.filter(t => primaryTagSet.has(t)).length;
+      if (overlap >= 1) coherentAlts.push(cand);
+      else looseAlts.push(cand);
+    }
+    // Prefer coherent alts; fill the rest with loose alts if needed
+    const altItems = [...coherentAlts, ...looseAlts].slice(0, 8);
+    console.log(`Slide ${index}: picked top (id=${primary.id}, score=${primary.score}) from ${scored.length} candidates | alts: ${coherentAlts.length} coherent + ${looseAlts.length} loose → exposing ${altItems.length}`);
+    const savedUrl = await downloadAndSave(primary.url, supabaseAdmin, storagePath, index);
 
     return {
       index,
-      url: savedUrl || primary,
-      alternatives,
+      url: savedUrl || primary.url,
+      sourceId: primary.id,                    // ← Pixabay ID for cross-slide dedup
+      alternatives: altItems.map(s => s.url),  // for UI swap
+      alternativeIds: altItems.map(s => s.id), // for dedup
       queryUsed,
       error: null,
     };
   } catch (err) {
     console.error(`Exception searching stock for slide ${index}:`, err);
-    return { index, url: null, alternatives: [], queryUsed: query, error: "exception" };
+    return { index, url: null, sourceId: null, alternatives: [], alternativeIds: [], queryUsed: query, error: "exception" };
   }
 }
 
@@ -426,12 +896,14 @@ async function downloadAndSave(
   index: number
 ): Promise<string | null> {
   try {
-    const imgResponse = await fetch(imageUrl);
-    if (!imgResponse.ok) return null;
-
-    const arrayBuffer = await imgResponse.arrayBuffer();
-    const imageBytes = new Uint8Array(arrayBuffer);
-    const contentType = imgResponse.headers.get('content-type') || 'image/jpeg';
+    // SSRF guard: only Pixabay / Supabase / trusted CDNs allowed
+    const fetched = await safeFetch(imageUrl, { maxBytes: 10 * 1024 * 1024, timeoutMs: 15_000 });
+    if (!fetched.ok) {
+      console.warn(`Slide ${index}: rejected URL (${fetched.error})`);
+      return null;
+    }
+    const imageBytes = fetched.bytes;
+    const contentType = fetched.contentType;
     const ext = contentType.includes('png') ? 'png' : 'jpg';
     const fileName = `${storagePath}/slide_${index + 1}.${ext}`;
 

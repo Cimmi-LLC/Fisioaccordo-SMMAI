@@ -34,7 +34,6 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({ data, format = '1:1' 
     regeneratingImage,
     renderConfig,
     updateSlideText,
-    updateSlidePrompt,
     regenerateSlide,
     regenerateSingleImage,
     swapSlideImage,
@@ -44,8 +43,6 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({ data, format = '1:1' 
     copyCaption,
   } = useCarouselPreview(data);
 
-  const [editingPrompt, setEditingPrompt] = useState<number | null>(null);
-  const [tempPrompt, setTempPrompt] = useState('');
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const { user } = useAuth();
   const { activeBrand } = useActiveBrand();
@@ -96,18 +93,6 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({ data, format = '1:1' 
       urls.push(data.url as string);
     }
     return urls;
-  };
-
-  const startEditPrompt = (index: number) => {
-    if (!carousel) return;
-    setEditingPrompt(index);
-    setTempPrompt((carousel.slides[index].keywords_stock || []).join(', '));
-  };
-
-  const confirmPromptEdit = (index: number) => {
-    updateSlidePrompt(index, tempPrompt);
-    regenerateSingleImage(index, tempPrompt);
-    setEditingPrompt(null);
   };
 
   if (!carousel || carousel.slides.length === 0) {
@@ -344,33 +329,6 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({ data, format = '1:1' 
             </div>
           )}
 
-          {/* Prompt editor for image — slides with image (cover + content) */}
-          {hasImageRole && editingPrompt === activeSlide ? (
-            <div className="mt-3 p-3 rounded-lg space-y-2" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)' }}>
-              <div className="text-[10px] font-bold uppercase" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>Keywords ricerca immagine (in inglese, separate da virgola)</div>
-              <Textarea
-                value={tempPrompt}
-                onChange={e => setTempPrompt(e.target.value)}
-                rows={3}
-                className="text-xs"
-                style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 9 }}
-              />
-              <div className="flex gap-2 justify-end">
-                <Button size="sm" variant="ghost" className="h-7 text-[10px]" onClick={() => setEditingPrompt(null)}>Annulla</Button>
-                <Button size="sm" className="h-7 text-[10px] text-white" style={{ backgroundColor: 'var(--viola)' }} onClick={() => confirmPromptEdit(activeSlide)}>
-                  Cerca con queste keywords
-                </Button>
-              </div>
-            </div>
-          ) : hasImageRole ? (
-            <button
-              onClick={() => startEditPrompt(activeSlide)}
-              className="mt-2 text-[10px] font-medium"
-              style={{ color: 'var(--viola)', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-            >
-              Modifica keywords immagine
-            </button>
-          ) : null}
         </CardContent>
       </Card>
 
