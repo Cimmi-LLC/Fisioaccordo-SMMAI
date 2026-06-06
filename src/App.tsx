@@ -31,6 +31,7 @@ const Privacy = lazy(() => import("./pages/Privacy"));
 const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const DeletionStatus = lazy(() => import("./pages/DeletionStatus"));
+const DataDeletion = lazy(() => import("./pages/DataDeletion"));
 const Settings = lazy(() => import("./pages/Settings"));
 const BrandPage = lazy(() => import("./pages/BrandPage"));
 const BrandsListPage = lazy(() => import("./pages/BrandsListPage"));
@@ -88,6 +89,7 @@ const App = () => (
                     <Route path="/cookie-policy" element={<CookiePolicy />} />
                     <Route path="/terms" element={<Terms />} />
                     <Route path="/deletion-status" element={<DeletionStatus />} />
+                    <Route path="/data-deletion" element={<DataDeletion />} />
 
                     {/* App routes — wrapped in sidebar layout */}
                     <Route element={<AppLayout />}>

@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
 
     console.log(`Data deletion processed for Facebook user: ${facebookUserId}, code: ${confirmationCode}`);
 
-    const statusUrl = `https://social-generator-fisioaccordo.lovable.app/deletion-status?id=${confirmationCode}`;
+    const statusUrl = `https://fisioaccordo-smm-ai.vercel.app/deletion-status?id=${confirmationCode}`;
 
     return new Response(JSON.stringify({
       url: statusUrl,
