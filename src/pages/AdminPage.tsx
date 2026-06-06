@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { supabase } from '@/integrations/supabase/client';
+import { normalizeWebsiteUrl } from '@/utils/url';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Users, BarChart3, AlertCircle, Image as ImageIcon, FileText, Calendar } from 'lucide-react';
 
@@ -231,7 +232,7 @@ const AdminPage = () => {
                     <tr key={u.user_id} style={{ borderBottom: '1px solid var(--line)' }}>
                       <td className="p-3 text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>{u.nome_business || '—'}</td>
                       <td className="p-3 text-[12px]">
-                        {u.website_url ? <a href={u.website_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--viola)' }} className="hover:underline">{u.website_url.replace(/^https?:\/\//, '').slice(0, 30)}</a> : <span style={{ color: 'var(--ink3)' }}>—</span>}
+                        {u.website_url ? <a href={normalizeWebsiteUrl(u.website_url)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--viola)' }} className="hover:underline">{u.website_url.replace(/^https?:\/\//, '').slice(0, 30)}</a> : <span style={{ color: 'var(--ink3)' }}>—</span>}
                       </td>
                       <td className="p-3 text-[12px]" style={{ color: 'var(--ink3)' }}>
                         <Calendar className="h-3 w-3 inline mr-1" />

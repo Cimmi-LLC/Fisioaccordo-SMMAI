@@ -173,7 +173,7 @@ const Onboarding = () => {
           title: 'Analisi parziale',
           description: 'Abbiamo trovato poche informazioni. Completa i campi manualmente.',
         });
-        setBrand({ ...EMPTY_BRAND, website_url: trimmedUrl });
+        setBrand({ ...EMPTY_BRAND, website_url: trimmedUrl.startsWith('http') ? trimmedUrl : 'https://' + trimmedUrl });
         setStep(2);
         return;
       }
@@ -207,7 +207,7 @@ const Onboarding = () => {
         colore_secondario: profile.colore_secondario || '#E6007E',
         colore_terziario: profile.colore_terziario || '#1a1a2e',
         logo_url: processedLogo,
-        website_url: trimmedUrl,
+        website_url: trimmedUrl.startsWith('http') ? trimmedUrl : 'https://' + trimmedUrl,
         raw_analysis: profile,
       }));
       setStep(2);

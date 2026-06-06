@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { normalizeWebsiteUrl } from '@/utils/url';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -222,7 +223,7 @@ const BrandPage = () => {
                   <EditableField label="Sito Web">
                     <div className="flex items-center gap-2">
                       <Globe className="h-3.5 w-3.5" style={{ color: 'var(--viola)' }} />
-                      <a href={brand.website_url} target="_blank" rel="noopener noreferrer" className="text-sm" style={{ color: 'var(--viola)' }}>{brand.website_url}</a>
+                      <a href={normalizeWebsiteUrl(brand.website_url)} target="_blank" rel="noopener noreferrer" className="text-sm" style={{ color: 'var(--viola)' }}>{brand.website_url}</a>
                     </div>
                   </EditableField>
                 )}
