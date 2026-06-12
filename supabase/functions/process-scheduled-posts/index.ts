@@ -65,7 +65,35 @@ async function processPost(
 
   try {
     if (!post.connection_id) throw new Error("connection_id mancante");
-    if (!post.image_urls || post.image_urls.length === 0) throw new Error("image_urls mancante");
+
+    // Prefer new {bucket, paths} shape. Mint signed URLs right now (TTL 10
+    // minutes) so Meta Graph can download them during container creation.
+    // Fall back to legacy image_urls if present.
+    let mediaUrls: string[] = [];
+    const hasPaths = Array.isArray(post.image_paths) && post.image_paths.length > 0;
+    if (hasPaths) {
+      const bucket = post.image_bucket || "carousel-images";
+      // Ownership: the cron is service-role but each path must belong to the
+      // post owner. We re-check here as defense in depth (DB rows should
+      // already satisfy it because schedule-post enforced it on insert).
+      const ownerPrefix = post.user_id + "/";
+      for (const p of post.image_paths) {
+        if (typeof p !== "string" || !p.startsWith(ownerPrefix)) {
+          throw new Error("Path non appartiene al proprietario del post");
+        }
+      }
+      const { data: signed, error: signErr } = await supabase.storage
+        .from(bucket)
+        .createSignedUrls(post.image_paths, 60 * 10);
+      if (signErr || !signed) {
+        throw new Error("Signed URL fallita: " + (signErr?.message || "unknown"));
+      }
+      mediaUrls = signed.map((s: any) => s.signedUrl);
+    } else if (Array.isArray(post.image_urls) && post.image_urls.length > 0) {
+      mediaUrls = post.image_urls;
+    } else {
+      throw new Error("image_paths/image_urls mancante");
+    }
 
     // Read token via security-definer RPC (decrypted from Vault-protected key)
     const { data: connRows, error: connErr } = await supabase
@@ -89,13 +117,13 @@ async function processPost(
       ? await publishStory(
           conn.instagram_business_id,
           conn.page_access_token,
-          post.image_urls[0]
+          mediaUrls[0]
         )
       : await publishToInstagram(
           conn.instagram_business_id,
           conn.page_access_token,
           fullCaption,
-          post.image_urls
+          mediaUrls
         );
 
     if (!result.success) throw new Error(result.error || "Pubblicazione fallita");

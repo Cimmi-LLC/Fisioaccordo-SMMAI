@@ -42,14 +42,41 @@ Deno.serve(async (req) => {
     const verified_user_id = user.id
 
     const body = await req.json()
-    const { connection_id, platform, content, image_url, carousel_urls } = body
-    console.log('meta-publish request:', JSON.stringify({ connection_id, platform, has_image: !!image_url, carousel_count: carousel_urls?.length }))
+    const {
+      connection_id, platform, content,
+      // Legacy: caller passes already-public URLs (still accepted)
+      image_url, carousel_urls,
+      // New: caller passes storage paths; signed URLs are minted server-side
+      // right before publishing (TTL > the entire Meta Graph download window).
+      image_path, image_paths, image_bucket,
+    } = body
+    console.log('meta-publish request:', JSON.stringify({
+      connection_id, platform,
+      has_image_url: !!image_url, carousel_url_count: carousel_urls?.length,
+      has_image_path: !!image_path, image_path_count: image_paths?.length, image_bucket,
+    }))
 
     if (!connection_id || !platform || !content) {
       return new Response(
         JSON.stringify({ success: false, error: 'Parametri mancanti' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
+    }
+
+    // Ownership pre-check: when the caller asks us to sign storage paths we
+    // MUST verify the paths belong to the caller. Otherwise an authenticated
+    // user could request a signed URL for someone else's slide and publish it.
+    const userPrefix = verified_user_id + '/'
+    const allInputPaths: string[] = []
+    if (typeof image_path === 'string') allInputPaths.push(image_path)
+    if (Array.isArray(image_paths)) {
+      for (const p of image_paths) if (typeof p === 'string') allInputPaths.push(p)
+    }
+    for (const p of allInputPaths) {
+      if (!p.startsWith(userPrefix)) {
+        console.warn('meta-publish ownership reject', { user: verified_user_id, path: p })
+        return errorResponse('Path non autorizzato', 403)
+      }
     }
 
     // Read decrypted token via security-definer RPC (token is encrypted at rest).
@@ -103,9 +130,33 @@ Deno.serve(async (req) => {
       return errorResponse('Nessun account Instagram collegato', 400)
     }
 
+    // Resolve paths → signed URLs at publish time (TTL 10 min; Meta downloads
+    // each image during the container creation, well within the window).
+    const bucket = (typeof image_bucket === 'string' && image_bucket) || 'carousel-images'
+    let resolvedImageUrl: string | null = image_url || null
+    let resolvedCarouselUrls: string[] | null = Array.isArray(carousel_urls) ? carousel_urls : null
+
+    if (Array.isArray(image_paths) && image_paths.length > 0) {
+      const { data: signed, error: signErr } = await supabase.storage
+        .from(bucket)
+        .createSignedUrls(image_paths, 60 * 10)
+      if (signErr || !signed) {
+        return errorResponse('Errore generazione URL firmate: ' + (signErr?.message || 'unknown'), 500)
+      }
+      resolvedCarouselUrls = signed.map((s: any) => s.signedUrl)
+    } else if (typeof image_path === 'string' && image_path) {
+      const { data: signed, error: signErr } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(image_path, 60 * 10)
+      if (signErr || !signed) {
+        return errorResponse('Errore generazione URL firmata: ' + (signErr?.message || 'unknown'), 500)
+      }
+      resolvedImageUrl = signed.signedUrl
+    }
+
     // Carousel post
-    if (carousel_urls && carousel_urls.length > 1) {
-      const result = await publishCarousel(igId, accessToken, content, carousel_urls)
+    if (resolvedCarouselUrls && resolvedCarouselUrls.length > 1) {
+      const result = await publishCarousel(igId, accessToken, content, resolvedCarouselUrls)
       if (!result.success) return errorResponse(result.error || 'Pubblicazione fallita')
       return new Response(
         JSON.stringify({ success: true, post_id: result.postId }),
@@ -114,11 +165,11 @@ Deno.serve(async (req) => {
     }
 
     // Single image post
-    if (!image_url) {
+    if (!resolvedImageUrl) {
       return errorResponse('Instagram richiede almeno un\'immagine', 400)
     }
 
-    const result = await publishSingleImage(igId, accessToken, content, image_url)
+    const result = await publishSingleImage(igId, accessToken, content, resolvedImageUrl)
     if (!result.success) return errorResponse(result.error || 'Pubblicazione fallita')
     return new Response(
       JSON.stringify({ success: true, post_id: result.postId }),

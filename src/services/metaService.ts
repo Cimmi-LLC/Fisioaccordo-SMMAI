@@ -185,16 +185,35 @@ export class MetaService {
     }
   }
 
-  static async publishToInstagram(connectionId: string, caption: string, imageUrl: string, carouselUrls?: string[]): Promise<{ success: boolean; error?: string }> {
+  /**
+   * Immediate publish to Instagram.
+   * Prefer the new {bucket, paths} shape (signed URLs minted server-side
+   * at publish time, never leaked to the client). The legacy URL shape is
+   * still accepted by the edge function for backward compat.
+   */
+  static async publishToInstagram(
+    connectionId: string,
+    caption: string,
+    imageUrlOrPath: string,
+    carouselUrlsOrPaths?: string[],
+    options?: { bucket?: string; isPath?: boolean }
+  ): Promise<{ success: boolean; error?: string }> {
     try {
-      console.log('[MetaService] publishToInstagram:', { connectionId, imageUrl, carouselCount: carouselUrls?.length });
+      const isPath = options?.isPath ?? false;
+      const bucket = options?.bucket || 'carousel-images';
+      console.log('[MetaService] publishToInstagram:', { connectionId, isPath, bucket, carouselCount: carouselUrlsOrPaths?.length });
       const response = await supabase.functions.invoke('meta-publish', {
         body: {
           connection_id: connectionId,
           platform: 'instagram',
           content: caption,
-          image_url: imageUrl,
-          carousel_urls: carouselUrls
+          // new shape
+          image_path: isPath && !carouselUrlsOrPaths?.length ? imageUrlOrPath : undefined,
+          image_paths: isPath && carouselUrlsOrPaths?.length ? carouselUrlsOrPaths : undefined,
+          image_bucket: isPath ? bucket : undefined,
+          // legacy shape (kept for callers that still pass full URLs)
+          image_url: isPath ? undefined : imageUrlOrPath,
+          carousel_urls: isPath ? undefined : carouselUrlsOrPaths,
         }
       });
 
