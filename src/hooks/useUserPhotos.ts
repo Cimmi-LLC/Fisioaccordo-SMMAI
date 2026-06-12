@@ -2,10 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { signedUrl } from '@/lib/storage';
 
 export interface UserPhoto {
   id: string;
   storage_path: string;
+  /**
+   * Signed URL minted on read. Stays in memory only — NOT written to DB.
+   * Legacy `public_url` column kept null for forward-compat.
+   */
   public_url: string;
   filename: string;
   category: string;
@@ -29,7 +34,14 @@ export const useUserPhotos = () => {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setPhotos(data || []);
+      // Mint signed URLs for display (1h TTL). public_url in DB is legacy.
+      const enriched = await Promise.all(
+        (data || []).map(async (p) => ({
+          ...p,
+          public_url: await signedUrl('user-photos', p.storage_path),
+        }))
+      );
+      setPhotos(enriched);
     } catch (err) {
       console.error('Error fetching photos:', err);
     } finally {
@@ -60,13 +72,13 @@ export const useUserPhotos = () => {
       }
       console.log('uploadPhoto: storage upload success');
 
-      const { data: urlData } = supabase.storage.from('user-photos').getPublicUrl(path);
-      console.log('uploadPhoto: public url:', urlData.publicUrl);
+      // Rule: don't persist full URLs in DB — generate signed URL on read.
+      const signed = await signedUrl('user-photos', path);
 
       const { data, error } = await supabase.from('user_photos').insert({
         user_id: user.id,
         storage_path: path,
-        public_url: urlData.publicUrl,
+        public_url: null,
         filename: file.name,
         category,
         tags
@@ -77,9 +89,10 @@ export const useUserPhotos = () => {
         throw error;
       }
       console.log('uploadPhoto: DB insert success', data);
-      setPhotos(prev => [data, ...prev]);
+      const withUrl = { ...data, public_url: signed } as UserPhoto;
+      setPhotos(prev => [withUrl, ...prev]);
       toast({ title: '📸 Foto caricata!', description: file.name });
-      return data as UserPhoto;
+      return withUrl;
     } catch (err: any) {
       console.error('uploadPhoto: error:', err);
       toast({ title: '❌ Errore upload', description: err.message, variant: 'destructive' });

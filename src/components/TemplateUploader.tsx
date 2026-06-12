@@ -233,14 +233,16 @@ const TemplateUploader: React.FC<TemplateUploaderProps> = ({ open, onOpenChange,
           .upload(filePath, pf.file, { contentType });
         if (uploadError) throw uploadError;
 
-        const { data: urlData } = supabase.storage.from('user-photos').getPublicUrl(filePath);
-
+        // Rule: persist storage_path (relative). UI mints signed URL on read.
+        // `background_url` kept null for forward-compat; older rows may still
+        // hold a full URL string.
         const { error: dbError } = await supabase
           .from('canva_templates')
           .insert([{
             name: pf.name || `Template ${i + 1}`,
             category,
-            background_url: urlData.publicUrl, // kept as reference image only
+            background_url: null,
+            storage_path: filePath, // new column; see migration 20260607150000
             text_zones: {
               background: pf.background,
               photoZone: pf.photoZone,

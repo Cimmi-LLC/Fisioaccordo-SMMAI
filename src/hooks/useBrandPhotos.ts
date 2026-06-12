@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { signedUrl } from '@/lib/storage';
 
 export interface BrandPhoto {
   id: string;
   brand_id: string;
   user_id: string;
+  /** Signed URL minted on read. `url` column in DB is legacy and kept null. */
   url: string;
   storage_path: string | null;
   caption: string | null;
@@ -40,7 +42,14 @@ export const useBrandPhotos = (brandId: string | null) => {
         .eq('brand_id', brandId)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setPhotos((data as BrandPhoto[]) || []);
+      // Mint signed URLs for display from storage_path.
+      const enriched = await Promise.all(
+        ((data || []) as BrandPhoto[]).map(async (p) => ({
+          ...p,
+          url: p.storage_path ? await signedUrl(BUCKET, p.storage_path) : (p.url || ''),
+        }))
+      );
+      setPhotos(enriched);
     } catch (e: any) {
       console.error('[useBrandPhotos] load failed:', e);
       toast({ title: 'Errore caricamento foto', description: e.message, variant: 'destructive' });
@@ -77,16 +86,15 @@ export const useBrandPhotos = (brandId: string | null) => {
       }
       console.log('[useBrandPhotos] storage upload OK');
 
-      const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      const url = pub.publicUrl;
-      console.log('[useBrandPhotos] public url:', url);
+      // Rule: don't persist full URLs in DB. Generate signed URL on read.
+      const signed = await signedUrl(BUCKET, path);
 
       const { data: row, error: insErr } = await supabase
         .from('brand_photos')
         .insert({
           brand_id: brandId,
           user_id: user.id,
-          url,
+          url: null,
           storage_path: path,
           caption: caption || null,
           tags: tags || [],
@@ -99,9 +107,10 @@ export const useBrandPhotos = (brandId: string | null) => {
       }
       console.log('[useBrandPhotos] DB insert OK', row);
 
-      setPhotos(prev => [row as BrandPhoto, ...prev]);
+      const withUrl = { ...(row as BrandPhoto), url: signed };
+      setPhotos(prev => [withUrl, ...prev]);
       toast({ title: 'Foto caricata', description: file.name });
-      return row as BrandPhoto;
+      return withUrl;
     } catch (e: any) {
       console.error('[useBrandPhotos] addFromFile failed:', e);
       const msg = e?.message || e?.error || JSON.stringify(e);

@@ -4,6 +4,7 @@ import { Palette, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { signedUrl } from "@/lib/storage";
 import TemplateUploader from "./TemplateUploader";
 
 export interface CanvaTemplate {
@@ -11,7 +12,12 @@ export interface CanvaTemplate {
   name: string;
   description: string | null;
   category: string;
+  /**
+   * Legacy column. For new rows it's null and the actual file is referenced
+   * via `storage_path`. The display URL is minted on read into this field.
+   */
   background_url: string;
+  storage_path?: string | null;
   text_zones: any;
   text_color: string;
   is_default: boolean;
@@ -55,7 +61,16 @@ const CanvaTemplateSelector: React.FC<CanvaTemplateSelectorProps> = ({ value, on
         userTemplates = (data as any[] || []) as CanvaTemplate[];
       }
 
-      setTemplates([...(defaults as any[] || []) as CanvaTemplate[], ...userTemplates]);
+      const raw = [...(defaults as any[] || []) as CanvaTemplate[], ...userTemplates];
+      // Mint signed URL for rows that use storage_path (new). Keep legacy
+      // background_url string for rows that still hold a full URL.
+      const enriched = await Promise.all(raw.map(async (t) => {
+        if (t.storage_path) {
+          return { ...t, background_url: await signedUrl('user-photos', t.storage_path) };
+        }
+        return t;
+      }));
+      setTemplates(enriched);
     } catch (err) {
       console.error('Error loading templates:', err);
     } finally {
