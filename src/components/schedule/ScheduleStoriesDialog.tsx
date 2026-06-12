@@ -124,17 +124,20 @@ const ScheduleStoriesDialog: React.FC<Props> = ({ open, onClose, stories, onSche
       setSubmitMsg(`Preparo storia ${i + 1}/${toProcess.length}...`);
       try {
         const dataUrl = await s.render();
-        // Upload via save-slide-image (already handles dataUrl → public URL)
+        // Upload via save-slide-image → returns {bucket, path, url}.
+        // Persist only `path` (signed URL is minted in process-scheduled-posts
+        // at publish time).
         const { data: saveData, error: saveErr } = await supabase.functions.invoke('save-slide-image', {
           body: { dataUrl, userId: user.id, slideIndex: i },
         });
-        if (saveErr || saveData?.error || !saveData?.url) {
+        if (saveErr || saveData?.error || !saveData?.path) {
           throw new Error(saveData?.error || saveErr?.message || 'Upload fallito');
         }
         const { data: schedData, error: schedErr } = await supabase.functions.invoke('schedule-post', {
           body: {
             content: s.title,
-            image_urls: [saveData.url],
+            image_paths: [saveData.path],
+            image_bucket: saveData.bucket,
             connection_id: connectionId,
             scheduled_for: scheduledDate.toISOString(),
             media_type: 'story',

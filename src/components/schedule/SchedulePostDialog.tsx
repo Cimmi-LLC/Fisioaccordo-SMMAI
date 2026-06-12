@@ -15,11 +15,11 @@ interface SchedulePostDialogProps {
   /** Hashtags as a single line (es. "#fisio #salute"). Optional. */
   hashtags?: string;
   /**
-   * Async preparer that resolves to public image URLs ready for Instagram.
-   * Called only when the user confirms — for carousels this typically
-   * exports slides via html-to-image and uploads them via save-slide-image.
+   * Async preparer that uploads slide images to Storage and resolves to
+   * `{ bucket, paths }`. The cron mints signed URLs at publish time from
+   * these paths — we never persist public URLs in DB.
    */
-  prepareImages: () => Promise<string[]>;
+  prepareImages: () => Promise<{ bucket: string; paths: string[] }>;
   onScheduled?: () => void;
 }
 
@@ -99,14 +99,15 @@ const SchedulePostDialog: React.FC<SchedulePostDialogProps> = ({
     if (!scheduledDate || !connectionId) return;
     setPreparing(true);
     try {
-      const imageUrls = await prepareImages();
-      if (!imageUrls || imageUrls.length === 0) {
+      const { bucket, paths } = await prepareImages();
+      if (!paths || paths.length === 0) {
         throw new Error('Nessuna immagine disponibile per il post');
       }
       const ok = await schedulePost({
         content,
         hashtags,
-        imageUrls,
+        imagePaths: paths,
+        imageBucket: bucket,
         connectionId,
         scheduledFor: scheduledDate,
       });

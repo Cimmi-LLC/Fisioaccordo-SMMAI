@@ -76,10 +76,11 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({ data, format = '1:1' 
     }
   };
 
-  const prepareImagesForSchedule = async (): Promise<string[]> => {
-    if (!carousel) return [];
+  const prepareImagesForSchedule = async (): Promise<{ bucket: string; paths: string[] }> => {
+    if (!carousel) return { bucket: 'carousel-images', paths: [] };
     const { toPng } = await import('html-to-image');
-    const urls: string[] = [];
+    const paths: string[] = [];
+    let bucket = 'carousel-images';
     for (let i = 0; i < carousel.slides.length; i++) {
       const node = document.getElementById(`slide-export-${i}`);
       if (!node) continue;
@@ -87,12 +88,13 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({ data, format = '1:1' 
       const { data, error } = await supabase.functions.invoke('save-slide-image', {
         body: { dataUrl, userId: user?.id, slideIndex: i },
       });
-      if (error || data?.error || !data?.url) {
+      if (error || data?.error || !data?.path) {
         throw new Error(data?.error || error?.message || `Errore upload slide ${i + 1}`);
       }
-      urls.push(data.url as string);
+      paths.push(data.path as string);
+      if (data.bucket) bucket = data.bucket as string;
     }
-    return urls;
+    return { bucket, paths };
   };
 
   if (!carousel || carousel.slides.length === 0) {

@@ -72,8 +72,10 @@ serve(async (req) => {
     const ext = contentType.includes("png") ? "png"
       : contentType.includes("webp") ? "webp"
       : "jpg";
-    // Path is rooted on the VERIFIED user id — IDOR-proof
-    const fileName = `carousels/${verifiedUserId}/${safeCarouselId}/slide_${idx + 1}_${Date.now()}.${ext}`;
+    // Path is rooted on the VERIFIED user id — IDOR-proof.
+    // First segment = userId so the folder-owner storage policy
+    // (foldername[1] = auth.uid()) matches uploads from the client side too.
+    const fileName = `${verifiedUserId}/${safeCarouselId}/slide_${idx + 1}_${Date.now()}.${ext}`;
 
     const supabaseAdmin = adminClient();
     const { error } = await supabaseAdmin.storage
@@ -85,9 +87,23 @@ serve(async (req) => {
       return jsonResponse(req, { error: "Upload fallito" }, 500);
     }
 
-    const { data: urlData } = supabaseAdmin.storage.from("carousel-images").getPublicUrl(fileName);
+    // Return {bucket, path}. The caller should persist these and mint a
+    // signed URL on demand (publishing, in-app preview).
+    // `url` is kept for backward-compat with current callers but points to
+    // a short-lived signed URL — never store this URL in DB.
+    const { data: signed, error: signErr } = await supabaseAdmin.storage
+      .from("carousel-images")
+      .createSignedUrl(fileName, 60 * 60); // 1h, for immediate preview only
+    if (signErr) {
+      console.error("Signed URL fallita:", signErr.message);
+      return jsonResponse(req, { error: "Signed URL fallita" }, 500);
+    }
 
-    return jsonResponse(req, { url: urlData.publicUrl });
+    return jsonResponse(req, {
+      bucket: "carousel-images",
+      path: fileName,
+      url: signed.signedUrl,
+    });
   } catch (e) {
     console.error("save-slide-image error:", e);
     return jsonResponse(req, { error: "Errore interno" }, 500);

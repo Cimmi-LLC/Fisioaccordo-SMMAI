@@ -6,7 +6,16 @@ import { safeFetch } from "../_shared/ssrf.ts";
 
 interface ImageResult {
   index: number;
-  url: string | null;          // PUBLIC URL to use (Supabase Storage after rehost)
+  /**
+   * Short-lived signed URL for in-app rendering. Do NOT persist this in DB.
+   * For DB persistence, save `bucket` + `path` and mint signed URLs on demand
+   * (e.g. inside meta-publish/process-scheduled-posts).
+   */
+  url: string | null;
+  /** Storage path inside `bucket` — persist this, not `url`. */
+  path: string | null;
+  /** Storage bucket for `path` — `carousel-images` or null (e.g. brand_pool URL). */
+  bucket: string | null;
   sourceId: number | null;     // Pixabay numeric ID — used for cross-slide dedup
   alternatives: string[];      // raw Pixabay URLs (for UI preview only)
   alternativeIds: number[];    // Pixabay IDs of alternatives (for dedup)
@@ -136,7 +145,9 @@ serve(async (req) => {
     const safeCarouselId = (typeof carouselId === "string" || typeof carouselId === "number")
       ? String(carouselId).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) || `c_${Date.now()}`
       : `c_${Date.now()}`;
-    const storagePath = `carousels/${verifiedUserId}/${safeCarouselId}`;
+    // First segment must be the verified user id so the storage folder-owner
+    // policy matches (see migration 20260607130000_storage_policies_tighten).
+    const storagePath = `${verifiedUserId}/${safeCarouselId}`;
 
     // ── BRAND POOL: pre-load brand-uploaded photos for this brand
     // If pool exists, we'll prefer those over Freepik for each slide.
@@ -193,7 +204,11 @@ serve(async (req) => {
           results.push({
             index: originalIndex,
             url: brandPhoto,
-            sourceId: null, // brand pool photos don't have Pixabay ID
+            // brand_pool images currently live as URLs (legacy). Once brand_photos
+            // is migrated to {bucket, path}, we'll mint a signed URL here too.
+            path: null,
+            bucket: null,
+            sourceId: null,
             alternatives: brandPool.filter(p => p.url !== brandPhoto).slice(0, 3).map(p => p.url),
             alternativeIds: [],
             queryUsed: `brand_pool:${keywords.join(' ')}`,
@@ -217,7 +232,7 @@ serve(async (req) => {
         );
       } catch (e) {
         console.error(`Slide ${originalIndex} search exception:`, e);
-        result = { index: originalIndex, url: null, sourceId: null, alternatives: [], alternativeIds: [], queryUsed: searchQuery, error: "exception" };
+        result = { index: originalIndex, url: null, path: null, bucket: null, sourceId: null, alternatives: [], alternativeIds: [], queryUsed: searchQuery, error: "exception" };
       }
       results.push(result);
       // Add picked Pixabay ID + alternative IDs to cumulative exclude set.
@@ -233,7 +248,12 @@ serve(async (req) => {
           carousel_id: safeCarouselId,
           slide_index: r.index,
           prompt_used: r.queryUsed,
-          image_url: r.url,
+          // For new rows we persist the storage path; image_url is left null
+          // since signed URLs are minted on demand. Legacy rows may still
+          // have full URLs.
+          image_url: null,
+          storage_bucket: r.bucket,
+          storage_path: r.path,
           error: r.error,
           provider: r.queryUsed.startsWith("brand_pool") ? "brand_pool" : "pixabay_stock",
         } as any);
@@ -845,6 +865,8 @@ async function searchPixabayStock(
       return {
         index,
         url: null,
+        path: null,
+        bucket: null,
         sourceId: null,
         alternatives: [],
         alternativeIds: [],
@@ -872,11 +894,13 @@ async function searchPixabayStock(
     // Prefer coherent alts; fill the rest with loose alts if needed
     const altItems = [...coherentAlts, ...looseAlts].slice(0, 8);
     console.log(`Slide ${index}: picked top (id=${primary.id}, score=${primary.score}) from ${scored.length} candidates | alts: ${coherentAlts.length} coherent + ${looseAlts.length} loose → exposing ${altItems.length}`);
-    const savedUrl = await downloadAndSave(primary.url, supabaseAdmin, storagePath, index);
+    const saved = await downloadAndSave(primary.url, supabaseAdmin, storagePath, index);
 
     return {
       index,
-      url: savedUrl || primary.url,
+      url: saved?.url || primary.url,
+      path: saved?.path || null,
+      bucket: saved?.path ? "carousel-images" : null,
       sourceId: primary.id,                    // ← Pixabay ID for cross-slide dedup
       alternatives: altItems.map(s => s.url),  // for UI swap
       alternativeIds: altItems.map(s => s.id), // for dedup
@@ -885,7 +909,7 @@ async function searchPixabayStock(
     };
   } catch (err) {
     console.error(`Exception searching stock for slide ${index}:`, err);
-    return { index, url: null, sourceId: null, alternatives: [], alternativeIds: [], queryUsed: query, error: "exception" };
+    return { index, url: null, path: null, bucket: null, sourceId: null, alternatives: [], alternativeIds: [], queryUsed: query, error: "exception" };
   }
 }
 
@@ -894,7 +918,7 @@ async function downloadAndSave(
   supabaseAdmin: ReturnType<typeof createClient>,
   storagePath: string,
   index: number
-): Promise<string | null> {
+): Promise<{ url: string; path: string } | null> {
   try {
     // SSRF guard: only Pixabay / Supabase / trusted CDNs allowed
     const fetched = await safeFetch(imageUrl, { maxBytes: 10 * 1024 * 1024, timeoutMs: 15_000 });
@@ -916,9 +940,17 @@ async function downloadAndSave(
       return null;
     }
 
-    const { data: urlData } = supabaseAdmin.storage.from("carousel-images").getPublicUrl(fileName);
-    console.log(`Slide ${index}: saved to ${urlData.publicUrl}`);
-    return urlData.publicUrl;
+    // Return a short-lived signed URL + the path. The path is what should
+    // be persisted by the caller; `url` is only good for immediate render.
+    const { data: signed, error: signErr } = await supabaseAdmin.storage
+      .from("carousel-images")
+      .createSignedUrl(fileName, 60 * 60);
+    if (signErr) {
+      console.error(`Slide ${index}: signed URL error`, signErr.message);
+      return null;
+    }
+    console.log(`Slide ${index}: saved to path ${fileName} (signed URL minted)`);
+    return { url: signed.signedUrl, path: fileName };
   } catch (err) {
     console.error(`Download/save error slide ${index}:`, err);
     return null;

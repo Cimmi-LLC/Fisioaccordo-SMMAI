@@ -14,7 +14,9 @@ export interface MetaConnection {
 export interface SchedulePostInput {
   content: string;
   hashtags?: string;
-  imageUrls: string[];
+  /** Storage paths inside `imageBucket` — NOT public URLs. */
+  imagePaths: string[];
+  imageBucket: string;
   connectionId: string;
   scheduledFor: Date;
 }
@@ -52,7 +54,8 @@ export const useSchedulePost = () => {
         body: {
           content: input.content,
           hashtags: input.hashtags,
-          image_urls: input.imageUrls,
+          image_paths: input.imagePaths,
+          image_bucket: input.imageBucket,
           connection_id: input.connectionId,
           scheduled_for: input.scheduledFor.toISOString(),
         },

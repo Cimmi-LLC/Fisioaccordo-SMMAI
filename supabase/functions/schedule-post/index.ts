@@ -34,7 +34,7 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { content, hashtags, image_urls, connection_id, scheduled_for, media_type } = body;
+    const { content, hashtags, image_urls, image_paths, image_bucket, connection_id, scheduled_for, media_type } = body;
     const mediaType = media_type === 'story' ? 'story' : 'post';
 
     if (!content || typeof content !== "string") {
@@ -42,10 +42,25 @@ serve(async (req) => {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (!Array.isArray(image_urls) || image_urls.length === 0) {
-      return new Response(JSON.stringify({ error: "image_urls obbligatorio (almeno 1 immagine)" }), {
+
+    // Prefer new shape (image_paths + image_bucket). Fall back to legacy
+    // image_urls for backward compat during the rollout window.
+    const usingPaths = Array.isArray(image_paths) && image_paths.length > 0;
+    if (!usingPaths && (!Array.isArray(image_urls) || image_urls.length === 0)) {
+      return new Response(JSON.stringify({ error: "image_paths o image_urls obbligatorio (almeno 1)" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+    if (usingPaths) {
+      // Ownership check: each path must live in the caller's folder.
+      const userPrefix = user.id + "/";
+      for (const p of image_paths) {
+        if (typeof p !== "string" || !p.startsWith(userPrefix)) {
+          return new Response(JSON.stringify({ error: "Path non autorizzato" }), {
+            status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
     }
     if (!connection_id) {
       return new Response(JSON.stringify({ error: "connection_id obbligatorio" }), {
@@ -101,7 +116,12 @@ serve(async (req) => {
         user_id: user.id,
         content,
         hashtags: hashtags || null,
-        image_urls,
+        // Legacy column kept null for new rows; preferred fields are
+        // image_paths + image_bucket. The cron resolves them to signed URLs
+        // at publish time.
+        image_urls: usingPaths ? null : image_urls,
+        image_paths: usingPaths ? image_paths : null,
+        image_bucket: usingPaths ? (image_bucket || "carousel-images") : null,
         platforms: ["instagram"],
         connection_id,
         status: "scheduled",
