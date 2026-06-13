@@ -67,11 +67,45 @@ serve(async (req) => {
       }
     }
 
-    const { url, text, platform, postType } = await req.json();
-    if (!url && !text) {
-      return new Response(JSON.stringify({ error: "Inserisci un URL o il testo del post" }), {
+    const { url, text, video_path, video_mime_type, platform, postType } = await req.json();
+    if (!url && !text && !video_path) {
+      return new Response(JSON.stringify({ error: "Inserisci un URL, il testo del post, oppure carica un video" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Download video from Storage (if provided)
+    let video_base64: string | null = null;
+    if (video_path) {
+      if (!auth.ok) {
+        return new Response(JSON.stringify({ error: "Autenticazione richiesta per analisi video" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Ownership: the path must start with the user's id (the policy enforces this too, but double-check)
+      if (!video_path.startsWith(`${auth.userId}/`)) {
+        return new Response(JSON.stringify({ error: "Accesso video non autorizzato" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const admin = adminClient();
+      const { data: file, error: dlErr } = await admin.storage.from("viral-uploads").download(video_path);
+      if (dlErr || !file) {
+        return new Response(JSON.stringify({ error: `Download video fallito: ${dlErr?.message || 'sconosciuto'}` }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const buf = new Uint8Array(await file.arrayBuffer());
+      // Convert to base64 chunked (avoid String.fromCharCode call stack overflow)
+      let bin = "";
+      const chunk = 0x8000;
+      for (let i = 0; i < buf.length; i += chunk) {
+        bin += String.fromCharCode(...buf.subarray(i, i + chunk));
+      }
+      video_base64 = btoa(bin);
+
+      // Best-effort cleanup so storage doesn't accumulate
+      admin.storage.from("viral-uploads").remove([video_path]).catch(() => { /* ignore */ });
     }
 
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
@@ -85,10 +119,10 @@ serve(async (req) => {
       fetchedContent = await fetchOgContent(url);
     }
 
-    // If only URL provided (no text) and we couldn't fetch content, ask for text
-    if (!text && !fetchedContent) {
+    // If only URL provided (no text, no video) and we couldn't fetch content, ask for text/video
+    if (!text && !fetchedContent && !video_base64) {
       return new Response(JSON.stringify({
-        error: "Instagram/TikTok bloccano la lettura automatica. Incolla la caption del post nel campo di testo per analizzarlo.",
+        error: "Instagram/TikTok bloccano la lettura automatica. Incolla la caption del post o carica il video MP4.",
         requires_text: true
       }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -101,30 +135,50 @@ serve(async (req) => {
     if (fetchedContent) postContext += `${postContext ? "\n\n" : ""}CONTENUTO DALLA PAGINA:\n${fetchedContent}`;
     if (url) postContext += `\n\nURL: ${url}`;
 
-    const prompt = `Analizza questo ${postType || 'post'} da ${platform || 'social media'} e trova i pattern che lo rendono virale.
+    const hasVideo = !!video_base64;
+    const promptHeader = hasVideo
+      ? `Analizza questo ${postType || 'post'} video da ${platform || 'social media'}. Hai accesso al video completo (inquadrature, transizioni, audio, eventuale voiceover) e ai metadati testuali.`
+      : `Analizza questo ${postType || 'post'} da ${platform || 'social media'} e trova i pattern che lo rendono virale.`;
+
+    const videoFields = hasVideo
+      ? `,\n  "visual_analysis": "analisi delle inquadrature, composizione, colori, transizioni, presenza di testo on-screen, ritmo di taglio",\n  "audio_analysis": "analisi dell'audio: musica/voice over, energia, sincronizzazione con i visual"`
+      : '';
+
+    const prompt = `${promptHeader}
 
 ${postContext}
 
 ISTRUZIONI:
-- Analizza ESCLUSIVAMENTE il contenuto fornito sopra.
+- Analizza ESCLUSIVAMENTE il contenuto fornito.
 - NON inventare o assumere contenuti non presenti.
-- Cita frasi, parole chiave ed elementi concreti dal post reale.
-- Analizza la strategia di copy, hook, struttura narrativa e CTA.
+- Cita elementi concreti (frasi, frame, parole chiave) dal materiale reale.
+${hasVideo ? '- Considera visual, audio E caption come un unico sistema.' : '- Analizza la strategia di copy, hook, struttura narrativa e CTA.'}
 
 Rispondi SOLO con un JSON valido:
 {
   "patterns": {
-    "hook_type": "tipo di hook usato (domanda, statistica, provocazione, storia, lista)",
-    "structure": ["lista dei passaggi narrativi del post"],
+    "hook_type": "tipo di hook usato (domanda, statistica, provocazione, storia, lista${hasVideo ? ', visual stopper' : ''})",
+    "structure": ["lista dei passaggi narrativi del ${hasVideo ? 'video' : 'post'}"],
     "cta_style": "tipo di call to action",
     "emotional_triggers": ["lista trigger emotivi usati"],
     "formatting": ["pattern di formattazione (emoji, spazi, lunghezza frasi)"],
     "hashtag_strategy": "strategia hashtag usata"
   },
-  "analysis": "analisi completa in 3-5 frasi del perché questo post funziona, con citazioni dal testo reale",
+  "analysis": "analisi completa in 3-5 frasi del perché questo ${hasVideo ? 'reel' : 'post'} funziona, con citazioni dal contenuto reale",
   "score": 75,
-  "takeaways": ["3-5 lezioni concrete da applicare ai propri post"]
+  "takeaways": ["3-5 lezioni concrete da applicare ai propri ${hasVideo ? 'reel' : 'post'}"]${videoFields}
 }`;
+
+    // Build Gemini parts: text + optional inline video
+    const userParts: Array<Record<string, unknown>> = [{ text: prompt }];
+    if (hasVideo) {
+      userParts.push({
+        inline_data: {
+          mime_type: video_mime_type || "video/mp4",
+          data: video_base64,
+        },
+      });
+    }
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
@@ -132,8 +186,8 @@ Rispondi SOLO con un JSON valido:
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          system_instruction: { parts: [{ text: "Sei un esperto analista di contenuti social virali. Analizzi post e trovi i pattern che li rendono virali. Basa la tua analisi SOLO sul contenuto reale fornito. Rispondi SOLO con JSON valido." }] },
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          system_instruction: { parts: [{ text: "Sei un esperto analista di contenuti social virali. Analizzi reel/post identificando i pattern che li rendono virali. Basa la tua analisi SOLO sul contenuto reale fornito (testo, video, audio). Rispondi SOLO con JSON valido." }] },
+          contents: [{ role: "user", parts: userParts }],
           generationConfig: {
             temperature: 0.7,
             responseMimeType: "application/json",

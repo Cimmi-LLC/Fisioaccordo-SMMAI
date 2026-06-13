@@ -31,12 +31,26 @@ interface Rect { top: number; left: number; width: number; height: number; }
 const TOOLTIP_W = 320;
 const TOOLTIP_H_EST = 170;  // approximate height for positioning
 const ARROW_GAP = 14;
+const MOBILE_BREAKPOINT = 768;
 
 function clamp(v: number, min: number, max: number) { return Math.max(min, Math.min(max, v)); }
 
 function computeTooltipPos(targetRect: Rect | null, placement: TourStep['placement']): React.CSSProperties {
   const winW = window.innerWidth;
   const winH = window.innerHeight;
+  // Mobile: anchor the tooltip to the bottom of the screen. Trying to
+  // float it next to a target on a 390px screen always ends up partially
+  // off-screen or covering the target itself.
+  if (winW < MOBILE_BREAKPOINT) {
+    return {
+      position: 'fixed',
+      left: 12,
+      right: 12,
+      bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
+      width: 'auto',
+      maxWidth: '100%',
+    };
+  }
   if (!targetRect || placement === 'center') {
     return {
       position: 'fixed',
@@ -66,7 +80,7 @@ function computeTooltipPos(targetRect: Rect | null, placement: TourStep['placeme
 }
 
 const OnboardingTour: React.FC = () => {
-  const { running, markCompleted, stop } = useOnboardingTour();
+  const { running, markCompleted } = useOnboardingTour();
   const navigate = useNavigate();
   const location = useLocation();
   const [stepIndex, setStepIndex] = useState(0);
@@ -185,10 +199,11 @@ const OnboardingTour: React.FC = () => {
         }} />
       )}
 
-      {/* Tooltip */}
+      {/* Tooltip — on mobile, computeTooltipPos returns left+right so we
+          don't apply a fixed width (let it fill the screen with 12px margins). */}
       <div style={{
+        width: window.innerWidth < MOBILE_BREAKPOINT ? undefined : TOOLTIP_W,
         ...tooltipPos,
-        width: TOOLTIP_W,
         background: '#ffffff',
         borderRadius: 12,
         boxShadow: '0 4px 24px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.04)',
@@ -197,9 +212,9 @@ const OnboardingTour: React.FC = () => {
         fontFamily: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
         overflow: 'hidden',
       }}>
-        {/* Close X */}
+        {/* Close X — marks the tour as completed so it doesn't auto-reopen */}
         <button
-          onClick={stop}
+          onClick={markCompleted}
           aria-label="Chiudi"
           style={{
             position: 'absolute', top: 8, right: 8,

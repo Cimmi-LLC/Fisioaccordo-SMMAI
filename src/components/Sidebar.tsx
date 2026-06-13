@@ -63,13 +63,18 @@ const Sidebar: React.FC = () => {
 
   return (
     <>
-      {/* Mobile hamburger (visible only on mobile when drawer closed) */}
+      {/* Mobile hamburger (visible only on mobile when drawer closed).
+          `calc(env(safe-area-inset-top) + 12px)` keeps it below the iPhone
+          notch / status bar instead of being eaten by it. */}
       {isMobile && !mobileOpen && (
         <button
           onClick={() => setMobileOpen(true)}
           aria-label="Apri menu"
           style={{
-            position: 'fixed', top: 12, left: 12, zIndex: 49,
+            position: 'fixed',
+            top: 'calc(env(safe-area-inset-top, 0px) + 12px)',
+            left: 'calc(env(safe-area-inset-left, 0px) + 12px)',
+            zIndex: 49,
             width: 40, height: 40, borderRadius: 10,
             background: 'var(--surface)', border: '1px solid var(--line)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -95,7 +100,10 @@ const Sidebar: React.FC = () => {
       <aside
         style={{
           width: 220,
-          height: '100vh',
+          // Use dynamic viewport units when available — fixes iOS Safari URL bar
+          // resizing the page and the sidebar getting clipped at the bottom.
+          height: '100dvh',
+          minHeight: '100vh',
           backgroundColor: 'var(--surface)',
           borderRight: '1px solid var(--line)',
           display: 'flex',
@@ -108,6 +116,9 @@ const Sidebar: React.FC = () => {
           transform: isMobile && !mobileOpen ? 'translateX(-100%)' : 'translateX(0)',
           transition: 'transform 0.25s ease',
           overflowY: 'auto',
+          // Respect iPhone notch / home indicator
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         }}
       >
       {/* Logo + close button (mobile) */}

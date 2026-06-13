@@ -168,10 +168,10 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
     } catch (error) {
       console.error('Errore durante il salvataggio:', error);
       loadingState.finishLoading(false, '❌ Errore salvataggio');
-      
+      const { extractErrorMessage } = await import('@/lib/errors');
       toast({
-        title: "❌ Errore",
-        description: "Errore durante il salvataggio. Riprova.",
+        title: "❌ Errore salvataggio",
+        description: extractErrorMessage(error),
         variant: "destructive"
       });
     }

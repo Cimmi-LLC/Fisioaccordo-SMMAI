@@ -41,7 +41,7 @@ export const useViralAnalysis = () => {
 
   useEffect(() => { fetchAnalyses(); }, [fetchAnalyses]);
 
-  const analyzePost = useCallback(async (input: { url?: string; text?: string; platform: string; postType: string }) => {
+  const analyzePost = useCallback(async (input: { url?: string; text?: string; video_path?: string; video_mime_type?: string; platform: string; postType: string }) => {
     if (!user) return null;
     setAnalyzing(true);
     try {
@@ -58,7 +58,14 @@ export const useViralAnalysis = () => {
         platform: input.platform,
         post_type: input.postType,
         patterns: data.patterns || {},
-        engagement_data: data.engagement_data || {},
+        engagement_data: {
+          ...(data.engagement_data || {}),
+          score: data.score,
+          analysis: data.analysis,
+          visual_analysis: data.visual_analysis,
+          audio_analysis: data.audio_analysis,
+          takeaways: data.takeaways,
+        },
         analysis_text: data.analysis || ''
       } as any).select().single();
 

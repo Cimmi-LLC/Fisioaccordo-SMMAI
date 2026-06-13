@@ -162,7 +162,8 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
       }
     } catch (err) {
       console.error('Error generating images:', err);
-      toast({ title: "Errore generazione immagini", description: "Si è verificato un errore. Riprova.", variant: "destructive" });
+      const { extractErrorMessage } = await import('@/lib/errors');
+      toast({ title: "Errore generazione immagini", description: extractErrorMessage(err), variant: "destructive" });
     } finally {
       setIsGeneratingImages(false);
     }

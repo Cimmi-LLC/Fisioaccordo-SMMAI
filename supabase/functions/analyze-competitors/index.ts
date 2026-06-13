@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { scrapeInstagramPosts, scrapeInstagramProfile } from "./apify.ts";
 import { computeMetrics, InsufficientDataError } from "./metrics.ts";
-import { buildLegacyContext, LEGACY_SYSTEM_PROMPT, buildLegacyUserPrompt } from "./prompt.ts";
+import { buildLegacyContext, LEGACY_SYSTEM_PROMPT, buildLegacyUserPrompt, filterMostUsedAgainstObserved } from "./prompt.ts";
 import { callGemini } from "./llm.ts";
 import { adminClient, requireAuth, requireWithinRateLimit } from "../_shared/auth.ts";
 
@@ -91,7 +91,10 @@ serve(async (req) => {
       });
     }
 
-    // 5. Attach v1 scraped_metrics (compat) + new extended metrics (additive)
+    // 5a. Strip hallucinated hashtags from "most_used" — keep only those actually observed
+    filterMostUsedAgainstObserved(parsed, scrapedData);
+
+    // 5b. Attach v1 scraped_metrics (compat) + new extended metrics (additive)
     if (scrapedData) {
       parsed.scraped_metrics = {
         posts_analyzed: scrapedData.postsCount,

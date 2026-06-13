@@ -434,9 +434,16 @@ const Onboarding = () => {
             {brand.raw_analysis && (
               <div className="flex items-center gap-2 p-3 rounded-xl mb-6" style={{ backgroundColor: 'var(--viola-dim)', border: '1px solid rgba(85,70,151,0.15)' }}>
                 <CheckCircle2 className="h-4 w-4 flex-shrink-0" style={{ color: 'var(--viola)' }} />
-                <p className="text-[11px]" style={{ color: 'var(--ink2)' }}>
+                <p className="text-[11px] flex-1" style={{ color: 'var(--ink2)' }}>
                   Abbiamo analizzato il tuo sito e trovato queste informazioni. Puoi modificare qualsiasi campo.
                 </p>
+                <button
+                  onClick={() => { setBrand(EMPTY_BRAND); setStep(0); }}
+                  className="text-[11px] font-bold flex-shrink-0"
+                  style={{ color: 'var(--viola)', background: 'transparent', border: '1px solid var(--viola)', borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}
+                >
+                  Rianalizza un altro sito
+                </button>
               </div>
             )}
 

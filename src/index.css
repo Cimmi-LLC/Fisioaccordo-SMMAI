@@ -263,3 +263,20 @@ label[style*="var(--rosa)"]:not([style*="rosa-dim"]):active,
     padding-top: 60px; /* room for the floating hamburger button */
   }
 }
+
+/* ────────────────────────────────────────────────────────
+   Mobile: kill horizontal overflow + pinch-zoom drift
+   The viewport meta locks zoom; these rules stop any
+   stray inner overflow from making the page slide laterally.
+   ──────────────────────────────────────────────────────── */
+html, body, #root {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+body {
+  /* iOS Safari: prevent rubber-band horizontal bounce */
+  overscroll-behavior-x: none;
+  /* Disable double-tap zoom on form controls (still allows pinch via OS access) */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
