@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import ReelScriptPreview from '@/components/reel/ReelScriptPreview';
@@ -7,6 +8,7 @@ import { useReelScript } from '@/hooks/useReelScript';
 const QTY_OPTIONS = [1, 2, 5, 10] as const;
 
 const ReelPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [topic, setTopic] = useState('');
   const [qty, setQty] = useState<number>(1);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -15,6 +17,25 @@ const ReelPage = () => {
   const handleGenerate = () => {
     if (topic.trim()) generateScripts(topic.trim(), qty);
   };
+
+  // Deep-link from Trend page: prefill topic + auto-generate when ?topic=…&auto=1
+  // Auto-runs at most once per navigation (we clear the params after firing).
+  const autoFiredRef = useRef(false);
+  useEffect(() => {
+    if (autoFiredRef.current) return;
+    const incoming = (searchParams.get('topic') || '').trim();
+    const auto = searchParams.get('auto') === '1';
+    if (!incoming) return;
+    setTopic(incoming);
+    if (auto) {
+      autoFiredRef.current = true;
+      // Defer to next tick so React commits the topic state first
+      setTimeout(() => generateScripts(incoming, qty), 0);
+      // Strip params so a future refresh doesn't re-fire the generation
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Reset active script to first when new scripts arrive
   useEffect(() => { setActiveIndex(0); }, [scripts.length]);

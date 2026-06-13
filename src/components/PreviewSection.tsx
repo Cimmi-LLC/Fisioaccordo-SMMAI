@@ -63,12 +63,30 @@ const PreviewSection: React.FC<PreviewSectionProps> = ({
   const [swappingIndex, setSwappingIndex] = useState<number | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
 
-  const prepareImagesForSchedule = async (): Promise<string[]> => {
-    const urls = carouselSlides
-      .map((s) => s.userImageUrl || s.imageUrl)
-      .filter((u): u is string => !!u);
-    if (urls.length === 0) throw new Error('Nessuna immagine disponibile');
-    return urls;
+  /**
+   * Build the post payload for SchedulePostDialog.
+   * Persistence rule (sprint 1.5): {bucket, paths}, never URLs.
+   * Re-uploads each slide via save-slide-image so the returned path is
+   * canonical and rooted on the verified user id.
+   */
+  const prepareImagesForSchedule = async (): Promise<{ bucket: string; paths: string[] }> => {
+    const paths: string[] = [];
+    let bucket = 'carousel-images';
+    for (let i = 0; i < carouselSlides.length; i++) {
+      const s = carouselSlides[i];
+      const sourceUrl = s.userImageUrl || s.imageUrl;
+      if (!sourceUrl) continue;
+      const { data, error } = await supabase.functions.invoke('save-slide-image', {
+        body: { imageUrl: sourceUrl, slideIndex: i },
+      });
+      if (error || data?.error || !data?.path) {
+        throw new Error(data?.error || error?.message || `Errore upload slide ${i + 1}`);
+      }
+      paths.push(data.path as string);
+      if (data.bucket) bucket = data.bucket as string;
+    }
+    if (paths.length === 0) throw new Error('Nessuna immagine disponibile');
+    return { bucket, paths };
   };
 
   const swapSlideImage = async (

@@ -1,5 +1,6 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useGlobalLoading } from "@/contexts/GlobalLoadingContext";
@@ -49,6 +50,41 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
 
   const noopFn = useCallback(() => {}, []);
   const { generatedContent, setGeneratedContent, lastRawResponses, generateContent } = useContentGeneration(user, formData, noopFn);
+
+  // Deep-link from Trend page (?topic=…&type=carosello&auto=1):
+  //   1) prefill description
+  //   2) set postType if provided
+  //   3) flag for auto-trigger; the actual generate fires in the next effect
+  //      after formData has been committed (otherwise generateContent would
+  //      see the stale closure description and send an empty topic).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const consumedParamsRef = useRef(false);
+  const [pendingAuto, setPendingAuto] = useState(false);
+  useEffect(() => {
+    if (consumedParamsRef.current) return;
+    const incoming = (searchParams.get('topic') || '').trim();
+    const type = (searchParams.get('type') || '').trim();
+    const auto = searchParams.get('auto') === '1';
+    if (!incoming && !type) return;
+    consumedParamsRef.current = true;
+    setFormData(prev => ({
+      ...prev,
+      description: incoming || prev.description,
+      postType: type || prev.postType,
+    }));
+    setSearchParams({}, { replace: true });
+    if (auto && incoming) setPendingAuto(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fires generate AFTER setFormData has been committed (formData.description
+  // matches the value we set above). One-shot.
+  useEffect(() => {
+    if (!pendingAuto) return;
+    if (!formData.description) return;
+    setPendingAuto(false);
+    generateContent();
+  }, [pendingAuto, formData.description, generateContent]);
 
   // Build CarouselData[] from raw AI responses
   React.useEffect(() => {
