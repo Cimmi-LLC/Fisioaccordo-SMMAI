@@ -34,10 +34,13 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
+  Eye,
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 import { useGenerationHistory } from '@/hooks/useGenerationHistory';
 import { useActiveBrand } from '@/hooks/useActiveBrand';
-import { GENERATION_TYPE_LABELS, type GenerationType } from '@/types/history';
+import { GENERATION_TYPE_LABELS, type GenerationType, type HistoryEntry } from '@/types/history';
 
 const TYPE_ICONS: Record<GenerationType, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
   post: LayoutGrid,
@@ -65,6 +68,7 @@ const HistoryPage: React.FC = () => {
   const { entries, rawEntries, loading, filters, setFilters, remove } = useGenerationHistory();
   const { brands } = useActiveBrand();
   const [confirmDelete, setConfirmDelete] = React.useState<string | null>(null);
+  const [previewEntry, setPreviewEntry] = React.useState<HistoryEntry | null>(null);
 
   const stats = {
     total: rawEntries.length,
@@ -182,8 +186,14 @@ const HistoryPage: React.FC = () => {
             const brand = brands.find((b) => b.id === e.brand_id);
             const date = new Date(e.created_at);
             const isFailed = e.status === 'failed';
+            const hasPreview = e.preview && Object.keys(e.preview).length > 0;
             return (
-              <Card key={e.id} className="panel-card">
+              <Card
+                key={e.id}
+                className="panel-card"
+                onClick={() => hasPreview && setPreviewEntry(e)}
+                style={{ cursor: hasPreview ? 'pointer' : 'default' }}
+              >
                 <CardContent style={{ padding: '14px 18px' }}>
                   <div className="flex items-start gap-3">
                     <div
@@ -238,14 +248,23 @@ const HistoryPage: React.FC = () => {
                         </div>
                       )}
                     </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setConfirmDelete(e.id)}
-                      style={{ color: '#ef4444', flexShrink: 0 }}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {hasPreview && (
+                        <Eye
+                          className="h-4 w-4"
+                          style={{ color: 'var(--ink3)' }}
+                          aria-label="Vedi anteprima"
+                        />
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={(ev) => { ev.stopPropagation(); setConfirmDelete(e.id); }}
+                        style={{ color: '#ef4444' }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -253,6 +272,112 @@ const HistoryPage: React.FC = () => {
           })}
         </div>
       )}
+
+      {/* Preview modal */}
+      <Dialog open={!!previewEntry} onOpenChange={(v) => !v && setPreviewEntry(null)}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          {previewEntry && (() => {
+            const p = (previewEntry.preview || {}) as Record<string, any>;
+            const m = (previewEntry.metadata || {}) as Record<string, any>;
+            const type = previewEntry.generation_type;
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Badge style={{ backgroundColor: (TYPE_COLOR[type] || '#888') + '22', color: TYPE_COLOR[type] }}>
+                      {GENERATION_TYPE_LABELS[type]}
+                    </Badge>
+                    <span>{previewEntry.title || previewEntry.topic || 'Anteprima'}</span>
+                  </DialogTitle>
+                  <DialogDescription>
+                    Generato il {new Date(previewEntry.created_at).toLocaleString('it-IT')}
+                    {m.postType && ` · ${m.postType}`}
+                    {m.numSlides && ` · ${m.numSlides} slide`}
+                    {p.slides_count && ` · ${p.slides_count} slide`}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 mt-2">
+                  {/* Carosello / post: cover + caption */}
+                  {(type === 'carousel' || type === 'post') && (
+                    <>
+                      {p.first_title && (
+                        <div>
+                          <div className="text-[10px] font-bold uppercase mb-1" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>
+                            Cover (slide 1)
+                          </div>
+                          <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--viola-dim)', border: '1px solid rgba(85,70,151,0.18)' }}>
+                            <div className="text-base font-bold mb-1" style={{ color: 'var(--ink)' }}>{p.first_title}</div>
+                            {p.first_text && <div className="text-sm" style={{ color: 'var(--ink2)' }}>{p.first_text}</div>}
+                          </div>
+                        </div>
+                      )}
+                      {p.caption_preview && (
+                        <div>
+                          <div className="text-[10px] font-bold uppercase mb-1" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>
+                            Caption
+                          </div>
+                          <div className="rounded-xl p-4 text-sm whitespace-pre-wrap" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink2)' }}>
+                            {p.caption_preview}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* Reel */}
+                  {type === 'reel' && (
+                    <>
+                      {p.script_preview && (
+                        <div>
+                          <div className="text-[10px] font-bold uppercase mb-1" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>
+                            Script
+                          </div>
+                          <div className="rounded-xl p-4 text-sm whitespace-pre-wrap" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink2)' }}>
+                            {p.script_preview}
+                          </div>
+                        </div>
+                      )}
+                      {p.durata_stimata && (
+                        <div className="text-xs" style={{ color: 'var(--ink3)' }}>
+                          Durata stimata: <strong>{p.durata_stimata}</strong>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* Hashtag (carousel, post, reel) */}
+                  {Array.isArray(p.hashtags) && p.hashtags.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-bold uppercase mb-1.5" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>
+                        Hashtag
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {p.hashtags.map((h: string, i: number) => (
+                          <Badge key={i} variant="outline" className="text-xs">#{String(h).replace(/^#/, '')}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error message for failed generations */}
+                  {previewEntry.status === 'failed' && previewEntry.error_message && (
+                    <div className="rounded-xl p-3 text-sm" style={{ backgroundColor: 'rgba(239,68,68,0.08)', color: '#ef4444' }}>
+                      ⚠ {previewEntry.error_message}
+                    </div>
+                  )}
+
+                  {!p.first_title && !p.caption_preview && !p.script_preview && (
+                    <p className="text-sm text-center py-6" style={{ color: 'var(--ink3)' }}>
+                      Nessuna anteprima salvata per questo tipo di generazione.
+                    </p>
+                  )}
+                </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!confirmDelete} onOpenChange={(v) => !v && setConfirmDelete(null)}>
         <AlertDialogContent>
