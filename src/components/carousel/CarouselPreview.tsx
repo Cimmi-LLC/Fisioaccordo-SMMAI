@@ -54,7 +54,8 @@ const CarouselPreview: React.FC<CarouselPreviewProps> = ({ data, format = '1:1' 
     colorTerziario: activeBrand?.colore_terziario || '#1a1a2e',
     fontFamily: renderConfig.brandFont,
     logoUrl: renderConfig.logoUrl,
-    logoInitials: carousel?.titolo_carosello?.substring(0, 2).toUpperCase() || 'FA',
+    logoInitials: (activeBrand?.nome_business || carousel?.titolo_carosello || 'FA').substring(0, 2).toUpperCase(),
+    brandName: activeBrand?.nome_business || undefined,
     totalSlides: carousel?.slides.length || 0,
     postTemplateId: activeBrand?.post_template_id || null,
   };
