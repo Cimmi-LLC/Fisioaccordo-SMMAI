@@ -68,24 +68,51 @@ serve(async (req) => {
 
           if (brand) {
             brandData = brand;
-            brandContext = `\n\n=== BRAND KIT (usa SEMPRE queste info) ===
-NOME STUDIO: ${brand.nome_business || "Studio"}
-DESCRIZIONE: ${brand.descrizione || ""}
-SERVIZI: ${(brand.servizi || []).join(", ")}
-TARGET PAZIENTI: ${brand.target_pazienti || "pubblico generale"}
-TONO DI VOCE: ${brand.tono_voce || "professionale"}
-PERSONA DI SCRITTURA: ${brand.persona_scrittura === "io" ? "Prima persona singolare (io)" : "Prima persona plurale (noi)"}
-VANTAGGI COMPETITIVI: ${(brand.vantaggi_competitivi || []).join(", ")}
-MISSION: ${brand.mission || ""}
-IDENTITÀ CORE: ${brand.identita_core || ""}
-CATEGORIE: ${(brand.categorie || []).join(", ")}
-CTA PREFERITE: ${(brand.cta_suggerite || []).join(", ")}
-TEMI CHIAVE: ${(brand.temi_chiave || []).join(", ")}
-PAROLE DA EVITARE: ${(brand.parole_da_evitare || []).join(", ") || "nessuna"}
-COLORE PRIMARIO: ${brand.colore_primario || "#554697"}
-COLORE SECONDARIO: ${brand.colore_secondario || "#E6007E"}
+            const persona = brand.persona_scrittura === "io" ? "prima persona singolare (io / il mio studio)" : "prima persona plurale (noi / nel nostro studio)";
+            const cta = (brand.cta_suggerite || []).filter(Boolean);
+            const vantaggi = (brand.vantaggi_competitivi || []).filter(Boolean);
+            const paroleEvitare = (brand.parole_da_evitare || []).filter(Boolean);
+            const temi = (brand.temi_chiave || []).filter(Boolean);
+            const servizi = (brand.servizi || []).filter(Boolean);
 
-REGOLA FONDAMENTALE: Ogni contenuto DEVE sembrare scritto da "${brand.nome_business || "lo studio"}". Usa il tono "${brand.tono_voce || "professionale"}" e scrivi in ${brand.persona_scrittura === "io" ? "prima persona singolare" : "prima persona plurale"}. Non usare mai le parole da evitare.`;
+            brandContext = `
+
+=== BRAND: ${brand.nome_business || "Studio"} ===
+${brand.descrizione ? `Descrizione: ${brand.descrizione}` : ""}
+${brand.mission ? `Mission: ${brand.mission}` : ""}
+${brand.identita_core ? `Identità: ${brand.identita_core}` : ""}
+
+=== TARGET PAZIENTI (a chi stai parlando in OGNI slide) ===
+${brand.target_pazienti || "pubblico generale"}
+→ Ogni hook, esempio, scenario DEVE risuonare con questo target. Mai parlare a "tutti".
+
+=== VOCE OBBLIGATORIA ===
+Tono: ${brand.tono_voce || "professionale"}
+Persona: ${persona}
+${persona.includes("singolare") ? "→ Usa 'io', 'il mio studio', 'nel mio lavoro vedo…'. MAI 'noi' o 'il nostro team'." : "→ Usa 'noi', 'nel nostro studio', 'i nostri pazienti'. MAI 'io' o 'il mio lavoro'."}
+
+=== SERVIZI DEL BRAND (riferisciti SOLO a questi) ===
+${servizi.length > 0 ? servizi.join(" · ") : "(generici)"}
+→ La CTA finale e gli esempi di servizio devono riferirsi a UNO di questi, mai inventare servizi diversi.
+
+${vantaggi.length > 0 ? `=== VANTAGGI COMPETITIVI (cita almeno UNO in una slide content) ===
+${vantaggi.map((v: string, i: number) => `${i + 1}. ${v}`).join("\n")}
+→ Almeno una slide deve trasformare uno di questi vantaggi in un beneficio concreto per il paziente.
+` : ""}
+${cta.length > 0 ? `=== CTA APPROVATE DAL BRAND (scegline UNA per cta_finale / bottone_cta) ===
+${cta.map((c: string) => `• ${c}`).join("\n")}
+→ Non inventare CTA fuori da questa lista. Adatta il fraseggio al topic ma resta nel set.
+` : ""}
+${temi.length > 0 ? `=== TEMI CHIAVE del brand: ${temi.join(", ")}
+→ Se il topic ne tocca uno, sfruttalo per creare connessione col brand.
+` : ""}
+${paroleEvitare.length > 0 ? `=== PAROLE/ESPRESSIONI BANDITE (output rifiutato se le usi) ===
+${paroleEvitare.map((p: string) => `❌ ${p}`).join("\n")}
+` : ""}
+${brand.categorie?.length ? `Categorie cliniche: ${brand.categorie.join(", ")}` : ""}
+COLORI BRAND: primario ${brand.colore_primario || "#554697"}, secondario ${brand.colore_secondario || "#E6007E"}
+
+REGOLA FONDAMENTALE: il contenuto deve sembrare scritto DA "${brand.nome_business || "lo studio"}", non da un'agenzia generica. Se rileggendo il copy non si capisce CHE È IL BRAND a parlare (vs. qualsiasi altro studio), riscrivilo.`;
           }
 
         }
@@ -127,20 +154,53 @@ Testo: "Ogni giorno, il mal di schiena limita milioni di persone, impedendo movi
 === REGOLE DI SCRITTURA ===
 - Ogni contenuto DEVE essere 100% specifico per il topic
 - Hook potente nei primi 3 secondi
-- Numeri concreti, fatti reali
+- Numeri concreti, fatti reali (NO statistiche inventate o non verificabili)
 - Parla direttamente al lettore con "tu"
-- CTA forte e specifica
+- CTA scelta dalla lista approvata del brand (mai inventata)
 - NO emoji nel titolo e testo delle slide (solo nella caption Instagram)
 - NO frasi fatte generiche
 - Usa CONTRASTO drammatico (prima/dopo)
 - Stile conversazionale e diretto
 - Cliffhanger tra una slide e l'altra
 
+=== HOOK / FRASI BANDITE (output rifiutato se le usi) ===
+Sono tutte sentite mille volte, indeboliscono il messaggio:
+❌ "Il tuo corpo ti sta parlando"
+❌ "Sapevi che…?"
+❌ "X cose che non sai su…"
+❌ "Non sottovalutare…"
+❌ "La verità su…"
+❌ "Attenzione!"
+❌ "Devi assolutamente…"
+❌ "X consigli/segreti per…"
+❌ "Il modo migliore per…"
+❌ "Ecco perché…"
+❌ "Continua a leggere per scoprire…"
+❌ Domande retoriche generiche tipo "Mai capitato che…?"
+USA INVECE: scenari concreti ("Ieri in studio…"), numeri specifici ("3 settimane dopo l'infortunio…"),
+contrasti netti ("Pensavi fosse stress. Era il diaframma."), label sul target ("A te che corri 30 km a settimana:").
+
+=== ANTI-GENERICO (banned) ===
+❌ "milioni di persone soffrono di…"
+❌ "ognuno di noi ha vissuto…"
+❌ "in un mondo in cui…"
+❌ "la salute è importante"
+❌ "prendersi cura di sé"
+❌ "il benessere è la chiave"
+Sono frasi vuote. Sostituisci con casi concreti, persone reali del target.
+
 === STRUTTURA CAROSELLO ===
-- Slide 1 (tipo "cover"): HOOK + SOTTOTITOLO + IMMAGINE STOCK. Campi: hook, sottotitolo, keywords_stock.
-- Slide 2 (tipo "content"): PROBLEMA specifico e identificabile
-- Slide 3 a N-1 (tipo "content"): SOLUZIONE con proof, numeri, step concreti
-- Ultima Slide (tipo "cta"): CTA IRRESISTIBILE + riassunto valore. NO immagine generata.
+- Slide 1 (tipo "cover"): HOOK ad alta tensione che identifica il target o lo scenario specifico.
+  Campi: hook (max 5 parole, niente domande generiche), sottotitolo (≤10 parole), keywords_stock.
+- Slide 2 (tipo "content"): PROBLEMA in scena concreta — un caso/scenario riconoscibile dal target.
+  Niente "molte persone soffrono di X". Sì "se hai dolore alla schiena dopo 30 minuti seduto…".
+- Slide 3 (tipo "content"): CAUSA NON OVVIA — l'insight che cambia prospettiva.
+  Tipo: "Non è la postura. È che il diaframma non si espande." Differenzia dal banale.
+- Slide 4..N-1 (tipo "content"): SOLUZIONE con step misurabili / proof concreta.
+  Cita un servizio del brand quando ha senso. Includi tempo/numero ("in 3 sessioni…", "il 70% dei pazienti…")
+  SOLO se il brand l'ha fornito nei vantaggi competitivi; altrimenti usa quantitativi generici verificabili.
+- Ultima Slide (tipo "cta"): CTA dalla lista BRAND. Aggancia il valore al servizio specifico.
+  Es. "Prenota la valutazione gratuita" → riferisce a un servizio reale del brand.
 
 === REGOLE keywords_stock (FONDAMENTALE) ===
 Per ogni slide ragiona in QUESTO ORDINE prima di scrivere "keywords_stock":
@@ -203,9 +263,18 @@ Rispondi con questo JSON esatto:
 REGOLE:
 1. UNA sola slide di tipo "content" con titolo, testo e keywords_stock
 2. Il contenuto deve essere SPECIFICO sul topic "${topic.trim()}"
-3. Scrivi dal punto di vista di "${brandName}"
+3. Scrivi dal punto di vista di "${brandName}", rispettando la VOCE OBBLIGATORIA (io/noi)
 4. Testo: MASSIMO 2 frasi brevi
-5. keywords_stock: 3-4 parole inglesi concrete per foto stock`
+5. keywords_stock: 3-4 parole inglesi concrete per foto stock
+6. Niente frasi BANDITE (vedi system prompt), niente PAROLE BANDITE del brand
+7. La caption_instagram deve riferirsi al TARGET PAZIENTI del brand e chiudere con UNA CTA APPROVATA
+
+=== SELF-CHECK PRIMA DI RISPONDERE ===
+[ ] Il TARGET PAZIENTI si riconosce dal post?
+[ ] Voce io/noi rispettata?
+[ ] Nessuna frase/parola bandita?
+[ ] CTA dalla lista approvata?
+Se anche solo UNA è NO, riscrivi.`
 
       : `Genera un carosello Instagram su: "${topic.trim()}"
 Numero slide: ${slidesCount}
@@ -252,7 +321,17 @@ REGOLE CRITICHE:
 7. Il contenuto deve essere SPECIFICO sul topic "${topic.trim()}"
 8. Scrivi dal punto di vista di "${brandName}"
 9. Usa cliffhanger tra una slide e l'altra
-10. L'ultima slide deve usare una CTA del brand`;
+10. L'ultima slide deve usare UNA delle CTA APPROVATE dal brand (vedi sezione CTA APPROVATE sopra). Niente CTA inventate.
+
+=== SELF-CHECK PRIMA DI RISPONDERE ===
+Rileggi mentalmente l'output e verifica:
+[ ] Nessuna frase nella lista BANDITE è presente?
+[ ] Il TARGET PAZIENTI si riconosce dal copy (non sembra scritto "per tutti")?
+[ ] La VOCE OBBLIGATORIA è rispettata (io vs noi)?
+[ ] Almeno una slide usa un VANTAGGIO COMPETITIVO del brand?
+[ ] La CTA finale è una di quelle approvate?
+[ ] Nessuna PAROLA BANDITA è presente?
+Se anche solo UNA risposta è NO, riscrivi prima di rispondere.`;
 
     const captionRules = `
 
