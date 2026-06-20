@@ -69,11 +69,19 @@ interface Kpi {
   sub?: string;
 }
 
-function buildKpis(channel: Channel, rows: MetricRow[], prevRows: MetricRow[]): Kpi[] {
+function buildKpis(
+  channel: Channel,
+  rows: MetricRow[],            // post-level rows only
+  accountRows: MetricRow[],     // account-level rows only
+  prevRows: MetricRow[],
+  prevAccountRows: MetricRow[],
+): Kpi[] {
   const sum = (k: keyof MetricRow) => sumKey(rows, k);
   const psum = (k: keyof MetricRow) => sumKey(prevRows, k);
-  const last = (k: keyof MetricRow) => lastNonNull(rows, k);
-  const plast = (k: keyof MetricRow) => lastNonNull(prevRows, k);
+  // followers / new_followers: account-level rows (LAST or SUM as appropriate)
+  const last = (k: keyof MetricRow) => lastNonNull(accountRows, k);
+  const plast = (k: keyof MetricRow) => lastNonNull(prevAccountRows, k);
+  const sumAcc = (k: keyof MetricRow) => sumKey(accountRows, k);
   const avg = (k: keyof MetricRow) => avgKey(rows, k);
   const pavg = (k: keyof MetricRow) => avgKey(prevRows, k);
 
@@ -90,7 +98,7 @@ function buildKpis(channel: Channel, rows: MetricRow[], prevRows: MetricRow[]): 
     const erIg = er(eng, reach, prevEng, prevReach);
     return [
       { key: 'reach', label: 'Copertura', value: fmt(reach), delta: delta(reach, prevReach) },
-      { key: 'foll',  label: 'Follower',  value: fmt(foll),  delta: delta(foll, pfoll), sub: `+${fmt(sum('new_followers'))} nuovi` },
+      { key: 'foll',  label: 'Follower',  value: fmt(foll),  delta: delta(foll, pfoll), sub: `+${fmt(sumAcc('new_followers'))} nuovi` },
       { key: 'eng',   label: 'Interazioni', value: fmt(eng), delta: delta(eng, prevEng) },
       { key: 'er',    label: 'Tasso engagement', value: erIg.value, delta: erIg.d },
       { key: 'saves', label: 'Salvataggi', value: fmt(sum('saves')),  delta: delta(sum('saves'), psum('saves')) },
@@ -105,7 +113,7 @@ function buildKpis(channel: Channel, rows: MetricRow[], prevRows: MetricRow[]): 
     const erTt = er(likes, views, plikes, pviews);
     return [
       { key: 'views', label: 'Visualizzazioni', value: fmt(views), delta: delta(views, pviews) },
-      { key: 'foll',  label: 'Follower',        value: fmt(foll),  delta: delta(foll, pfoll), sub: `+${fmt(sum('new_followers'))} nuovi` },
+      { key: 'foll',  label: 'Follower',        value: fmt(foll),  delta: delta(foll, pfoll), sub: `+${fmt(sumAcc('new_followers'))} nuovi` },
       { key: 'eng',   label: 'Mi piace + commenti', value: fmt(likes), delta: delta(likes, plikes) },
       { key: 'er',    label: 'Tasso engagement', value: erTt.value, delta: erTt.d },
       { key: 'comp',  label: 'Tasso completamento', value: (avg('video_completion_rate') * 100).toFixed(1) + '%', delta: delta(avg('video_completion_rate'), pavg('video_completion_rate')) },
@@ -119,7 +127,7 @@ function buildKpis(channel: Channel, rows: MetricRow[], prevRows: MetricRow[]): 
   const erYt = er(eng, views, peng, pviews);
   return [
     { key: 'views', label: 'Visualizzazioni', value: fmt(views), delta: delta(views, pviews) },
-    { key: 'foll',  label: 'Iscritti',        value: fmt(foll),  delta: delta(foll, pfoll), sub: `+${fmt(sum('new_followers'))} nuovi` },
+    { key: 'foll',  label: 'Iscritti',        value: fmt(foll),  delta: delta(foll, pfoll), sub: `+${fmt(sumAcc('new_followers'))} nuovi` },
     { key: 'eng',   label: 'Interazioni',     value: fmt(eng),   delta: delta(eng, peng) },
     { key: 'er',    label: 'Tasso engagement', value: erYt.value, delta: erYt.d },
     { key: 'watch', label: 'Tempo di visualizzazione', value: fmt(Math.round(sum('watch_minutes') / 60)) + ' h', delta: delta(sum('watch_minutes'), psum('watch_minutes')) },
@@ -146,16 +154,28 @@ const PerformanceDashboard: React.FC = () => {
     from, to,
   });
 
-  const kpis = useMemo(() => buildKpis(channel, rows, prevRows), [channel, rows, prevRows]);
+  // Post-level vs account-level split. Post metrics (reach, engagement, …)
+  // SUM only over post rows so account snapshots don't double-count.
+  // Followers / new_followers come from account rows (LAST in period).
+  const postRows = useMemo(() => rows.filter((r) => !r.is_account_level), [rows]);
+  const accountRows = useMemo(() => rows.filter((r) => r.is_account_level), [rows]);
+  const prevPostRows = useMemo(() => prevRows.filter((r) => !r.is_account_level), [prevRows]);
+  const prevAccountRows = useMemo(() => prevRows.filter((r) => r.is_account_level), [prevRows]);
+
+  const kpis = useMemo(
+    () => buildKpis(channel, postRows, accountRows, prevPostRows, prevAccountRows),
+    [channel, postRows, accountRows, prevPostRows, prevAccountRows]
+  );
 
   const channelMeta = CHANNELS.find((c) => c.id === channel)!;
   const accent = channelMeta.accent;
 
-  // Trend chart data — daily reach OR video_views depending on channel
+  // Trend chart data — daily reach OR video_views depending on channel.
+  // SUM only over post rows (account rows have reach=null anyway).
   const trendKey: keyof MetricRow = channel === 'instagram' ? 'reach' : 'video_views';
   const trendData = useMemo(() => {
     const byDay = new Map<string, number>();
-    for (const r of rows) {
+    for (const r of postRows) {
       byDay.set(r.snapshot_date, (byDay.get(r.snapshot_date) || 0) + (Number(r[trendKey]) || 0));
     }
     return Array.from(byDay.entries())
@@ -165,26 +185,24 @@ const PerformanceDashboard: React.FC = () => {
         label: new Date(date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }),
         value,
       }));
-  }, [rows, trendKey]);
+  }, [postRows, trendKey]);
 
+  // Follower growth: pull from account rows (1 per day, even if no posts).
   const followersData = useMemo(() => {
-    const byDay = new Map<string, number>();
-    for (const r of rows) {
-      if (r.followers_total != null) byDay.set(r.snapshot_date, r.followers_total);
-    }
-    return Array.from(byDay.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([date, followers]) => ({
-        date,
-        label: new Date(date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }),
-        followers,
+    return [...accountRows]
+      .sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date))
+      .filter((r) => r.followers_total != null)
+      .map((r) => ({
+        date: r.snapshot_date,
+        label: new Date(r.snapshot_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }),
+        followers: r.followers_total as number,
       }));
-  }, [rows]);
+  }, [accountRows]);
 
   // Top content of the period (aggregate per external_post_id, sort by engagement)
   const topRows = useMemo(() => {
     const byPost = new Map<string, { title: string; reach: number; engagement: number }>();
-    for (const r of rows) {
+    for (const r of postRows) {
       const id = r.external_post_id;
       const prev = byPost.get(id) || { title: r.caption_excerpt || '(senza testo)', reach: 0, engagement: 0 };
       prev.reach += Number(r[trendKey]) || 0;
@@ -193,7 +211,7 @@ const PerformanceDashboard: React.FC = () => {
       byPost.set(id, prev);
     }
     return Array.from(byPost.values()).sort((a, b) => b.engagement - a.engagement).slice(0, 5);
-  }, [rows, trendKey]);
+  }, [postRows, trendKey]);
 
   if (!isAdmin) {
     return (

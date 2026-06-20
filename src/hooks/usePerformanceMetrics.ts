@@ -20,6 +20,7 @@ export interface MetricRow {
   new_followers: number | null;
   caption_excerpt: string | null;
   external_post_id: string;
+  is_account_level: boolean;
 }
 
 export interface PerformanceQuery {

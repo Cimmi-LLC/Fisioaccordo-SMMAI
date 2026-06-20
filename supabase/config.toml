@@ -53,3 +53,6 @@ verify_jwt = false
 
 [functions.meta-data-deletion]
 verify_jwt = false
+
+[functions.sync-instagram-metrics]
+verify_jwt = false
