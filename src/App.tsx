@@ -24,6 +24,7 @@ const CompetitorPage = lazy(() => import("./pages/CompetitorPage"));
 const ViralePage = lazy(() => import("./pages/ViralePage"));
 const ReelPage = lazy(() => import("./pages/ReelPage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
+const PerformanceDashboard = lazy(() => import("./pages/admin/PerformanceDashboard"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const InstagramCallback = lazy(() => import("./pages/InstagramCallback"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -103,6 +104,7 @@ const App = () => (
                       <Route path="/storico" element={<HistoryPage />} />
                       <Route path="/brands" element={<BrandsListPage />} />
                       <Route path="/admin" element={<AdminPage />} />
+                      <Route path="/admin/performance" element={<PerformanceDashboard />} />
                       <Route path="/brand" element={<BrandPage />} />
                       <Route path="/settings" element={<Settings />} />
                     </Route>

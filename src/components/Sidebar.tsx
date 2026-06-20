@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { LayoutGrid, BookImage, TrendingUp, Users, BarChart3, Settings, LogOut, Building2, Video, Shield, CalendarClock, Briefcase, Menu, X } from 'lucide-react';
+import { LayoutGrid, BookImage, TrendingUp, Users, BarChart3, Settings, LogOut, Building2, Video, Shield, CalendarClock, Briefcase, Menu, X, Activity } from 'lucide-react';
 import logo from '@/assets/logo-full.png';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import BrandSwitcher from './BrandSwitcher';
@@ -205,21 +205,38 @@ const Sidebar: React.FC = () => {
       {/* Bottom section */}
       <div style={{ padding: '8px 8px 12px', borderTop: '1px solid var(--line)' }}>
         {isAdmin && (
-          <NavLink
-            to="/admin"
-            style={({ isActive }) => ({
-              display: 'flex', alignItems: 'center', gap: 10,
-              padding: '10px 12px', borderRadius: 10, textDecoration: 'none',
-              fontSize: 13, fontWeight: isActive ? 700 : 500,
-              color: isActive ? 'var(--rosa)' : 'var(--ink3)',
-              backgroundColor: isActive ? 'rgba(230,0,126,0.08)' : 'transparent',
-              transition: 'all 0.15s',
-              marginBottom: 4,
-            })}
-          >
-            <Shield style={{ width: 18, height: 18 }} />
-            Admin
-          </NavLink>
+          <>
+            <NavLink
+              to="/admin"
+              style={({ isActive }) => ({
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 12px', borderRadius: 10, textDecoration: 'none',
+                fontSize: 13, fontWeight: isActive ? 700 : 500,
+                color: isActive ? 'var(--rosa)' : 'var(--ink3)',
+                backgroundColor: isActive ? 'rgba(230,0,126,0.08)' : 'transparent',
+                transition: 'all 0.15s',
+                marginBottom: 4,
+              })}
+            >
+              <Shield style={{ width: 18, height: 18 }} />
+              Admin
+            </NavLink>
+            <NavLink
+              to="/admin/performance"
+              style={({ isActive }) => ({
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 12px', borderRadius: 10, textDecoration: 'none',
+                fontSize: 13, fontWeight: isActive ? 700 : 500,
+                color: isActive ? 'var(--rosa)' : 'var(--ink3)',
+                backgroundColor: isActive ? 'rgba(230,0,126,0.08)' : 'transparent',
+                transition: 'all 0.15s',
+                marginBottom: 4,
+              })}
+            >
+              <Activity style={{ width: 18, height: 18 }} />
+              Performance
+            </NavLink>
+          </>
         )}
         {BOTTOM_ITEMS.map(({ to, label, icon: Icon }) => {
           const tourKey = to === '/brand' ? 'nav-brand' : undefined;
