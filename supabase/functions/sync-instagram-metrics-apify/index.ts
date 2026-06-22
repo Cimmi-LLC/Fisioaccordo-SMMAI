@@ -60,26 +60,47 @@ interface SyncOutcome {
 }
 
 async function apifyScrape(username: string, token: string): Promise<any[]> {
-  const url = `${APIFY_BASE}?token=${encodeURIComponent(token)}&timeout=90`;
-  const res = await fetch(url, {
+  const url = `${APIFY_BASE}?token=${encodeURIComponent(token)}&timeout=120`;
+  // Use `directUrls` (the modern input form for apify/instagram-scraper).
+  // The legacy `usernames + searchType:user` form started returning
+  // "Empty or private data" for most public profiles in mid-2025.
+  const profileUrl = `https://www.instagram.com/${username}/`;
+
+  const profileRes = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      usernames: [username],
-      resultsType: "posts",
-      resultsLimit: POSTS_PER_BRAND,
-      searchType: "user",
-      // Including `addParentData` makes Apify enrich each post with
-      // owner_followers_count / owner_full_name — saves a second call.
-      addParentData: true,
+      directUrls: [profileUrl],
+      resultsType: "details",
+      resultsLimit: 1,
     }),
   });
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(`Apify HTTP ${res.status}: ${txt.slice(0, 200)}`);
+  if (!profileRes.ok) {
+    const txt = await profileRes.text().catch(() => "");
+    throw new Error(`Apify details HTTP ${profileRes.status}: ${txt.slice(0, 200)}`);
   }
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
+  const profile = await profileRes.json();
+  const profileRow = Array.isArray(profile) && profile[0]
+    ? { __profile: true, ...profile[0] }
+    : null;
+
+  const postsRes = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      directUrls: [profileUrl],
+      resultsType: "posts",
+      resultsLimit: POSTS_PER_BRAND,
+    }),
+  });
+  if (!postsRes.ok) {
+    const txt = await postsRes.text().catch(() => "");
+    throw new Error(`Apify posts HTTP ${postsRes.status}: ${txt.slice(0, 200)}`);
+  }
+  const posts = await postsRes.json();
+  const postsArr = Array.isArray(posts) ? posts : [];
+
+  return profileRow ? [profileRow, ...postsArr] : postsArr;
 }
 
 async function syncOneTarget(
@@ -101,10 +122,22 @@ async function syncOneTarget(
       return out;
     }
 
+    // Surface actor errors (e.g. private profile) if NO usable post survived.
+    const usable = items.filter((p) => p && !p.error && !p.__profile);
+    if (usable.length === 0) {
+      const firstErr = items.map((p) => p?.errorDescription || p?.error).find(Boolean);
+      if (firstErr) {
+        out.error = String(firstErr).slice(0, 240);
+        // We still proceed to write the account-level row (followers) if profile arrived.
+      }
+    }
+
     const today = todayIso();
-    const firstWithOwner = items.find((p) => p?.ownerFollowersCount != null || p?.followersCount != null);
+    // Followers: try every known shape from the actor (details vs posts result)
+    const profileItem = items.find((p) => p?.__profile);
+    const firstAny = profileItem || items.find((p) => p?.ownerFollowersCount != null || p?.followersCount != null || p?.followers != null);
     const followers = Number(
-      firstWithOwner?.ownerFollowersCount ?? firstWithOwner?.followersCount ?? 0,
+      firstAny?.followersCount ?? firstAny?.ownerFollowersCount ?? firstAny?.followers ?? 0,
     ) || 0;
     out.followers = followers;
 
@@ -146,13 +179,15 @@ async function syncOneTarget(
 
     // Per-post rows
     for (const p of items) {
-      if (!p || p.error) continue;
-      const externalId = String(p.shortCode || p.id || p.url || "").trim();
+      if (!p || p.error || p.__profile) continue;
+      const externalId = String(
+        p.shortCode || p.shortcode || p.id || p.url || ""
+      ).trim();
       if (!externalId) continue;
-      const likes = Number(p.likesCount) || 0;
-      const comments = Number(p.commentsCount) || 0;
-      const views = Number(p.videoViewCount ?? p.videoPlayCount ?? null);
-      const isVideo = !!p.isVideo || !!p.videoUrl || p.type === "Video";
+      const likes = Number(p.likesCount ?? p.likes ?? 0) || 0;
+      const comments = Number(p.commentsCount ?? p.comments ?? 0) || 0;
+      const views = Number(p.videoViewCount ?? p.videoPlayCount ?? p.videoViews ?? null);
+      const isVideo = !!p.isVideo || !!p.videoUrl || p.type === "Video" || p.productType === "clips";
       const engagementProxy = likes + comments;
 
       const { error: postErr } = await supabase
