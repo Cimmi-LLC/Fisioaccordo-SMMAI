@@ -2,11 +2,13 @@ import React, { useMemo, useState } from 'react';
 import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { ArrowUpRight, ArrowDownRight, Instagram, Music2, Youtube, Calendar, AlertCircle, type LucideIcon } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, Instagram, Music2, Youtube, Calendar, AlertCircle, RefreshCw, type LucideIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import SidebarClients, { ClientBrand } from '@/components/admin/SidebarClients';
 import { usePerformanceMetrics, Channel, MetricRow } from '@/hooks/usePerformanceMetrics';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 type RangeId = 7 | 28 | 90 | 'custom';
 
@@ -137,11 +139,35 @@ function buildKpis(
 
 const PerformanceDashboard: React.FC = () => {
   const isAdmin = useIsAdmin();
+  const { toast } = useToast();
   const [client, setClient] = useState<ClientBrand | null>(null);
   const [channel, setChannel] = useState<Channel>('instagram');
   const [range, setRange] = useState<RangeId>(28);
   const [customFrom, setCustomFrom] = useState(shiftDays(todayStr(), -27));
   const [customTo, setCustomTo] = useState(todayStr());
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSyncNow = async () => {
+    setSyncing(true);
+    try {
+      // We invoke the Apify ingestion fn. The fn accepts either x-cron-secret
+      // or an admin JWT — supabase.functions.invoke automatically includes
+      // the user JWT, and the fn checks user_roles for 'admin'.
+      const { data, error } = await supabase.functions.invoke('sync-instagram-metrics-apify', { body: {} });
+      if (error) throw error;
+      const d = data as any;
+      toast({
+        title: 'Sincronizzazione completata',
+        description: `${d?.processed ?? 0} account · ${d?.totalPostsSynced ?? 0} post aggiornati. Refresh tra 2-3 secondi.`,
+      });
+      // small delay so post_metrics is consistent, then refresh
+      setTimeout(() => window.location.reload(), 2500);
+    } catch (e: any) {
+      toast({ title: 'Errore sincronizzazione', description: e?.message || 'unknown', variant: 'destructive' });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const { from, to } = useMemo(() => {
     if (range === 'custom') return { from: customFrom, to: customTo };
@@ -149,7 +175,8 @@ const PerformanceDashboard: React.FC = () => {
   }, [range, customFrom, customTo]);
 
   const { rows, prevRows, loading, error } = usePerformanceMetrics({
-    brandId: client?.id ?? null,
+    brandId: client?.kind === 'brand' ? client.id : null,
+    trackedHandleId: client?.kind === 'tracked' ? client.id : null,
     channel,
     from, to,
   });
@@ -256,8 +283,24 @@ const PerformanceDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Date selector */}
+          {/* Date selector + Sync now */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              onClick={handleSyncNow}
+              disabled={syncing}
+              title="Forza ora la sincronizzazione dati da Apify"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 14px', borderRadius: 999,
+                fontSize: 12, fontWeight: 700,
+                background: 'var(--ink)', color: '#fff',
+                border: 'none', cursor: syncing ? 'wait' : 'pointer',
+                opacity: syncing ? 0.6 : 1,
+              }}
+            >
+              <RefreshCw className="h-3.5 w-3.5" style={{ animation: syncing ? 'spin 1s linear infinite' : 'none' }} />
+              {syncing ? 'Sincronizzo…' : 'Sincronizza ora'}
+            </button>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 2,
               padding: 3, borderRadius: 10, backgroundColor: 'var(--bg)', border: '1px solid var(--line)',

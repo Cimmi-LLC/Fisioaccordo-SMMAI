@@ -58,6 +58,48 @@ const AdminPage = () => {
   const [editingHandleValue, setEditingHandleValue] = useState('');
   const [savingHandle, setSavingHandle] = useState(false);
 
+  // Tracked handles (standalone IGs, no brand)
+  interface TrackedHandle { id: string; username: string; label: string | null; created_at: string; }
+  const [tracked, setTracked] = useState<TrackedHandle[]>([]);
+  const [newHandle, setNewHandle] = useState('');
+  const [newLabel, setNewLabel] = useState('');
+  const [addingTracked, setAddingTracked] = useState(false);
+
+  const loadTracked = async () => {
+    const { data } = await (supabase as any)
+      .from('tracked_handles')
+      .select('id, username, label, created_at')
+      .eq('channel', 'instagram')
+      .order('created_at', { ascending: false });
+    setTracked((data || []) as TrackedHandle[]);
+  };
+
+  const addTracked = async () => {
+    const u = newHandle.replace(/^@/, '').trim();
+    if (!u) return;
+    setAddingTracked(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('tracked_handles')
+        .insert({ username: u, label: newLabel.trim() || null, channel: 'instagram' });
+      if (error) throw error;
+      setNewHandle('');
+      setNewLabel('');
+      await loadTracked();
+    } catch (e: any) {
+      alert('Errore: ' + (e?.message || 'sconosciuto'));
+    } finally {
+      setAddingTracked(false);
+    }
+  };
+
+  const deleteTracked = async (id: string) => {
+    if (!confirm('Eliminare questo handle dal tracking?')) return;
+    const { error } = await (supabase as any).from('tracked_handles').delete().eq('id', id);
+    if (error) return alert('Errore: ' + error.message);
+    setTracked((p) => p.filter((t) => t.id !== id));
+  };
+
   const saveHandle = async (brandId: string, raw: string) => {
     const clean = raw.replace(/^@/, '').trim() || null;
     setSavingHandle(true);
@@ -78,12 +120,18 @@ const AdminPage = () => {
   };
   const [stats, setStats] = useState<Stats | null>(null);
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([]);
-  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'errors'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'tracked' | 'errors'>('stats');
 
   useEffect(() => {
     if (!isAdmin) return;
     loadAll();
   }, [isAdmin]);
+
+  // Reload tracked handles whenever the user switches to the IG Tracking tab.
+  useEffect(() => {
+    if (isAdmin && activeTab === 'tracked') loadTracked();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, activeTab]);
 
   const loadAll = async () => {
     setLoading(true);
@@ -168,6 +216,7 @@ const AdminPage = () => {
   const tabs = [
     { id: 'stats' as const, label: 'Statistiche', icon: <BarChart3 className="h-4 w-4" /> },
     { id: 'users' as const, label: 'Utenti', icon: <Users className="h-4 w-4" /> },
+    { id: 'tracked' as const, label: 'IG Tracking', icon: <ImageIcon className="h-4 w-4" /> },
     { id: 'errors' as const, label: 'Log errori', icon: <AlertCircle className="h-4 w-4" /> },
   ];
 
@@ -332,6 +381,90 @@ const AdminPage = () => {
                 </tbody>
               </table>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* TAB: IG Tracking */}
+      {activeTab === 'tracked' && (
+        <Card className="panel-card">
+          <CardContent style={{ padding: 20 }}>
+            <h2 className="text-[14px] font-bold mb-1" style={{ color: 'var(--ink)' }}>Account IG da monitorare (no brand)</h2>
+            <p className="text-[12px] mb-4" style={{ color: 'var(--ink3)' }}>
+              Aggiungi qui @handle di account Instagram che vuoi monitorare anche se non sono clienti registrati.
+              Vengono scrapati ogni domenica 04:30 UTC (o manualmente da /admin/performance).
+            </p>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <input
+                value={newHandle}
+                onChange={(e) => setNewHandle(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') addTracked(); }}
+                placeholder="@username"
+                disabled={addingTracked}
+                style={{
+                  flex: 1, padding: '8px 12px', fontSize: 13,
+                  border: '1px solid var(--line)', borderRadius: 8, background: 'var(--bg)',
+                }}
+              />
+              <input
+                value={newLabel}
+                onChange={(e) => setNewLabel(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') addTracked(); }}
+                placeholder="Etichetta (opzionale, es: 'Cliente potenziale')"
+                disabled={addingTracked}
+                style={{
+                  flex: 2, padding: '8px 12px', fontSize: 13,
+                  border: '1px solid var(--line)', borderRadius: 8, background: 'var(--bg)',
+                }}
+              />
+              <button
+                onClick={addTracked}
+                disabled={addingTracked || !newHandle.trim()}
+                style={{
+                  padding: '8px 18px', fontSize: 12, fontWeight: 700,
+                  borderRadius: 8, border: 'none', cursor: 'pointer',
+                  background: 'var(--viola)', color: '#fff', opacity: addingTracked || !newHandle.trim() ? 0.5 : 1,
+                }}
+              >Aggiungi</button>
+            </div>
+
+            {tracked.length === 0 ? (
+              <p className="text-[12px] text-center py-6" style={{ color: 'var(--ink3)' }}>
+                Nessun account tracciato. Aggiungine uno sopra.
+              </p>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="w-full text-sm">
+                  <thead style={{ backgroundColor: 'var(--bg)', borderBottom: '1px solid var(--line)' }}>
+                    <tr>
+                      <th className="text-left p-3 text-[11px] font-bold uppercase" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>Handle</th>
+                      <th className="text-left p-3 text-[11px] font-bold uppercase" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>Etichetta</th>
+                      <th className="text-left p-3 text-[11px] font-bold uppercase" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>Aggiunto</th>
+                      <th className="text-right p-3 text-[11px] font-bold uppercase" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>Azioni</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tracked.map((t) => (
+                      <tr key={t.id} style={{ borderBottom: '1px solid var(--line)' }}>
+                        <td className="p-3 text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>@{t.username}</td>
+                        <td className="p-3 text-[12px]" style={{ color: 'var(--ink2)' }}>{t.label || '—'}</td>
+                        <td className="p-3 text-[12px]" style={{ color: 'var(--ink3)' }}>{new Date(t.created_at).toLocaleDateString('it-IT')}</td>
+                        <td className="p-3 text-right">
+                          <button
+                            onClick={() => deleteTracked(t.id)}
+                            style={{
+                              padding: '4px 10px', fontSize: 11, fontWeight: 600,
+                              borderRadius: 6, border: '1px solid #ef4444',
+                              background: 'transparent', color: '#ef4444', cursor: 'pointer',
+                            }}
+                          >Elimina</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

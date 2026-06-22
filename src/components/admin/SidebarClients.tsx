@@ -4,6 +4,9 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ClientBrand {
+  /** Whether this entry comes from a registered brand or a tracked-only IG. */
+  kind: 'brand' | 'tracked';
+  /** brand.id if kind=brand, tracked_handles.id if kind=tracked */
   id: string;
   user_id: string;
   nome_business: string;
@@ -30,6 +33,47 @@ function pickColor(id: string) {
 
 function initials(name: string) {
   return name.split(/\s+/).filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+}
+
+function renderRow(
+  b: ClientBrand,
+  selectedId: string | null,
+  onSelect: (b: ClientBrand) => void,
+) {
+  const active = b.id === selectedId;
+  return (
+    <button
+      key={b.id}
+      onClick={() => onSelect(b)}
+      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-left"
+      style={{
+        backgroundColor: active ? 'var(--ink)' : 'transparent',
+        color: active ? '#fff' : 'var(--ink2)',
+        border: 'none',
+        cursor: 'pointer',
+        marginBottom: 2,
+      }}
+    >
+      <span
+        style={{
+          width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+          background: b.color, color: '#fff', fontWeight: 700, fontSize: 12,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        {initials(b.nome_business)}
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span className="block truncate text-sm font-medium">{b.nome_business}</span>
+        <span
+          className="block truncate text-[11px]"
+          style={{ color: active ? 'rgba(255,255,255,0.7)' : 'var(--ink3)' }}
+        >
+          {b.instagram_username ? `@${b.instagram_username}` : '— senza IG'}
+        </span>
+      </span>
+    </button>
+  );
 }
 
 /**
@@ -73,14 +117,30 @@ const SidebarClients: React.FC<SidebarClientsProps> = ({ selectedId, onSelect })
           if (c.instagram_username) handleMap[c.user_id] = c.instagram_username;
         }
       }
-      const list: ClientBrand[] = (rows || []).map((b: any) => ({
+      const brandList: ClientBrand[] = (rows || []).map((b: any) => ({
+        kind: 'brand',
         id: b.id,
         user_id: b.user_id,
         nome_business: b.nome_business || '(senza nome)',
         instagram_username: handleMap[b.user_id] || null,
         color: pickColor(b.id),
       }));
-      setBrands(list);
+
+      // tracked handles (admin-only, no brand)
+      const { data: tracked } = await (supabase as any)
+        .from('tracked_handles')
+        .select('id, username, label, added_by')
+        .eq('channel', 'instagram');
+      const trackedList: ClientBrand[] = ((tracked || []) as any[]).map((t) => ({
+        kind: 'tracked',
+        id: t.id,
+        user_id: t.added_by || '',
+        nome_business: t.label || `@${t.username}`,
+        instagram_username: t.username,
+        color: pickColor(t.id),
+      }));
+
+      setBrands([...brandList, ...trackedList]);
       setLoading(false);
     })();
   }, []);
@@ -132,42 +192,15 @@ const SidebarClients: React.FC<SidebarClientsProps> = ({ selectedId, onSelect })
             {brands.length === 0 ? 'Nessun cliente.' : 'Nessun risultato.'}
           </div>
         ) : (
-          filtered.map((b) => {
-            const active = b.id === selectedId;
-            return (
-              <button
-                key={b.id}
-                onClick={() => onSelect(b)}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-left"
-                style={{
-                  backgroundColor: active ? 'var(--ink)' : 'transparent',
-                  color: active ? '#fff' : 'var(--ink2)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  marginBottom: 2,
-                }}
-              >
-                <span
-                  style={{
-                    width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-                    background: b.color, color: '#fff', fontWeight: 700, fontSize: 12,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >
-                  {initials(b.nome_business)}
-                </span>
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span className="block truncate text-sm font-medium">{b.nome_business}</span>
-                  <span
-                    className="block truncate text-[11px]"
-                    style={{ color: active ? 'rgba(255,255,255,0.7)' : 'var(--ink3)' }}
-                  >
-                    {b.instagram_username ? `@${b.instagram_username}` : '— senza IG'}
-                  </span>
-                </span>
-              </button>
-            );
-          })
+          <>
+            {filtered.filter((b) => b.kind === 'brand').map((b) => renderRow(b, selectedId, onSelect))}
+            {filtered.some((b) => b.kind === 'tracked') && (
+              <div className="px-3 pt-4 pb-1.5 text-[10px] font-bold uppercase" style={{ color: 'var(--ink3)', letterSpacing: '0.6px' }}>
+                Account tracciati
+              </div>
+            )}
+            {filtered.filter((b) => b.kind === 'tracked').map((b) => renderRow(b, selectedId, onSelect))}
+          </>
         )}
       </div>
     </aside>
