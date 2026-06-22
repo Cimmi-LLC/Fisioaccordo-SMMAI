@@ -11,6 +11,8 @@ interface UserRow {
   email?: string;
   nome_business: string;
   website_url: string | null;
+  instagram_username: string | null;
+  brand_id: string | null;
   created_at: string;
 }
 
@@ -52,6 +54,28 @@ const AdminPage = () => {
   const isAdmin = useIsAdmin();
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [editingHandleId, setEditingHandleId] = useState<string | null>(null);
+  const [editingHandleValue, setEditingHandleValue] = useState('');
+  const [savingHandle, setSavingHandle] = useState(false);
+
+  const saveHandle = async (brandId: string, raw: string) => {
+    const clean = raw.replace(/^@/, '').trim() || null;
+    setSavingHandle(true);
+    try {
+      const { error } = await (supabase as any)
+        .from('brands')
+        .update({ instagram_username: clean })
+        .eq('id', brandId);
+      if (error) throw error;
+      setUsers((prev) => prev.map((u) => u.brand_id === brandId ? { ...u, instagram_username: clean } : u));
+      setEditingHandleId(null);
+    } catch (e: any) {
+      console.error('save handle failed:', e);
+      alert('Errore: ' + (e?.message || 'sconosciuto'));
+    } finally {
+      setSavingHandle(false);
+    }
+  };
   const [stats, setStats] = useState<Stats | null>(null);
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([]);
   const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'errors'>('stats');
@@ -65,8 +89,15 @@ const AdminPage = () => {
     setLoading(true);
     try {
       // Lista utenti (da brands)
-      const { data: brandsData } = await supabase.from('brands').select('user_id, nome_business, website_url, created_at').order('created_at', { ascending: false });
-      const usersList = (brandsData || []) as UserRow[];
+      const { data: brandsData } = await (supabase as any).from('brands').select('id, user_id, nome_business, website_url, instagram_username, created_at').order('created_at', { ascending: false });
+      const usersList: UserRow[] = (brandsData || []).map((b: any) => ({
+        user_id: b.user_id,
+        brand_id: b.id,
+        nome_business: b.nome_business,
+        website_url: b.website_url,
+        instagram_username: b.instagram_username || null,
+        created_at: b.created_at,
+      }));
       setUsers(usersList);
 
       // Statistiche
@@ -221,18 +252,75 @@ const AdminPage = () => {
                   <tr>
                     <th className="text-left p-3 text-[11px] font-bold uppercase" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>Brand</th>
                     <th className="text-left p-3 text-[11px] font-bold uppercase" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>Sito</th>
+                    <th className="text-left p-3 text-[11px] font-bold uppercase" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>IG Handle</th>
                     <th className="text-left p-3 text-[11px] font-bold uppercase" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>Registrato</th>
                     <th className="text-left p-3 text-[11px] font-bold uppercase" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>User ID</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.length === 0 ? (
-                    <tr><td colSpan={4} className="p-6 text-center text-[12px]" style={{ color: 'var(--ink3)' }}>Nessun utente registrato</td></tr>
+                    <tr><td colSpan={5} className="p-6 text-center text-[12px]" style={{ color: 'var(--ink3)' }}>Nessun utente registrato</td></tr>
                   ) : users.map(u => (
                     <tr key={u.user_id} style={{ borderBottom: '1px solid var(--line)' }}>
                       <td className="p-3 text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>{u.nome_business || '—'}</td>
                       <td className="p-3 text-[12px]">
                         {u.website_url ? <a href={normalizeWebsiteUrl(u.website_url)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--viola)' }} className="hover:underline">{u.website_url.replace(/^https?:\/\//, '').slice(0, 30)}</a> : <span style={{ color: 'var(--ink3)' }}>—</span>}
+                      </td>
+                      <td className="p-3 text-[12px]">
+                        {editingHandleId === u.brand_id ? (
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            <input
+                              autoFocus
+                              value={editingHandleValue}
+                              onChange={(e) => setEditingHandleValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && u.brand_id) saveHandle(u.brand_id, editingHandleValue);
+                                if (e.key === 'Escape') setEditingHandleId(null);
+                              }}
+                              placeholder="@nomestudio"
+                              disabled={savingHandle}
+                              style={{
+                                fontSize: 12, padding: '4px 8px',
+                                border: '1px solid var(--line)', borderRadius: 6,
+                                width: 140, background: 'var(--bg)',
+                              }}
+                            />
+                            <button
+                              onClick={() => u.brand_id && saveHandle(u.brand_id, editingHandleValue)}
+                              disabled={savingHandle}
+                              style={{
+                                fontSize: 11, fontWeight: 700, padding: '4px 8px',
+                                border: 'none', borderRadius: 6, color: '#fff',
+                                background: 'var(--viola)', cursor: 'pointer',
+                              }}
+                            >OK</button>
+                            <button
+                              onClick={() => setEditingHandleId(null)}
+                              style={{
+                                fontSize: 11, padding: '4px 8px',
+                                border: 'none', borderRadius: 6,
+                                background: 'transparent', color: 'var(--ink3)', cursor: 'pointer',
+                              }}
+                            >×</button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              if (!u.brand_id) return;
+                              setEditingHandleId(u.brand_id);
+                              setEditingHandleValue(u.instagram_username || '');
+                            }}
+                            style={{
+                              padding: '3px 8px', borderRadius: 6,
+                              border: '1px dashed var(--line)', background: 'transparent',
+                              fontSize: 12, cursor: 'pointer',
+                              color: u.instagram_username ? 'var(--viola)' : 'var(--ink3)',
+                            }}
+                            title="Click per modificare"
+                          >
+                            {u.instagram_username ? `@${u.instagram_username}` : '+ aggiungi'}
+                          </button>
+                        )}
                       </td>
                       <td className="p-3 text-[12px]" style={{ color: 'var(--ink3)' }}>
                         <Calendar className="h-3 w-3 inline mr-1" />

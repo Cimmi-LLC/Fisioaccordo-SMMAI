@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.sync-instagram-metrics]
 verify_jwt = false
+
+[functions.sync-instagram-metrics-apify]
+verify_jwt = false
