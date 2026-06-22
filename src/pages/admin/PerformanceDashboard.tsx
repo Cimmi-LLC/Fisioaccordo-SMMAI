@@ -97,9 +97,14 @@ function buildKpis(
     const reach = sum('reach'); const prevReach = psum('reach');
     const eng = sum('engagement'); const prevEng = psum('engagement');
     const foll = last('followers_total'); const pfoll = plast('followers_total');
-    const erIg = er(eng, reach, prevEng, prevReach);
+    // Engagement rate: use reach when available (Meta Graph case), else
+    // fall back to followers (Apify case). Avoids the division-by-0 that
+    // would otherwise show 0.0% on every Apify-scraped account.
+    const denom = reach > 0 ? reach : foll;
+    const prevDenom = prevReach > 0 ? prevReach : pfoll;
+    const erIg = er(eng, denom, prevEng, prevDenom);
     return [
-      { key: 'reach', label: 'Copertura', value: fmt(reach), delta: delta(reach, prevReach) },
+      { key: 'reach', label: 'Copertura', value: reach > 0 ? fmt(reach) : '—', delta: delta(reach, prevReach) },
       { key: 'foll',  label: 'Follower',  value: fmt(foll),  delta: delta(foll, pfoll), sub: `+${fmt(sumAcc('new_followers'))} nuovi` },
       { key: 'eng',   label: 'Interazioni', value: fmt(eng), delta: delta(eng, prevEng) },
       { key: 'er',    label: 'Tasso engagement', value: erIg.value, delta: erIg.d },
