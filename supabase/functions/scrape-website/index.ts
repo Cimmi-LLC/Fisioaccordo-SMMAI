@@ -87,14 +87,66 @@ function extractHeadings(html: string): string[] {
   return headings.slice(0, 20);
 }
 
+/**
+ * Jina Reader fallback (r.jina.ai) — free service that renders the page in a
+ * real browser and returns Markdown. Bypasses datacenter-IP blocks like
+ * SiteGround's sgcaptcha (which serve an empty captcha page to Deno fetch).
+ * Rate limit without API key: ~20 rpm per IP — fine for onboarding traffic.
+ *
+ * Returns a SYNTHETIC HTML document (title + body text wrapped in tags) so the
+ * downstream extractors (title/headings/bodyText) keep working unchanged.
+ */
+async function tryJinaFallback(url: string): Promise<string | null> {
+  try {
+    console.log("Trying Jina Reader fallback for:", url);
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 30000);
+    const res = await fetch(`https://r.jina.ai/${url}`, { signal: controller.signal });
+    clearTimeout(t);
+    if (!res.ok) {
+      console.warn("Jina fallback HTTP", res.status);
+      return null;
+    }
+    const md = await res.text();
+    if (!md || md.length < 300) return null;
+
+    // Parse the Jina envelope: "Title: …\nURL Source: …\nMarkdown Content:\n…"
+    const titleMatch = md.match(/^Title:\s*(.+)$/m);
+    const title = titleMatch?.[1]?.trim() ?? "";
+    const contentIdx = md.indexOf("Markdown Content:");
+    const body = contentIdx >= 0 ? md.slice(contentIdx + "Markdown Content:".length) : md;
+
+    // Strip markdown syntax noise (links, images) but keep the text.
+    const text = body
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")       // images
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")     // links → keep label
+      .replace(/[#>*_`~-]{1,}/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (text.length < 200) return null;
+
+    // Headings from markdown (## Foo) BEFORE we stripped them — re-extract from raw body
+    const headings = Array.from(body.matchAll(/^#{1,4}\s+(.{4,120})$/gm)).map((m) => m[1].trim());
+
+    // Synthetic HTML so the existing extractors work as-is
+    const headingTags = headings.slice(0, 20).map((h) => `<h2>${h}</h2>`).join("\n");
+    return `<html><head><title>${title}</title></head><body>${headingTags}<p>${text}</p></body></html>`;
+  } catch (err) {
+    console.error("Jina fallback exception:", err);
+    return null;
+  }
+}
+
 async function tryApifyFallback(url: string): Promise<string | null> {
   const APIFY_API_TOKEN = Deno.env.get("APIFY_API_TOKEN");
   if (!APIFY_API_TOKEN) return null;
   try {
     console.log("Trying Apify fallback for:", url);
-    // Use Apify's web-scraper or simple HTTP scraper
+    // cheerio crawler (raw HTTP, ~5-15s vs playwright's 45s+) routed through
+    // Apify RESIDENTIAL proxy — sites like SiteGround/Aruba block datacenter
+    // IPs (ours AND Apify's default pool), residential exits bypass that.
     const response = await fetch(
-      `https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=${APIFY_API_TOKEN}&timeout=45`,
+      `https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items?token=${APIFY_API_TOKEN}&timeout=90`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -102,18 +154,27 @@ async function tryApifyFallback(url: string): Promise<string | null> {
           startUrls: [{ url }],
           maxCrawlPages: 1,
           maxResults: 1,
-          crawlerType: "playwright:chrome",
+          crawlerType: "cheerio",
+          proxyConfiguration: {
+            useApifyProxy: true,
+            apifyProxyGroups: ["RESIDENTIAL"],
+          },
         }),
       }
     );
     if (!response.ok) {
-      console.error("Apify fallback failed:", response.status);
+      console.error("Apify fallback failed:", response.status, (await response.text().catch(() => "")).slice(0, 150));
       return null;
     }
     const items = await response.json();
     if (!items || items.length === 0) return null;
     const item = items[0];
-    return item.html || item.text || item.markdown || null;
+    if (item.html) return item.html;
+    // text/markdown → wrap in synthetic HTML so downstream extractors work
+    const text = (item.text || item.markdown || "").replace(/\s+/g, " ").trim();
+    if (text.length < 200) return null;
+    const title = item.metadata?.title || item.title || "";
+    return `<html><head><title>${title}</title></head><body><p>${text}</p></body></html>`;
   } catch (err) {
     console.error("Apify fallback exception:", err);
     return null;
@@ -185,10 +246,11 @@ serve(async (req) => {
       clearTimeout(timeout);
 
       if (!response.ok) {
-        // Try Apify as fallback for sites that block server-side requests (Cloudflare, etc.)
-        const apifyResult = await tryApifyFallback(parsedUrl.href);
-        if (apifyResult) {
-          html = apifyResult;
+        // Blocked/unreachable via direct fetch. Fallback chain: Jina (fast,
+        // real browser, bypasses datacenter-IP blocks) → Apify (slow, last resort).
+        const fallback = await tryJinaFallback(parsedUrl.href) || await tryApifyFallback(parsedUrl.href);
+        if (fallback) {
+          html = fallback;
         } else {
           return new Response(JSON.stringify({ success: false, error: "unreachable" }), {
             status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -198,16 +260,24 @@ serve(async (req) => {
         html = await response.text();
       }
     } catch (err: any) {
-      // Try Apify as fallback
-      const apifyResult = await tryApifyFallback(parsedUrl.href);
-      if (apifyResult) {
-        html = apifyResult;
+      const fallback = await tryJinaFallback(parsedUrl.href) || await tryApifyFallback(parsedUrl.href);
+      if (fallback) {
+        html = fallback;
       } else {
         const errorType = err.name === "AbortError" ? "timeout" : "unreachable";
         return new Response(JSON.stringify({ success: false, error: errorType }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+    }
+
+    // Anti-bot pages often return 200 with a near-empty captcha shell
+    // (e.g. SiteGround sgcaptcha meta-refresh, ~170 bytes). Detect and fall back.
+    const looksLikeCaptcha = html.length < 600 || /sgcaptcha|__cf_chl|checking your browser/i.test(html);
+    if (looksLikeCaptcha) {
+      console.warn("Direct fetch returned captcha/empty shell, trying fallbacks");
+      const fallback = await tryJinaFallback(parsedUrl.href) || await tryApifyFallback(parsedUrl.href);
+      if (fallback) html = fallback;
     }
 
     if (!html || html.length < 100) {
