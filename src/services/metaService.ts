@@ -29,6 +29,7 @@ export class MetaService {
 
     const authUrl = `https://www.instagram.com/oauth/authorize?client_id=${this.META_APP_ID}&redirect_uri=${encodeURIComponent(this.REDIRECT_URI)}&scope=${scopes}&response_type=code&state=meta_auth&enable_fb_login=0`;
 
+    window.location.href = authUrl; return;
     const popup = window.open(
       authUrl,
       'meta-auth',
