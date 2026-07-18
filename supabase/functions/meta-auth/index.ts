@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    const appId = Deno.env.get('META_APP_ID') || Deno.env.get('INSTAGRAM_APP_ID')
+    const appId = Deno.env.get('INSTAGRAM_APP_ID') || Deno.env.get('INSTAGRAM_APP_ID')
     const appSecret = Deno.env.get('INSTAGRAM_APP_SECRET')
 
     if (!appId) {
