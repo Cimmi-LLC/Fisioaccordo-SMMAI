@@ -17,7 +17,7 @@ export interface MetaConnectionData {
 export class MetaService {
   // Public OAuth App ID — not secret, but read from env for consistency with backend.
   // Falls back to the legacy literal so existing deployments don't break before .env is set.
-  private static readonly META_APP_ID = import.meta.env.VITE_META_APP_ID || '1685995206180695';
+  private static readonly META_APP_ID = '1685995206180695';
   private static readonly REDIRECT_URI = import.meta.env.VITE_META_REDIRECT_URI
     || 'https://social-generator-fisioaccordo.lovable.app/auth/instagram/callback';
 
