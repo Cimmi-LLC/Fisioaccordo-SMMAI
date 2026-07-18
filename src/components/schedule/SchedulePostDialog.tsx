@@ -252,8 +252,7 @@ const SchedulePostDialog: React.FC<SchedulePostDialogProps> = ({
               )}
             </div>
           )}
-              <Button onClick={handlePublishNow} disabled={!connectionId || preparing || scheduling} className="w-full text-white font-bold mb-2" style={{ backgroundColor: 'var(--rosa)' }}>{preparing ? (<><Loader2 className="h-4 w-4 animate-spin mr-2" /> Pubblico ora...</>>) : (<><Instagram className="h-4 w-4 mr-2" /> Pubblica ora</>>)}</Button>
-          {/* Buttons */}
+              <Button onClick={handlePublishNow} disabled={!connectionId || preparing || scheduling} className="w-full text-white font-bold mb-2" style={{ backgroundColor: 'var(--rosa)' }}>{preparing ? 'Pubblico ora...' : 'Pubblica ora'}          </Button>
           <div className="flex gap-2 pt-2">
             <Button variant="outline" onClick={onClose} disabled={scheduling || preparing} className="flex-1">
               Annulla
