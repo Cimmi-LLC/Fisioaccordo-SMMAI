@@ -120,7 +120,7 @@ const SchedulePostDialog: React.FC<SchedulePostDialogProps> = ({
       setPreparing(false);
     }
   };
-
+  const handlePublishNow = async () => { if (!connectionId) return; setPreparing(true); try { const imageUrls = await prepareImages(); if (!imageUrls || imageUrls.length === 0) { throw new Error('Nessuna immagine disponibile per il post'); } const caption = hashtags ? content + '\n\n' + hashtags : content; const res = await MetaService.publishToInstagram(connectionId, caption, imageUrls[0], imageUrls.length > 1 ? imageUrls : undefined); if (res.success) { onScheduled?.(); onClose(); } else { alert('Errore pubblicazione: ' + (res.error || 'sconosciuto')); } } catch (err) { alert('Errore: ' + (err instanceof Error ? err.message : String(err))); } finally { setPreparing(false); } };
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-md">
@@ -252,7 +252,7 @@ const SchedulePostDialog: React.FC<SchedulePostDialogProps> = ({
               )}
             </div>
           )}
-
+              <Button onClick={handlePublishNow} disabled={!connectionId || preparing || scheduling} className="w-full text-white font-bold mb-2" style={{ backgroundColor: 'var(--rosa)' }}>{preparing ? (<><Loader2 className="h-4 w-4 animate-spin mr-2" /> Pubblico ora...</>>) : (<><Instagram className="h-4 w-4 mr-2" /> Pubblica ora</>>)}</Button>
           {/* Buttons */}
           <div className="flex gap-2 pt-2">
             <Button variant="outline" onClick={onClose} disabled={scheduling || preparing} className="flex-1">
