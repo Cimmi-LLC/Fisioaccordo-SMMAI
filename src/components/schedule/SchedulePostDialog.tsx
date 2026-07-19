@@ -6,6 +6,7 @@ import { Loader2, CalendarClock, Instagram } from 'lucide-react';
 import { useSchedulePost } from '@/hooks/useSchedulePost';
 import { MetaService } from '@/services/metaService';
 import { it } from 'date-fns/locale';
+import { markPublished } from "@/services/archiveService";
 
 interface SchedulePostDialogProps {
   open: boolean;
@@ -120,7 +121,7 @@ const SchedulePostDialog: React.FC<SchedulePostDialogProps> = ({
       setPreparing(false);
     }
   };
-  const handlePublishNow = async () => { if (!connectionId) return; setPreparing(true); try { const imageUrls = await prepareImages(); if (!imageUrls || imageUrls.length === 0) { throw new Error('Nessuna immagine disponibile per il post'); } const caption = hashtags ? content + '\n\n' + hashtags : content; const res = await MetaService.publishToInstagram(connectionId, caption, imageUrls[0], imageUrls.length > 1 ? imageUrls : undefined); if (res.success) { onScheduled?.(); onClose(); } else { alert('Errore pubblicazione: ' + (res.error || 'sconosciuto')); } } catch (err) { alert('Errore: ' + (err instanceof Error ? err.message : String(err))); } finally { setPreparing(false); } };
+    const handlePublishNow = async () => { if (!connectionId) return; setPreparing(true); try { const imageUrls = await prepareImages(); if (!imageUrls || imageUrls.length === 0) { throw new Error('Nessuna immagine disponibile per il post'); } const caption = hashtags ? content + String.fromCharCode(10, 10) + hashtags : content; const res = await MetaService.publishToInstagram(connectionId, caption, imageUrls[0], imageUrls.length > 1 ? imageUrls : undefined); if (res.success) { await markPublished({ title: (content || '').slice(0, 90), contentText: content, kind: imageUrls.length > 1 ? 'carosello' : 'post', images: imageUrls }); onScheduled?.(); onClose(); } else { alert('Errore pubblicazione: ' + (res.error || 'sconosciuto')); } } catch (err) { alert('Errore: ' + (err instanceof Error ? err.message : String(err))); } finally { setPreparing(false); } };
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-md">
