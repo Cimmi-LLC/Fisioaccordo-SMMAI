@@ -67,6 +67,8 @@ const AccountPreferences: React.FC<AccountPreferencesProps> = ({ user }) => {
 
       <AvatarTypeCard />
 
+      <ImageModelCard />
+
       <Card className="panel-card">
         <CardHeader style={{ padding: '22px 24px', borderBottom: '1px solid var(--line)' }}>
           <CardTitle
