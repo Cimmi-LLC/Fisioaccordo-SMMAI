@@ -1,8 +1,17 @@
+function findImagePayload(node: any, depth = 0): { data: string; mime: string } | null { if (!node || depth > 10) return null; if (Array.isArray(node)) { for (const c of node) { const r = findImagePayload(c, depth + 1); if (r) return r; } return null; } if (typeof node !== "object") return null; const n = node as any; const mime = String(n.mime_type || n.mimeType || ""); const data = n.data || n.bytesBase64Encoded || n.b64_json; if (typeof data === "string" && data.length > 500 && mime.indexOf("image/") === 0) return { data, mime }; for (const k of Object.keys(n)) { const r = findImagePayload(n[k], depth + 1); if (r) return r; } return null; }
+function findAnyBase64(node: any, depth = 0): string | null { if (!node || depth > 10) return null; if (Array.isArray(node)) { for (const c of node) { const r = findAnyBase64(c, depth + 1); if (r) return r; } return null; } if (typeof node !== "object") return null; const n = node as any; for (const k of Object.keys(n)) { const v = n[k]; if (typeof v === "string" && v.length > 5000 && /^[A-Za-z0-9+\/=]+$/.test(v.slice(0, 200))) return v; const r = findAnyBase64(v, depth + 1); if (r) return r; } return null; }
+function b64ToBytes(b64: string): Uint8Array | null { try { const clean = b64.indexOf(",") >= 0 ? String(b64.split(",").pop()) : b64; const bin = atob(clean.replace(/\s/g, "")); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; } catch { return null; } }
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { adminClient, assertBrandOwnership, requireAuth, requireWithinRateLimit } from "../_shared/auth.ts";
 import { corsHeaders, handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { safeFetch } from "../_shared/ssrf.ts";
+// ===== GENERAZIONE IMMAGINI CON AI (Gemini / Nano Banana) =====
+const AI_IMAGE_MODELS = ["gemini-3-pro-image", "gemini-3.1-flash-image"];
+const AI_IMAGE_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/interactions";
+function buildAiPrompt(slide: any, isCover: boolean): string { const subject = [slide?.titolo, slide?.hook, slide?.sottotitolo, slide?.testo].filter(Boolean).join(". ").slice(0, 320); const kw = Array.isArray(slide?.keywords_stock) ? slide.keywords_stock.join(", ") : ""; const parts = ["Fotografia editoriale professionale per un centro di fisioterapia e riabilitazione in Italia.", subject ? ("Scena da rappresentare: " + subject + ".") : "", kw ? ("Elementi chiave: " + kw + ".") : "", "Stile: fotografia reale scattata con obiettivo 50mm, luce naturale morbida e diffusa, ambiente clinico moderno pulito e accogliente, palette calda e neutra (bianco, beige, legno chiaro, tocchi di verde salvia), profondita di campo cinematografica, altissimo dettaglio, aspetto autentico e non artefatto.", "Persone: adulti europei realistici, corporatura normale, espressione serena e credibile, abbigliamento sportivo neutro o divisa sanitaria semplice. Mani e volti anatomicamente corretti.", isCover ? "Inquadratura di grande impatto con soggetto centrale e ampio spazio negativo in alto e in basso per inserire del testo." : "Inquadratura naturale con spazio negativo laterale per inserire del testo.", "VIETATO nella immagine: qualunque testo, lettera, numero, scritta, logo, filigrana, watermark, interfaccia grafica, collage, bordi o cornici. Niente stile 3D, cartoon, illustrazione o rendering. Niente arti o dita deformate."]; return parts.filter(Boolean).join(" "); }
+async function generateAiImage(prompt: string, apiKey: string, aspectRatio: string): Promise<{ bytes: Uint8Array; contentType: string } | null> { for (const model of AI_IMAGE_MODELS) { try { const res = await fetch(AI_IMAGE_ENDPOINT, { method: "POST", headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" }, body: JSON.stringify({ model, input: [{ type: "text", text: prompt }], response_format: { type: "image", mime_type: "image/jpeg", aspect_ratio: aspectRatio, image_size: "2K" } }) }); if (!res.ok) { const t = await res.text(); console.warn("AI image " + model + " HTTP " + res.status + ": " + t.slice(0, 300)); continue; } const json = await res.json(); const found = findImagePayload(json); const raw = found ? found.data : findAnyBase64(json); if (!raw) { console.warn("AI image " + model + ": nessuna immagine nella risposta"); continue; } const bytes = b64ToBytes(raw); if (!bytes || bytes.length < 2000) { console.warn("AI image " + model + ": payload troppo piccolo"); continue; } console.log("AI image OK via " + model + " (" + bytes.length + " bytes)"); return { bytes, contentType: found && found.mime ? found.mime : "image/jpeg" }; } catch (e) { console.warn("AI image " + model + " error:", e); } } return null; }
+async function saveAiBytes(bytes: Uint8Array, contentType: string, supabaseAdmin: any, storagePath: string, index: number): Promise<string | null> { try { const ext = contentType.indexOf("png") >= 0 ? "png" : "jpg"; const fileName = storagePath + "/ai_slide_" + (index + 1) + "_" + Date.now() + "." + ext; const { error } = await supabaseAdmin.storage.from("carousel-images").upload(fileName, bytes, { contentType, upsert: true }); if (error) { console.error("AI upload error slide " + index + ":", error); return null; } const { data } = supabaseAdmin.storage.from("carousel-images").getPublicUrl(fileName); return data.publicUrl; } catch (e) { console.error("AI save error slide " + index + ":", e); return null; } }
 
 interface ImageResult {
   index: number;
@@ -121,6 +130,7 @@ serve(async (req) => {
     }
 
     const supabaseAdmin = adminClient();
+    const GEMINI_IMG_KEY = Deno.env.get("GEMINI_API_KEY") || ""; const aiAspect = typeof (body as any).aspectRatio === "string" ? (body as any).aspectRatio : "4:5"; const aiEnabled = Boolean(GEMINI_IMG_KEY) && (body as any).useAi !== false;
 
     // Rate limit: max 40 batches per minute (a batch can be 1-20 slides)
     const rl = await requireWithinRateLimit(supabaseAdmin, verifiedUserId, "generate-carousel-images", 40, 60);
@@ -174,6 +184,7 @@ serve(async (req) => {
     // We use IDs (numeric) NOT URLs because Pixabay rotates URLs per request.
     const runUsedIds = new Set<number>(excludeSet);
     const results: ImageResult[] = [];
+    const aiMap = new Map<number, string>(); if (aiEnabled) { const aiJobs = slidesToProcess.map(async (item: any) => { const gen = await generateAiImage(buildAiPrompt(item.slide, item.slide?.tipo === "cover"), GEMINI_IMG_KEY, aiAspect); if (!gen) return; const savedAi = await saveAiBytes(gen.bytes, gen.contentType, supabaseAdmin, storagePath, item.originalIndex); if (savedAi) aiMap.set(item.originalIndex, savedAi); }); await Promise.allSettled(aiJobs); console.log("Immagini AI generate: " + aiMap.size + " su " + slidesToProcess.length); }
 
     for (const { slide, originalIndex } of slidesToProcess) {
       const keywords: string[] = slide.keywords_stock || [];
@@ -202,6 +213,7 @@ serve(async (req) => {
           continue;
         }
       }
+      const aiReady = aiMap.get(originalIndex); if (aiReady) { results.push({ index: originalIndex, url: aiReady, sourceId: null, alternatives: [], alternativeIds: [], queryUsed: "ai_gemini", error: null }); continue; }
 
       // 2) Pixabay search with body-part hard filter + cumulative dedup BY ID
       const hasKeywords = keywords.length > 0;
