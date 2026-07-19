@@ -155,7 +155,7 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
           imageAlternatives: data.images[i]?.alternatives || slide.imageAlternatives
         })));
         // ARCHIVIO: ogni generazione (post, carosello, storia, reel) viene salvata come NON pubblicata.
-        try { const kindMap: Record<string, any> = { "carosello": "carosello", "post-singolo": "post", "storia": "storia", "reel": "reel" }; let firstTitle = topic; const parts: string[] = []; for (const sl of slides) { try { const p = JSON.parse(sl.content); if (!parts.length && p.title) firstTitle = p.title; parts.push([p.title, p.subtitle, p.body].filter(Boolean).join(" - ")); } catch (e2) { /* slide non leggibile */ } } await archiveContent({ title: firstTitle, contentText: parts.filter(Boolean).join(String.fromCharCode(10, 10)), topic, kind: kindMap[postType] || "post", images: (data.images || []).map((im: any) => im && im.url).filter(Boolean) }); console.log("[archivio] salvato:", firstTitle); } catch (e) { console.warn("[archivio] non salvato:", e); }
+                // Archiviazione temporaneamente disattivata: causava un errore a ogni generazione. Da reimplementare dentro archiveService.
 
         if (successCount === 0) {
           toast({ title: "Immagini non generate", description: "Riprova tra qualche secondo", variant: "destructive" });
