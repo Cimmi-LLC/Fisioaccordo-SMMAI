@@ -4,6 +4,7 @@ import { User, Mail, Calendar, PlayCircle } from 'lucide-react';
 import { useOnboardingTour } from '@/hooks/useOnboardingTour';
 import { useNavigate } from 'react-router-dom';
 import AvatarTypeCard from './AvatarTypeCard';
+import ImageModelCard from './ImageModelCard';
 
 interface AccountPreferencesProps {
   user: any;
