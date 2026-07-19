@@ -5,7 +5,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useActiveBrand } from '@/hooks/useActiveBrand';
 import { useToast } from '@/hooks/use-toast';
 
-// 1 credito = 1 euro per il cliente finale.
+// 1 credito = 0,10 euro per il cliente finale.
+const EURO_PER_CREDITO = 0.10;
 export const IMAGE_MODELS = [
   {
     value: 'nano-2',
@@ -107,7 +108,7 @@ const ImageModelCard: React.FC = () => {
                     )}
                   </span>
                   <span className="text-[11px] font-bold whitespace-nowrap" style={{ color: active ? 'var(--rosa)' : 'var(--ink3)' }}>
-                                        {opt.credits === 0 ? 'Gratis' : opt.credits + (opt.credits === 1 ? ' credito' : ' crediti') + ' · ' + opt.credits + ' €'}
+                                                            {opt.credits === 0 ? 'Gratis' : opt.credits + (opt.credits === 1 ? ' credito' : ' crediti') + ' · ' + (opt.credits * EURO_PER_CREDITO).toFixed(2).replace('.', ',') + ' €'}
                   </span>
                 </span>
                 <span className="block text-[11px] mt-1" style={{ color: 'var(--ink3)' }}>
@@ -118,7 +119,7 @@ const ImageModelCard: React.FC = () => {
           })}
         </div>
         <p className="text-[11px] mt-4" style={{ color: 'var(--ink3)' }}>
-                    1 credito = 1 euro. Un carosello da 6 slide consuma 6 volte i crediti del motore scelto.
+                              1 credito = 0,10 euro. Un carosello da 6 slide consuma 6 volte i crediti del motore scelto.
         </p>
       </CardContent>
     </Card>
