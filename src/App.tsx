@@ -33,6 +33,7 @@ const Terms = lazy(() => import("./pages/Terms"));
 const DeletionStatus = lazy(() => import("./pages/DeletionStatus"));
 const DataDeletion = lazy(() => import("./pages/DataDeletion"));
 const Settings = lazy(() => import("./pages/Settings"));
+const ArchivePage = lazy(() => import("./pages/ArchivePage"));
 const BrandPage = lazy(() => import("./pages/BrandPage"));
 const BrandsListPage = lazy(() => import("./pages/BrandsListPage"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
@@ -101,6 +102,7 @@ const App = () => (
                       <Route path="/reel" element={<ReelPage />} />
                       <Route path="/calendario" element={<CalendarPage />} />
                       <Route path="/storico" element={<HistoryPage />} />
+                      <Route path="/archivio" element={<ArchivePage />} />
                       <Route path="/brands" element={<BrandsListPage />} />
                       <Route path="/admin" element={<AdminPage />} />
                       <Route path="/brand" element={<BrandPage />} />
