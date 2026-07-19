@@ -5,6 +5,7 @@ import { useOnboardingTour } from '@/hooks/useOnboardingTour';
 import { useNavigate } from 'react-router-dom';
 import AvatarTypeCard from './AvatarTypeCard';
 import ImageModelCard from './ImageModelCard';
+import SlideStyleCard from './SlideStyleCard';
 
 interface AccountPreferencesProps {
   user: any;
