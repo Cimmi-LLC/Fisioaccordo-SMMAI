@@ -328,7 +328,7 @@ const ScheduleStoriesDialog: React.FC<Props> = ({ open, onClose, stories, onSche
               )}
             </div>
           </div>
-
+            <Button onClick={publishNow} disabled={!connectionId || submitting || noConnections || selectedCount === 0} className="w-full text-white font-bold mb-2" style={{ backgroundColor: 'var(--rosa)' }}>{submitting ? 'Pubblico...' : 'Pubblica ora'}</Button>
           {submitMsg && (
             <div className="text-[12px] flex items-center gap-2" style={{ color: 'var(--viola)' }}>
               <Loader2 className="h-3 w-3 animate-spin" /> {submitMsg}
