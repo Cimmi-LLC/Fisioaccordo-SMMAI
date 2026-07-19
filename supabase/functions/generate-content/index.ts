@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { topic, numSlides, postType, brandId } = await req.json();
+    const { topic, numSlides, postType, brandId, avatar = 'B2C', obiettivo = 'nurture', tipoContenuto = 'valore' } = await req.json();
 
     if (!topic || typeof topic !== "string" || topic.trim().length < 2) {
       return new Response(JSON.stringify({ error: "Topic is required (min 2 chars)" }), {
@@ -97,12 +97,11 @@ REGOLA FONDAMENTALE: Ogni contenuto DEVE sembrare scritto da "${brand.nome_busin
     const brandName = brandData?.nome_business || "Studio";
     const brandColor = brandData?.colore_primario || "#554697";
 
-    const systemPrompt = `Sei un copywriter d'élite specializzato in contenuti social per il settore sanitario (fisioterapia, osteopatia, poliambulatori). Formazione: $100M Playbook di Alex Hormozi.
+    const systemPrompt = `Sei un copywriter d'élite specializzato in contenuti social per il settore sanitario (fisioterapia, osteopatia, poliambulatori).
 ${brandContext}
-
+=== INPUT DEL PEZZO === Avatar: ${avatar} (B2B o B2C). Obiettivo: ${obiettivo} (reach/nurture/convert/retain). Tipo: ${tipoContenuto} (valore o offerta). === FORMATO = OBIETTIVO x PIATTAFORMA === reach: gancio larghissimo e breve. nurture: spiega ed educa passo-passo. convert: promessa + prova + CTA dura. retain: umano, dietro le quinte. === STRUTTURA: HOOK -> VALORE -> CTA === Una sola big idea. HOOK che chiama la situazione specifica del lettore (niente generico). VALORE: cosa ottiene, come funziona, cosa cambia; leve: sogno/risultato, probabilita con prova e numeri, tempo, sforzo. CTA: una sola azione chiara. === VALORE vs OFFERTA === Se tipo=valore: educa e basta, nessuna vendita, CTA soft (salva/segui/commenta). Se tipo=offerta: promessa -> meccanismo credibile -> prova -> CTA dura (prenota/DM/link) piu rimozione del rischio; mai promesse mediche garantite, mai toni ingannevoli. === COPY B2C vs B2B === B2C: emozione, desiderio, vita quotidiana, frasi corte, tanto tu, esempi di vita. B2B: rischio, soldi, tempo, status; il tuo team e la tua azienda; KPI e numeri; piu prove, casi, screenshot.
 === FRAMEWORK HOOK ===
-Usa i 7 tipi di hook di Hormozi:
-1) LABELS - Chiama direttamente il target
+Usa i 7 tipi di hook:1) LABELS - Chiama direttamente il target
 2) DOMANDE SÌ - "Vorresti [risultato] in [tempo]?"
 3) DOMANDE APERTE - "Quale preferiresti?"
 4) CONDIZIONALI - "Se [situazione], stai facendo [errore]"
