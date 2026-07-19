@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { publishSingleImage, publishCarousel } from '../_shared/instagramPublish.ts'
+import { publishSingleImage, publishCarousel, publishStory } from '../_shared/instagramPublish.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
     const verified_user_id = user.id
 
     const body = await req.json()
-    const { connection_id, platform, content, image_url, carousel_urls } = body
+    const { connection_id, platform, content, image_url, carousel_urls, media_type } = body
     console.log('meta-publish request:', JSON.stringify({ connection_id, platform, has_image: !!image_url, carousel_count: carousel_urls?.length }))
 
     if (!connection_id || !platform || !content) {
@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
     if (!igId) {
       return errorResponse('Nessun account Instagram collegato', 400)
     }
-
+    if (media_type === 'story') { if (!image_url) return errorResponse('La storia richiede un immagine', 400); const rs = await publishStory(igId, accessToken, image_url); if (!rs.success) return errorResponse(rs.error || 'Pubblicazione storia fallita'); return new Response(JSON.stringify({ success: true, post_id: rs.postId }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }); }
     // Carousel post
     if (carousel_urls && carousel_urls.length > 1) {
       const result = await publishCarousel(igId, accessToken, content, carousel_urls)
