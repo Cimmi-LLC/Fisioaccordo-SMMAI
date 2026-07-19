@@ -107,16 +107,7 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
       setLastRawResponses(successful);
       generateCarouselSlides();
       // Archivio: ogni contenuto generato viene salvato come NON pubblicato.
-      successful.forEach((v: any, idx: number) => {
-        archiveContent({
-          title: v?.titolo_carosello || v?.hook_principale || formData.description,
-          contentText: v?.content || v?.caption_instagram || '',
-          topic: topicsForGeneration[idx] || formData.description,
-          kind: formData.postType === 'carosello' ? 'carosello' : formData.postType === 'reel' ? 'reel' : 'post',
-          platform: formData.platform || 'instagram',
-        });
-      });
-
+      
       cacheContent(cacheKey, personalizedContent, [], formData);
 
       loadingState.finishLoading(true, successful.length > 1
