@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { topic, numSlides, postType, brandId, avatar = 'B2C', obiettivo = 'nurture', tipoContenuto = 'valore' } = await req.json();
+        const { topic, numSlides, postType, brandId, avatar: avatarInput = 'B2C', obiettivo = 'nurture', tipoContenuto = 'valore' } = await req.json();
 
     if (!topic || typeof topic !== "string" || topic.trim().length < 2) {
       return new Response(JSON.stringify({ error: "Topic is required (min 2 chars)" }), {
@@ -96,6 +96,7 @@ REGOLA FONDAMENTALE: Ogni contenuto DEVE sembrare scritto da "${brand.nome_busin
 
     const brandName = brandData?.nome_business || "Studio";
     const brandColor = brandData?.colore_primario || "#554697";
+    const avatar = (brandData?.avatar_type === "B2B" || brandData?.avatar_type === "B2C") ? brandData.avatar_type : avatarInput;
 
     const systemPrompt = `Sei un copywriter d'élite specializzato in contenuti social per il settore sanitario (fisioterapia, osteopatia, poliambulatori).
 ${brandContext}
