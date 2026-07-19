@@ -186,6 +186,7 @@ let aiModels: string[] = AI_MODEL_SETS["nano-2"]; if (brandId) { try { const { d
     // We use IDs (numeric) NOT URLs because Pixabay rotates URLs per request.
     const runUsedIds = new Set<number>(excludeSet);
     const results: ImageResult[] = [];
+console.log("AI decisione: enabled=" + aiEnabled + " | modelli=" + aiModels.join(",") + " | gemini=" + (GEMINI_IMG_KEY ? "presente" : "MANCANTE") + " | openai=" + (OPENAI_IMG_KEY ? "presente" : "assente") + " | brandId=" + String(brandId) + " | slides=" + slidesToProcess.length);
     const aiMap = new Map<number, string>(); if (aiEnabled) { const aiJobs = slidesToProcess.map(async (item: any) => { const gen = await generateAiImage(buildAiPrompt(item.slide, item.slide?.tipo === "cover"), GEMINI_IMG_KEY, aiAspect); if (!gen) return; const savedAi = await saveAiBytes(gen.bytes, gen.contentType, supabaseAdmin, storagePath, item.originalIndex); if (savedAi) aiMap.set(item.originalIndex, savedAi); }); await Promise.allSettled(aiJobs); console.log("Immagini AI generate: " + aiMap.size + " su " + slidesToProcess.length); }
 
     for (const { slide, originalIndex } of slidesToProcess) {
