@@ -45,16 +45,26 @@ type VariantRow = {
 type PaletteColors = { bg_color: string; title_color: string; body_color: string };
 
 function resolveSkeleton(skeleton: string, slide: SlideInput, colors: PaletteColors): string {
-  return sanitize(
-    skeleton
-      .replaceAll("{{title}}", slide.title || "")
-      .replaceAll("{{body}}", slide.body || "")
-      .replaceAll("{{number}}", slide.number || String(slide.index + 1).padStart(2, "0"))
-      .replaceAll("{{illustration}}", slide.illustration || slide.title || "")
-      .replaceAll("{{bg_color}}", colors.bg_color)
-      .replaceAll("{{title_color}}", colors.title_color)
-      .replaceAll("{{body_color}}", colors.body_color)
-  );
+  let prompt = skeleton
+    .replaceAll("{{title}}", slide.title || "")
+    .replaceAll("{{body}}", slide.body || "")
+    .replaceAll("{{number}}", slide.number || String(slide.index + 1).padStart(2, "0"))
+    .replaceAll("{{illustration}}", slide.illustration || slide.title || "")
+    .replaceAll("{{bg_color}}", colors.bg_color)
+    .replaceAll("{{title_color}}", colors.title_color)
+    .replaceAll("{{body_color}}", colors.body_color);
+
+  // Alcuni archetipi hanno un piccolo label accanto al numero: nei template
+  // generati prima del fix il segnaposto era la parola letterale "Label".
+  // Istruzione globale: mai copiarla, sostituirla con una parola vera.
+  if (slide.role === "content") {
+    prompt +=
+      "\nIf the layout includes a short label next to the index number, write there ONE real Italian word " +
+      "that categorizes this slide content (for example Postura, Metodo, Consiglio). " +
+      "Never write placeholder words such as Label, Testo or Categoria.";
+  }
+
+  return sanitize(prompt);
 }
 
 async function downloadAsBase64(

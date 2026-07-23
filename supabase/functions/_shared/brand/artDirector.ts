@@ -42,7 +42,8 @@ export function buildArtDirectorPrompt(
   semantics: BrandSemantics | null,
   palette: GenesisPalette,
   feedback?: string,
-  previousErrors?: string[]
+  previousErrors?: string[],
+  usedArchetypes?: string[]
 ): string {
   const sections: string[] = [];
 
@@ -77,6 +78,15 @@ export function buildArtDirectorPrompt(
       'Layout tendency: ' + (semantics.layout_tendency ?? 'unknown') + '\n' +
       'Recurring decoration: ' + (semantics.decoration_motif ?? 'none detected') + '\n' +
       'Uses photography: ' + String(semantics.uses_photography)
+    );
+  }
+
+  if (usedArchetypes && usedArchetypes.length > 0) {
+    sections.push(
+      'ARCHETYPES ALREADY USED by other brands of this same agency: ' +
+      usedArchetypes.join(', ') + '. ' +
+      'Visual variety across brands is a goal: choose a DIFFERENT archetype unless the brand identity strongly demands one of these. ' +
+      'If you do reuse one, differentiate it clearly through decoration, density and background strategy.'
     );
   }
 

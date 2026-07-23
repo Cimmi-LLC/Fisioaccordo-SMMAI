@@ -49,6 +49,7 @@ export const PLACEHOLDER = {
   },
   content: {
     number: '02',
+    label: 'IL METODO',
     title: 'LA POSTURA NON È LA CAUSA',
     body:
       'Il dolore persistente dipende da più fattori che agiscono insieme. Ridurlo a un solo elemento porta a scelte poco efficaci.',
@@ -138,6 +139,7 @@ function placeholderBlock(role: SlideRole): string {
   if (role === 'content') {
     return (
       'Index number: "' + PLACEHOLDER.content.number + '"\n' +
+      'Small label next to the index number, if the archetype includes one: "' + PLACEHOLDER.content.label + '"\n' +
       'Headline text: "' + PLACEHOLDER.content.title + '"\n' +
       'Body text: "' + PLACEHOLDER.content.body + '"'
     );

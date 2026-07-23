@@ -255,6 +255,20 @@ serve(async (req) => {
         return jsonResponse(req, { error: "palette mancante o incompleta" }, 400);
       }
 
+      // Archetipi gia usati dagli altri brand dell'account: l'art director
+      // li evita quando puo, per dare varieta visiva tra i brand.
+      const { data: otherBrands } = await supabase
+        .from("brands")
+        .select("genome")
+        .eq("user_id", userId)
+        .neq("id", brandId)
+        .not("genome", "is", null);
+      const usedArchetypes = Array.from(new Set(
+        ((otherBrands || []) as Array<{ genome: { archetype?: string } | null }>)
+          .map((b) => b.genome?.archetype)
+          .filter((a): a is string => typeof a === "string" && a.length > 0)
+      ));
+
       // Art director: 1 tentativo + 1 retry con gli errori appesi.
       let genome: TemplateGenome | null = null;
       let adErrors: string[] = [];
@@ -265,6 +279,7 @@ serve(async (req) => {
           palette,
           feedback,
           attempt > 0 ? adErrors : undefined,
+          usedArchetypes,
         );
         const result = await callGeminiWithRetry({
           apiKey: GEMINI_API_KEY,
