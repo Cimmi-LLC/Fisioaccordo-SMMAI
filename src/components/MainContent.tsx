@@ -56,12 +56,23 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
 
   // ── Template Genesis: gating + produzione NB2 ──
   const navigate = useNavigate();
-  const { activeBrand } = useActiveBrand();
+  const { activeBrand, loading: brandLoading } = useActiveBrand();
   const brandRecord = activeBrand as (typeof activeBrand & { genesis_status?: string; genome?: unknown }) | null;
   const genesisLocked = brandRecord?.genesis_status === 'locked';
   const nb2 = useNb2Carousel(brandRecord?.id ?? null, brandRecord?.genome ?? null);
   const [carouselRunId, setCarouselRunId] = useState('');
   const producedFingerprint = useRef('');
+
+  /** Avvio manuale della produzione (fallback se l'automatico non e partito). */
+  const produceNow = useCallback(() => {
+    const carousel = carouselDataList[activeVariant];
+    if (!carousel || !brandRecord?.id) return;
+    producedFingerprint.current = activeVariant + '|' + carousel.titolo_carosello + '|' + carousel.slides.length;
+    const runId = 'nb2_' + Date.now() + '_v' + activeVariant;
+    setCarouselRunId(runId);
+    nb2.produce(carousel, runId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carouselDataList, activeVariant, brandRecord?.id]);
 
   // Deep-link from Trend page (?topic=…&type=carosello&auto=1):
   //   1) prefill description
@@ -133,7 +144,17 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
   // riprodurre lo stesso contenuto a ogni re-render.
   useEffect(() => {
     const carousel = carouselDataList[activeVariant];
-    if (!carousel || !genesisLocked || !brandRecord?.id) return;
+    if (!carousel) return;
+    if (!genesisLocked || !brandRecord?.id) {
+      // Non deve mai fallire in silenzio: il fallback visibile in colonna
+      // preview offre l'avvio manuale, qui lasciamo traccia per il debug.
+      console.warn('Produzione NB2 non avviata:', {
+        brandId: brandRecord?.id ?? null,
+        genesisLocked,
+        brandLoading,
+      });
+      return;
+    }
     const fingerprint = activeVariant + '|' + carousel.titolo_carosello + '|' + carousel.slides.length;
     if (producedFingerprint.current === fingerprint) return;
     producedFingerprint.current = fingerprint;
@@ -141,7 +162,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
     setCarouselRunId(runId);
     nb2.produce(carousel, runId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carouselDataList, activeVariant, genesisLocked]);
+  }, [carouselDataList, activeVariant, genesisLocked, brandRecord?.id]);
 
   const handleInputChange = useCallback((field: string, value: string | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -265,7 +286,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
               })}
             </div>
           )}
-          {carouselDataList[activeVariant] && (
+          {carouselDataList[activeVariant] && (nb2.slides.length > 0 || nb2.producing) && (
             <Nb2CarouselPreview
               key={activeVariant}
               carousel={carouselDataList[activeVariant]}
@@ -275,6 +296,39 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
               regenerating={nb2.regenerating}
               onRegenerate={(index, override) => nb2.regenerateSlide(index, carouselRunId, override)}
             />
+          )}
+          {/* Fallback: copy pronto ma slide non prodotte (produzione fallita
+              o saltata). Mai lasciare la colonna vuota senza spiegazione. */}
+          {carouselDataList[activeVariant] && nb2.slides.length === 0 && !nb2.producing && (
+            <Card className="panel-card">
+              <CardContent style={{ padding: 24 }}>
+                <div className="py-8 text-center space-y-3">
+                  <p className="text-[14px] font-bold" style={{ color: 'var(--ink)' }}>
+                    "{carouselDataList[activeVariant].titolo_carosello}"
+                  </p>
+                  <p className="text-[12px]" style={{ color: 'var(--ink3)' }}>
+                    Il copy e pronto ma le slide non sono state ancora prodotte.
+                  </p>
+                  {brandRecord?.id && genesisLocked ? (
+                    <button
+                      onClick={produceNow}
+                      className="text-white text-[12px] font-black uppercase px-6 py-3 rounded-xl"
+                      style={{ backgroundColor: 'var(--rosa)', border: 'none', cursor: 'pointer', letterSpacing: '0.5px' }}
+                    >
+                      Genera le slide
+                    </button>
+                  ) : (
+                    <p className="text-[12px]" style={{ color: '#b45309' }}>
+                      {brandLoading
+                        ? 'Sto caricando il brand attivo, un attimo…'
+                        : !brandRecord
+                          ? 'Nessun brand attivo trovato: ricarica la pagina o seleziona un brand.'
+                          : 'Il brand attivo non ha un template approvato: completa prima il Template Genesis.'}
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           )}
           {!carouselDataList[activeVariant] && (
             <Card className="panel-card">

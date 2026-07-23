@@ -32,6 +32,11 @@ export const useActiveBrand = () => {
       const valid = candidate && list.some(b => b.id === candidate) ? candidate : list[0]?.id || null;
       setActiveBrandIdState(valid);
       if (typeof window !== 'undefined' && valid) localStorage.setItem(LS_KEY, valid);
+    } catch (err) {
+      // Un fetch fallito non deve lasciare l'app senza brand in silenzio:
+      // lo stato precedente resta, il chiamante vede loading=false e puo
+      // mostrare un fallback esplicito.
+      console.error('useActiveBrand: caricamento brand fallito', err);
     } finally {
       setLoading(false);
     }
