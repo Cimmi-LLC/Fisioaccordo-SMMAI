@@ -12,7 +12,8 @@ export type GenerationType =
   | "competitor"
   | "viral_analysis"
   | "image_swap"
-  | "expand_topic";
+  | "expand_topic"
+  | "template_genesis";
 
 export interface LogEntry {
   userId: string;
