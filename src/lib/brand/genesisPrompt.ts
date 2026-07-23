@@ -95,7 +95,9 @@ const ILLUSTRATION_DIRECTIVE_FLAT =
 const ILLUSTRATION_DIRECTIVE_REALISTIC =
   'ILLUSTRATION: reserve one clearly visible zone of the layout for a realistic image. ' +
   'Draw a placeholder there: a realistic photographic style render of a human spine anatomical model, ' +
-  'softly and naturally lit, cut out and isolated directly on the background with no frame and no container box. ' +
+  'softly and naturally lit. THE IMAGE MUST BE A CUTOUT: the subject isolated along its own silhouette ' +
+  'directly on the flat background color, like a sticker. Absolutely no rectangular photo, no square crop, ' +
+  'no photo box, no frame, no visible photo edges: around the subject there must be only the flat background color. ' +
   'It must read as an explanatory visual that supports the text, not as decoration.';
 
 /**

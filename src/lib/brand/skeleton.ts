@@ -30,7 +30,7 @@ export function skeletonFromGenome(genome: TemplateGenome, role: SlideRole): str
     lines.push('Body text: "{{body}}"');
     lines.push(
       realistic
-        ? 'Image: replace the subject of the placeholder image with ONE realistic photographic style image that visually explains this topic: "{{illustration}}". Keep it cut out on the background, in the same position and size as in the reference. It must be immediately understandable and support the text.'
+        ? 'Image: replace the subject of the placeholder image with ONE realistic photographic style image that visually explains this topic: "{{illustration}}". THE IMAGE MUST BE A CUTOUT: subject isolated along its own silhouette directly on the flat background, like a sticker, in the same position and size as in the reference. Never a rectangular photo, never a photo box, frame or visible photo edges. It must be immediately understandable and support the text.'
         : 'Illustration: replace the subject of the placeholder illustration with ONE simple flat illustration that visually explains this topic: "{{illustration}}". Keep the same style, the same single accent color and the same position and size as in the reference. It must be immediately understandable, like an explanatory diagram.'
     );
   } else {

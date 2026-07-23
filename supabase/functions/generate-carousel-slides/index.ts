@@ -61,7 +61,10 @@ function resolveSkeleton(skeleton: string, slide: SlideInput, colors: PaletteCol
     prompt +=
       "\nIf the layout includes a short label next to the index number, write there ONE real Italian word " +
       "that categorizes this slide content (for example Postura, Metodo, Consiglio). " +
-      "Never write placeholder words such as Label, Testo or Categoria.";
+      "Never write placeholder words such as Label, Testo or Categoria." +
+      "\nAny image or illustration on this slide must be a CUTOUT: subject isolated along its own silhouette " +
+      "directly on the flat background, like a sticker. Never place images inside rectangles: " +
+      "no straight photo edges, no frames, no photo boxes.";
   }
 
   return sanitize(prompt);
