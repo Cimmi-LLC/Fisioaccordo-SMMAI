@@ -27,13 +27,16 @@ export function skeletonFromGenome(_genome: TemplateGenome, role: SlideRole): st
     lines.push('Index number: "{{number}}"');
     lines.push('Headline text: "{{title}}"');
     lines.push('Body text: "{{body}}"');
+    lines.push(
+      'Illustration: replace the subject of the placeholder illustration with ONE simple flat illustration that visually explains this topic: "{{illustration}}". Keep the same style, the same single accent color and the same position and size as in the reference. It must be immediately understandable, like an explanatory diagram.'
+    );
   } else {
     lines.push('Headline text: "{{title}}"');
     lines.push('Supporting line: "{{body}}"');
   }
 
   lines.push('Background color {{bg_color}}, title color {{title_color}}, body color {{body_color}}.');
-  lines.push('Crisp legible typography. No logo, no watermark, no photography, no human figures.');
+  lines.push('Crisp legible typography. No logo, no watermark, no photographic imagery, no realistic human faces.');
 
   return sanitize(lines.join('\n'));
 }

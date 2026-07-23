@@ -78,6 +78,16 @@ describe('buildGenesisPrompt', () => {
     expect(cta).toContain(PLACEHOLDER.cta.title);
   });
 
+  it('la zona illustrazione esplicativa c\'e solo sulle slide content', () => {
+    const content = buildGenesisPrompt(KIT, genomeFor('split_panel'), 'content', 1);
+    expect(content).toContain('ILLUSTRATION:');
+    expect(content).toContain('explanatory diagram');
+    const cover = buildGenesisPrompt(KIT, genomeFor('split_panel'), 'cover', 1);
+    expect(cover).not.toContain('ILLUSTRATION:');
+    const cta = buildGenesisPrompt(KIT, genomeFor('split_panel'), 'cta', 1);
+    expect(cta).not.toContain('ILLUSTRATION:');
+  });
+
   it('ogni combinazione archetipo x ruolo x variante e dash-free e senza placeholder {{...}}', () => {
     for (const id of ALL_IDS) {
       for (const role of ROLES) {

@@ -27,6 +27,7 @@ const TemplateGenesisWizard: React.FC = () => {
 
   const [step, setStep] = useState<WizardStep>(0);
   const [selection, setSelection] = useState<Partial<Record<SlideRole, string>>>({});
+  const [existingLogoUrl, setExistingLogoUrl] = useState<string | null>(null);
 
   const genesis = useGenesis(brandId);
   const { candidates, genesisStatus } = useTemplateCandidates(
@@ -40,23 +41,25 @@ const TemplateGenesisWizard: React.FC = () => {
     if (!brandId) navigate('/brand');
   }, [authLoading, user, brandId, navigate]);
 
-  // Se il brand e gia locked, il wizard non serve.
+  // Se il brand e gia locked, il wizard non serve. Nel frattempo recupera
+  // il logo gia salvato nel kit per non richiederlo.
   useEffect(() => {
     if (!brandId) return;
     (async () => {
       const { data } = await (supabase as any)
         .from('brands')
-        .select('genesis_status')
+        .select('genesis_status, logo_url')
         .eq('id', brandId)
         .maybeSingle();
       if (data?.genesis_status === 'locked') navigate('/posts');
+      if (data?.logo_url) setExistingLogoUrl(data.logo_url as string);
     })();
   }, [brandId, navigate]);
 
   const progress = useMemo(() => ((step + 1) / 4) * 100, [step]);
 
-  const handleUpload = async (logoFile: File, posts: File[]) => {
-    const ok = await genesis.uploadSources(logoFile, posts);
+  const handleUpload = async (logoFile: File | null, posts: File[]) => {
+    const ok = await genesis.uploadSources(logoFile, posts, existingLogoUrl);
     if (!ok) return;
     // Analisi semantica subito dopo l'upload (se ci sono post).
     if (posts.length > 0) await genesis.analyze();
@@ -111,7 +114,7 @@ const TemplateGenesisWizard: React.FC = () => {
           style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 2px 12px rgba(85,70,151,0.07)' }}
         >
           {step === 0 && (
-            <UploadStep busy={genesis.busy} onSubmit={handleUpload} />
+            <UploadStep busy={genesis.busy} existingLogoUrl={existingLogoUrl} onSubmit={handleUpload} />
           )}
 
           {step === 1 && genesis.palette && (

@@ -14,6 +14,8 @@ export interface Nb2Slide {
   title: string;
   body: string;
   number: string;
+  /** Soggetto dell'illustrazione esplicativa (solo content). */
+  illustration: string;
   /** Path storage della PNG generata (persistere questo, non l'URL). */
   path: string | null;
   /** Signed URL per il rendering. */
@@ -39,6 +41,13 @@ function slideBody(s: CarouselSlideData): string {
   if (s.tipo === 'cover') return s.sottotitolo || '';
   if (s.tipo === 'cta') return s.testo_cta || s.testo || '';
   return s.testo || '';
+}
+
+/** Soggetto dell'illustrazione esplicativa: keywords della slide, o il titolo. */
+function slideIllustration(s: CarouselSlideData): string {
+  if (slideRole(s) !== 'content') return '';
+  const kw = (s.keywords_stock || []).slice(0, 3).join(', ');
+  return kw || slideTitle(s);
 }
 
 export function useNb2Carousel(brandId: string | null, genome: unknown) {
@@ -67,6 +76,7 @@ export function useNb2Carousel(brandId: string | null, genome: unknown) {
         title: slideTitle(s),
         body: slideBody(s),
         number: String(s.numero ?? i + 1).padStart(2, '0'),
+        illustration: slideIllustration(s),
       }));
 
       // Stato ottimistico: tutte le slide in "generazione".
@@ -130,6 +140,7 @@ export function useNb2Carousel(brandId: string | null, genome: unknown) {
         title: override?.title ?? current.title,
         body: override?.body ?? current.body,
         number: current.number,
+        illustration: current.illustration,
       };
       const { data, error } = await supabase.functions.invoke('generate-carousel-slides', {
         body: { action: 'regenerate', brandId, carouselId, slides: [input], colors },

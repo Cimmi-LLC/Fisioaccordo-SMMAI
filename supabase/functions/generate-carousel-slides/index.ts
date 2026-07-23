@@ -20,7 +20,9 @@ import { COST_NB2_IMAGE_1K } from "../_shared/brand/costs.ts";
 
 const IMAGE_MODEL = "gemini-3.1-flash-image";
 const IMAGE_MODEL_FALLBACK = "nano-banana-pro-preview";
-const CONCURRENCY = 3;
+// 6 in parallelo: un carosello tipico (5-6 slide) parte in un'unica ondata,
+// eventuali 429 li assorbe callGeminiWithRetry.
+const CONCURRENCY = 6;
 const OUTPUT_BUCKET = "carousel-images";
 
 type SlideInput = {
@@ -29,6 +31,7 @@ type SlideInput = {
   title: string;
   body?: string;
   number?: string;
+  illustration?: string;
 };
 
 type VariantRow = {
@@ -47,6 +50,7 @@ function resolveSkeleton(skeleton: string, slide: SlideInput, colors: PaletteCol
       .replaceAll("{{title}}", slide.title || "")
       .replaceAll("{{body}}", slide.body || "")
       .replaceAll("{{number}}", slide.number || String(slide.index + 1).padStart(2, "0"))
+      .replaceAll("{{illustration}}", slide.illustration || slide.title || "")
       .replaceAll("{{bg_color}}", colors.bg_color)
       .replaceAll("{{title_color}}", colors.title_color)
       .replaceAll("{{body_color}}", colors.body_color)

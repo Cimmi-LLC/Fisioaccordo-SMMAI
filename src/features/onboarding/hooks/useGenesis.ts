@@ -20,11 +20,32 @@ export function useGenesis(brandId: string | null) {
   const [genome, setGenome] = useState<TemplateGenome | null>(null);
   const [genomeVersion, setGenomeVersion] = useState<number | null>(null);
 
-  /** Step 1: upload logo + post e righe brand_sources. */
-  const uploadSources = useCallback(async (logo: File, posts: File[]): Promise<boolean> => {
+  /**
+   * Step 1: upload logo + post e righe brand_sources.
+   * logo === null significa: recupera il logo gia salvato nel kit
+   * (brands.logo_url) senza chiederlo di nuovo all'utente.
+   */
+  const uploadSources = useCallback(async (
+    logo: File | null,
+    posts: File[],
+    existingLogoUrl?: string | null
+  ): Promise<boolean> => {
     if (!user || !brandId) return false;
     setBusy(true);
     try {
+      if (!logo) {
+        if (!existingLogoUrl) throw new Error('Logo mancante');
+        try {
+          const res = await fetch(existingLogoUrl);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const blob = await res.blob();
+          const mime = blob.type || 'image/png';
+          const ext = mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : 'png';
+          logo = new File([blob], `logo.${ext}`, { type: mime });
+        } catch {
+          throw new Error('Non riesco a leggere il logo salvato nel brand: caricalo manualmente.');
+        }
+      }
       const uploads: Array<{ kind: string; file: File; path: string }> = [];
       const ext = (f: File) => (f.name.split('.').pop() || 'png').toLowerCase();
       uploads.push({ kind: 'logo', file: logo, path: `${user.id}/${brandId}/sources/logo.${ext(logo)}` });

@@ -67,8 +67,18 @@ const VARIANT_HINTS: Record<GenesisVariant, string> = {
 
 const NEGATIVE_CONSTRAINTS =
   'Safe margins of 90px on all sides. Crisp perfectly legible typography. ' +
-  'No logo, no watermark, no photography, no human figures, no UI chrome, ' +
+  'No logo, no watermark, no photographic imagery, no realistic human faces, no UI chrome, ' +
   'no drop shadows, no gradients unless specified.';
+
+// Zona illustrazione esplicativa: solo le slide content la prevedono.
+// Il segnaposto e un soggetto fisso (colonna vertebrale) che la produzione
+// sostituira con il soggetto della slide reale.
+const ILLUSTRATION_DIRECTIVE =
+  'ILLUSTRATION: reserve one clearly visible zone of the layout for a spot illustration. ' +
+  'Draw a placeholder there: a simple flat illustration of a human spine seen from the side, ' +
+  'single color using the accent color, clean minimal stroke style consistent with the decoration motif, ' +
+  'isolated directly on the background with no frame and no container box. ' +
+  'It must read as an explanatory diagram that supports the text, not as decoration.';
 
 /**
  * Risolve i colori concreti di sfondo e testo per il ruolo, secondo la
@@ -169,6 +179,11 @@ export function buildGenesisPrompt(
     'RENDER THIS PLACEHOLDER COPY, in Italian, exactly as written:\n' +
     placeholderBlock(role)
   );
+
+  // 7b. Zona illustrazione esplicativa (solo content)
+  if (role === 'content') {
+    sections.push(ILLUSTRATION_DIRECTIVE);
+  }
 
   // 8. Hint di variante
   sections.push('VARIANT ' + variant + ' OF 3: ' + VARIANT_HINTS[variant]);
