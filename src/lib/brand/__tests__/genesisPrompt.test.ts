@@ -88,6 +88,20 @@ describe('buildGenesisPrompt', () => {
     expect(cta).not.toContain('ILLUSTRATION:');
   });
 
+  it('visual_style realistic cambia direttiva e vincoli, flat_icon e il default', () => {
+    const realistic = buildGenesisPrompt(
+      KIT, { ...genomeFor('split_panel'), visual_style: 'realistic' }, 'content', 1
+    );
+    expect(realistic).toContain('realistic photographic style render');
+    expect(realistic).toContain('no identifiable human faces');
+    expect(realistic).not.toContain('no photographic imagery');
+    expect(realistic.trimEnd().endsWith('no drop shadows, no gradients unless specified.')).toBe(true);
+
+    const flat = buildGenesisPrompt(KIT, genomeFor('split_panel'), 'content', 1);
+    expect(flat).toContain('simple flat illustration');
+    expect(flat).toContain('no photographic imagery');
+  });
+
   it('ogni combinazione archetipo x ruolo x variante e dash-free e senza placeholder {{...}}', () => {
     for (const id of ALL_IDS) {
       for (const role of ROLES) {

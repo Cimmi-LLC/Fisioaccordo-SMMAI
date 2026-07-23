@@ -235,6 +235,14 @@ serve(async (req) => {
         return jsonResponse(req, { error: "Art director fallito: " + adErrors.join("; ") }, 502);
       }
 
+      // Stile visual: scelta dell'utente nel wizard, non dell'art director.
+      // Iniettato nel genoma cosi si propaga a candidati, brands.genome e
+      // allo skeleton congelato all'approvazione.
+      genome = {
+        ...genome,
+        visual_style: body.visualStyle === "realistic" ? "realistic" : "flat_icon",
+      };
+
       // Versione genoma: +1 su regenerate.
       const { data: maxRow } = await supabase
         .from("template_candidates")

@@ -23,6 +23,8 @@ const IT: Record<string, string> = {
   alternating_solid: 'sfondi pieni alternati',
   accent_cover: 'copertina in colore accento',
   mono_with_accent_blocks: 'monocromo con blocchi accento',
+  flat_icon: 'icone e illustrazioni',
+  realistic: 'immagini realistiche',
 };
 
 const SummaryStep: React.FC<SummaryStepProps> = ({ busy, genome, candidates, selection, onApprove }) => {
@@ -70,6 +72,7 @@ const SummaryStep: React.FC<SummaryStepProps> = ({ busy, genome, candidates, sel
           <div>Densita: <strong style={{ color: 'var(--ink)' }}>{IT[genome.density]}</strong></div>
           <div>Allineamento: <strong style={{ color: 'var(--ink)' }}>{IT[genome.alignment]}</strong></div>
           <div className="sm:col-span-2">Sfondi: <strong style={{ color: 'var(--ink)' }}>{IT[genome.bg_strategy]}</strong></div>
+          <div className="sm:col-span-2">Immagini nelle slide: <strong style={{ color: 'var(--ink)' }}>{IT[genome.visual_style ?? 'flat_icon']}</strong></div>
         </div>
       </div>
 

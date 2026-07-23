@@ -1,17 +1,41 @@
-// Step 2: conferma del brand estratto (palette + lettura semantica).
+// Step 2: conferma del brand estratto (palette + lettura semantica) e
+// scelta dello stile visual delle slide content (icone vs realistiche).
 // I campi a bassa confidenza sono evidenziati.
 import React from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, PenTool, Camera } from 'lucide-react';
 import type { PaletteResult } from '@/lib/brand/extractor.ts';
 import type { BrandSemantics } from '@/lib/brand/artDirector.ts';
+import type { VisualStyle } from '@/lib/brand/genome.ts';
 
 interface BrandConfirmStepProps {
   busy: boolean;
   palette: PaletteResult;
   semantics: BrandSemantics | null;
+  visualStyle: VisualStyle;
   onPaletteChange: (p: PaletteResult) => void;
+  onVisualStyleChange: (s: VisualStyle) => void;
   onConfirm: () => void;
 }
+
+const VISUAL_STYLE_OPTIONS: Array<{
+  value: VisualStyle;
+  label: string;
+  description: string;
+  Icon: typeof PenTool;
+}> = [
+  {
+    value: 'flat_icon',
+    label: 'Icone e illustrazioni',
+    description: 'Grafica piatta e pulita nel colore del brand. Stile editoriale, sempre coerente.',
+    Icon: PenTool,
+  },
+  {
+    value: 'realistic',
+    label: 'Immagini realistiche',
+    description: 'Immagini in stile fotografico scontornate sullo sfondo. Piu concrete e dirette.',
+    Icon: Camera,
+  },
+];
 
 const SWATCH_KEYS: Array<{ key: keyof PaletteResult; label: string }> = [
   { key: 'bg_a', label: 'Sfondo chiaro' },
@@ -22,7 +46,7 @@ const SWATCH_KEYS: Array<{ key: keyof PaletteResult; label: string }> = [
 ];
 
 const BrandConfirmStep: React.FC<BrandConfirmStepProps> = ({
-  busy, palette, semantics, onPaletteChange, onConfirm,
+  busy, palette, semantics, visualStyle, onPaletteChange, onVisualStyleChange, onConfirm,
 }) => {
   const lowConfidence = (semantics?.confidence ?? 0) < 0.5;
 
@@ -92,6 +116,42 @@ const BrandConfirmStep: React.FC<BrandConfirmStepProps> = ({
           </div>
         </div>
       )}
+
+      {/* Stile visual delle slide content */}
+      <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)' }}>
+        <div className="text-[11px] font-bold uppercase mb-1" style={{ color: 'var(--ink3)', letterSpacing: '0.6px' }}>
+          Immagini nelle slide
+        </div>
+        <p className="text-[11px] mb-3" style={{ color: 'var(--ink3)' }}>
+          Ogni slide di contenuto avra un visual che spiega l'argomento. Scegli lo stile.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {VISUAL_STYLE_OPTIONS.map(({ value, label, description, Icon }) => {
+            const active = visualStyle === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onVisualStyleChange(value)}
+                className="text-left rounded-xl p-4 transition-all"
+                style={{
+                  border: active ? '2px solid var(--viola)' : '1px solid var(--line)',
+                  backgroundColor: active ? 'var(--viola-dim)' : 'var(--bg)',
+                  cursor: 'pointer',
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Icon className="h-4 w-4" style={{ color: active ? 'var(--viola)' : 'var(--ink3)' }} />
+                  <span className="text-[13px] font-black" style={{ color: active ? 'var(--viola)' : 'var(--ink)' }}>
+                    {label}
+                  </span>
+                </div>
+                <p className="text-[11px]" style={{ color: 'var(--ink2)' }}>{description}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <button
         onClick={onConfirm}

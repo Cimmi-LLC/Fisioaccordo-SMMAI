@@ -12,6 +12,8 @@ export type TypeContrast = 'low' | 'high' | 'extreme';
 export type Density = 'airy' | 'balanced' | 'packed';
 export type Alignment = 'left' | 'center';
 export type BgStrategy = 'alternating_solid' | 'accent_cover' | 'mono_with_accent_blocks';
+/** Stile dei visual esplicativi nelle slide content: scelto dall'utente nel wizard. */
+export type VisualStyle = 'flat_icon' | 'realistic';
 
 export type TemplateGenome = {
   archetype: ArchetypeId;
@@ -28,6 +30,11 @@ export type TemplateGenome = {
   bg_strategy: BgStrategy;
   /** Una frase dell'art director che giustifica la scelta. */
   rationale: string;
+  /**
+   * Stile visual delle slide content. Non lo decide l'art director: viene
+   * iniettato dalla scelta utente nel wizard. Assente = flat_icon.
+   */
+  visual_style?: VisualStyle;
 };
 
 const DECORATION_SCALES: readonly string[] = ['subtle', 'medium', 'dominant'];
@@ -105,6 +112,15 @@ export function validateGenome(g: unknown): { ok: boolean; errors: string[] } {
 
   if (!isNonEmptyString(o.rationale)) {
     errors.push('rationale mancante');
+  }
+
+  // Campo opzionale: se presente deve essere uno dei due stili noti.
+  if (
+    o.visual_style !== undefined &&
+    o.visual_style !== 'flat_icon' &&
+    o.visual_style !== 'realistic'
+  ) {
+    errors.push('visual_style non valido: ' + String(o.visual_style));
   }
 
   // Vincolo incrociato: allineamento centrato incompatibile con archetipi

@@ -65,20 +65,37 @@ const VARIANT_HINTS: Record<GenesisVariant, string> = {
   3: 'Variant with more prominent decoration and a more asymmetric composition.',
 };
 
-const NEGATIVE_CONSTRAINTS =
-  'Safe margins of 90px on all sides. Crisp perfectly legible typography. ' +
-  'No logo, no watermark, no photographic imagery, no realistic human faces, no UI chrome, ' +
-  'no drop shadows, no gradients unless specified.';
+/**
+ * Vincoli negativi in coda al prompt. La clausola sulle foto dipende dallo
+ * stile visual: con flat_icon il fotografico e vietato del tutto, con
+ * realistic e ammesso ma senza volti riconoscibili.
+ */
+function negativeConstraints(style: 'flat_icon' | 'realistic'): string {
+  const photoClause = style === 'realistic'
+    ? 'no identifiable human faces, '
+    : 'no photographic imagery, no realistic human faces, ';
+  return (
+    'Safe margins of 90px on all sides. Crisp perfectly legible typography. ' +
+    'No logo, no watermark, ' + photoClause + 'no UI chrome, ' +
+    'no drop shadows, no gradients unless specified.'
+  );
+}
 
-// Zona illustrazione esplicativa: solo le slide content la prevedono.
-// Il segnaposto e un soggetto fisso (colonna vertebrale) che la produzione
-// sostituira con il soggetto della slide reale.
-const ILLUSTRATION_DIRECTIVE =
+// Zona visual esplicativa: solo le slide content la prevedono. Il segnaposto
+// e un soggetto fisso (colonna vertebrale) che la produzione sostituira con
+// il soggetto della slide reale. Due versioni, una per stile.
+const ILLUSTRATION_DIRECTIVE_FLAT =
   'ILLUSTRATION: reserve one clearly visible zone of the layout for a spot illustration. ' +
   'Draw a placeholder there: a simple flat illustration of a human spine seen from the side, ' +
   'single color using the accent color, clean minimal stroke style consistent with the decoration motif, ' +
   'isolated directly on the background with no frame and no container box. ' +
   'It must read as an explanatory diagram that supports the text, not as decoration.';
+
+const ILLUSTRATION_DIRECTIVE_REALISTIC =
+  'ILLUSTRATION: reserve one clearly visible zone of the layout for a realistic image. ' +
+  'Draw a placeholder there: a realistic photographic style render of a human spine anatomical model, ' +
+  'softly and naturally lit, cut out and isolated directly on the background with no frame and no container box. ' +
+  'It must read as an explanatory visual that supports the text, not as decoration.';
 
 /**
  * Risolve i colori concreti di sfondo e testo per il ruolo, secondo la
@@ -144,6 +161,7 @@ export function buildGenesisPrompt(
   const archetype = getArchetype(genome.archetype);
   const spec = archetype.roles[role];
   const colors = resolveColors(kit.palette, genome, role);
+  const visualStyle = genome.visual_style === 'realistic' ? 'realistic' : 'flat_icon';
 
   const sections: string[] = [];
 
@@ -180,16 +198,18 @@ export function buildGenesisPrompt(
     placeholderBlock(role)
   );
 
-  // 7b. Zona illustrazione esplicativa (solo content)
+  // 7b. Zona visual esplicativa (solo content), nello stile scelto dall'utente
   if (role === 'content') {
-    sections.push(ILLUSTRATION_DIRECTIVE);
+    sections.push(
+      visualStyle === 'realistic' ? ILLUSTRATION_DIRECTIVE_REALISTIC : ILLUSTRATION_DIRECTIVE_FLAT
+    );
   }
 
   // 8. Hint di variante
   sections.push('VARIANT ' + variant + ' OF 3: ' + VARIANT_HINTS[variant]);
 
   // 9. Negative constraints
-  sections.push(NEGATIVE_CONSTRAINTS);
+  sections.push(negativeConstraints(visualStyle));
 
   return sanitize(sections.join('\n\n'));
 }

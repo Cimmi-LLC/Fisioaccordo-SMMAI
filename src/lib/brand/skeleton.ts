@@ -11,8 +11,9 @@ import type { TemplateGenome } from './genome.ts';
  * Produce lo skeleton con i placeholder {{...}} che la pipeline di
  * produzione risolvera con il copy generato e i colori del brand.
  */
-export function skeletonFromGenome(_genome: TemplateGenome, role: SlideRole): string {
+export function skeletonFromGenome(genome: TemplateGenome, role: SlideRole): string {
   const lines: string[] = [];
+  const realistic = genome.visual_style === 'realistic';
 
   lines.push(
     'Follow the attached reference image EXACTLY: same layout, same spacing, same proportions, same decorative motif. Replace only the text content.'
@@ -28,7 +29,9 @@ export function skeletonFromGenome(_genome: TemplateGenome, role: SlideRole): st
     lines.push('Headline text: "{{title}}"');
     lines.push('Body text: "{{body}}"');
     lines.push(
-      'Illustration: replace the subject of the placeholder illustration with ONE simple flat illustration that visually explains this topic: "{{illustration}}". Keep the same style, the same single accent color and the same position and size as in the reference. It must be immediately understandable, like an explanatory diagram.'
+      realistic
+        ? 'Image: replace the subject of the placeholder image with ONE realistic photographic style image that visually explains this topic: "{{illustration}}". Keep it cut out on the background, in the same position and size as in the reference. It must be immediately understandable and support the text.'
+        : 'Illustration: replace the subject of the placeholder illustration with ONE simple flat illustration that visually explains this topic: "{{illustration}}". Keep the same style, the same single accent color and the same position and size as in the reference. It must be immediately understandable, like an explanatory diagram.'
     );
   } else {
     lines.push('Headline text: "{{title}}"');
@@ -36,7 +39,11 @@ export function skeletonFromGenome(_genome: TemplateGenome, role: SlideRole): st
   }
 
   lines.push('Background color {{bg_color}}, title color {{title_color}}, body color {{body_color}}.');
-  lines.push('Crisp legible typography. No logo, no watermark, no photographic imagery, no realistic human faces.');
+  lines.push(
+    realistic
+      ? 'Crisp legible typography. No logo, no watermark, no identifiable human faces.'
+      : 'Crisp legible typography. No logo, no watermark, no photographic imagery, no realistic human faces.'
+  );
 
   return sanitize(lines.join('\n'));
 }

@@ -58,6 +58,15 @@ describe('validateGenome', () => {
     expect(validateGenome(null).ok).toBe(false);
     expect(validateGenome('genoma').ok).toBe(false);
   });
+
+  it('visual_style: opzionale, accetta i due stili noti, rifiuta il resto', () => {
+    expect(validateGenome(GOLDEN).ok).toBe(true);
+    expect(validateGenome({ ...GOLDEN, visual_style: 'flat_icon' }).ok).toBe(true);
+    expect(validateGenome({ ...GOLDEN, visual_style: 'realistic' }).ok).toBe(true);
+    const r = validateGenome({ ...GOLDEN, visual_style: 'cartoon' });
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(' ')).toContain('visual_style');
+  });
 });
 
 describe('genomeToPromptFragment', () => {
