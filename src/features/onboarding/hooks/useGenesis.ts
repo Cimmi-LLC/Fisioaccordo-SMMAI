@@ -35,16 +35,33 @@ export function useGenesis(brandId: string | null) {
     try {
       if (!logo) {
         if (!existingLogoUrl) throw new Error('Logo mancante');
+        let blob: Blob | null = null;
+        // Tentativo 1: fetch diretto (funziona per URL Supabase Storage).
         try {
           const res = await fetch(existingLogoUrl);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const blob = await res.blob();
-          const mime = blob.type || 'image/png';
-          const ext = mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : 'png';
-          logo = new File([blob], `logo.${ext}`, { type: mime });
-        } catch {
-          throw new Error('Non riesco a leggere il logo salvato nel brand: caricalo manualmente.');
+          if (res.ok) blob = await res.blob();
+          if (blob && blob.type && !blob.type.startsWith('image/')) blob = null;
+        } catch { /* CORS o rete: si passa al tentativo server-side */ }
+        // Tentativo 2: la edge fn scarica il logo server-side (nessun CORS)
+        // e lo deposita in brand-assets; da li lo leggiamo via storage API.
+        if (!blob) {
+          const { data, error } = await supabase.functions.invoke('generate-template', {
+            body: { action: 'import_logo', brandId },
+          });
+          if (error || data?.error || !data?.path) {
+            throw new Error('Non riesco a leggere il logo salvato nel brand: caricalo manualmente.');
+          }
+          const { data: dl, error: dlErr } = await supabase.storage
+            .from(data.bucket as string)
+            .download(data.path as string);
+          if (dlErr || !dl) {
+            throw new Error('Non riesco a leggere il logo salvato nel brand: caricalo manualmente.');
+          }
+          blob = dl;
         }
+        const mime = blob.type || 'image/png';
+        const ext = mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : mime.includes('webp') ? 'webp' : 'png';
+        logo = new File([blob], `logo.${ext}`, { type: mime });
       }
       const uploads: Array<{ kind: string; file: File; path: string }> = [];
       const ext = (f: File) => (f.name.split('.').pop() || 'png').toLowerCase();

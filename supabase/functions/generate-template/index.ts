@@ -135,6 +135,55 @@ serve(async (req) => {
     const own = await assertBrandOwnership(supabase, userId, brandId);
     if (!own.ok) return jsonResponse(req, { error: own.error }, own.status);
 
+    // ─── IMPORT_LOGO ──────────────────────────────────────────
+    // Il logo del kit (brands.logo_url) puo stare su un dominio esterno che
+    // blocca il fetch dal browser (CORS): lo scarichiamo qui server-side e lo
+    // portiamo in brand-assets come sorgente del genesis. Nessuna chiamata AI,
+    // quindi fuori dal rate limit.
+    if (action === "import_logo") {
+      const { data: b } = await supabase
+        .from("brands")
+        .select("logo_url")
+        .eq("id", brandId)
+        .single();
+      const logoUrl = (b as { logo_url?: string } | null)?.logo_url || "";
+      if (!logoUrl) return jsonResponse(req, { error: "Il brand non ha un logo salvato" }, 404);
+
+      let res: Response;
+      try {
+        res = await fetch(logoUrl, {
+          headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)" },
+        });
+      } catch {
+        return jsonResponse(req, { error: "Logo non scaricabile dall'URL salvato" }, 502);
+      }
+      const contentType = res.headers.get("content-type") || "";
+      if (!res.ok || !contentType.startsWith("image/")) {
+        return jsonResponse(req, { error: "L'URL del logo non restituisce un'immagine" }, 502);
+      }
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      if (bytes.length === 0 || bytes.length > 8 * 1024 * 1024) {
+        return jsonResponse(req, { error: "Logo vuoto o troppo grande" }, 502);
+      }
+      const ext = contentType.includes("jpeg") ? "jpg" : contentType.includes("webp") ? "webp" : "png";
+      const path = `${userId}/${brandId}/sources/logo.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, bytes, { contentType, upsert: true });
+      if (upErr) return jsonResponse(req, { error: "Upload logo fallito: " + upErr.message }, 500);
+
+      await supabase.from("brand_sources").delete().eq("brand_id", brandId).eq("kind", "logo");
+      await supabase.from("brand_sources").insert({
+        brand_id: brandId,
+        user_id: userId,
+        kind: "logo",
+        storage_bucket: BUCKET,
+        storage_path: path,
+      });
+
+      return jsonResponse(req, { bucket: BUCKET, path });
+    }
+
     const rl = await requireWithinRateLimit(supabase, userId, "generate-template", 6, 3600);
     if (!rl.ok) return jsonResponse(req, { error: rl.error }, rl.status);
 
