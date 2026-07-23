@@ -247,7 +247,11 @@ serve(async (req) => {
         ? (((maxRow as { genome_version?: number } | null)?.genome_version) || 0) + 1
         : (((maxRow as { genome_version?: number } | null)?.genome_version) || 0) + 1;
 
-      await supabase.from("brands").update({ genome, genesis_status: "generating" }).eq("id", brandId);
+      // La palette entra nel jsonb accanto al genoma: serve alla pipeline di
+      // produzione per risolvere {{bg_color}}/{{title_color}}/{{body_color}}.
+      await supabase.from("brands")
+        .update({ genome: { ...genome, palette }, genesis_status: "generating" })
+        .eq("id", brandId);
 
       const kit: GenesisBrandKit = {
         nome_business: (brand as BrandRow).nome_business || "Studio",

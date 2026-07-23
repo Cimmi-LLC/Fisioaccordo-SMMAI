@@ -39,6 +39,7 @@ const BrandsListPage = lazy(() => import("./pages/BrandsListPage"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
 const HistoryPage = lazy(() => import("./pages/HistoryPage"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
+const TemplateGenesisWizard = lazy(() => import("./features/onboarding/TemplateGenesisWizard"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -86,6 +87,7 @@ const App = () => (
                     <Route path="/auth/instagram/callback" element={<InstagramCallback />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/onboarding" element={<Onboarding />} />
+                    <Route path="/onboarding/template" element={<TemplateGenesisWizard />} />
                     <Route path="/privacy" element={<Privacy />} />
                     <Route path="/cookie-policy" element={<CookiePolicy />} />
                     <Route path="/terms" element={<Terms />} />

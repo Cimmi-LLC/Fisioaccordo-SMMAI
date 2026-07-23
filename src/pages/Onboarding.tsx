@@ -275,7 +275,9 @@ const Onboarding = () => {
           ? 'Il nuovo brand è ora attivo. Puoi generare contenuti per questo cliente.'
           : 'Il tuo brand è pronto. Iniziamo a creare contenuti!',
       });
-      navigate(isNewBrandMode ? '/brands' : '/posts');
+      // Dopo il salvataggio del brand si entra nel Template Genesis:
+      // senza template approvato la generazione caroselli e bloccata.
+      navigate(inserted?.id ? `/onboarding/template?brand=${inserted.id}` : (isNewBrandMode ? '/brands' : '/posts'));
     } catch (err: any) {
       toast({ title: 'Errore nel salvataggio', description: err.message, variant: 'destructive' });
       setStep(2);

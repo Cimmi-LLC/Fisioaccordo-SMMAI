@@ -7,12 +7,15 @@ import { useGlobalLoading } from "@/contexts/GlobalLoadingContext";
 import { useToast } from "@/hooks/use-toast";
 import IdeaGenerator from "./IdeaGenerator";
 import ContentForm from "./ContentForm";
-import CarouselPreview from "./carousel/CarouselPreview";
+import Nb2CarouselPreview from "./carousel/Nb2CarouselPreview";
 import type { CarouselData } from "@/types/carousel";
 import SkeletonLoader from "./ui/skeleton-loader";
 import EnhancedProgress from "./ui/enhanced-progress";
 import { useContentGeneration } from "@/hooks/useContentGeneration";
-import { ChevronDown, Lightbulb } from 'lucide-react';
+import { useNb2Carousel } from "@/hooks/useNb2Carousel";
+import { useActiveBrand } from "@/hooks/useActiveBrand";
+import { useNavigate } from 'react-router-dom';
+import { ChevronDown, Lightbulb, Sparkles } from 'lucide-react';
 
 interface MainContentProps {
   user: any;
@@ -50,6 +53,15 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
 
   const noopFn = useCallback(() => {}, []);
   const { generatedContent, setGeneratedContent, lastRawResponses, generateContent } = useContentGeneration(user, formData, noopFn);
+
+  // ── Template Genesis: gating + produzione NB2 ──
+  const navigate = useNavigate();
+  const { activeBrand } = useActiveBrand();
+  const brandRecord = activeBrand as (typeof activeBrand & { genesis_status?: string; genome?: unknown }) | null;
+  const genesisLocked = brandRecord?.genesis_status === 'locked';
+  const nb2 = useNb2Carousel(brandRecord?.id ?? null, brandRecord?.genome ?? null);
+  const [carouselRunId, setCarouselRunId] = useState('');
+  const producedFingerprint = useRef('');
 
   // Deep-link from Trend page (?topic=…&type=carosello&auto=1):
   //   1) prefill description
@@ -116,6 +128,21 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
     setActiveVariant(0);
   }, [lastRawResponses]);
 
+  // Produzione NB2: quando arriva un carosello (o si cambia variante),
+  // genera le slide reali via reference template. Fingerprint per non
+  // riprodurre lo stesso contenuto a ogni re-render.
+  useEffect(() => {
+    const carousel = carouselDataList[activeVariant];
+    if (!carousel || !genesisLocked || !brandRecord?.id) return;
+    const fingerprint = activeVariant + '|' + carousel.titolo_carosello + '|' + carousel.slides.length;
+    if (producedFingerprint.current === fingerprint) return;
+    producedFingerprint.current = fingerprint;
+    const runId = 'nb2_' + Date.now() + '_v' + activeVariant;
+    setCarouselRunId(runId);
+    nb2.produce(carousel, runId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carouselDataList, activeVariant, genesisLocked]);
+
   const handleInputChange = useCallback((field: string, value: string | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
@@ -124,6 +151,34 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
     setFormData(prev => ({ ...prev, description: idea }));
     setIdeaOpen(false);
   }, []);
+
+  // GATE Template Genesis: senza template approvato la produzione caroselli
+  // e bloccata (sostituzione totale della vecchia pipeline).
+  if (brandRecord && !genesisLocked) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16">
+        <Card className="panel-card">
+          <CardContent style={{ padding: 40, textAlign: 'center' }}>
+            <Sparkles className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--rosa)' }} />
+            <h2 className="text-xl font-black mb-2" style={{ color: 'var(--ink)' }}>
+              Prima crea il tuo template
+            </h2>
+            <p className="text-[13px] mb-6" style={{ color: 'var(--ink3)' }}>
+              I tuoi caroselli vengono generati sul TUO sistema visivo.
+              Bastano 5 minuti: carichi logo e qualche post, l'AI progetta il template, tu approvi.
+            </p>
+            <button
+              onClick={() => navigate(`/onboarding/template?brand=${brandRecord.id}`)}
+              className="text-white text-[13px] font-black uppercase px-8 py-3.5 rounded-xl"
+              style={{ backgroundColor: 'var(--rosa)', border: 'none', cursor: 'pointer', letterSpacing: '0.5px' }}
+            >
+              Crea il template
+            </button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8" style={{ paddingTop: '44px' }}>
@@ -210,10 +265,28 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
               })}
             </div>
           )}
-          <CarouselPreview
-            key={activeVariant}
-            data={carouselDataList[activeVariant] || null}
-          />
+          {carouselDataList[activeVariant] && (
+            <Nb2CarouselPreview
+              key={activeVariant}
+              carousel={carouselDataList[activeVariant]}
+              carouselId={carouselRunId}
+              slides={nb2.slides}
+              producing={nb2.producing}
+              regenerating={nb2.regenerating}
+              onRegenerate={(index, override) => nb2.regenerateSlide(index, carouselRunId, override)}
+            />
+          )}
+          {!carouselDataList[activeVariant] && (
+            <Card className="panel-card">
+              <CardContent style={{ padding: 24 }}>
+                <div className="py-12 text-center">
+                  <p className="text-[12px]" style={{ color: 'var(--ink3)' }}>
+                    Scrivi un argomento e clicca "Genera Contenuto"
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
