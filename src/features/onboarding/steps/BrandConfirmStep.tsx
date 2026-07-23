@@ -2,20 +2,42 @@
 // scelta dello stile visual delle slide content (icone vs realistiche).
 // I campi a bassa confidenza sono evidenziati.
 import React from 'react';
-import { AlertCircle, PenTool, Camera } from 'lucide-react';
+import { AlertCircle, PenTool, Camera, Square, RectangleVertical } from 'lucide-react';
 import type { PaletteResult } from '@/lib/brand/extractor.ts';
 import type { BrandSemantics } from '@/lib/brand/artDirector.ts';
-import type { VisualStyle } from '@/lib/brand/genome.ts';
+import type { VisualStyle, SlideFormat } from '@/lib/brand/genome.ts';
 
 interface BrandConfirmStepProps {
   busy: boolean;
   palette: PaletteResult;
   semantics: BrandSemantics | null;
   visualStyle: VisualStyle;
+  format: SlideFormat;
   onPaletteChange: (p: PaletteResult) => void;
   onVisualStyleChange: (s: VisualStyle) => void;
+  onFormatChange: (f: SlideFormat) => void;
   onConfirm: () => void;
 }
+
+const FORMAT_OPTIONS: Array<{
+  value: SlideFormat;
+  label: string;
+  description: string;
+  Icon: typeof Square;
+}> = [
+  {
+    value: '4:5',
+    label: 'Verticale 4:5 (consigliato)',
+    description: '1080x1350: occupa piu schermo nel feed, il formato che performa meglio.',
+    Icon: RectangleVertical,
+  },
+  {
+    value: '1:1',
+    label: 'Quadrato 1:1',
+    description: '1080x1080: il formato classico dei caroselli.',
+    Icon: Square,
+  },
+];
 
 const VISUAL_STYLE_OPTIONS: Array<{
   value: VisualStyle;
@@ -46,7 +68,7 @@ const SWATCH_KEYS: Array<{ key: keyof PaletteResult; label: string }> = [
 ];
 
 const BrandConfirmStep: React.FC<BrandConfirmStepProps> = ({
-  busy, palette, semantics, visualStyle, onPaletteChange, onVisualStyleChange, onConfirm,
+  busy, palette, semantics, visualStyle, format, onPaletteChange, onVisualStyleChange, onFormatChange, onConfirm,
 }) => {
   const lowConfidence = (semantics?.confidence ?? 0) < 0.5;
 
@@ -133,6 +155,39 @@ const BrandConfirmStep: React.FC<BrandConfirmStepProps> = ({
                 key={value}
                 type="button"
                 onClick={() => onVisualStyleChange(value)}
+                className="text-left rounded-xl p-4 transition-all"
+                style={{
+                  border: active ? '2px solid var(--viola)' : '1px solid var(--line)',
+                  backgroundColor: active ? 'var(--viola-dim)' : 'var(--bg)',
+                  cursor: 'pointer',
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Icon className="h-4 w-4" style={{ color: active ? 'var(--viola)' : 'var(--ink3)' }} />
+                  <span className="text-[13px] font-black" style={{ color: active ? 'var(--viola)' : 'var(--ink)' }}>
+                    {label}
+                  </span>
+                </div>
+                <p className="text-[11px]" style={{ color: 'var(--ink2)' }}>{description}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Formato slide */}
+      <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)' }}>
+        <div className="text-[11px] font-bold uppercase mb-3" style={{ color: 'var(--ink3)', letterSpacing: '0.6px' }}>
+          Formato slide
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          {FORMAT_OPTIONS.map(({ value, label, description, Icon }) => {
+            const active = format === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onFormatChange(value)}
                 className="text-left rounded-xl p-4 transition-all"
                 style={{
                   border: active ? '2px solid var(--viola)' : '1px solid var(--line)',

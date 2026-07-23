@@ -5,7 +5,7 @@
 
 import { getArchetype, type SlideRole, type Slot } from './archetypes.ts';
 import { sanitize } from './genesisPrompt.ts';
-import type { TemplateGenome } from './genome.ts';
+import { canvasForFormat, type TemplateGenome } from './genome.ts';
 
 /**
  * Produce lo skeleton con i placeholder {{...}} che la pipeline di
@@ -48,14 +48,26 @@ export function skeletonFromGenome(genome: TemplateGenome, role: SlideRole): str
   return sanitize(lines.join('\n'));
 }
 
-/** Slot geometrici (canvas 1080) per il compositing di logo e foto. */
+/**
+ * Slot geometrici per il compositing di logo e foto, scalati sul formato
+ * del genoma. Gli archetipi definiscono gli slot sul canvas quadrato 1080:
+ * in 4:5 (1080x1350) la larghezza resta invariata e le coordinate verticali
+ * si riproporzionano per mantenere la posizione relativa.
+ */
 export function slotsForRole(
   genome: TemplateGenome,
   role: SlideRole
 ): { logo: Slot; photo: Slot | null } {
   const spec = getArchetype(genome.archetype).roles[role];
+  const { h } = canvasForFormat(genome.format);
+  const yScale = h / 1080;
+  const scale = (s: Slot): Slot => ({
+    ...s,
+    y: Math.round(s.y * yScale),
+    ...(s.h !== undefined ? { h: Math.round(s.h * yScale) } : {}),
+  });
   return {
-    logo: spec.logo_slot,
-    photo: spec.photo_slot ?? null,
+    logo: scale(spec.logo_slot),
+    photo: spec.photo_slot ? scale(spec.photo_slot) : null,
   };
 }

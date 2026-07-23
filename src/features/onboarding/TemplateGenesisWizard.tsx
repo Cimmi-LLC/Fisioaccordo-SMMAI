@@ -14,7 +14,7 @@ import SummaryStep from './steps/SummaryStep.tsx';
 import { useGenesis } from './hooks/useGenesis.ts';
 import { useTemplateCandidates } from './hooks/useTemplateCandidates.ts';
 import type { SlideRole } from '@/lib/brand/archetypes.ts';
-import type { VisualStyle } from '@/lib/brand/genome.ts';
+import type { VisualStyle, SlideFormat } from '@/lib/brand/genome.ts';
 
 type WizardStep = 0 | 1 | 2 | 3;
 
@@ -30,6 +30,7 @@ const TemplateGenesisWizard: React.FC = () => {
   const [selection, setSelection] = useState<Partial<Record<SlideRole, string>>>({});
   const [existingLogoUrl, setExistingLogoUrl] = useState<string | null>(null);
   const [visualStyle, setVisualStyle] = useState<VisualStyle>('flat_icon');
+  const [format, setFormat] = useState<SlideFormat>('4:5');
 
   const genesis = useGenesis(brandId);
   const { candidates, genesisStatus } = useTemplateCandidates(
@@ -69,12 +70,12 @@ const TemplateGenesisWizard: React.FC = () => {
   };
 
   const handleGenerate = async () => {
-    const ok = await genesis.generate(undefined, visualStyle);
+    const ok = await genesis.generate(undefined, visualStyle, format);
     if (ok) { setSelection({}); setStep(2); }
   };
 
   const handleRegenerate = async (feedback: string) => {
-    const ok = await genesis.generate(feedback, visualStyle);
+    const ok = await genesis.generate(feedback, visualStyle, format);
     if (ok) setSelection({});
   };
 
@@ -125,8 +126,10 @@ const TemplateGenesisWizard: React.FC = () => {
               palette={genesis.palette}
               semantics={genesis.semantics}
               visualStyle={visualStyle}
+              format={format}
               onPaletteChange={genesis.setPalette}
               onVisualStyleChange={setVisualStyle}
+              onFormatChange={setFormat}
               onConfirm={handleGenerate}
             />
           )}

@@ -73,6 +73,7 @@ async function downloadAsBase64(
 async function generateOneImage(
   apiKey: string,
   prompt: string,
+  aspectRatio: string,
 ): Promise<Uint8Array | null> {
   for (const model of [IMAGE_MODEL, IMAGE_MODEL_FALLBACK]) {
     try {
@@ -83,7 +84,7 @@ async function generateOneImage(
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           generationConfig: {
             responseModalities: ["IMAGE"],
-            imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
+            imageConfig: { aspectRatio, imageSize: "1K" },
           },
         },
       });
@@ -299,12 +300,13 @@ serve(async (req) => {
         return jsonResponse(req, { error: "Art director fallito: " + adErrors.join("; ") }, 502);
       }
 
-      // Stile visual: scelta dell'utente nel wizard, non dell'art director.
-      // Iniettato nel genoma cosi si propaga a candidati, brands.genome e
-      // allo skeleton congelato all'approvazione.
+      // Stile visual e formato: scelte dell'utente nel wizard, non dell'art
+      // director. Iniettate nel genoma cosi si propagano a candidati,
+      // brands.genome e allo skeleton congelato all'approvazione.
       genome = {
         ...genome,
         visual_style: body.visualStyle === "realistic" ? "realistic" : "flat_icon",
+        format: body.format === "1:1" ? "1:1" : "4:5",
       };
 
       // Versione genoma: +1 su regenerate.
@@ -364,7 +366,7 @@ serve(async (req) => {
           await supabase.from("template_candidates")
             .update({ status: "generating", updated_at: new Date().toISOString() })
             .eq("id", c.id);
-          const bytes = await generateOneImage(GEMINI_API_KEY, c.prompt);
+          const bytes = await generateOneImage(GEMINI_API_KEY, c.prompt, genome!.format === "4:5" ? "4:5" : "1:1");
           if (!bytes) {
             await supabase.from("template_candidates")
               .update({ status: "failed", error: "nessuna immagine dal modello", updated_at: new Date().toISOString() })

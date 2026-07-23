@@ -88,6 +88,16 @@ describe('buildGenesisPrompt', () => {
     expect(cta).not.toContain('ILLUSTRATION:');
   });
 
+  it('il formato 4:5 cambia il canvas del master template', () => {
+    const vertical = buildGenesisPrompt(
+      KIT, { ...genomeFor('split_panel'), format: '4:5' }, 'cover', 1
+    );
+    expect(vertical).toContain('1080x1350');
+    expect(vertical).toContain('vertical 4:5 portrait');
+    const square = buildGenesisPrompt(KIT, genomeFor('split_panel'), 'cover', 1);
+    expect(square).toContain('1080x1080');
+  });
+
   it('visual_style realistic cambia direttiva e vincoli, flat_icon e il default', () => {
     const realistic = buildGenesisPrompt(
       KIT, { ...genomeFor('split_panel'), visual_style: 'realistic' }, 'content', 1

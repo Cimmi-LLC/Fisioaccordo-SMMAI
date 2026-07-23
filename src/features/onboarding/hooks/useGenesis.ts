@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/errors';
 import { extractPalette, type PaletteResult } from '@/lib/brand/extractor.ts';
 import type { BrandSemantics } from '@/lib/brand/artDirector.ts';
-import type { TemplateGenome, VisualStyle } from '@/lib/brand/genome.ts';
+import type { TemplateGenome, VisualStyle, SlideFormat } from '@/lib/brand/genome.ts';
 import { approveTemplate } from '@/lib/brand/approve.ts';
 
 export function useGenesis(brandId: string | null) {
@@ -127,8 +127,12 @@ export function useGenesis(brandId: string | null) {
     }
   }, [brandId, toast]);
 
-  /** Step 3: genesi (o rigenerazione con feedback), con lo stile visual scelto. */
-  const generate = useCallback(async (feedback?: string, visualStyle?: VisualStyle): Promise<boolean> => {
+  /** Step 3: genesi (o rigenerazione con feedback), con stile visual e formato scelti. */
+  const generate = useCallback(async (
+    feedback?: string,
+    visualStyle?: VisualStyle,
+    format?: SlideFormat
+  ): Promise<boolean> => {
     if (!brandId || !palette) return false;
     setBusy(true);
     try {
@@ -140,6 +144,7 @@ export function useGenesis(brandId: string | null) {
           semantics,
           feedback,
           visualStyle: visualStyle ?? 'flat_icon',
+          format: format ?? '4:5',
         },
       });
       if (error || data?.error) throw new Error(data?.error || error?.message);

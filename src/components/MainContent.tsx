@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import IdeaGenerator from "./IdeaGenerator";
 import ContentForm from "./ContentForm";
 import Nb2CarouselPreview from "./carousel/Nb2CarouselPreview";
+import ProducedCarouselsList from "./carousel/ProducedCarouselsList";
 import type { CarouselData } from "@/types/carousel";
 import SkeletonLoader from "./ui/skeleton-loader";
 import EnhancedProgress from "./ui/enhanced-progress";
@@ -60,7 +61,6 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
   const brandRecord = activeBrand as (typeof activeBrand & { genesis_status?: string; genome?: unknown }) | null;
   const genesisLocked = brandRecord?.genesis_status === 'locked';
   const nb2 = useNb2Carousel(brandRecord?.id ?? null, brandRecord?.genome ?? null);
-  const [carouselRunId, setCarouselRunId] = useState('');
   const producedFingerprint = useRef('');
 
   /** Avvio manuale della produzione (fallback se l'automatico non e partito). */
@@ -68,11 +68,22 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
     const carousel = carouselDataList[activeVariant];
     if (!carousel || !brandRecord?.id) return;
     producedFingerprint.current = activeVariant + '|' + carousel.titolo_carosello + '|' + carousel.slides.length;
-    const runId = 'nb2_' + Date.now() + '_v' + activeVariant;
-    setCarouselRunId(runId);
-    nb2.produce(carousel, runId);
+    nb2.produce(carousel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carouselDataList, activeVariant, brandRecord?.id]);
+
+  /** Riapre un carosello prodotto in precedenza (senza rigenerare nulla). */
+  const handleReopen = useCallback(async (rowId: string) => {
+    const copy = await nb2.reopen(rowId);
+    if (copy) {
+      // Fingerprint impostato PRIMA di settare la lista: il riaprire non
+      // deve mai far ripartire una produzione (costerebbe di nuovo).
+      producedFingerprint.current = '0|' + copy.titolo_carosello + '|' + copy.slides.length;
+      setCarouselDataList([copy]);
+      setActiveVariant(0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nb2.reopen]);
 
   // Deep-link from Trend page (?topic=…&type=carosello&auto=1):
   //   1) prefill description
@@ -158,9 +169,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
     const fingerprint = activeVariant + '|' + carousel.titolo_carosello + '|' + carousel.slides.length;
     if (producedFingerprint.current === fingerprint) return;
     producedFingerprint.current = fingerprint;
-    const runId = 'nb2_' + Date.now() + '_v' + activeVariant;
-    setCarouselRunId(runId);
-    nb2.produce(carousel, runId);
+    nb2.produce(carousel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carouselDataList, activeVariant, genesisLocked, brandRecord?.id]);
 
@@ -290,11 +299,11 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
             <Nb2CarouselPreview
               key={activeVariant}
               carousel={carouselDataList[activeVariant]}
-              carouselId={carouselRunId}
+              format={nb2.format}
               slides={nb2.slides}
               producing={nb2.producing}
               regenerating={nb2.regenerating}
-              onRegenerate={(index, override) => nb2.regenerateSlide(index, carouselRunId, override)}
+              onRegenerate={(index, override) => nb2.regenerateSlide(index, override)}
             />
           )}
           {/* Fallback: copy pronto ma slide non prodotte (produzione fallita
@@ -343,6 +352,13 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
           )}
         </div>
       </div>
+
+      {/* Caroselli gia prodotti: persistono e si riaprono senza rigenerare */}
+      <ProducedCarouselsList
+        brandId={brandRecord?.id ?? null}
+        activeId={nb2.carouselId}
+        onOpen={handleReopen}
+      />
     </div>
   );
 });

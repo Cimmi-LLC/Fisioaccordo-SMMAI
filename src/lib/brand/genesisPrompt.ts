@@ -7,7 +7,7 @@
 // File PURO, specchiato in supabase/functions/_shared/brand/genesisPrompt.ts.
 
 import { getArchetype, type SlideRole } from './archetypes.ts';
-import { genomeToPromptFragment, type TemplateGenome } from './genome.ts';
+import { canvasForFormat, genomeToPromptFragment, type TemplateGenome } from './genome.ts';
 
 /** Palette risolta del brand: input del prompt, prodotta dall'extractor. */
 export type GenesisPalette = {
@@ -174,9 +174,13 @@ export function buildGenesisPrompt(
     'LANGUAGE DIRECTIVE: every piece of text rendered inside the image must be in ITALIAN, exactly as written below, with no translation, no paraphrase, no additions.'
   );
 
-  // 2. Dichiarazione TEMPLATE MASTER
+  // 2. Dichiarazione TEMPLATE MASTER (canvas dal formato del genoma)
+  const canvas = canvasForFormat(genome.format);
   sections.push(
-    'This is a MASTER TEMPLATE for an Instagram carousel slide, 1080x1080 pixels. What matters is layout, spacing and proportions: the design system, not the specific content. Flat graphic design, vector style.'
+    'This is a MASTER TEMPLATE for an Instagram carousel slide, ' +
+    canvas.w + 'x' + canvas.h + ' pixels' +
+    (genome.format === '4:5' ? ' (vertical 4:5 portrait)' : '') +
+    '. What matters is layout, spacing and proportions: the design system, not the specific content. Flat graphic design, vector style.'
   );
 
   // 3. Spec compositiva del ruolo

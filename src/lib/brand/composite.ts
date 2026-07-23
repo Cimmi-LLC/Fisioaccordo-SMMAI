@@ -10,7 +10,9 @@
 
 import type { Slot } from './archetypes.ts';
 
-const CANVAS = 1080;
+/** Dimensioni canvas di destinazione (1080x1080 o 1080x1350 per il 4:5). */
+export type CanvasSize = { w: number; h: number };
+const SQUARE: CanvasSize = { w: 1080, h: 1080 };
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -22,10 +24,10 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-function makeCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
+function makeCanvas(size: CanvasSize): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
   const canvas = document.createElement('canvas');
-  canvas.width = CANVAS;
-  canvas.height = CANVAS;
+  canvas.width = size.w;
+  canvas.height = size.h;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D non disponibile');
   return { canvas, ctx };
@@ -44,12 +46,15 @@ function toBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 export async function compositeLogo(
   slideUrl: string,
   logoUrl: string,
-  slot: Slot
+  slot: Slot,
+  size: CanvasSize = SQUARE
 ): Promise<Blob> {
   const [slide, logo] = await Promise.all([loadImage(slideUrl), loadImage(logoUrl)]);
-  const { canvas, ctx } = makeCanvas();
+  const { canvas, ctx } = makeCanvas(size);
 
-  ctx.drawImage(slide, 0, 0, CANVAS, CANVAS);
+  // La slide viene normalizzata alle dimensioni target del formato
+  // (l'output nativo del modello puo differire di qualche pixel).
+  ctx.drawImage(slide, 0, 0, size.w, size.h);
 
   // contain-fit del logo dentro lo slot (larghezza slot.w, altezza libera)
   const maxW = slot.w;
@@ -72,12 +77,13 @@ export async function compositeLogo(
 export async function compositePhoto(
   slideUrl: string,
   photoUrl: string,
-  slot: Slot & { h: number }
+  slot: Slot & { h: number },
+  size: CanvasSize = SQUARE
 ): Promise<Blob> {
   const [slide, photo] = await Promise.all([loadImage(slideUrl), loadImage(photoUrl)]);
-  const { canvas, ctx } = makeCanvas();
+  const { canvas, ctx } = makeCanvas(size);
 
-  ctx.drawImage(slide, 0, 0, CANVAS, CANVAS);
+  ctx.drawImage(slide, 0, 0, size.w, size.h);
 
   const isSquare = Math.abs(slot.w - slot.h) < 2;
 

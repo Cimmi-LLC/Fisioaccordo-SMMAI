@@ -14,6 +14,13 @@ export type Alignment = 'left' | 'center';
 export type BgStrategy = 'alternating_solid' | 'accent_cover' | 'mono_with_accent_blocks';
 /** Stile dei visual esplicativi nelle slide content: scelto dall'utente nel wizard. */
 export type VisualStyle = 'flat_icon' | 'realistic';
+/** Formato delle slide: quadrato o verticale Instagram. Scelto nel wizard. */
+export type SlideFormat = '1:1' | '4:5';
+
+/** Dimensioni canvas in pixel per formato. */
+export function canvasForFormat(format: SlideFormat | undefined): { w: number; h: number } {
+  return format === '4:5' ? { w: 1080, h: 1350 } : { w: 1080, h: 1080 };
+}
 
 export type TemplateGenome = {
   archetype: ArchetypeId;
@@ -35,6 +42,11 @@ export type TemplateGenome = {
    * iniettato dalla scelta utente nel wizard. Assente = flat_icon.
    */
   visual_style?: VisualStyle;
+  /**
+   * Formato slide. Anche questo e una scelta utente iniettata dal wizard.
+   * Assente = 1:1 (compatibilita con i template creati prima del campo).
+   */
+  format?: SlideFormat;
 };
 
 const DECORATION_SCALES: readonly string[] = ['subtle', 'medium', 'dominant'];
@@ -121,6 +133,11 @@ export function validateGenome(g: unknown): { ok: boolean; errors: string[] } {
     o.visual_style !== 'realistic'
   ) {
     errors.push('visual_style non valido: ' + String(o.visual_style));
+  }
+
+  // Campo opzionale: formato slide.
+  if (o.format !== undefined && o.format !== '1:1' && o.format !== '4:5') {
+    errors.push('format non valido: ' + String(o.format));
   }
 
   // Vincolo incrociato: allineamento centrato incompatibile con archetipi

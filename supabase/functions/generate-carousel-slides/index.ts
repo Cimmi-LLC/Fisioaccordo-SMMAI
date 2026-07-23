@@ -2,12 +2,16 @@
 //
 // Per ogni slide del copy: reference image = template_variants del ruolo,
 // prompt = prompt_skeleton con i placeholder risolti, NB2 genera la slide
-// finale 1080x1080. Concorrenza 3, retry via callGeminiWithRetry, una slide
-// fallita non uccide il job.
+// finale nel formato del template (1:1 o 4:5). Una slide fallita non
+// uccide il job.
+//
+// Persistenza e progresso: ogni run crea una riga in produced_carousels;
+// le slide vengono aggiornate nel jsonb man mano che escono e il client
+// segue via Realtime (+ polling di sicurezza).
 //
 // Actions:
-//   generate    → tutte le slide del carosello (202 + background)
-//   regenerate  → una singola slide (sincrona: il client aspetta ~5-10s)
+//   generate    → crea la riga, risponde 202, produce in background
+//   regenerate  → una singola slide di una riga esistente (sincrona)
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { adminClient, requireAuth, assertBrandOwnership, requireWithinRateLimit } from "../_shared/auth.ts";
@@ -34,12 +38,18 @@ type SlideInput = {
   illustration?: string;
 };
 
+type SlideRecord = SlideInput & {
+  path: string | null;
+  error: string | null;
+  status: "pending" | "done" | "failed";
+};
+
 type VariantRow = {
   slide_role: SlideRole;
   storage_bucket: string;
   storage_path: string;
   prompt_skeleton: string;
-  genome: { archetype?: string } | null;
+  genome: { archetype?: string; format?: string } | null;
 };
 
 type PaletteColors = { bg_color: string; title_color: string; body_color: string };
@@ -89,6 +99,7 @@ async function generateSlide(
   apiKey: string,
   referenceB64: string,
   prompt: string,
+  aspectRatio: string,
 ): Promise<Uint8Array | null> {
   for (const model of [IMAGE_MODEL, IMAGE_MODEL_FALLBACK]) {
     try {
@@ -105,7 +116,7 @@ async function generateSlide(
           }],
           generationConfig: {
             responseModalities: ["IMAGE"],
-            imageConfig: { aspectRatio: "1:1", imageSize: "1K" },
+            imageConfig: { aspectRatio, imageSize: "1K" },
           },
         },
       });
@@ -133,6 +144,26 @@ async function runPool<T>(jobs: Array<() => Promise<T>>, limit: number): Promise
   return results;
 }
 
+/** Aggiorna una slide nel jsonb della riga (riletto per non perdere update concorrenti). */
+async function patchSlide(
+  supabase: ReturnType<typeof adminClient>,
+  rowId: string,
+  slide: SlideRecord,
+): Promise<void> {
+  const { data } = await supabase
+    .from("produced_carousels")
+    .select("slides")
+    .eq("id", rowId)
+    .single();
+  const slides = ((data as { slides?: SlideRecord[] } | null)?.slides || []) as SlideRecord[];
+  const next = slides.map((s) => (s.index === slide.index ? slide : s));
+  const okCount = next.filter((s) => s.status === "done").length;
+  await supabase
+    .from("produced_carousels")
+    .update({ slides: next, ok_count: okCount, updated_at: new Date().toISOString() })
+    .eq("id", rowId);
+}
+
 serve(async (req) => {
   const pre = handlePreflight(req);
   if (pre) return pre;
@@ -148,7 +179,6 @@ serve(async (req) => {
 
     const action = String(body.action || "generate");
     const brandId = String(body.brandId || "");
-    const carouselId = String(body.carouselId || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) || `c_${Date.now()}`;
     const slides = Array.isArray(body.slides) ? (body.slides as SlideInput[]) : [];
     const colors = (body.colors ?? null) as PaletteColors | null;
 
@@ -184,6 +214,9 @@ serve(async (req) => {
       }, 409);
     }
 
+    // Formato dal genoma congelato del template (default 1:1 per i vecchi).
+    const format = byRole.get("content")!.genome?.format === "4:5" ? "4:5" : "1:1";
+
     // Scarica le 3 reference una volta sola.
     const refCache = new Map<SlideRole, string>();
     for (const role of ["cover", "content", "cta"] as SlideRole[]) {
@@ -193,50 +226,118 @@ serve(async (req) => {
       refCache.set(role, b64);
     }
 
-    const produceOne = async (slide: SlideInput): Promise<{ index: number; path: string | null; error: string | null }> => {
+    const produceOne = async (
+      rowId: string,
+      slide: SlideInput,
+    ): Promise<SlideRecord> => {
       const variant = byRole.get(slide.role)!;
       const prompt = resolveSkeleton(variant.prompt_skeleton, slide, colors);
-      const bytes = await generateSlide(GEMINI_API_KEY, refCache.get(slide.role)!, prompt);
-      if (!bytes) return { index: slide.index, path: null, error: "nessuna immagine dal modello" };
-      const path = `${userId}/${carouselId}/slide_${slide.index + 1}_${Date.now()}.png`;
+      const bytes = await generateSlide(GEMINI_API_KEY, refCache.get(slide.role)!, prompt, format);
+      if (!bytes) {
+        return { ...slide, path: null, error: "nessuna immagine dal modello", status: "failed" };
+      }
+      const path = `${userId}/${rowId}/slide_${slide.index + 1}_${Date.now()}.png`;
       const { error: upErr } = await supabase.storage
         .from(OUTPUT_BUCKET)
         .upload(path, bytes, { contentType: "image/png", upsert: true });
-      if (upErr) return { index: slide.index, path: null, error: upErr.message };
-      return { index: slide.index, path, error: null };
+      if (upErr) return { ...slide, path: null, error: upErr.message, status: "failed" };
+      return { ...slide, path, error: null, status: "done" };
     };
 
-    // regenerate: 1 slide, risposta sincrona.
+    // ─── REGENERATE: una slide di una riga esistente, sincrona ───
     if (action === "regenerate") {
-      const result = await produceOne(slides[0]);
+      const rowId = String(body.carouselId || "");
+      if (!rowId) return jsonResponse(req, { error: "carouselId obbligatorio" }, 400);
+      const { data: row } = await supabase
+        .from("produced_carousels")
+        .select("id, user_id")
+        .eq("id", rowId)
+        .maybeSingle();
+      if (!row || (row as { user_id: string }).user_id !== userId) {
+        return jsonResponse(req, { error: "Carosello non trovato" }, 404);
+      }
+
+      const result = await produceOne(rowId, slides[0]);
+      await patchSlide(supabase, rowId, result);
       await logGeneration({
         userId, brandId, type: "carousel",
         status: result.path ? "success" : "failed",
         title: "Rigenerazione slide " + (slides[0].index + 1),
-        metadata: { phase: "regenerate-slide", estimated_cost_usd: result.path ? COST_NB2_IMAGE_1K : 0 },
+        metadata: { phase: "regenerate-slide", carouselId: rowId, estimated_cost_usd: result.path ? COST_NB2_IMAGE_1K : 0 },
       });
       if (!result.path) return jsonResponse(req, { error: result.error || "generazione fallita" }, 502);
       return jsonResponse(req, { bucket: OUTPUT_BUCKET, path: result.path, index: result.index });
     }
 
-    // generate: tutte le slide, risposta sincrona (il client mostra progresso
-    // ottimistico; 6 slide a concorrenza 3 = ~2 batch, tipicamente 15-30s).
-    const results = await runPool(slides.map((s) => () => produceOne(s)), CONCURRENCY);
-    const okCount = results.filter((r) => r.path).length;
+    // ─── GENERATE: riga persistente + 202 + produzione in background ───
+    const copy = (body.copy ?? null) as Record<string, unknown> | null;
+    const title = String(body.title || copy?.titolo_carosello || "Carosello");
 
-    await logGeneration({
-      userId, brandId, type: "carousel",
-      status: okCount === slides.length ? "success" : okCount > 0 ? "partial" : "failed",
-      title: "Produzione carosello (" + okCount + "/" + slides.length + " slide)",
-      metadata: { phase: "produce-slides", carouselId, estimated_cost_usd: okCount * COST_NB2_IMAGE_1K },
-    });
+    const initialSlides: SlideRecord[] = slides.map((s) => ({
+      ...s, path: null, error: null, status: "pending",
+    }));
+
+    const { data: inserted, error: insErr } = await supabase
+      .from("produced_carousels")
+      .insert({
+        user_id: userId,
+        brand_id: brandId,
+        title,
+        copy: copy ?? {},
+        slides: initialSlides,
+        storage_bucket: OUTPUT_BUCKET,
+        format,
+        status: "producing",
+        total: slides.length,
+      })
+      .select("id")
+      .single();
+    if (insErr || !inserted) {
+      return jsonResponse(req, { error: "Creazione run fallita: " + (insErr?.message || "") }, 500);
+    }
+    const rowId = (inserted as { id: string }).id;
+
+    const job = async () => {
+      try {
+        const results = await runPool(
+          slides.map((s) => async () => {
+            const r = await produceOne(rowId, s);
+            await patchSlide(supabase, rowId, r);
+            return r;
+          }),
+          CONCURRENCY,
+        );
+        const okCount = results.filter((r) => r.status === "done").length;
+        const finalStatus = okCount === slides.length ? "ready" : okCount > 0 ? "partial" : "failed";
+        await supabase
+          .from("produced_carousels")
+          .update({ status: finalStatus, ok_count: okCount, updated_at: new Date().toISOString() })
+          .eq("id", rowId);
+
+        await logGeneration({
+          userId, brandId, type: "carousel",
+          status: finalStatus === "ready" ? "success" : finalStatus === "partial" ? "partial" : "failed",
+          title: "Produzione carosello (" + okCount + "/" + slides.length + " slide)",
+          metadata: { phase: "produce-slides", carouselId: rowId, format, estimated_cost_usd: okCount * COST_NB2_IMAGE_1K },
+        });
+      } catch (e) {
+        console.error("Produzione background fallita:", e);
+        await supabase
+          .from("produced_carousels")
+          .update({ status: "failed", error: (e as Error).message, updated_at: new Date().toISOString() })
+          .eq("id", rowId);
+      }
+    };
+
+    // @ts-ignore EdgeRuntime disponibile nell'ambiente Supabase
+    EdgeRuntime.waitUntil(job());
 
     return jsonResponse(req, {
+      carouselId: rowId,
       bucket: OUTPUT_BUCKET,
-      slides: results,
-      ok: okCount,
-      failed: slides.length - okCount,
-    });
+      format,
+      total: slides.length,
+    }, 202);
   } catch (e) {
     console.error("generate-carousel-slides error:", e);
     return jsonResponse(req, { error: (e as Error).message || "Errore interno" }, 500);

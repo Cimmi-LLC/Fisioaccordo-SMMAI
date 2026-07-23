@@ -13,13 +13,13 @@ import { supabase } from '@/integrations/supabase/client';
 import SchedulePostDialog from '@/components/schedule/SchedulePostDialog';
 import { compositeLogo } from '@/lib/brand/composite.ts';
 import { slotsForRole } from '@/lib/brand/skeleton.ts';
-import type { TemplateGenome } from '@/lib/brand/genome.ts';
+import { canvasForFormat, type TemplateGenome, type SlideFormat } from '@/lib/brand/genome.ts';
 import type { Nb2Slide } from '@/hooks/useNb2Carousel';
 import type { CarouselData } from '@/types/carousel';
 
 interface Nb2CarouselPreviewProps {
   carousel: CarouselData;
-  carouselId: string;
+  format: SlideFormat;
   slides: Nb2Slide[];
   producing: boolean;
   regenerating: number | null;
@@ -27,7 +27,7 @@ interface Nb2CarouselPreviewProps {
 }
 
 const Nb2CarouselPreview: React.FC<Nb2CarouselPreviewProps> = ({
-  carousel, carouselId, slides, producing, regenerating, onRegenerate,
+  carousel, format, slides, producing, regenerating, onRegenerate,
 }) => {
   const { toast } = useToast();
   const { activeBrand } = useActiveBrand();
@@ -68,7 +68,7 @@ const Nb2CarouselPreview: React.FC<Nb2CarouselPreviewProps> = ({
       let dataUrl: string;
       if (logoUrl && genome) {
         const slots = slotsForRole(genome, s.role);
-        const blob = await compositeLogo(s.imageUrl, logoUrl, slots.logo);
+        const blob = await compositeLogo(s.imageUrl, logoUrl, slots.logo, canvasForFormat(format));
         dataUrl = await new Promise<string>((resolve) => {
           const r = new FileReader();
           r.onloadend = () => resolve(String(r.result));
@@ -104,7 +104,11 @@ const Nb2CarouselPreview: React.FC<Nb2CarouselPreviewProps> = ({
         <div style={{ position: 'relative' }}>
           <div
             className="rounded-2xl overflow-hidden mx-auto"
-            style={{ maxWidth: 440, aspectRatio: '1', backgroundColor: 'var(--bg)', border: '1px solid var(--line)' }}
+            style={{
+              maxWidth: format === '4:5' ? 400 : 440,
+              aspectRatio: format === '4:5' ? '4 / 5' : '1',
+              backgroundColor: 'var(--bg)', border: '1px solid var(--line)',
+            }}
           >
             {current?.imageUrl ? (
               <img src={current.imageUrl} alt={`slide ${active + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

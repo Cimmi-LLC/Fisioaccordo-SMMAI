@@ -73,6 +73,7 @@ const SummaryStep: React.FC<SummaryStepProps> = ({ busy, genome, candidates, sel
           <div>Allineamento: <strong style={{ color: 'var(--ink)' }}>{IT[genome.alignment]}</strong></div>
           <div className="sm:col-span-2">Sfondi: <strong style={{ color: 'var(--ink)' }}>{IT[genome.bg_strategy]}</strong></div>
           <div className="sm:col-span-2">Immagini nelle slide: <strong style={{ color: 'var(--ink)' }}>{IT[genome.visual_style ?? 'flat_icon']}</strong></div>
+          <div className="sm:col-span-2">Formato: <strong style={{ color: 'var(--ink)' }}>{genome.format === '4:5' ? 'verticale 4:5 (1080x1350)' : 'quadrato 1:1 (1080x1080)'}</strong></div>
         </div>
       </div>
 

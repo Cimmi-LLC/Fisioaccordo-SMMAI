@@ -59,6 +59,14 @@ describe('validateGenome', () => {
     expect(validateGenome('genoma').ok).toBe(false);
   });
 
+  it('format: opzionale, accetta 1:1 e 4:5, rifiuta il resto', () => {
+    expect(validateGenome({ ...GOLDEN, format: '1:1' }).ok).toBe(true);
+    expect(validateGenome({ ...GOLDEN, format: '4:5' }).ok).toBe(true);
+    const r = validateGenome({ ...GOLDEN, format: '16:9' });
+    expect(r.ok).toBe(false);
+    expect(r.errors.join(' ')).toContain('format');
+  });
+
   it('visual_style: opzionale, accetta i due stili noti, rifiuta il resto', () => {
     expect(validateGenome(GOLDEN).ok).toBe(true);
     expect(validateGenome({ ...GOLDEN, visual_style: 'flat_icon' }).ok).toBe(true);
