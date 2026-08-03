@@ -39,8 +39,20 @@ type BrandRow = {
   categorie: string[] | null;
   servizi: string[] | null;
   tono_voce: string | null;
+  mission: string | null;
+  identita_core: string | null;
+  vantaggi_competitivi: string[] | null;
+  temi_chiave: string[] | null;
+  font_intestazioni: string | null;
+  font_body: string | null;
+  location_photos: string[] | null;
+  gallery_photos: string[] | null;
 };
 
+/**
+ * Piu materiale distintivo riceve l'art director, meno il risultato
+ * converge sulla scelta generica valida per qualsiasi studio sanitario.
+ */
 function brandInfo(b: BrandRow): ArtDirectorBrandInfo {
   return {
     nome_business: b.nome_business || "Studio",
@@ -48,6 +60,12 @@ function brandInfo(b: BrandRow): ArtDirectorBrandInfo {
     categorie: b.categorie || [],
     servizi: b.servizi || [],
     tono_voce: b.tono_voce || "professionale",
+    mission: b.mission || undefined,
+    identita_core: b.identita_core || undefined,
+    vantaggi_competitivi: b.vantaggi_competitivi || undefined,
+    temi_chiave: b.temi_chiave || undefined,
+    font_intestazioni: b.font_intestazioni || undefined,
+    font_body: b.font_body || undefined,
   };
 }
 
@@ -193,7 +211,7 @@ serve(async (req) => {
 
     const { data: brand, error: brandErr } = await supabase
       .from("brands")
-      .select("id, user_id, nome_business, descrizione, categorie, servizi, tono_voce")
+      .select("id, user_id, nome_business, descrizione, categorie, servizi, tono_voce, mission, identita_core, vantaggi_competitivi, temi_chiave, font_intestazioni, font_body, location_photos, gallery_photos")
       .eq("id", brandId)
       .single();
     if (brandErr || !brand) return jsonResponse(req, { error: "Brand non trovato" }, 404);
@@ -206,15 +224,55 @@ serve(async (req) => {
         .eq("brand_id", brandId)
         .in("kind", ["logo", "post"]);
 
-      const parts: Array<Record<string, unknown>> = [{ text: buildSemanticsPrompt() }];
+      const rows = (sources || []) as Array<{ kind: string; storage_bucket: string; storage_path: string }>;
+      const hasPosts = rows.some((s) => s.kind === "post");
+      const b = brand as BrandRow;
+
+      const parts: Array<Record<string, unknown>> = [{
+        text: buildSemanticsPrompt(hasPosts, {
+          nome_business: b.nome_business,
+          descrizione: b.descrizione,
+          servizi: b.servizi,
+          mission: b.mission,
+          identita_core: b.identita_core,
+          vantaggi_competitivi: b.vantaggi_competitivi,
+          temi_chiave: b.temi_chiave,
+          tono_voce: b.tono_voce,
+        }),
+      }];
+
       let imagesLoaded = 0;
-      for (const s of (sources || []) as Array<{ kind: string; storage_bucket: string; storage_path: string }>) {
+      for (const s of rows) {
         const img = await downloadAsBase64(supabase, s.storage_bucket, s.storage_path);
         if (img) {
           parts.push({ inline_data: { mime_type: img.mime, data: img.data } });
           imagesLoaded++;
         }
       }
+
+      // Senza post caricati si guardano anche le foto dello studio del brand
+      // kit: sono materiale reale che aiuta a leggere ambiente e atmosfera.
+      if (!hasPosts) {
+        const premises = [...(b.location_photos || []), ...(b.gallery_photos || [])].slice(0, 4);
+        for (const url of premises) {
+          try {
+            const res = await fetch(url);
+            const contentType = res.headers.get("content-type") || "";
+            if (!res.ok || !contentType.startsWith("image/")) continue;
+            const bytes = new Uint8Array(await res.arrayBuffer());
+            if (bytes.length === 0 || bytes.length > 6 * 1024 * 1024) continue;
+            let bin = "";
+            for (let i = 0; i < bytes.length; i += 0x8000) {
+              bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+            }
+            parts.push({ inline_data: { mime_type: contentType, data: btoa(bin) } });
+            imagesLoaded++;
+          } catch {
+            // foto non raggiungibile: si prosegue con quello che c'e
+          }
+        }
+      }
+
       if (imagesLoaded === 0) {
         return jsonResponse(req, { error: "Nessuna immagine caricata da analizzare" }, 400);
       }
@@ -264,11 +322,19 @@ serve(async (req) => {
         .eq("user_id", userId)
         .neq("id", brandId)
         .not("genome", "is", null);
+      const otherGenomes = ((otherBrands || []) as Array<{
+        genome: { archetype?: string; decoration_motif?: string } | null;
+      }>).map((b) => b.genome).filter(Boolean);
       const usedArchetypes = Array.from(new Set(
-        ((otherBrands || []) as Array<{ genome: { archetype?: string } | null }>)
-          .map((b) => b.genome?.archetype)
+        otherGenomes
+          .map((g) => g!.archetype)
           .filter((a): a is string => typeof a === "string" && a.length > 0)
       ));
+      const usedMotifs = Array.from(new Set(
+        otherGenomes
+          .map((g) => g!.decoration_motif)
+          .filter((m): m is string => typeof m === "string" && m.length > 0)
+      )).slice(0, 8);
 
       // Art director: 1 tentativo + 1 retry con gli errori appesi.
       let genome: TemplateGenome | null = null;
@@ -281,13 +347,16 @@ serve(async (req) => {
           feedback,
           attempt > 0 ? adErrors : undefined,
           usedArchetypes,
+          usedMotifs,
         );
         const result = await callGeminiWithRetry({
           apiKey: GEMINI_API_KEY,
           model: TEXT_MODEL,
           body: {
             contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, responseMimeType: "application/json" },
+            // Temperatura alta di proposito: con 0.7 il modello cadeva sempre
+            // sulla scelta "sicura" e i brand simili convergevano.
+            generationConfig: { temperature: 0.95, responseMimeType: "application/json" },
           },
         });
         const raw = result?.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";

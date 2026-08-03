@@ -170,6 +170,58 @@ export async function extractPalette(images: Array<File | Blob | string>): Promi
   };
 }
 
+/** Colori ufficiali dichiarati nel brand kit (brands.colore_*). */
+export type BrandKitColors = {
+  primario?: string | null;
+  secondario?: string | null;
+  terziario?: string | null;
+};
+
+/** Default Fisioaccordo: presenti su ogni brand appena creato, non scelti. */
+const DEFAULT_BRAND_COLORS = new Set(['#554697', '#e6007e', '#1a1a2e']);
+
+function isChosenColor(hex: string | null | undefined): hex is string {
+  if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return false;
+  return !DEFAULT_BRAND_COLORS.has(hex.toLowerCase());
+}
+
+/**
+ * Fonde i colori ufficiali del brand con quelli estratti dalle immagini.
+ *
+ * I colori dichiarati nel brand kit vincono sempre: sono la scelta del
+ * cliente, mentre l'estrazione da un logo compresso restituisce spesso
+ * versioni slavate dello stesso colore (esempio reale: brand con accento
+ * #0b7834 a cui l'estrattore assegnava #92bb93). Se il brand non ha mai
+ * personalizzato i colori restano quelli estratti.
+ */
+export function mergePaletteWithBrandKit(
+  extracted: PaletteResult,
+  kit: BrandKitColors
+): PaletteResult {
+  const chosen = [kit.primario, kit.secondario, kit.terziario].filter(isChosenColor);
+  if (chosen.length === 0) return extracted;
+
+  // Il primario e l'accento del brand. Sfondi: si prende dal kit il colore
+  // piu chiaro e il piu scuro, quando ci sono.
+  const accent = isChosenColor(kit.primario) ? kit.primario : extracted.accent;
+  const byLuminance = [...chosen].sort((a, b) => relativeLuminance(a) - relativeLuminance(b));
+  const darkest = byLuminance[0];
+  const lightest = byLuminance[byLuminance.length - 1];
+
+  const bgA = relativeLuminance(lightest) > 0.7 ? lightest : extracted.bg_a;
+  const bgB = relativeLuminance(darkest) < 0.25 ? darkest : extracted.bg_b;
+
+  return {
+    ...extracted,
+    bg_a: bgA,
+    bg_b: bgB,
+    accent,
+    text_on_light: ensureContrast(bgB, bgA),
+    text_on_dark: ensureContrast(bgA, bgB),
+    candidates: Array.from(new Set([...chosen, ...extracted.candidates])).slice(0, 10),
+  };
+}
+
 // ── Lettura semantica ────────────────────────────────────────────
 // Il tipo BrandSemantics vive in artDirector.ts (file mirrorabile in Deno);
 // qui lo ri-esportiamo per comodita dei consumer client-side.

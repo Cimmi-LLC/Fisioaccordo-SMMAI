@@ -64,8 +64,9 @@ const TemplateGenesisWizard: React.FC = () => {
   const handleUpload = async (logoFile: File | null, posts: File[]) => {
     const ok = await genesis.uploadSources(logoFile, posts, existingLogoUrl);
     if (!ok) return;
-    // Analisi semantica subito dopo l'upload (se ci sono post).
-    if (posts.length > 0) await genesis.analyze();
+    // Analisi semantica SEMPRE: senza post lavora su logo, foto dello studio
+    // e testi del brand. Saltarla era la causa dei template tutti uguali.
+    await genesis.analyze();
     setStep(1);
   };
 

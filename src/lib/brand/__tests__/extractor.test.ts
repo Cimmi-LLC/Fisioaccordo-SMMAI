@@ -23,6 +23,7 @@ import {
   contrastRatio,
   ensureContrast,
   extractPalette,
+  mergePaletteWithBrandKit,
 } from '../extractor.ts';
 
 describe('WCAG helpers', () => {
@@ -102,5 +103,35 @@ describe('parseArtDirectorResponse', () => {
     const r = parseArtDirectorResponse(JSON.stringify(bad));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.errors.length).toBeGreaterThan(1);
+  });
+});
+
+describe('mergePaletteWithBrandKit', () => {
+  const extracted = {
+    bg_a: '#f7f5f0', bg_b: '#1e2430',
+    accent: '#92bb93',            // verde slavato letto dal logo compresso
+    text_on_light: '#1e2430', text_on_dark: '#f7f5f0',
+    candidates: ['#92bb93', '#f7f5f0'],
+  };
+
+  it('i colori ufficiali del brand vincono sull estrazione', () => {
+    const merged = mergePaletteWithBrandKit(extracted, {
+      primario: '#0b7834', secondario: '#333333', terziario: '#eeeeee',
+    });
+    expect(merged.accent).toBe('#0b7834');
+    expect(merged.candidates).toContain('#0b7834');
+  });
+
+  it('i default Fisioaccordo non contano come scelta del cliente', () => {
+    const merged = mergePaletteWithBrandKit(extracted, {
+      primario: '#554697', secondario: '#E6007E', terziario: '#1a1a2e',
+    });
+    expect(merged).toEqual(extracted);
+  });
+
+  it('mantiene il contrasto minimo sui testi', () => {
+    const merged = mergePaletteWithBrandKit(extracted, { primario: '#0b7834' });
+    expect(contrastRatio(merged.text_on_light, merged.bg_a)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(merged.text_on_dark, merged.bg_b)).toBeGreaterThanOrEqual(4.5);
   });
 });

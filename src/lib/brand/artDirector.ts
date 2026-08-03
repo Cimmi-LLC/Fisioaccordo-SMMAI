@@ -24,13 +24,25 @@ export type BrandSemantics = {
   confidence: number;
 };
 
-/** Sottoinsieme del brand kit utile alla direzione artistica. */
+/**
+ * Sottoinsieme del brand kit utile alla direzione artistica.
+ * Piu materiale specifico arriva, meno il risultato converge sulla scelta
+ * generica: i campi distintivi (mission, vantaggi, temi, identita) sono
+ * quelli che davvero separano uno studio dall'altro.
+ */
 export type ArtDirectorBrandInfo = {
   nome_business: string;
   descrizione: string;
   categorie: string[];
   servizi: string[];
   tono_voce: string;
+  mission?: string;
+  identita_core?: string;
+  vantaggi_competitivi?: string[];
+  temi_chiave?: string[];
+  /** Font gia dichiarati nel brand kit: vincolano type_pairing. */
+  font_intestazioni?: string;
+  font_body?: string;
 };
 
 /**
@@ -43,7 +55,8 @@ export function buildArtDirectorPrompt(
   palette: GenesisPalette,
   feedback?: string,
   previousErrors?: string[],
-  usedArchetypes?: string[]
+  usedArchetypes?: string[],
+  usedMotifs?: string[]
 ): string {
   const sections: string[] = [];
 
@@ -54,14 +67,31 @@ export function buildArtDirectorPrompt(
 
   sections.push('ARCHETYPE LIBRARY:\n' + listArchetypesForPrompt());
 
-  sections.push(
-    'BRAND:\n' +
-    'Name: ' + brand.nome_business + '\n' +
-    'Description: ' + brand.descrizione + '\n' +
-    'Categories: ' + brand.categorie.join(', ') + '\n' +
-    'Services: ' + brand.servizi.join(', ') + '\n' +
-    'Tone of voice: ' + brand.tono_voce
-  );
+  const brandLines = [
+    'BRAND:',
+    'Name: ' + brand.nome_business,
+    'Description: ' + brand.descrizione,
+    'Categories: ' + brand.categorie.join(', '),
+    'Services: ' + brand.servizi.join(', '),
+    'Tone of voice: ' + brand.tono_voce,
+  ];
+  if (brand.mission) brandLines.push('Mission: ' + brand.mission);
+  if (brand.identita_core) brandLines.push('Core identity: ' + brand.identita_core);
+  if (brand.vantaggi_competitivi?.length) {
+    brandLines.push('What makes it different: ' + brand.vantaggi_competitivi.join('; '));
+  }
+  if (brand.temi_chiave?.length) {
+    brandLines.push('Key themes: ' + brand.temi_chiave.join(', '));
+  }
+  sections.push(brandLines.join('\n'));
+
+  if (brand.font_intestazioni || brand.font_body) {
+    sections.push(
+      'BRAND TYPEFACES already chosen by this studio (respect them in type_pairing, describe them faithfully):\n' +
+      'Headings: ' + (brand.font_intestazioni || 'not specified') + '\n' +
+      'Body: ' + (brand.font_body || 'not specified')
+    );
+  }
 
   sections.push(
     'BRAND PALETTE (already resolved, do not invent colors):\n' +
@@ -81,13 +111,18 @@ export function buildArtDirectorPrompt(
     );
   }
 
-  if (usedArchetypes && usedArchetypes.length > 0) {
-    sections.push(
-      'ARCHETYPES ALREADY USED by other brands of this same agency: ' +
-      usedArchetypes.join(', ') + '. ' +
-      'Visual variety across brands is a goal: choose a DIFFERENT archetype unless the brand identity strongly demands one of these. ' +
-      'If you do reuse one, differentiate it clearly through decoration, density and background strategy.'
-    );
+  if ((usedArchetypes && usedArchetypes.length > 0) || (usedMotifs && usedMotifs.length > 0)) {
+    const lines = [
+      'ANTI CONVERGENCE: every studio of this agency must end up with a visually distinct template. Two brands that look like recolors of each other are a failure.',
+    ];
+    if (usedArchetypes?.length) {
+      lines.push('Archetypes already assigned to other brands: ' + usedArchetypes.join(', ') + '. Pick a DIFFERENT one unless the brand identity strongly demands one of these.');
+    }
+    if (usedMotifs?.length) {
+      lines.push('Decoration motifs already in use: ' + usedMotifs.join(' | ') + '. Your motif must not be a paraphrase of any of them: change the geometry family, not just the wording.');
+    }
+    lines.push('If you are forced to reuse an archetype, then shape_language, number_treatment, bg_texture and accent_element MUST differ from a conventional treatment, so the result reads as a different design system.');
+    sections.push(lines.join('\n'));
   }
 
   if (feedback && feedback.trim().length > 0) {
@@ -115,10 +150,14 @@ export function buildArtDirectorPrompt(
   );
 
   sections.push(
+    'DERIVE FROM THIS SPECIFIC BRAND, not from the healthcare category in general: the decoration motif must come from something concrete about THIS studio (its name, its specialties, its equipment, its city, its core identity), never a generic medical cliche such as a cross, a heartbeat line or a plain circle. Two studios in the same field must not receive the same motif.'
+  );
+
+  sections.push(
     'TASK: choose ONE archetype (justify it in one sentence in the rationale field, in Italian) and return ONLY a pure JSON object, no surrounding text, no markdown fences, with exactly this shape:\n' +
     '{\n' +
     '  "archetype": "<one of the 6 ids>",\n' +
-    '  "decoration_motif": "<short english description of one abstract decorative motif derived from the brand>",\n' +
+    '  "decoration_motif": "<short english description of one abstract decorative motif derived from THIS brand>",\n' +
     '  "decoration_scale": "subtle" | "medium" | "dominant",\n' +
     '  "decoration_anchor": "corner" | "edge" | "behind_text" | "full_bleed",\n' +
     '  "decoration_opacity": <number between 0.05 and 0.35>,\n' +
@@ -127,8 +166,14 @@ export function buildArtDirectorPrompt(
     '  "density": "airy" | "balanced" | "packed",\n' +
     '  "alignment": "left" | "center",\n' +
     '  "bg_strategy": "alternating_solid" | "accent_cover" | "mono_with_accent_blocks",\n' +
+    '  "number_treatment": "plain" | "outline" | "oversized_bg" | "circle_badge" | "none",\n' +
+    '  "shape_language": "sharp" | "rounded" | "pill" | "organic",\n' +
+    '  "bg_texture": "none" | "subtle_grain" | "halftone_dots" | "thin_grid",\n' +
+    '  "accent_element": "underline" | "side_bar" | "corner_block" | "bracket" | "none",\n' +
+    '  "progress_indicator": "none" | "dots" | "bar" | "counter",\n' +
     '  "rationale": "<one sentence in Italian>"\n' +
-    '}'
+    '}\n' +
+    'The last five fields are the ones that make two studios on the same archetype look different: choose them from the brand personality, do not default to the first option of each list.'
   );
 
   return sections.join('\n\n');

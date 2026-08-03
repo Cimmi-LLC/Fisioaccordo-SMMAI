@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/errors';
-import { extractPalette, type PaletteResult } from '@/lib/brand/extractor.ts';
+import { extractPalette, mergePaletteWithBrandKit, type PaletteResult } from '@/lib/brand/extractor.ts';
 import type { BrandSemantics } from '@/lib/brand/artDirector.ts';
 import type { TemplateGenome, VisualStyle, SlideFormat } from '@/lib/brand/genome.ts';
 import { approveTemplate } from '@/lib/brand/approve.ts';
@@ -92,9 +92,20 @@ export function useGenesis(brandId: string | null) {
         }
       }
 
-      // Palette programmatica client-side (deterministica).
-      const pal = await extractPalette([logo, ...posts.slice(0, 6)]);
-      setPalette(pal);
+      // Palette programmatica client-side (deterministica), poi fusa con i
+      // colori ufficiali del brand kit: quelli dichiarati dal cliente vincono
+      // sull'estrazione dal logo, che restituisce spesso versioni slavate.
+      const extracted = await extractPalette([logo, ...posts.slice(0, 6)]);
+      const { data: brandColors } = await (supabase as any)
+        .from('brands')
+        .select('colore_primario, colore_secondario, colore_terziario')
+        .eq('id', brandId)
+        .maybeSingle();
+      setPalette(mergePaletteWithBrandKit(extracted, {
+        primario: brandColors?.colore_primario ?? null,
+        secondario: brandColors?.colore_secondario ?? null,
+        terziario: brandColors?.colore_terziario ?? null,
+      }));
 
       await (supabase as any).from('brands')
         .update({ genesis_status: 'sources_uploaded' })

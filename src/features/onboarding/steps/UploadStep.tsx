@@ -119,6 +119,9 @@ const UploadStep: React.FC<UploadStepProps> = ({ busy, existingLogoUrl, onSubmit
           <span className="text-sm font-semibold" style={{ color: 'var(--ink2)' }}>
             Post Instagram esistenti (opzionale, {posts.length}/{MAX_POSTS})
           </span>
+          <span className="text-[11px]" style={{ color: 'var(--ink3)' }}>
+            Bastano 2 o 3 screenshot dei tuoi post
+          </span>
         </div>
         {posts.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-4 justify-center">
@@ -138,6 +141,16 @@ const UploadStep: React.FC<UploadStepProps> = ({ busy, existingLogoUrl, onSubmit
           </div>
         )}
       </div>
+
+      {posts.length === 0 && (
+        <div
+          className="rounded-xl p-3 text-[11px]"
+          style={{ backgroundColor: 'rgba(245,158,11,0.08)', color: 'var(--ink2)' }}
+        >
+          Senza post l'AI progettera il template partendo da logo, colori e descrizione del tuo studio.
+          Funziona, ma con 2 o 3 post il risultato somiglia molto di piu al tuo stile reale.
+        </div>
+      )}
 
       <button
         onClick={() => hasLogo && onSubmit(logo, posts)}
