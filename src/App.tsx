@@ -38,6 +38,7 @@ const BrandPage = lazy(() => import("./pages/BrandPage"));
 const BrandsListPage = lazy(() => import("./pages/BrandsListPage"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
 const HistoryPage = lazy(() => import("./pages/HistoryPage"));
+const ArchivePage = lazy(() => import("./pages/ArchivePage"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const TemplateGenesisWizard = lazy(() => import("./features/onboarding/TemplateGenesisWizard"));
 
@@ -104,6 +105,7 @@ const App = () => (
                       <Route path="/reel" element={<ReelPage />} />
                       <Route path="/calendario" element={<CalendarPage />} />
                       <Route path="/storico" element={<HistoryPage />} />
+                      <Route path="/archivio" element={<ArchivePage />} />
                       <Route path="/brands" element={<BrandsListPage />} />
                       <Route path="/admin" element={<AdminPage />} />
                       <Route path="/admin/performance" element={<PerformanceDashboard />} />

@@ -6,13 +6,21 @@ import { Textarea } from '@/components/ui/textarea';
 import { ChevronLeft, ChevronRight, Copy, Download, RefreshCw, Pencil, Check, X, Loader2, Hash, ImageIcon, Shuffle, Upload, CalendarClock } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useCarouselPreview } from '@/hooks/useCarouselPreview';
-import SlideTemplate from './SlideTemplate';
+import SlideTemplateBase from './SlideTemplate';
+import SlideTemplateNeon from './SlideTemplateNeon';
 import MinimalProgressBar from './MinimalProgressBar';
 import SchedulePostDialog from '@/components/schedule/SchedulePostDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveBrand } from '@/hooks/useActiveBrand';
 import type { CarouselData } from '@/types/carousel';
+
+/** Sceglie il template in base allo stile grafico impostato sul brand. */
+const SlideTemplate: React.FC<any> = (props) => {
+  const { activeBrand } = useActiveBrand();
+  const neon = (activeBrand as any)?.slide_style === 'neon';
+  return neon ? <SlideTemplateNeon {...props} /> : <SlideTemplateBase {...props} />;
+};
 
 interface CarouselPreviewProps {
   data: CarouselData | null;

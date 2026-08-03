@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Loader2, CalendarClock, Instagram } from 'lucide-react';
 import { useSchedulePost } from '@/hooks/useSchedulePost';
 import { MetaService } from '@/services/metaService';
+import { markPublished } from '@/services/archiveService';
+import { useToast } from '@/hooks/use-toast';
 import { it } from 'date-fns/locale';
 
 interface SchedulePostDialogProps {
@@ -47,6 +49,8 @@ const SchedulePostDialog: React.FC<SchedulePostDialogProps> = ({
   });
   const [connectionId, setConnectionId] = useState<string>('');
   const [preparing, setPreparing] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const { toast } = useToast();
   const [connectingMeta, setConnectingMeta] = useState(false);
 
   useEffect(() => {
@@ -94,6 +98,54 @@ const SchedulePostDialog: React.FC<SchedulePostDialogProps> = ({
   const noConnections = connections !== null && connections.length === 0;
   const canSubmit =
     !!scheduledDate && !isInPast && !!connectionId && !scheduling && !preparing && !noConnections;
+
+  /**
+   * Pubblicazione immediata su Instagram, senza passare dallo scheduler.
+   * Le immagini vengono preparate come per la programmazione e passate come
+   * path: meta-publish minta le signed URL subito prima della chiamata Meta.
+   */
+  const handlePublishNow = async () => {
+    if (!connectionId) return;
+    setPublishing(true);
+    try {
+      const { bucket, paths } = await prepareImages();
+      if (!paths || paths.length === 0) {
+        throw new Error('Nessuna immagine disponibile per il post');
+      }
+      const caption = [content, hashtags].filter(Boolean).join('\n\n');
+      const res = await MetaService.publishToInstagram(
+        connectionId,
+        caption,
+        paths[0],
+        paths.length > 1 ? paths : undefined,
+        { bucket, isPath: true },
+      );
+      if (!res.success) throw new Error(res.error || 'Pubblicazione fallita');
+
+      toast({ title: 'Pubblicato su Instagram' });
+      try {
+        await markPublished({
+          title: content.slice(0, 80),
+          contentText: content,
+          kind: paths.length > 1 ? 'carosello' : 'post',
+          platform: 'instagram',
+          images: paths,
+        });
+      } catch (e) {
+        console.warn('Archivio non aggiornato:', e);
+      }
+      onScheduled?.();
+      onClose();
+    } catch (err) {
+      toast({
+        title: 'Errore pubblicazione',
+        description: err instanceof Error ? err.message : 'Errore imprevisto',
+        variant: 'destructive',
+      });
+    } finally {
+      setPublishing(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!scheduledDate || !connectionId) return;
@@ -254,9 +306,27 @@ const SchedulePostDialog: React.FC<SchedulePostDialogProps> = ({
             </div>
           )}
 
+          {/* Pubblicazione immediata, senza scheduler */}
+          <Button
+            onClick={handlePublishNow}
+            disabled={!connectionId || publishing || scheduling || preparing || noConnections}
+            className="w-full text-white font-bold"
+            style={{ backgroundColor: 'var(--rosa)' }}
+          >
+            {publishing ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" /> Pubblico ora...
+              </>
+            ) : (
+              <>
+                <Instagram className="h-4 w-4 mr-2" /> Pubblica ora
+              </>
+            )}
+          </Button>
+
           {/* Buttons */}
           <div className="flex gap-2 pt-2">
-            <Button variant="outline" onClick={onClose} disabled={scheduling || preparing} className="flex-1">
+            <Button variant="outline" onClick={onClose} disabled={scheduling || preparing || publishing} className="flex-1">
               Annulla
             </Button>
             <Button

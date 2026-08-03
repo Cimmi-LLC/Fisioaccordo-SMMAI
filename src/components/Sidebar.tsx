@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { LayoutGrid, BookImage, TrendingUp, Users, BarChart3, Settings, LogOut, Building2, Video, Shield, CalendarClock, Briefcase, Menu, X, Activity } from 'lucide-react';
+import { LayoutGrid, BookImage, TrendingUp, Users, BarChart3, Settings, LogOut, Building2, Video, Shield, CalendarClock, Briefcase, Menu, X, Activity, Archive } from 'lucide-react';
 import logo from '@/assets/logo-full.png';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import BrandSwitcher from './BrandSwitcher';
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { to: '/storie', label: 'Storie', icon: BookImage },
   { to: '/reel', label: 'Reel', icon: Video },
   { to: '/calendario', label: 'Calendario', icon: CalendarClock },
+  { to: '/archivio', label: 'Archivio', icon: Archive },
   { to: '/trend', label: 'Trend', icon: TrendingUp },
   { to: '/competitor', label: 'Competitor', icon: Users },
   { to: '/virale', label: 'Analisi Virale', icon: BarChart3 },

@@ -48,6 +48,7 @@ const ScheduleStoriesDialog: React.FC<Props> = ({ open, onClose, stories, onSche
   });
   const [connectionId, setConnectionId] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [submitMsg, setSubmitMsg] = useState('');
   const [connectingMeta, setConnectingMeta] = useState(false);
 
@@ -111,6 +112,68 @@ const ScheduleStoriesDialog: React.FC<Props> = ({ open, onClose, stories, onSche
 
   const selectAll = () => setSelected(new Set(safeStories.map(s => s.id)));
   const deselectAll = () => setSelected(new Set());
+
+  /**
+   * Pubblicazione immediata delle storie selezionate, senza scheduler:
+   * ogni storia viene renderizzata, caricata su storage e pubblicata da
+   * meta-publish con media_type 'story'.
+   */
+  const publishNow = async () => {
+    if (!user || !connectionId) return;
+    setPublishing(true);
+    const toProcess = safeStories.filter(s => selected.has(s.id));
+    let okCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < toProcess.length; i++) {
+      const s = toProcess[i];
+      setSubmitMsg(`Pubblico storia ${i + 1}/${toProcess.length}...`);
+      try {
+        const dataUrl = await s.render();
+        const { data: saveData, error: saveErr } = await supabase.functions.invoke('save-slide-image', {
+          body: { dataUrl, userId: user.id, slideIndex: i },
+        });
+        if (saveErr || saveData?.error || !saveData?.path) {
+          throw new Error(saveData?.error || saveErr?.message || 'Upload fallito');
+        }
+        const { data: pubData, error: pubErr } = await supabase.functions.invoke('meta-publish', {
+          body: {
+            connection_id: connectionId,
+            platform: 'instagram',
+            content: s.title,
+            image_path: saveData.path,
+            image_bucket: saveData.bucket,
+            media_type: 'story',
+          },
+        });
+        if (pubErr || pubData?.error || !pubData?.success) {
+          throw new Error(pubData?.error || pubErr?.message || 'Pubblicazione fallita');
+        }
+        okCount++;
+      } catch (err) {
+        console.error(`Story ${i + 1} publish failed:`, err);
+        failCount++;
+      }
+    }
+
+    setPublishing(false);
+    setSubmitMsg('');
+    if (okCount > 0) {
+      toast({
+        title: failCount === 0 ? `${okCount} storie pubblicate!` : `${okCount}/${toProcess.length} pubblicate`,
+        description: failCount > 0 ? `${failCount} fallite. Controlla la console.` : 'Restano online 24 ore.',
+        variant: failCount > 0 ? 'destructive' : 'default',
+      });
+      onScheduled?.();
+      onClose();
+    } else {
+      toast({
+        title: 'Pubblicazione fallita',
+        description: 'Nessuna storia e stata pubblicata. Controlla la console.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   const submit = async () => {
     if (!user || !scheduledDate || !connectionId) return;
@@ -338,8 +401,20 @@ const ScheduleStoriesDialog: React.FC<Props> = ({ open, onClose, stories, onSche
             </div>
           )}
 
+          {/* Pubblicazione immediata, senza scheduler */}
+          <Button
+            onClick={publishNow}
+            disabled={!connectionId || publishing || submitting || noConnections || selectedCount === 0}
+            className="w-full text-white font-bold"
+            style={{ backgroundColor: 'var(--rosa)' }}
+          >
+            {publishing
+              ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Pubblico ora...</>
+              : <><Instagram className="h-4 w-4 mr-2" /> Pubblica ora {selectedCount} {selectedCount === 1 ? 'storia' : 'storie'}</>}
+          </Button>
+
           <div className="flex gap-2 pt-2">
-            <Button variant="outline" onClick={onClose} disabled={submitting} className="flex-1">
+            <Button variant="outline" onClick={onClose} disabled={submitting || publishing} className="flex-1">
               Annulla
             </Button>
             <Button

@@ -4,6 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { User, Mail, Calendar, PlayCircle } from 'lucide-react';
 import { useOnboardingTour } from '@/hooks/useOnboardingTour';
 import { useNavigate } from 'react-router-dom';
+import AvatarTypeCard from './AvatarTypeCard';
+import ImageModelCard from './ImageModelCard';
+import SlideStyleCard from './SlideStyleCard';
 
 interface AccountPreferencesProps {
   user: any;
@@ -65,20 +68,11 @@ const AccountPreferences: React.FC<AccountPreferencesProps> = ({ user }) => {
         </CardContent>
       </Card>
 
-      <Card className="panel-card">
-        <CardHeader style={{ padding: '22px 24px', borderBottom: '1px solid var(--line)' }}>
-          <CardTitle
-            style={{ fontSize: '13px', fontWeight: 800, color: 'var(--ink)' }}
-          >
-            Preferenze Generazione
-          </CardTitle>
-        </CardHeader>
-        <CardContent style={{ padding: '22px 24px' }}>
-          <p className="text-xs" style={{ color: 'var(--ink3)' }}>
-            Le preferenze di generazione sono memorizzate nell'<strong style={{ color: 'var(--ink2)' }}>AI Memory</strong>. Aggiungi istruzioni nel tab "AI Memory" per personalizzare il tono, lo stile e le regole di scrittura dell'AI.
-          </p>
-        </CardContent>
-      </Card>
+      {/* Preferenze di generazione per lo studio attivo (lavoro recuperato
+          dal branch backup/lovable-2026-07-20, adattato alla pipeline attuale) */}
+      <AvatarTypeCard />
+      <ImageModelCard />
+      <SlideStyleCard />
 
       <Card className="panel-card">
         <CardHeader style={{ padding: '22px 24px', borderBottom: '1px solid var(--line)' }}>

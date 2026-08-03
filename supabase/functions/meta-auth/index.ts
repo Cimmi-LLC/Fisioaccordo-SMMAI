@@ -48,7 +48,10 @@ Deno.serve(async (req) => {
       )
     }
 
-    const appId = Deno.env.get('META_APP_ID') || Deno.env.get('INSTAGRAM_APP_ID')
+    // Priorita all'App ID Instagram: e quello che il token exchange di
+    // instagram.com/oauth si aspetta (l'App ID Meta genera
+    // "Invalid platform app"). META_APP_ID resta come fallback.
+    const appId = Deno.env.get('INSTAGRAM_APP_ID') || Deno.env.get('META_APP_ID')
     const appSecret = Deno.env.get('INSTAGRAM_APP_SECRET')
 
     if (!appId) {

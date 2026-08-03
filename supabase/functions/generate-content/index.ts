@@ -16,7 +16,12 @@ serve(async (req) => {
   }
 
   try {
-    const { topic, numSlides, postType, brandId } = await req.json();
+    const {
+      topic, numSlides, postType, brandId,
+      avatar: avatarInput = "B2C",
+      obiettivo = "nurture",
+      tipoContenuto = "valore",
+    } = await req.json();
 
     if (!topic || typeof topic !== "string" || topic.trim().length < 2) {
       return new Response(JSON.stringify({ error: "Topic is required (min 2 chars)" }), {
@@ -124,8 +129,36 @@ REGOLA FONDAMENTALE: il contenuto deve sembrare scritto DA "${brand.nome_busines
     const brandName = brandData?.nome_business || "Studio";
     const brandColor = brandData?.colore_primario || "#554697";
 
+    // Tipo di copy: la scelta salvata sullo studio (card impostazioni) vince
+    // su quella passata nel body.
+    const avatar = (brandData?.avatar_type === "B2B" || brandData?.avatar_type === "B2C")
+      ? brandData.avatar_type
+      : (avatarInput === "B2B" ? "B2B" : "B2C");
+
+    const avatarBlock = `
+=== A CHI PARLI: E LA REGOLA PIU IMPORTANTE DI TUTTE ===
+Avatar impostato: ${avatar}.
+Se Avatar vale B2C devi parlare DIRETTAMENTE ALLA PERSONA CHE HA IL PROBLEMA, dandole del tu, parlando dei suoi sintomi, della sua giornata e della sua vita: e VIETATO rivolgersi al terapista o al titolare dello studio, e sono VIETATE le parole posizionamento, autorevolezza, competenza, acquisizione pazienti, marketing, professionisti, colleghi, business, clienti, fatturato, percorso commerciale, differenziante.
+Se Avatar vale B2B allora parli al titolare dello studio e quelle parole sono ammesse.
+Il BRAND KIT qui sopra serve SOLO a sapere chi e lo studio che pubblica, NON decide a chi ti rivolgi: anche se lo studio si rivolge a professionisti, se Avatar vale B2C tu scrivi al paziente.
+Prima di scrivere ogni frase verifica che sia rivolta al destinatario giusto secondo Avatar: ${avatar}.
+Obiettivo: ${obiettivo} (reach/nurture/convert/retain). Tipo: ${tipoContenuto} (valore o offerta).
+
+=== FORMATO = OBIETTIVO x PIATTAFORMA ===
+reach: gancio larghissimo e breve. nurture: spiega ed educa passo-passo. convert: promessa + prova + CTA dura. retain: umano, dietro le quinte.
+
+=== STRUTTURA: HOOK -> VALORE -> CTA ===
+Una sola big idea. HOOK che chiama la situazione specifica del lettore (niente generico). VALORE: cosa ottiene, come funziona, cosa cambia; leve: sogno/risultato, probabilita con prova e numeri, tempo, sforzo. CTA: una sola azione chiara.
+
+=== VALORE vs OFFERTA ===
+Se tipo=valore: educa e basta, nessuna vendita, CTA soft (salva/segui/commenta). Se tipo=offerta: promessa -> meccanismo credibile -> prova -> CTA dura (prenota/DM/link) piu rimozione del rischio; mai promesse mediche garantite, mai toni ingannevoli.
+
+=== COPY B2C vs B2B ===
+B2C: emozione, desiderio, vita quotidiana, frasi corte, tanto tu, esempi di vita. B2B: rischio, soldi, tempo, status; il tuo team e la tua azienda; KPI e numeri; piu prove, casi, screenshot.`;
+
     const systemPrompt = `Sei un copywriter d'élite specializzato in contenuti social per il settore sanitario (fisioterapia, osteopatia, poliambulatori). Formazione: $100M Playbook di Alex Hormozi.
 ${brandContext}
+${avatarBlock}
 
 === FRAMEWORK HOOK ===
 Usa i 7 tipi di hook di Hormozi:

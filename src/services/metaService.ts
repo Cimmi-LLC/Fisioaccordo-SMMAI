@@ -21,6 +21,13 @@ export class MetaService {
   private static readonly REDIRECT_URI = import.meta.env.VITE_META_REDIRECT_URI
     || 'https://social-generator-fisioaccordo.lovable.app/auth/instagram/callback';
 
+  /**
+   * Flusso OAuth via popup. Disattivato: il redirect nella stessa scheda e
+   * piu affidabile (niente popup bloccati, funziona su mobile). Il codice
+   * del popup resta per poterci tornare cambiando questa costante.
+   */
+  private static readonly USE_POPUP_AUTH = false;
+
   static initiateAuth(): void {
     const scopes = [
       'instagram_business_basic',
@@ -28,6 +35,15 @@ export class MetaService {
     ].join(',');
 
     const authUrl = `https://www.instagram.com/oauth/authorize?client_id=${this.META_APP_ID}&redirect_uri=${encodeURIComponent(this.REDIRECT_URI)}&scope=${scopes}&response_type=code&state=meta_auth&enable_fb_login=0`;
+
+    // Redirect nella stessa scheda invece del popup: i browser mobile e i
+    // blocchi popup rendevano il flusso inaffidabile. Al ritorno la pagina
+    // /auth/instagram/callback non trova un opener e fa lo scambio del
+    // codice in-place (vedi InstagramCallback).
+    if (!MetaService.USE_POPUP_AUTH) {
+      window.location.href = authUrl;
+      return;
+    }
 
     const popup = window.open(
       authUrl,

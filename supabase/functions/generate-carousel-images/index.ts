@@ -3,6 +3,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { adminClient, assertBrandOwnership, requireAuth, requireWithinRateLimit } from "../_shared/auth.ts";
 import { corsHeaders, handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { safeFetch } from "../_shared/ssrf.ts";
+import {
+  AI_MODEL_SETS,
+  buildAiPrompt,
+  generateAiImage,
+  saveAiBytes,
+  type AiErrorLog,
+} from "./aiImages.ts";
 
 interface ImageResult {
   index: number;
@@ -171,6 +178,33 @@ serve(async (req) => {
     }
     const usedBrandUrls = new Set<string>(); // avoid repeating same brand photo across slides
 
+    // ── AI IMAGES: cascata modelli da brands.image_model, stile del prompt
+    // da brands.slide_style. Le immagini generate hanno la precedenza sullo
+    // stock Pixabay, che resta come fallback.
+    const GEMINI_IMG_KEY = Deno.env.get("GEMINI_API_KEY") || "";
+    const OPENAI_IMG_KEY = Deno.env.get("OPENAI_API_KEY") || "";
+    const aiAspect = typeof (body as any).aspectRatio === "string" ? (body as any).aspectRatio : "4:5";
+    let aiModels: string[] = AI_MODEL_SETS["nano-2"];
+    let aiStyle = "foto";
+    if (brandId) {
+      try {
+        const { data: prefs } = await supabaseAdmin
+          .from("brands")
+          .select("image_model, slide_style")
+          .eq("id", brandId)
+          .maybeSingle();
+        const modelKey = String((prefs as any)?.image_model || "nano-2");
+        if (AI_MODEL_SETS[modelKey]) aiModels = AI_MODEL_SETS[modelKey];
+        aiStyle = String((prefs as any)?.slide_style || "foto");
+        console.log("Generatore immagini scelto: " + modelKey + " (stile " + aiStyle + ")");
+      } catch (e) {
+        console.warn("image_model non letto:", e);
+      }
+    }
+    const aiEnabled = (body as any).useAi !== false
+      && aiModels.length > 0
+      && (Boolean(GEMINI_IMG_KEY) || Boolean(OPENAI_IMG_KEY));
+
     const contentSlides = slides
       .map((s: any, i: number) => ({ slide: s, originalIndex: i }))
       .filter(({ slide }: any) => slide.tipo === "content" || slide.tipo === "cover");
@@ -185,6 +219,36 @@ serve(async (req) => {
     // We use IDs (numeric) NOT URLs because Pixabay rotates URLs per request.
     const runUsedIds = new Set<number>(excludeSet);
     const results: ImageResult[] = [];
+
+    // Generazione AI in parallelo prima del loop: una slide fallita cade
+    // sullo stock senza bloccare le altre.
+    const aiMap = new Map<number, { bucket: string; path: string }>();
+    if (aiEnabled) {
+      const aiErrors: AiErrorLog = [];
+      console.log(
+        "AI decisione: modelli=" + aiModels.join(",") +
+        " | gemini=" + (GEMINI_IMG_KEY ? "presente" : "MANCANTE") +
+        " | openai=" + (OPENAI_IMG_KEY ? "presente" : "assente") +
+        " | brandId=" + String(brandId) + " | slides=" + slidesToProcess.length,
+      );
+      await Promise.allSettled(slidesToProcess.map(async ({ slide, originalIndex }: any) => {
+        try {
+          const prompt = buildAiPrompt(slide, slide?.tipo === "cover", aiStyle);
+          const generated = await generateAiImage(prompt, GEMINI_IMG_KEY, aiAspect, aiModels, OPENAI_IMG_KEY, aiErrors);
+          if (!generated) {
+            console.log("AI: nessuna immagine per slide " + originalIndex);
+            return;
+          }
+          const saved = await saveAiBytes(generated.bytes, generated.contentType, supabaseAdmin, storagePath, originalIndex);
+          if (saved) aiMap.set(originalIndex, saved);
+          else console.log("AI: salvataggio su storage fallito per slide " + originalIndex);
+        } catch (e) {
+          console.log("AI eccezione slide " + originalIndex + ": " + String(e));
+        }
+      }));
+      console.log("Immagini AI generate: " + aiMap.size + " su " + slidesToProcess.length);
+      console.log("AI dettaglio tentativi: " + aiErrors.slice(-8).join("  ///  "));
+    }
 
     for (const { slide, originalIndex } of slidesToProcess) {
       const keywords: string[] = slide.keywords_stock || [];
@@ -216,6 +280,26 @@ serve(async (req) => {
           });
           continue;
         }
+      }
+
+      // 1b) Immagine AI generata per questa slide (precede lo stock)
+      const aiReady = aiMap.get(originalIndex);
+      if (aiReady) {
+        const { data: signed } = await supabaseAdmin.storage
+          .from(aiReady.bucket)
+          .createSignedUrl(aiReady.path, 60 * 60);
+        results.push({
+          index: originalIndex,
+          url: signed?.signedUrl || null,
+          path: aiReady.path,
+          bucket: aiReady.bucket,
+          sourceId: null,
+          alternatives: [],
+          alternativeIds: [],
+          queryUsed: "ai_gemini",
+          error: null,
+        });
+        continue;
       }
 
       // 2) Pixabay search with body-part hard filter + cumulative dedup BY ID

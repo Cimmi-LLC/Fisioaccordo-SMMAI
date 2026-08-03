@@ -24,6 +24,16 @@ import { COST_NB2_IMAGE_1K } from "../_shared/brand/costs.ts";
 
 const IMAGE_MODEL = "gemini-3.1-flash-image";
 const IMAGE_MODEL_FALLBACK = "nano-banana-pro-preview";
+
+// Cascate modelli per brands.image_model (listino crediti in ImageModelCard).
+// gpt-2 e stock ripiegano su nano-2: la produzione con reference image e
+// supportata solo dai modelli Gemini (dichiarato nella card impostazioni).
+const MODEL_CASCADES: Record<string, string[]> = {
+  "nano-2": [IMAGE_MODEL, IMAGE_MODEL_FALLBACK],
+  "nano-pro": ["gemini-3-pro-image", IMAGE_MODEL_FALLBACK, IMAGE_MODEL],
+  "gpt-2": [IMAGE_MODEL, IMAGE_MODEL_FALLBACK],
+  "stock": [IMAGE_MODEL, IMAGE_MODEL_FALLBACK],
+};
 // 6 in parallelo: un carosello tipico (5-6 slide) parte in un'unica ondata,
 // eventuali 429 li assorbe callGeminiWithRetry.
 const CONCURRENCY = 6;
@@ -100,8 +110,9 @@ async function generateSlide(
   referenceB64: string,
   prompt: string,
   aspectRatio: string,
+  models: string[],
 ): Promise<Uint8Array | null> {
-  for (const model of [IMAGE_MODEL, IMAGE_MODEL_FALLBACK]) {
+  for (const model of models) {
     try {
       const result = await callGeminiWithRetry({
         apiKey,
@@ -217,6 +228,16 @@ serve(async (req) => {
     // Formato dal genoma congelato del template (default 1:1 per i vecchi).
     const format = byRole.get("content")!.genome?.format === "4:5" ? "4:5" : "1:1";
 
+    // Modello scelto dallo studio (brands.image_model, card impostazioni).
+    const { data: brandPrefs } = await supabase
+      .from("brands")
+      .select("image_model")
+      .eq("id", brandId)
+      .maybeSingle();
+    const modelKey = String((brandPrefs as { image_model?: string } | null)?.image_model || "nano-2");
+    const models = MODEL_CASCADES[modelKey] || MODEL_CASCADES["nano-2"];
+    console.log("Produzione con cascata modelli:", modelKey, models.join(" -> "));
+
     // Scarica le 3 reference una volta sola.
     const refCache = new Map<SlideRole, string>();
     for (const role of ["cover", "content", "cta"] as SlideRole[]) {
@@ -232,7 +253,7 @@ serve(async (req) => {
     ): Promise<SlideRecord> => {
       const variant = byRole.get(slide.role)!;
       const prompt = resolveSkeleton(variant.prompt_skeleton, slide, colors);
-      const bytes = await generateSlide(GEMINI_API_KEY, refCache.get(slide.role)!, prompt, format);
+      const bytes = await generateSlide(GEMINI_API_KEY, refCache.get(slide.role)!, prompt, format, models);
       if (!bytes) {
         return { ...slide, path: null, error: "nessuna immagine dal modello", status: "failed" };
       }

@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { publishSingleImage, publishCarousel } from '../_shared/instagramPublish.ts'
+import { publishSingleImage, publishCarousel, publishStory } from '../_shared/instagramPublish.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,6 +49,8 @@ Deno.serve(async (req) => {
       // New: caller passes storage paths; signed URLs are minted server-side
       // right before publishing (TTL > the entire Meta Graph download window).
       image_path, image_paths, image_bucket,
+      // 'story' pubblica come storia 24h invece che come post nel feed
+      media_type,
     } = body
     console.log('meta-publish request:', JSON.stringify({
       connection_id, platform,
@@ -152,6 +154,20 @@ Deno.serve(async (req) => {
         return errorResponse('Errore generazione URL firmata: ' + (signErr?.message || 'unknown'), 500)
       }
       resolvedImageUrl = signed.signedUrl
+    }
+
+    // Storia 24h: va valutata prima del feed, dopo la risoluzione degli URL
+    // firmati (il container Instagram scarica l'immagine da quell'URL).
+    if (media_type === 'story') {
+      if (!resolvedImageUrl) {
+        return errorResponse('Una storia richiede un\'immagine', 400)
+      }
+      const result = await publishStory(igId, accessToken, resolvedImageUrl)
+      if (!result.success) return errorResponse(result.error || 'Pubblicazione storia fallita')
+      return new Response(
+        JSON.stringify({ success: true, post_id: result.postId }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Carousel post
