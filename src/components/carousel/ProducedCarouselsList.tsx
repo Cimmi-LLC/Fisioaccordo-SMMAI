@@ -6,7 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Images, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { signedUrl } from '@/lib/storage';
+import { signedUrls } from '@/lib/storage';
 
 type Row = {
   id: string;
@@ -54,21 +54,30 @@ const ProducedCarouselsList: React.FC<ProducedCarouselsListProps> = ({ brandId, 
         if (cancelled || !data) return;
         const list = data as Row[];
         setRows(list);
-        // Thumbnail: la prima slide disponibile di ogni run.
-        for (const r of list) {
-          const first = (r.slides || []).find((s) => s.path)?.path;
-          if (!first) continue;
-          try {
-            const url = await signedUrl(r.storage_bucket, first, 3600);
-            if (!cancelled) setThumbs((t) => ({ ...t, [r.id]: url }));
-          } catch { /* thumbnail assente, resta il placeholder */ }
-        }
+
+        // Thumbnail: la prima slide disponibile di ogni run, firmate in UNA
+        // sola chiamata. Firmarle in sequenza significava una richiesta per
+        // carosello, che rallentava visibilmente l'apertura della pagina.
+        const wanted = list
+          .map((r) => ({ id: r.id, path: (r.slides || []).find((s) => s.path)?.path }))
+          .filter((x): x is { id: string; path: string } => !!x.path);
+        if (wanted.length === 0) return;
+        const bucket = list[0].storage_bucket || 'carousel-images';
+        try {
+          const urls = await signedUrls(bucket, wanted.map((w) => w.path), 3600);
+          if (cancelled) return;
+          const next: Record<string, string> = {};
+          wanted.forEach((w, i) => { if (urls[i]) next[w.id] = urls[i]; });
+          setThumbs((t) => ({ ...t, ...next }));
+        } catch { /* thumbnail assenti, restano i placeholder */ }
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [brandId, activeId]);
+    // activeId serve solo a evidenziare la card aperta: includerlo qui
+    // rifarebbe query e firme a ogni click sulla lista.
+  }, [brandId]);
 
   if (!brandId || (rows.length === 0 && !loading)) return null;
 
