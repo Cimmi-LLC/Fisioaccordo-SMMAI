@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/errors';
 import { extractPalette, mergePaletteWithBrandKit, type PaletteResult } from '@/lib/brand/extractor.ts';
+import { downscaleImage, runWithLimit } from '@/lib/brand/imagePrep.ts';
 import type { BrandSemantics } from '@/lib/brand/artDirector.ts';
 import type { TemplateGenome, VisualStyle, SlideFormat } from '@/lib/brand/genome.ts';
 import { approveTemplate } from '@/lib/brand/approve.ts';

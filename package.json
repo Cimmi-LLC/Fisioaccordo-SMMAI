@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck:genesis": "tsc -p tsconfig.genesis.json --noEmit"
+    "typecheck:genesis": "tsc -p tsconfig.genesis.json --noEmit",
+    "check:undef": "tsc --noEmit -p tsconfig.app.json 2>&1 | grep -E 'TS2304|TS2552|TS2307' && echo 'IDENTIFICATORI/IMPORT MANCANTI' && exit 1 || echo 'ok: nessun identificatore mancante'"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.1",
