@@ -15,6 +15,8 @@ export function useGenesis(brandId: string | null) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [busy, setBusy] = useState(false);
+  /** Messaggio di avanzamento mostrato nel wizard durante i passi lunghi. */
+  const [progress, setProgress] = useState('');
   const [palette, setPalette] = useState<PaletteResult | null>(null);
   const [semantics, setSemantics] = useState<BrandSemantics | null>(null);
   const [genome, setGenome] = useState<TemplateGenome | null>(null);
@@ -63,39 +65,60 @@ export function useGenesis(brandId: string | null) {
         const ext = mime.includes('jpeg') || mime.includes('jpg') ? 'jpg' : mime.includes('webp') ? 'webp' : 'png';
         logo = new File([blob], `logo.${ext}`, { type: mime });
       }
-      const uploads: Array<{ kind: string; file: File; path: string }> = [];
-      const ext = (f: File) => (f.name.split('.').pop() || 'png').toLowerCase();
-      uploads.push({ kind: 'logo', file: logo, path: `${user.id}/${brandId}/sources/logo.${ext(logo)}` });
-      posts.slice(0, 6).forEach((f, i) => {
-        uploads.push({ kind: 'post', file: f, path: `${user.id}/${brandId}/sources/post_${i + 1}.${ext(f)}` });
-      });
+      // Gli screenshot dei post vengono alleggeriti prima di partire: a
+      // piena risoluzione erano decine di MB caricati in fila, con il
+      // wizard fermo per minuti. Il logo resta intatto (trasparenza).
+      setProgress('Preparo le immagini...');
+      const preparedPosts = await runWithLimit(
+        posts.slice(0, 6).map((f) => () => downscaleImage(f)),
+        3,
+      );
 
-      for (const u of uploads) {
-        const { error: upErr } = await supabase.storage
-          .from('brand-assets')
-          .upload(u.path, u.file, { contentType: u.file.type || 'image/png', upsert: true });
-        if (upErr) throw new Error(`Upload ${u.kind} fallito: ${upErr.message}`);
-        // upsert della riga sorgente (il logo e UNIQUE per brand)
-        if (u.kind === 'logo') {
-          await (supabase as any).from('brand_sources').delete()
-            .eq('brand_id', brandId).eq('kind', 'logo');
-        }
-        const { error: insErr } = await (supabase as any).from('brand_sources').insert({
-          brand_id: brandId,
-          user_id: user.id,
-          kind: u.kind,
-          storage_bucket: 'brand-assets',
-          storage_path: u.path,
-        });
-        if (insErr && insErr.code !== '23505') {
-          throw new Error(`Registrazione ${u.kind} fallita: ${insErr.message}`);
-        }
-      }
+      const ext = (f: File) => (f.name.split('.').pop() || 'png').toLowerCase();
+      const uploads: Array<{ kind: string; file: File; path: string }> = [
+        { kind: 'logo', file: logo, path: `${user.id}/${brandId}/sources/logo.${ext(logo)}` },
+        ...preparedPosts.map((f, i) => ({
+          kind: 'post',
+          file: f,
+          path: `${user.id}/${brandId}/sources/post_${i + 1}.${ext(f)}`,
+        })),
+      ];
+
+      // Il logo e UNIQUE per brand: la vecchia riga va tolta una volta sola,
+      // prima di inserire (dentro il loop parallelo cancellerebbe a caso).
+      await (supabase as any).from('brand_sources').delete()
+        .eq('brand_id', brandId).eq('kind', 'logo');
+
+      let done = 0;
+      setProgress(`Carico 0/${uploads.length}...`);
+      await runWithLimit(
+        uploads.map((u) => async () => {
+          const { error: upErr } = await supabase.storage
+            .from('brand-assets')
+            .upload(u.path, u.file, { contentType: u.file.type || 'image/png', upsert: true });
+          if (upErr) throw new Error(`Upload ${u.kind} fallito: ${upErr.message}`);
+
+          const { error: insErr } = await (supabase as any).from('brand_sources').insert({
+            brand_id: brandId,
+            user_id: user.id,
+            kind: u.kind,
+            storage_bucket: 'brand-assets',
+            storage_path: u.path,
+          });
+          if (insErr && insErr.code !== '23505') {
+            throw new Error(`Registrazione ${u.kind} fallita: ${insErr.message}`);
+          }
+          done += 1;
+          setProgress(`Carico ${done}/${uploads.length}...`);
+        }),
+        3,
+      );
 
       // Palette programmatica client-side (deterministica), poi fusa con i
       // colori ufficiali del brand kit: quelli dichiarati dal cliente vincono
       // sull'estrazione dal logo, che restituisce spesso versioni slavate.
-      const extracted = await extractPalette([logo, ...posts.slice(0, 6)]);
+      setProgress('Estraggo i colori...');
+      const extracted = await extractPalette([logo, ...preparedPosts]);
       const { data: brandColors } = await (supabase as any)
         .from('brands')
         .select('colore_primario, colore_secondario, colore_terziario')
@@ -116,6 +139,7 @@ export function useGenesis(brandId: string | null) {
       return false;
     } finally {
       setBusy(false);
+      setProgress('');
     }
   }, [user, brandId, toast]);
 
@@ -123,6 +147,7 @@ export function useGenesis(brandId: string | null) {
   const analyze = useCallback(async (): Promise<boolean> => {
     if (!brandId) return false;
     setBusy(true);
+    setProgress('Analizzo il tuo stile...');
     try {
       const { data, error } = await supabase.functions.invoke('generate-template', {
         body: { action: 'analyze', brandId },
@@ -135,6 +160,7 @@ export function useGenesis(brandId: string | null) {
       return false;
     } finally {
       setBusy(false);
+      setProgress('');
     }
   }, [brandId, toast]);
 
@@ -189,6 +215,7 @@ export function useGenesis(brandId: string | null) {
 
   return {
     busy,
+    progress,
     palette, setPalette,
     semantics, setSemantics,
     genome, genomeVersion,

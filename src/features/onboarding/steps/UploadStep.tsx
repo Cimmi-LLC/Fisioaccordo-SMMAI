@@ -6,6 +6,8 @@ import { Upload, X, Image as ImageIcon, RefreshCw } from 'lucide-react';
 
 interface UploadStepProps {
   busy: boolean;
+  /** Messaggio di avanzamento durante upload e analisi. */
+  progress?: string;
   /** Logo gia presente nel kit del brand (brands.logo_url), se esiste. */
   existingLogoUrl?: string | null;
   /** logo === null significa: usa il logo esistente del kit. */
@@ -14,7 +16,7 @@ interface UploadStepProps {
 
 const MAX_POSTS = 6;
 
-const UploadStep: React.FC<UploadStepProps> = ({ busy, existingLogoUrl, onSubmit }) => {
+const UploadStep: React.FC<UploadStepProps> = ({ busy, progress, existingLogoUrl, onSubmit }) => {
   const [logo, setLogo] = useState<File | null>(null);
   const [useExisting, setUseExisting] = useState(!!existingLogoUrl);
   const [posts, setPosts] = useState<File[]>([]);
@@ -158,7 +160,7 @@ const UploadStep: React.FC<UploadStepProps> = ({ busy, existingLogoUrl, onSubmit
         className="w-full text-white text-[13px] font-black uppercase py-3.5 rounded-xl disabled:opacity-50"
         style={{ backgroundColor: 'var(--viola)', border: 'none', cursor: hasLogo && !busy ? 'pointer' : 'not-allowed', letterSpacing: '0.5px' }}
       >
-        {busy ? 'Caricamento…' : 'Continua'}
+        {busy ? (progress || 'Caricamento…') : 'Continua'}
       </button>
     </div>
   );

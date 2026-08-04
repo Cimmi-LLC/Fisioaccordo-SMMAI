@@ -98,13 +98,30 @@ function saturationOf(hex: string): number {
  * - accent: il piu saturo con popolazione sufficiente
  * - text_on_light / text_on_dark: contrasto minimo 4.5:1 garantito
  */
+/** Oltre questo tempo l'immagine viene abbandonata e si passa alla successiva. */
+const PER_IMAGE_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout estrazione colori')), ms);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
 export async function extractPalette(images: Array<File | Blob | string>): Promise<PaletteResult> {
   const allSwatches: Array<{ hex: string; population: number }> = [];
 
   for (const img of images) {
     const src = typeof img === 'string' ? img : URL.createObjectURL(img);
     try {
-      const palette = await Vibrant.from(src).getPalette();
+      // Timeout e cattura per singola immagine: un file corrotto o troppo
+      // pesante non deve piantare l'intero wizard. Prima un'immagine che
+      // non finiva di decodificare lasciava la promise pendente per sempre
+      // e il bottone restava su "Caricamento".
+      const palette = await withTimeout(Vibrant.from(src).getPalette(), PER_IMAGE_TIMEOUT_MS);
       const entries: SwatchLike[] = [
         palette.Vibrant, palette.Muted,
         palette.DarkVibrant, palette.DarkMuted,
@@ -113,6 +130,8 @@ export async function extractPalette(images: Array<File | Blob | string>): Promi
       for (const s of entries) {
         if (s && s.hex) allSwatches.push({ hex: s.hex, population: s.population || 1 });
       }
+    } catch (e) {
+      console.warn('Palette: immagine saltata', e);
     } finally {
       if (typeof img !== 'string') URL.revokeObjectURL(src);
     }

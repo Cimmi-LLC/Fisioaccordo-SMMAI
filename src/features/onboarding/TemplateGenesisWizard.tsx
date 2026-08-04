@@ -118,7 +118,7 @@ const TemplateGenesisWizard: React.FC = () => {
           style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 2px 12px rgba(85,70,151,0.07)' }}
         >
           {step === 0 && (
-            <UploadStep busy={genesis.busy} existingLogoUrl={existingLogoUrl} onSubmit={handleUpload} />
+            <UploadStep busy={genesis.busy} progress={genesis.progress} existingLogoUrl={existingLogoUrl} onSubmit={handleUpload} />
           )}
 
           {step === 1 && genesis.palette && (
