@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
+import { resolveProfession } from '@/lib/brand/profession';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -145,6 +146,9 @@ const BrandsListPage: React.FC = () => {
                         }}
                       >
                         {b.nome_business || 'Senza nome'}
+                      </div>
+                      <div className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: 'var(--viola)', fontWeight: 600 }}>
+                        {(() => { const r = resolveProfession(b); return r.label + (r.source === 'scelta' ? '' : ' · auto'); })()}
                       </div>
                       {b.citta && (
                         <div className="text-[11px] flex items-center gap-1 mt-0.5" style={{ color: 'var(--ink3)' }}>

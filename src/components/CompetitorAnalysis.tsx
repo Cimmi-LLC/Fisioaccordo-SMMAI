@@ -5,9 +5,12 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Users, Loader2, TrendingUp, TrendingDown, Lightbulb, Sparkles, Hash, BarChart3, ArrowLeft } from 'lucide-react';
 import { useCompetitorAnalysis } from '@/hooks/useCompetitorAnalysis';
+import { useActiveBrand } from '@/hooks/useActiveBrand';
 
 const CompetitorAnalysis: React.FC = () => {
   const { analyses, analyzing, analyzeCompetitor } = useCompetitorAnalysis();
+  // L'analisi e "per" il brand attivo: nome e professione finiscono nel prompt.
+  const { activeBrandId } = useActiveBrand();
   const [username, setUsername] = useState('');
   const [manualInfo, setManualInfo] = useState('');
   const [platform, setPlatform] = useState('instagram');
@@ -19,6 +22,7 @@ const CompetitorAnalysis: React.FC = () => {
       username: username.trim(),
       platform,
       manualInfo: manualInfo.trim() || undefined,
+      brandId: activeBrandId,
     });
     if (res) setResult(res);
   };

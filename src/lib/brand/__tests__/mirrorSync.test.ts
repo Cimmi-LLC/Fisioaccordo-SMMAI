@@ -1,4 +1,4 @@
-// Guardia anti-drift: i 4 file prompt-critical devono essere byte-identici
+// Guardia anti-drift: i 5 file prompt-critical devono essere byte-identici
 // tra la sorgente (src/lib/brand) e la copia specchio usata da Deno
 // (supabase/functions/_shared/brand). Se questo test fallisce, ricopia:
 //   cp src/lib/brand/<file>.ts supabase/functions/_shared/brand/<file>.ts
@@ -7,7 +7,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 const ROOT = resolve(__dirname, '../../../..');
-const MIRRORED = ['archetypes.ts', 'genome.ts', 'genesisPrompt.ts', 'artDirector.ts'];
+const MIRRORED = ['archetypes.ts', 'genome.ts', 'genesisPrompt.ts', 'artDirector.ts', 'profession.ts'];
 
 describe('sincronizzazione mirror Vite <-> Deno', () => {
   it.each(MIRRORED)('%s e byte-identico tra src e _shared', (file) => {

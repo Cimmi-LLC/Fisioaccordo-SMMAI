@@ -1,4 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import {
+  allProfessionCategories,
+  detectProfession,
+  isProfessionId,
+  professionListForPrompt,
+} from "../_shared/brand/profession.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,21 +56,22 @@ serve(async (req) => {
       websiteContent += `\n\nLOGO TROVATO NEL SITO: ${scrapedData.logoUrl}\nUsa questo URL come logo del brand.`;
     }
 
-    const systemPrompt = `Sei un esperto di marketing per il settore sanitario (fisioterapia, osteopatia, poliambulatori). Hai estratto il contenuto testuale di un sito web di uno studio sanitario. Il tuo compito è analizzare questo contenuto e costruire un profilo completo del brand.
+    const systemPrompt = `Sei un esperto di marketing per professionisti della salute (fisioterapisti, osteopati, poliambulatori, nutrizionisti, personal trainer, psicologi, dentisti e altre figure sanitarie). Hai estratto il contenuto testuale del sito web di uno studio o di un professionista. Il tuo compito è analizzare questo contenuto e costruire un profilo completo del brand.
 
 Analizza attentamente e ricava:
 - Il nome esatto dello studio/brand
+- La professione di chi pubblica: scegli UNO slug tra [${professionListForPrompt()}]. Usa "altro" solo se nessuna voce descrive il mestiere, e in quel caso scrivi l'etichetta in "professione_label" (es. "Terapista occupazionale"). Se lo studio riunisce più specialisti scegli "poliambulatorio".
 - Una descrizione breve e professionale (max 300 caratteri)
-- I servizi offerti (fisioterapia, osteopatia, riabilitazione, ecc.)
-- Il target di pazienti (anziani, sportivi, bambini, donne in gravidanza, ecc.)
+- I servizi offerti, con il lessico della professione (es. fisioterapia, piani alimentari, personal training, igiene orale, ecc.)
+- Il target di pazienti o clienti (anziani, sportivi, bambini, donne in gravidanza, ecc.)
 - Il tono di comunicazione percepito (professionale, empatico, informale, tecnico)
 - I punti di forza e vantaggi competitivi
 - La mission o i valori del brand (se presenti)
-- Suggerisci 5 temi chiave adatti per i post social
+- Suggerisci 5 temi chiave adatti per i post social, coerenti con la professione
 - Suggerisci 3 call to action adatte
 - La persona di scrittura suggerita ("io" per professionista singolo, "noi" per studio/team)
 - I colori principali del brand (analizza i colori CSS, i colori delle immagini, il logo se descritto). Restituisci 3 colori in formato hex: primario, secondario, terziario. Se non riesci a determinarli, suggerisci colori appropriati per il settore sanitario.
-- Categorie: scegli tra [Fisioterapia, Osteopatia, Poliambulatorio, Riabilitazione, Medicina dello Sport, Fisioterapia Pediatrica, Fisioterapia in Gravidanza, Posturologia, altro]
+- Categorie: scegli tra [${allProfessionCategories().join(", ")}, altro], coerenti con la professione rilevata
 
 Rispondi SOLO con JSON valido.`;
 
@@ -75,8 +82,10 @@ ${websiteContent}
 Rispondi con questo JSON esatto:
 {
   "nome_business": "nome dello studio",
+  "professione": "slug della professione (es. fisioterapista, nutrizionista, personal_trainer, altro)",
+  "professione_label": "etichetta breve della professione, obbligatoria se professione vale altro, altrimenti stringa vuota",
   "descrizione": "descrizione breve max 300 caratteri",
-  "categorie": ["Fisioterapia", "..."],
+  "categorie": ["categoria 1", "..."],
   "servizi": ["servizio 1", "servizio 2", "..."],
   "target_pazienti": "descrizione del target principale",
   "tono_voce": "professionale|empatico|informale|tecnico",
@@ -130,6 +139,28 @@ Rispondi con questo JSON esatto:
     if (!parsed.logo_url && scrapedData.logoUrl) {
       parsed.logo_url = scrapedData.logoUrl;
     }
+
+    // Professione: lo slug del modello vale solo se e nella lista; altrimenti
+    // si prova a riconoscerla dal testo del sito e dai campi appena estratti.
+    // Un valore non riconoscibile resta null: il brand kit la rilevera da se.
+    const modelSlug = typeof parsed.professione === "string" ? parsed.professione.trim().toLowerCase() : "";
+    if (!isProfessionId(modelSlug)) {
+      const detected = detectProfession({
+        nome_business: parsed.nome_business,
+        descrizione: [scrapedData.title, scrapedData.description, parsed.descrizione].filter(Boolean).join(" "),
+        categorie: Array.isArray(parsed.categorie) ? parsed.categorie : [],
+        servizi: Array.isArray(parsed.servizi) ? parsed.servizi : [],
+        temi_chiave: Array.isArray(parsed.temi_chiave) ? parsed.temi_chiave : [],
+        topic: String(scrapedData.bodyText || "").slice(0, 4000),
+      });
+      parsed.professione = detected ? detected.id : null;
+    } else {
+      parsed.professione = modelSlug;
+    }
+    parsed.professione_label = typeof parsed.professione_label === "string"
+      ? parsed.professione_label.trim().slice(0, 60)
+      : "";
+    if (parsed.professione !== "altro") parsed.professione_label = "";
 
     return new Response(JSON.stringify({ success: true, brandProfile: parsed }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

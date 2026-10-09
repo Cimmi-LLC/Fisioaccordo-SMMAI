@@ -3,6 +3,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import StoriesApp from '@/components/stories/StoriesApp';
 import { fisioaccordoClient } from '@/data/fisioaccordoStoryConfig';
 import { useActiveBrand } from '@/hooks/useActiveBrand';
+import { resolveProfession } from '@/lib/brand/profession';
 
 const isLightHex = (hex: string): boolean => {
   const h = hex.replace('#', '');
@@ -19,6 +20,8 @@ const StoriesGenerator = () => {
 
   const client = useMemo(() => {
     if (!activeBrand) return fisioaccordoClient;
+    // Professione del brand: entra nel prompt delle storie (lessico, foto).
+    const prof = resolveProfession(activeBrand);
     const colors = [
       activeBrand.colore_primario || '#554697',
       activeBrand.colore_secondario || '#E6007E',
@@ -30,14 +33,25 @@ const StoriesGenerator = () => {
       name: activeBrand.nome_business || 'Brand',
       city: activeBrand.citta || fisioaccordoClient.city,
       tone: activeBrand.tono_voce || fisioaccordoClient.tone,
-      focus: (activeBrand.servizi || []).slice(0, 3).join(', ') || fisioaccordoClient.focus,
+      focus: (activeBrand.servizi || []).slice(0, 3).join(', ') || prof.profile.settore,
       brandFont: activeBrand.font_intestazioni || fisioaccordoClient.brandFont,
       brandColors: colors,
       bgIsLight: isLightHex(colors[0]),
       templateDataUrl: activeBrand.logo_url || null,
+      profession: {
+        label: prof.label,
+        settore: prof.profile.settore,
+        cliente: prof.profile.cliente,
+        clientePlurale: prof.profile.clientePlurale,
+        promptContext: prof.profile.promptContext,
+        photoExamples: prof.profile.keywordExamples,
+      },
       clientInfo: {
         nome_business: activeBrand.nome_business,
         descrizione: activeBrand.descrizione,
+        // StoriesApp legge description/services: tenuti entrambi i nomi.
+        description: activeBrand.descrizione,
+        services: activeBrand.servizi,
         target_pazienti: activeBrand.target_pazienti,
         servizi: activeBrand.servizi,
         mission: activeBrand.mission,

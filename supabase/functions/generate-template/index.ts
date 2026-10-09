@@ -22,6 +22,7 @@ import type { TemplateGenome } from "../_shared/brand/genome.ts";
 import type { SlideRole } from "../_shared/brand/archetypes.ts";
 import { estimateGenesisCost, COST_GEMINI_FLASH_CALL } from "../_shared/brand/costs.ts";
 import { buildSemanticsPrompt, parseSemanticsResponse } from "./semantics.ts";
+import { resolveProfession, placeholderCopyFor } from "../_shared/brand/profession.ts";
 
 const IMAGE_MODEL = "gemini-3.1-flash-image";
 const IMAGE_MODEL_FALLBACK = "nano-banana-pro-preview";
@@ -47,6 +48,10 @@ type BrandRow = {
   font_body: string | null;
   location_photos: string[] | null;
   gallery_photos: string[] | null;
+  professione?: string | null;
+  professione_custom?: string | null;
+  raw_analysis?: { professione?: unknown } | null;
+  target_pazienti?: string | null;
 };
 
 /**
@@ -56,6 +61,7 @@ type BrandRow = {
 function brandInfo(b: BrandRow): ArtDirectorBrandInfo {
   return {
     nome_business: b.nome_business || "Studio",
+    professione: resolveProfession(b).label,
     descrizione: b.descrizione || "",
     categorie: b.categorie || [],
     servizi: b.servizi || [],
@@ -211,7 +217,7 @@ serve(async (req) => {
 
     const { data: brand, error: brandErr } = await supabase
       .from("brands")
-      .select("id, user_id, nome_business, descrizione, categorie, servizi, tono_voce, mission, identita_core, vantaggi_competitivi, temi_chiave, font_intestazioni, font_body, location_photos, gallery_photos")
+      .select("*")
       .eq("id", brandId)
       .single();
     if (brandErr || !brand) return jsonResponse(req, { error: "Brand non trovato" }, 404);
@@ -400,12 +406,15 @@ serve(async (req) => {
         nome_business: (brand as BrandRow).nome_business || "Studio",
         palette,
       };
+      // Copy segnaposto della professione: il kicker di copertina (es.
+      // NUTRIZIONE) e i titoli d'esempio finiscono dentro il template.
+      const placeholderCopy = placeholderCopyFor(resolveProfession(brand as BrandRow));
 
       // Crea i 9 record pending.
       const candidates: Array<{ id: string; role: SlideRole; variant: GenesisVariant; prompt: string }> = [];
       for (const role of ROLES) {
         for (const variant of VARIANTS) {
-          const prompt = buildGenesisPrompt(kit, genome, role, variant);
+          const prompt = buildGenesisPrompt(kit, genome, role, variant, placeholderCopy);
           const { data: row, error: insErr } = await supabase
             .from("template_candidates")
             .insert({

@@ -1,4 +1,11 @@
 import type { ScrapedRaw } from "./types.ts";
+import type { ResolvedProfession } from "../_shared/brand/profession.ts";
+
+/** Chi chiede l'analisi: il brand attivo e la sua professione. */
+export type AnalysisOwner = {
+  nome: string;
+  prof: ResolvedProfession;
+};
 
 /**
  * Build the legacy v1 prompt context (compatible with existing schema).
@@ -26,7 +33,8 @@ export function buildLegacyContext(
   scraped: ScrapedRaw | null,
   manualInfo: string | undefined,
   username: string,
-  platform: string
+  platform: string,
+  settore = "salute e benessere",
 ): string {
   if (scraped && scraped.posts.length > 0) {
     // Aggregate all hashtags actually observed across posts (after caption fallback)
@@ -58,7 +66,7 @@ ${enrichedPosts.map((p, i) =>
   if (manualInfo) {
     return `INFORMAZIONI SUL COMPETITOR:\n${manualInfo}`;
   }
-  return `Profilo competitor: @${username} su ${platform || "Instagram"}\nNOTA: Non è stato possibile scaricare i dati del profilo. Analizza basandoti sulla tua conoscenza generale del settore fisioterapia/salute su Instagram.`;
+  return `Profilo competitor: @${username} su ${platform || "Instagram"}\nNOTA: Non è stato possibile scaricare i dati del profilo. Analizza basandoti sulla tua conoscenza generale del settore ${settore} su Instagram.`;
 }
 
 /**
@@ -84,7 +92,7 @@ export function filterMostUsedAgainstObserved(
     .filter((h: string) => observed.has(h));
 }
 
-export const LEGACY_SYSTEM_PROMPT = `Sei un esperto analista di social media marketing specializzato nel settore sanitario e fisioterapico. Analizzi competitor e fornisci insight strategici actionable.
+export const LEGACY_SYSTEM_PROMPT = `Sei un esperto analista di social media marketing specializzato nel settore della salute e del benessere (fisioterapisti, nutrizionisti, personal trainer, psicologi, dentisti e altre figure sanitarie). Analizzi competitor e fornisci insight strategici actionable per il professionista che te lo chiede.
 
 REGOLE CRITICHE:
 - Basa OGNI analisi (engagement, topic, hashtag, frequenza) SOLO sui dati reali forniti nel prompt.
@@ -94,14 +102,18 @@ REGOLE CRITICHE:
 
 Rispondi SOLO con JSON valido.`;
 
-export function buildLegacyUserPrompt(competitorContext: string): string {
-  return `Sei un esperto di social media marketing nel settore fisioterapia/salute.
+export function buildLegacyUserPrompt(competitorContext: string, owner?: AnalysisOwner | null): string {
+  const settore = owner?.prof.profile.settore || "salute e benessere";
+  const chi = owner
+    ? `${owner.nome} (${owner.prof.label})`
+    : "un professionista della salute";
+  return `Sei un esperto di social media marketing nel settore ${settore}.
 
 Analizza questo competitor e fornisci un'analisi strategica completa:
 
 ${competitorContext}
 
-CONTESTO: L'analisi è per FisioAccordo, uno studio di fisioterapia che vuole migliorare la propria presenza social.
+CONTESTO: L'analisi è per ${chi}, che vuole migliorare la propria presenza social. Le opportunità e gli hashtag suggeriti devono avere senso per questo mestiere (${settore}), non per un altro.
 
 Rispondi SOLO con un JSON valido:
 {
@@ -116,7 +128,7 @@ Rispondi SOLO con un JSON valido:
   },
   "strengths": ["3-5 punti di forza specifici con dettagli"],
   "weaknesses": ["3-5 punti deboli o aree scoperte"],
-  "opportunities": ["3-5 opportunità che FisioAccordo può sfruttare guardando questo competitor"],
+  "opportunities": ["3-5 opportunità che chi chiede l'analisi può sfruttare guardando questo competitor"],
   "content_ideas": [
     {
       "idea": "Idea specifica per un contenuto",
@@ -126,7 +138,7 @@ Rispondi SOLO con un JSON valido:
   ],
   "hashtag_analysis": {
     "most_used": ["hashtag più usati dal competitor"],
-    "suggested": ["hashtag che FisioAccordo dovrebbe usare"]
+    "suggested": ["hashtag che chi chiede l'analisi dovrebbe usare"]
   },
   "summary": "Analisi riassuntiva in 3-4 frasi con insight actionable"
 }`;

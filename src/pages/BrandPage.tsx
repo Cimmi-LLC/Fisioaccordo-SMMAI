@@ -8,7 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Save, X, Plus, Pencil, Globe, Palette, Type, Upload, Image as ImageIcon, MapPin, User2 } from 'lucide-react';
-import { BrandProfile, EMPTY_BRAND, CATEGORIE_OPTIONS, TONO_OPTIONS, PERSONA_OPTIONS, FONT_OPTIONS } from '@/types/brand';
+import { BrandProfile, EMPTY_BRAND, TONO_OPTIONS, PERSONA_OPTIONS, FONT_OPTIONS, categorieOptionsFor } from '@/types/brand';
+import { detectProfession, isProfessionId } from '@/lib/brand/profession';
+import ProfessionSelect from '@/components/brand/ProfessionSelect';
 import { POST_TEMPLATES, POST_TEMPLATE_NONE, POST_TEMPLATE_RANDOM } from '@/data/postTemplates';
 import PostTemplateOverlay from '@/components/carousel/PostTemplateOverlay';
 import SinglePhotoUpload from '@/components/brand/SinglePhotoUpload';
@@ -148,6 +150,8 @@ const BrandPage = () => {
       // Update by brand id (not user_id) to avoid touching other brands of the same user
       const { error } = await supabase.from('brands').update({
         ...saveData,
+        professione: isProfessionId(brand.professione) ? brand.professione : null,
+        professione_custom: brand.professione === 'altro' ? (brand.professione_custom || '') : '',
         updated_at: new Date().toISOString(),
       } as any).eq('id', brand.id);
       if (error) throw error;
@@ -163,6 +167,22 @@ const BrandPage = () => {
   if (loading) {
     return <div className="flex items-center justify-center p-20"><Loader2 className="h-8 w-8 animate-spin" style={{ color: 'var(--viola)' }} /></div>;
   }
+
+  // Professione: scelta esplicita o rilevata dai campi; guida le categorie proposte.
+  const professionSignals = {
+    nome_business: brand.nome_business,
+    descrizione: brand.descrizione,
+    categorie: brand.categorie,
+    servizi: brand.servizi,
+    target_pazienti: brand.target_pazienti,
+    temi_chiave: brand.temi_chiave,
+    mission: brand.mission,
+    identita_core: brand.identita_core,
+    website_url: brand.website_url,
+  };
+  const chosenProfession = isProfessionId(brand.professione) ? brand.professione : null;
+  const effectiveProfession = chosenProfession ?? detectProfession(professionSignals)?.id ?? null;
+  const categorieOptions = categorieOptionsFor(effectiveProfession, brand.categorie);
 
   const tabs = [
     { id: 'brand' as const, label: 'Brand Kit' },
@@ -201,7 +221,7 @@ const BrandPage = () => {
               Profilo del Brand di {brand.nome_business || 'Il tuo Studio'}
             </h1>
             <p className="text-[13px]" style={{ color: 'var(--ink3)' }}>
-              Mantieni questa sezione aggiornata per ricevere post sempre coerenti con la tua identità, servizi e clienti.
+              Mantieni questa sezione aggiornata per ricevere post sempre coerenti con la tua professione, identità, servizi e clienti.
             </p>
           </div>
 
@@ -218,6 +238,16 @@ const BrandPage = () => {
                 <EditableField label="Nome Business">
                   <Input value={brand.nome_business} onChange={e => update('nome_business', e.target.value)} className="text-sm font-semibold" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 9 }} />
                 </EditableField>
+
+                <ProfessionSelect
+                  value={chosenProfession}
+                  custom={brand.professione_custom}
+                  signals={professionSignals}
+                  onChange={(professione, professione_custom) => {
+                    setBrand(prev => ({ ...prev, professione, professione_custom }));
+                    setHasChanges(true);
+                  }}
+                />
 
                 {brand.website_url && (
                   <EditableField label="Sito Web">
@@ -236,7 +266,7 @@ const BrandPage = () => {
 
             {/* Categorie */}
             <div className="flex flex-wrap gap-1.5 pt-2">
-              {CATEGORIE_OPTIONS.map(cat => {
+              {categorieOptions.map(cat => {
                 const active = brand.categorie.includes(cat);
                 return (
                   <button key={cat} onClick={() => update('categorie', active ? brand.categorie.filter(c => c !== cat) : [...brand.categorie, cat])}
@@ -373,7 +403,7 @@ const BrandPage = () => {
             <EditableField label="Servizi offerti">
               <TagInput tags={brand.servizi} onChange={v => update('servizi', v)} placeholder="Aggiungi servizio" />
             </EditableField>
-            <EditableField label="Target pazienti">
+            <EditableField label="Target (pazienti / clienti)">
               <Input value={brand.target_pazienti} onChange={e => update('target_pazienti', e.target.value)} className="text-sm" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 9 }} />
             </EditableField>
             <EditableField label="Città / Località">

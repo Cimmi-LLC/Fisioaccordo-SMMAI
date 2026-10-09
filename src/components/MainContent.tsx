@@ -15,6 +15,7 @@ import EnhancedProgress from "./ui/enhanced-progress";
 import { useContentGeneration } from "@/hooks/useContentGeneration";
 import { useNb2Carousel } from "@/hooks/useNb2Carousel";
 import { useActiveBrand } from "@/hooks/useActiveBrand";
+import { resolveProfession } from "@/lib/brand/profession";
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown, Lightbulb, Sparkles } from 'lucide-react';
 
@@ -59,6 +60,8 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
   const navigate = useNavigate();
   const { activeBrand, loading: brandLoading } = useActiveBrand();
   const brandRecord = activeBrand as (typeof activeBrand & { genesis_status?: string; genome?: unknown }) | null;
+  // Professione del brand attivo: idee rapide e placeholder nel suo linguaggio.
+  const brandProfession = resolveProfession(activeBrand);
   const genesisLocked = brandRecord?.genesis_status === 'locked';
   const nb2 = useNb2Carousel(brandRecord?.id ?? null, brandRecord?.genome ?? null);
   const producedFingerprint = useRef('');
@@ -247,7 +250,13 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-3">
-          <IdeaGenerator ideaInput={ideaInput} setIdeaInput={setIdeaInput} onIdeaGenerated={handleIdeaGenerated} />
+          <IdeaGenerator
+            ideaInput={ideaInput}
+            setIdeaInput={setIdeaInput}
+            onIdeaGenerated={handleIdeaGenerated}
+            ideas={brandProfession.profile.temiEsempio}
+            placeholder={`Inserisci un argomento (es. ${brandProfession.profile.temiEsempio.slice(0, 2).map(t => t.toLowerCase()).join(', ')})`}
+          />
         </CollapsibleContent>
       </Collapsible>
 

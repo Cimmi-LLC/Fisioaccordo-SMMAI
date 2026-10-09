@@ -368,7 +368,7 @@ const Auth = () => {
                     </div>
                     <div>
                       <FieldLabel>Studio / Clinica</FieldLabel>
-                      <Input type="text" name="clinicName" value={formData.clinicName} onChange={handleInputChange} style={inputStyle} placeholder="Studio di Fisioterapia XYZ" />
+                      <Input type="text" name="clinicName" value={formData.clinicName} onChange={handleInputChange} style={inputStyle} placeholder="Studio XYZ (fisioterapia, nutrizione, personal training...)" />
                     </div>
                     <div>
                       <FieldLabel>Email</FieldLabel>

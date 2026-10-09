@@ -23,6 +23,10 @@ export function skeletonFromGenome(genome: TemplateGenome, role: SlideRole): str
   );
 
   if (role === 'cover') {
+    // Il kicker del template nasce dal copy segnaposto della professione
+    // (es. NUTRIZIONE): in produzione viene riscritto con {{kicker}}, cosi
+    // un brand che cambia professione non resta con la vecchia parola.
+    lines.push('Kicker text: "{{kicker}}"');
     lines.push('Headline text: "{{title}}"');
   } else if (role === 'content') {
     lines.push('Index number: "{{number}}"');

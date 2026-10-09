@@ -32,6 +32,8 @@ export type BrandSemantics = {
  */
 export type ArtDirectorBrandInfo = {
   nome_business: string;
+  /** Professione di chi pubblica (es. "Nutrizionista"): orienta decorazione e tono visivo. */
+  professione?: string;
   descrizione: string;
   categorie: string[];
   servizi: string[];
@@ -70,6 +72,7 @@ export function buildArtDirectorPrompt(
   const brandLines = [
     'BRAND:',
     'Name: ' + brand.nome_business,
+    'Profession: ' + (brand.professione || 'healthcare professional'),
     'Description: ' + brand.descrizione,
     'Categories: ' + brand.categorie.join(', '),
     'Services: ' + brand.servizi.join(', '),

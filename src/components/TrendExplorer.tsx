@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TrendingUp, Loader2, Sparkles, Search, ArrowRight, Film, Layers, MessageSquare } from 'lucide-react';
 import { useTrends } from '@/hooks/useTrends';
+import { useActiveBrand } from '@/hooks/useActiveBrand';
+import { resolveProfession } from '@/lib/brand/profession';
 
 interface TrendExplorerProps {
   onUseTrend?: (topic: string) => void;
@@ -38,7 +40,16 @@ const TARGET_META: Record<DevTarget, { label: string; icon: React.ComponentType<
 const TrendExplorer: React.FC<TrendExplorerProps> = ({ onUseTrend }) => {
   const navigate = useNavigate();
   const { trends, searching, findTrends } = useTrends();
+  const { activeBrand } = useActiveBrand();
   const [niche, setNiche] = useState('');
+  // Nicchia proposta dal brand attivo (es. "nutrizione e alimentazione"):
+  // compilata solo se l'utente non ha ancora scritto nulla.
+  const [nichePrefilled, setNichePrefilled] = useState(false);
+  useEffect(() => {
+    if (nichePrefilled || !activeBrand) return;
+    setNichePrefilled(true);
+    if (!niche.trim()) setNiche(resolveProfession(activeBrand).profile.settore);
+  }, [activeBrand, niche, nichePrefilled]);
   const [platform, setPlatform] = useState('instagram');
   const [lastNiche, setLastNiche] = useState('');
   const [lastPlatform, setLastPlatform] = useState('');
@@ -72,7 +83,7 @@ const TrendExplorer: React.FC<TrendExplorerProps> = ({ onUseTrend }) => {
       <CardContent className="space-y-4">
         <div className="flex gap-2">
           <Input
-            placeholder="La tua nicchia (es: fisioterapia, fitness...)"
+            placeholder="La tua nicchia (es: fisioterapia, nutrizione, personal training...)"
             value={niche}
             onChange={e => setNiche(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSearch()}

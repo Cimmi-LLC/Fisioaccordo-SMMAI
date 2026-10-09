@@ -70,8 +70,8 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
             subtitle: lines[1] || '',
             body: lines.slice(2, 5).join('\n') || content.substring(0, 200),
             number: '', cta: '', banner: '',
-            logo: user?.user_metadata?.clinic_name || 'Studio Fisioterapico',
-            footer: user?.user_metadata?.clinic_name || 'Studio Fisioterapico',
+            logo: user?.user_metadata?.clinic_name || 'Il tuo studio',
+            footer: user?.user_metadata?.clinic_name || 'Il tuo studio',
           }),
           imageUrl: undefined,
           userImageUrl: basePhoto || undefined
@@ -87,8 +87,8 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
           content: JSON.stringify({
             title: slide.title, subtitle: slide.subtitle, body: slide.body,
             number: slide.number || '', cta: slide.cta || '', banner: slide.banner || '',
-            logo: user?.user_metadata?.clinic_name || 'Studio Fisioterapico',
-            footer: i === numSlides - 1 ? (user?.user_metadata?.clinic_name || 'Studio Fisioterapico') : (slide.cta || ''),
+            logo: user?.user_metadata?.clinic_name || 'Il tuo studio',
+            footer: i === numSlides - 1 ? (user?.user_metadata?.clinic_name || 'Il tuo studio') : (slide.cta || ''),
           }),
           imageUrl: undefined,
           userImageUrl: basePhoto && i === 0 ? basePhoto : undefined
@@ -129,7 +129,7 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
       }, 2000);
 
       const { data, error } = await supabase.functions.invoke('generate-carousel-images', {
-        body: { slides: slideData, style: 'modern, clean, professional healthcare', format: imageFormat, brandId: activeBrandId }
+        body: { slides: slideData, style: 'modern, clean, professional', format: imageFormat, brandId: activeBrandId }
       });
 
       clearInterval(progressInterval);
@@ -190,7 +190,7 @@ export const useCarouselSlides = (formData: FormData, user: any, basePhoto: stri
 function createFallbackSlides(topic: string, numSlides: number, user: any, basePhoto: string | null): CarouselSlide[] {
   const slideTypes = ['attention', 'problem', 'solution', 'results', 'cta'];
   const slides: CarouselSlide[] = [];
-  const clinicName = user?.user_metadata?.clinic_name || 'Studio Fisioterapico';
+  const clinicName = user?.user_metadata?.clinic_name || 'Il tuo studio';
 
   for (let i = 0; i < numSlides && i < slideTypes.length; i++) {
     slides.push({

@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { scrapeInstagramPosts, scrapeInstagramProfile } from "./apify.ts";
 import { computeMetrics, InsufficientDataError } from "./metrics.ts";
-import { buildLegacyContext, LEGACY_SYSTEM_PROMPT, buildLegacyUserPrompt, filterMostUsedAgainstObserved } from "./prompt.ts";
+import { buildLegacyContext, LEGACY_SYSTEM_PROMPT, buildLegacyUserPrompt, filterMostUsedAgainstObserved, type AnalysisOwner } from "./prompt.ts";
 import { callGemini } from "./llm.ts";
 import { adminClient, requireAuth, requireWithinRateLimit } from "../_shared/auth.ts";
+import { resolveProfession } from "../_shared/brand/profession.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,7 +30,27 @@ serve(async (req) => {
       }
     }
 
-    const { username, platform, manualInfo } = await req.json();
+    const { username, platform, manualInfo, brandId } = await req.json();
+
+    // Chi chiede l'analisi: il brand attivo (nome e professione). Senza
+    // brand l'analisi resta generica sul settore salute.
+    let owner: AnalysisOwner | null = null;
+    if (auth.ok && brandId) {
+      try {
+        const supabaseAdmin = adminClient();
+        const { data: brand } = await supabaseAdmin
+          .from("brands")
+          .select("*")
+          .eq("id", String(brandId))
+          .eq("user_id", auth.userId)
+          .maybeSingle();
+        if (brand) {
+          owner = { nome: (brand as { nome_business?: string }).nome_business || "il brand", prof: resolveProfession(brand) };
+        }
+      } catch (e) {
+        console.warn("Brand non caricato per l'analisi competitor:", e);
+      }
+    }
 
     if (!username && !manualInfo) {
       return new Response(JSON.stringify({ error: "Inserisci un username o informazioni sul competitor" }), {
@@ -77,8 +98,8 @@ serve(async (req) => {
     }
 
     // 3. Build legacy prompt context (v1 schema preserved)
-    const competitorContext = buildLegacyContext(scrapedData, manualInfo, username, platform);
-    const userPrompt = buildLegacyUserPrompt(competitorContext);
+    const competitorContext = buildLegacyContext(scrapedData, manualInfo, username, platform, owner?.prof.profile.settore);
+    const userPrompt = buildLegacyUserPrompt(competitorContext, owner);
 
     // 4. Call Gemini
     let parsed;
