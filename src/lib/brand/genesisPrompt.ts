@@ -41,8 +41,19 @@ export function sanitize(s: string): string {
     .replace(/[‒–—―]/g, ', ');
 }
 
-/** Copy segnaposto realistico, mai lorem ipsum. Lunghezze da spec. */
-export const PLACEHOLDER = {
+/** Copy segnaposto reso nell'immagine del template: kicker, titoli, corpo. */
+export type PlaceholderCopy = {
+  cover: { kicker: string; title: string };
+  content: { number: string; label: string; title: string; body: string };
+  cta: { title: string; body: string };
+};
+
+/**
+ * Copy segnaposto realistico, mai lorem ipsum. Lunghezze da spec.
+ * E quello della fisioterapia (default storico): per le altre professioni
+ * generate-template passa il copy di src/lib/brand/profession.ts.
+ */
+export const PLACEHOLDER: PlaceholderCopy = {
   cover: {
     kicker: 'FISIOTERAPIA',
     title: 'PERCHÉ LA SPALLA FA MALE ANCHE DA FERMA',
@@ -58,7 +69,7 @@ export const PLACEHOLDER = {
     title: 'PRENOTA UNA VALUTAZIONE',
     body: 'Scrivici in direct per parlarne.',
   },
-} as const;
+};
 
 const VARIANT_HINTS: Record<GenesisVariant, string> = {
   1: 'Faithful interpretation of the spec.',
@@ -131,36 +142,38 @@ function resolveColors(
   return { background: bg_a, text: text_on_light, accent };
 }
 
-function placeholderBlock(role: SlideRole): string {
+function placeholderBlock(role: SlideRole, copy: PlaceholderCopy): string {
   if (role === 'cover') {
     return (
-      'Kicker text: "' + PLACEHOLDER.cover.kicker + '"\n' +
-      'Headline text: "' + PLACEHOLDER.cover.title + '"'
+      'Kicker text: "' + copy.cover.kicker + '"\n' +
+      'Headline text: "' + copy.cover.title + '"'
     );
   }
   if (role === 'content') {
     return (
-      'Index number: "' + PLACEHOLDER.content.number + '"\n' +
-      'Small label next to the index number, if the archetype includes one: "' + PLACEHOLDER.content.label + '"\n' +
-      'Headline text: "' + PLACEHOLDER.content.title + '"\n' +
-      'Body text: "' + PLACEHOLDER.content.body + '"'
+      'Index number: "' + copy.content.number + '"\n' +
+      'Small label next to the index number, if the archetype includes one: "' + copy.content.label + '"\n' +
+      'Headline text: "' + copy.content.title + '"\n' +
+      'Body text: "' + copy.content.body + '"'
     );
   }
   return (
-    'Headline text: "' + PLACEHOLDER.cta.title + '"\n' +
-    'Supporting line: "' + PLACEHOLDER.cta.body + '"'
+    'Headline text: "' + copy.cta.title + '"\n' +
+    'Supporting line: "' + copy.cta.body + '"'
   );
 }
 
 /**
  * Costruisce il prompt di genesi completo per (archetipo del genoma, ruolo,
  * variante). Ordine fisso da spec. Ogni stringa passa da sanitize().
+ * `copy` e il segnaposto della professione del brand (default: fisioterapia).
  */
 export function buildGenesisPrompt(
   kit: GenesisBrandKit,
   genome: TemplateGenome,
   role: SlideRole,
-  variant: GenesisVariant
+  variant: GenesisVariant,
+  copy: PlaceholderCopy = PLACEHOLDER
 ): string {
   const archetype = getArchetype(genome.archetype);
   const spec = archetype.roles[role];
@@ -200,10 +213,10 @@ export function buildGenesisPrompt(
   // 5 + 6. Decorazione e tipografia dal genoma
   sections.push(genomeToPromptFragment(genome));
 
-  // 7. Copy segnaposto del ruolo
+  // 7. Copy segnaposto del ruolo (della professione del brand)
   sections.push(
     'RENDER THIS PLACEHOLDER COPY, in Italian, exactly as written:\n' +
-    placeholderBlock(role)
+    placeholderBlock(role, copy)
   );
 
   // 7b. Zona visual esplicativa (solo content), nello stile scelto dall'utente

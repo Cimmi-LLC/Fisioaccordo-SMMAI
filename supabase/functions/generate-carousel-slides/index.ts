@@ -21,6 +21,7 @@ import { logGeneration } from "../_shared/historyLogger.ts";
 import { sanitize } from "../_shared/brand/genesisPrompt.ts";
 import type { SlideRole } from "../_shared/brand/archetypes.ts";
 import { COST_NB2_IMAGE_1K } from "../_shared/brand/costs.ts";
+import { resolveProfession, type ProfessionBrandLike } from "../_shared/brand/profession.ts";
 
 const IMAGE_MODEL = "gemini-3.1-flash-image";
 const IMAGE_MODEL_FALLBACK = "nano-banana-pro-preview";
@@ -64,8 +65,9 @@ type VariantRow = {
 
 type PaletteColors = { bg_color: string; title_color: string; body_color: string };
 
-function resolveSkeleton(skeleton: string, slide: SlideInput, colors: PaletteColors): string {
+function resolveSkeleton(skeleton: string, slide: SlideInput, colors: PaletteColors, kicker: string): string {
   let prompt = skeleton
+    .replaceAll("{{kicker}}", kicker)
     .replaceAll("{{title}}", slide.title || "")
     .replaceAll("{{body}}", slide.body || "")
     .replaceAll("{{number}}", slide.number || String(slide.index + 1).padStart(2, "0"))
@@ -228,15 +230,18 @@ serve(async (req) => {
     // Formato dal genoma congelato del template (default 1:1 per i vecchi).
     const format = byRole.get("content")!.genome?.format === "4:5" ? "4:5" : "1:1";
 
-    // Modello scelto dallo studio (brands.image_model, card impostazioni).
+    // Modello scelto dallo studio (brands.image_model, card impostazioni) e
+    // professione del brand: il suo kicker (es. NUTRIZIONE) sostituisce
+    // {{kicker}} nello skeleton della cover.
     const { data: brandPrefs } = await supabase
       .from("brands")
-      .select("image_model")
+      .select("*")
       .eq("id", brandId)
       .maybeSingle();
     const modelKey = String((brandPrefs as { image_model?: string } | null)?.image_model || "nano-2");
     const models = MODEL_CASCADES[modelKey] || MODEL_CASCADES["nano-2"];
-    console.log("Produzione con cascata modelli:", modelKey, models.join(" -> "));
+    const kicker = resolveProfession(brandPrefs as unknown as ProfessionBrandLike | null).kicker;
+    console.log("Produzione con cascata modelli:", modelKey, models.join(" -> "), "| kicker:", kicker);
 
     // Scarica le 3 reference una volta sola.
     const refCache = new Map<SlideRole, string>();
@@ -252,7 +257,7 @@ serve(async (req) => {
       slide: SlideInput,
     ): Promise<SlideRecord> => {
       const variant = byRole.get(slide.role)!;
-      const prompt = resolveSkeleton(variant.prompt_skeleton, slide, colors);
+      const prompt = resolveSkeleton(variant.prompt_skeleton, slide, colors, kicker);
       const bytes = await generateSlide(GEMINI_API_KEY, refCache.get(slide.role)!, prompt, format, models);
       if (!bytes) {
         return { ...slide, path: null, error: "nessuna immagine dal modello", status: "failed" };

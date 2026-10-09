@@ -1,8 +1,17 @@
+import { categorieOptionsFor, type ProfessionId } from '@/lib/brand/profession';
+
 export interface BrandProfile {
   id?: string;
   user_id?: string;
   website_url?: string;
   nome_business: string;
+  /**
+   * Professione di chi pubblica (slug di src/lib/brand/profession.ts).
+   * null = rilevata automaticamente dal codice dai campi del brand kit.
+   */
+  professione?: ProfessionId | null;
+  /** Etichetta libera quando professione = 'altro' (es. "Terapista occupazionale"). */
+  professione_custom?: string;
   descrizione: string;
   categorie: string[];
   servizi: string[];
@@ -38,6 +47,8 @@ export interface BrandProfile {
 
 export const EMPTY_BRAND: BrandProfile = {
   nome_business: '',
+  professione: null,
+  professione_custom: '',
   descrizione: '',
   categorie: [],
   servizi: [],
@@ -63,18 +74,14 @@ export const EMPTY_BRAND: BrandProfile = {
   identita_core: '',
 };
 
-export const CATEGORIE_OPTIONS = [
-  'Fisioterapia',
-  'Osteopatia',
-  'Poliambulatorio',
-  'Riabilitazione',
-  'Medicina dello Sport',
-  'Fisioterapia Pediatrica',
-  'Fisioterapia in Gravidanza',
-  'Posturologia',
-  'Studio Professionale',
-  'Salute e Benessere',
-];
+/**
+ * Categorie storiche (fisioterapia). Le schermate del brand kit usano
+ * categorieOptionsFor(professione, selezionate) cosi un nutrizionista vede
+ * "Nutrizione Sportiva" e non "Fisioterapia Pediatrica".
+ */
+export const CATEGORIE_OPTIONS = categorieOptionsFor('fisioterapista');
+
+export { categorieOptionsFor };
 
 export const TONO_OPTIONS = [
   { value: 'professionale', label: 'Professionale' },

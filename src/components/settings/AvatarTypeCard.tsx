@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 type AvatarType = 'B2C' | 'B2B';
 
 const OPTIONS: { value: AvatarType; label: string; hint: string }[] = [
-  { value: 'B2C', label: 'B2C - Pazienti', hint: 'Copy emotivo: desiderio, vita quotidiana, frasi corte, tanto "tu".' },
+  { value: 'B2C', label: 'B2C - Pazienti / clienti', hint: 'Copy emotivo: desiderio, vita quotidiana, frasi corte, tanto "tu".' },
   { value: 'B2B', label: 'B2B - Aziende e professionisti', hint: 'Copy razionale: rischio, costi, tempo, KPI, casi studio e numeri.' },
 ];
 

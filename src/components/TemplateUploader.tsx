@@ -84,7 +84,7 @@ const PREVIEW_TEXTS: Record<string, string> = {
   banner: 'CLICCA IN BASSO',
   image: '📷',
   logo: 'BRAND',
-  footer: 'Studio Fisioterapico',
+  footer: 'Il tuo studio',
 };
 
 interface PendingFile {

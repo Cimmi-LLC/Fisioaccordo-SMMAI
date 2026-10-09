@@ -8,14 +8,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Globe, X, Plus, CheckCircle2 } from 'lucide-react';
-import { BrandProfile, EMPTY_BRAND, CATEGORIE_OPTIONS, TONO_OPTIONS, PERSONA_OPTIONS } from '@/types/brand';
+import { BrandProfile, EMPTY_BRAND, TONO_OPTIONS, PERSONA_OPTIONS, categorieOptionsFor } from '@/types/brand';
+import { detectProfession, isProfessionId } from '@/lib/brand/profession';
 import logo from '@/assets/logo-fisioaccordo.png';
 import SinglePhotoUpload from '@/components/brand/SinglePhotoUpload';
+import ProfessionSelect from '@/components/brand/ProfessionSelect';
 
 const LOADING_MESSAGES = [
   "Sto visitando il tuo sito...",
   "Sto leggendo i tuoi servizi...",
-  "Sto analizzando il tuo target di pazienti...",
+  "Sto capendo che professione fai e a chi ti rivolgi...",
   "Sto raccogliendo l'identità del tuo brand...",
   "Sto costruendo il tuo profilo...",
 ];
@@ -190,9 +192,23 @@ const Onboarding = () => {
           console.warn('Logo processing failed, using original:', err);
         }
       }
+      // Professione: lo slug dell'analisi se valido, altrimenti il
+      // rilevamento sui campi appena estratti; null = resta automatica.
+      const analyzedProfession = isProfessionId(profile.professione)
+        ? profile.professione
+        : (detectProfession({
+            nome_business: profile.nome_business,
+            descrizione: profile.descrizione,
+            categorie: profile.categorie,
+            servizi: profile.servizi,
+            temi_chiave: profile.temi_chiave,
+            website_url: trimmedUrl,
+          })?.id ?? null);
       setBrand(prev => ({
         ...prev,
         nome_business: profile.nome_business || '',
+        professione: analyzedProfession,
+        professione_custom: analyzedProfession === 'altro' ? (profile.professione_label || '') : '',
         descrizione: profile.descrizione || '',
         categorie: profile.categorie || [],
         servizi: profile.servizi || [],
@@ -233,6 +249,8 @@ const Onboarding = () => {
         user_id: user.id,
         website_url: brand.website_url || null,
         nome_business: brand.nome_business,
+        professione: brand.professione || null,
+        professione_custom: brand.professione === 'altro' ? (brand.professione_custom || '') : '',
         descrizione: brand.descrizione,
         categorie: brand.categorie,
         servizi: brand.servizi,
@@ -285,6 +303,20 @@ const Onboarding = () => {
       setSaving(false);
     }
   };
+
+  // Segnali per il rilevamento della professione e categorie coerenti con essa.
+  const professionSignals = {
+    nome_business: brand.nome_business,
+    descrizione: brand.descrizione,
+    categorie: brand.categorie,
+    servizi: brand.servizi,
+    target_pazienti: brand.target_pazienti,
+    temi_chiave: brand.temi_chiave,
+    mission: brand.mission,
+    website_url: brand.website_url,
+  };
+  const effectiveProfession = brand.professione ?? detectProfession(professionSignals)?.id ?? null;
+  const categorieOptions = categorieOptionsFor(effectiveProfession, brand.categorie);
 
   if (authLoading) {
     return (
@@ -480,11 +512,19 @@ const Onboarding = () => {
                 <Input
                   value={brand.nome_business}
                   onChange={e => setBrand({ ...brand, nome_business: e.target.value })}
-                  placeholder="Es. Studio Fisioterapico Rossi"
+                  placeholder="Es. Studio Rossi"
                   className="text-sm"
                   style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '9px' }}
                 />
               </div>
+
+              {/* Professione: rilevata dal sito/dai campi, modificabile */}
+              <ProfessionSelect
+                value={brand.professione}
+                custom={brand.professione_custom}
+                signals={professionSignals}
+                onChange={(professione, professione_custom) => setBrand({ ...brand, professione, professione_custom })}
+              />
 
               {/* Descrizione */}
               <div>
@@ -507,7 +547,7 @@ const Onboarding = () => {
                   Categorie
                 </label>
                 <div className="flex flex-wrap gap-1.5">
-                  {CATEGORIE_OPTIONS.map(cat => {
+                  {categorieOptions.map(cat => {
                     const active = brand.categorie.includes(cat);
                     return (
                       <button
@@ -536,13 +576,13 @@ const Onboarding = () => {
                 label="Servizi offerti"
                 tags={brand.servizi}
                 onChange={servizi => setBrand({ ...brand, servizi })}
-                placeholder="Es. Fisioterapia sportiva"
+                placeholder="Es. Fisioterapia sportiva, piani alimentari, personal training"
               />
 
               {/* Target */}
               <div>
                 <label className="block text-[10px] font-black uppercase mb-1.5" style={{ color: 'var(--ink2)', letterSpacing: '0.8px' }}>
-                  Target pazienti
+                  Target (pazienti / clienti)
                 </label>
                 <Input
                   value={brand.target_pazienti}

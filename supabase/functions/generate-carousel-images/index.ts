@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { adminClient, assertBrandOwnership, requireAuth, requireWithinRateLimit } from "../_shared/auth.ts";
 import { corsHeaders, handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { safeFetch } from "../_shared/ssrf.ts";
+import { resolveProfession, getProfession, DEFAULT_PROFESSION_ID, type ProfessionBrandLike, type ProfessionProfile, type ResolvedProfession } from "../_shared/brand/profession.ts";
 import {
   AI_MODEL_SETS,
   buildAiPrompt,
@@ -68,6 +69,31 @@ const HARD_REJECT = [
   'galaxy','planet','astronomy','outer space',
   'paesaggio naturale','catena montuosa'
 ];
+
+/**
+ * Filtri stock per richiesta: la professione del brand allarga la whitelist
+ * (un nutrizionista vuole cibo, un personal trainer vuole la palestra) e
+ * riammette le voci della blacklist che per lei sono il soggetto giusto.
+ * Vive nella richiesta, mai a livello di modulo: gli isolate Deno vengono
+ * riusati tra utenti diversi.
+ */
+type StockFilters = {
+  whitelist: string[];
+  blacklist: string[];
+  topicKeywords: string[];
+  fallbackQuery: string;
+};
+
+function buildStockFilters(profile: ProfessionProfile): StockFilters {
+  const extra = profile.imageWhitelist.map((t) => t.toLowerCase());
+  const unblock = new Set(profile.imageUnblacklist.map((t) => t.toLowerCase()));
+  return {
+    whitelist: Array.from(new Set([...MEDICAL_WHITELIST, ...extra])),
+    blacklist: BLACKLIST.filter((t) => !unblock.has(t)),
+    topicKeywords: Array.from(new Set([...TOPIC_KEYWORDS, ...extra])),
+    fallbackQuery: profile.stockFallbackQuery,
+  };
+}
 
 serve(async (req) => {
   const preflight = handlePreflight(req);
@@ -186,21 +212,30 @@ serve(async (req) => {
     const aiAspect = typeof (body as any).aspectRatio === "string" ? (body as any).aspectRatio : "4:5";
     let aiModels: string[] = AI_MODEL_SETS["nano-2"];
     let aiStyle = "foto";
+    // Professione del brand: scena delle immagini AI e filtri dello stock.
+    // Il testo delle slide fa da topic quando il brand non la dichiara.
+    const slidesTopic = (Array.isArray(slides) ? (slides as Array<Record<string, unknown>>) : [])
+      .map((s) => [s?.titolo, s?.hook, s?.title, s?.theme].filter((v) => typeof v === "string").join(" "))
+      .join(" ")
+      .slice(0, 2000);
+    let prof: ResolvedProfession = resolveProfession(null, slidesTopic);
     if (brandId) {
       try {
         const { data: prefs } = await supabaseAdmin
           .from("brands")
-          .select("image_model, slide_style")
+          .select("*")
           .eq("id", brandId)
           .maybeSingle();
         const modelKey = String((prefs as any)?.image_model || "nano-2");
         if (AI_MODEL_SETS[modelKey]) aiModels = AI_MODEL_SETS[modelKey];
         aiStyle = String((prefs as any)?.slide_style || "foto");
-        console.log("Generatore immagini scelto: " + modelKey + " (stile " + aiStyle + ")");
+        if (prefs) prof = resolveProfession(prefs as unknown as ProfessionBrandLike, slidesTopic);
+        console.log("Generatore immagini scelto: " + modelKey + " (stile " + aiStyle + ", professione " + prof.id + "/" + prof.source + ")");
       } catch (e) {
         console.warn("image_model non letto:", e);
       }
     }
+    const stockFilters = buildStockFilters(prof.profile);
     const aiEnabled = (body as any).useAi !== false
       && aiModels.length > 0
       && (Boolean(GEMINI_IMG_KEY) || Boolean(OPENAI_IMG_KEY));
@@ -233,7 +268,7 @@ serve(async (req) => {
       );
       await Promise.allSettled(slidesToProcess.map(async ({ slide, originalIndex }: any) => {
         try {
-          const prompt = buildAiPrompt(slide, slide?.tipo === "cover", aiStyle);
+          const prompt = buildAiPrompt(slide, slide?.tipo === "cover", aiStyle, prof.profile);
           const generated = await generateAiImage(prompt, GEMINI_IMG_KEY, aiAspect, aiModels, OPENAI_IMG_KEY, aiErrors);
           if (!generated) {
             console.log("AI: nessuna immagine per slide " + originalIndex);
@@ -304,7 +339,7 @@ serve(async (req) => {
 
       // 2) Pixabay search with body-part hard filter + cumulative dedup BY ID
       const hasKeywords = keywords.length > 0;
-      const searchQuery = hasKeywords ? keywords.join(' ') : FALLBACK_QUERY;
+      const searchQuery = hasKeywords ? keywords.join(' ') : stockFilters.fallbackQuery;
       let result: ImageResult;
       try {
         result = await searchPixabayStock(
@@ -313,6 +348,7 @@ serve(async (req) => {
           runUsedIds,   // ← cumulative IDs from previous slides
           isCover,
           bodyPart?.italianPhrase ?? null,
+          stockFilters,
         );
       } catch (e) {
         console.error(`Slide ${originalIndex} search exception:`, e);
@@ -437,10 +473,10 @@ const MEDICAL_WHITELIST = [
   'medico', 'clinica', 'terapia', 'dolore',
 ];
 
-function isMedicalImage(item: any): boolean {
+function isMedicalImage(item: any, whitelist: string[] = MEDICAL_WHITELIST): boolean {
   const hay = itemHaystack(item);
   if (!hay) return false;
-  return MEDICAL_WHITELIST.some(t => hay.includes(t));
+  return whitelist.some(t => hay.includes(t));
 }
 
 /**
@@ -468,18 +504,21 @@ const BLACKLIST = [
   'wedding','party','birthday',
 ];
 
-function isBlacklisted(item: any): boolean {
+/** Filtri storici (fisioterapia): usati quando nessuna professione e nota. */
+const DEFAULT_STOCK_FILTERS: StockFilters = buildStockFilters(getProfession(DEFAULT_PROFESSION_ID));
+
+function isBlacklisted(item: any, blacklist: string[] = BLACKLIST): boolean {
   const hay = itemHaystack(item);
   if (!hay) return false;
-  return BLACKLIST.some(t => hay.includes(t));
+  return blacklist.some(t => hay.includes(t));
 }
 
 /** Topic boost score: +1 per topic keyword found. 0 if no metadata. */
-function topicScore(item: any): number {
+function topicScore(item: any, topicKeywords: string[] = TOPIC_KEYWORDS): number {
   const hay = itemHaystack(item);
   if (!hay) return 0;
   let s = 0;
-  for (const k of TOPIC_KEYWORDS) if (hay.includes(k)) s += 1;
+  for (const k of topicKeywords) if (hay.includes(k)) s += 1;
   return s;
 }
 
@@ -735,6 +774,7 @@ async function pixabaySearch(
   excludeIds: Set<number> = new Set(),
   coverBoost: boolean = false,
   lang: "en" | "it" = "en",
+  filters: StockFilters = DEFAULT_STOCK_FILTERS,
 ): Promise<ScoredItem[]> {
   if (pixabayRateLimited) {
     console.warn(`Pixabay rate-limited, skipping query "${query}"`);
@@ -803,12 +843,12 @@ async function pixabaySearch(
     if (!id || !url) continue;
 
     // 1) HARD BLACKLIST — always reject (eagles, tattoos, food, etc.)
-    if (isBlacklisted(item)) { rejectedByBlacklist++; continue; }
+    if (isBlacklisted(item, filters.blacklist)) { rejectedByBlacklist++; continue; }
 
     // 2) WHITELIST — must have at least one medical/health tag (even when body
     //    part is detected, e.g. a "back tattoo" image has "back" tag but no
     //    medical context — we want it out)
-    if (!isMedicalImage(item)) { rejectedByWhitelist++; continue; }
+    if (!isMedicalImage(item, filters.whitelist)) { rejectedByWhitelist++; continue; }
 
     // 3) DEDUP by Pixabay ID (URLs rotate per request)
     if (excludeIds.has(id)) { rejectedByExclude++; continue; }
@@ -825,7 +865,7 @@ async function pixabaySearch(
 
     // 6) SCORING
     const score =
-      topicScore(item) +
+      topicScore(item, filters.topicKeywords) +
       slideMatchScore(item, contextWords) +
       anatomyVisualScore(item, coverBoost) +
       topMatchBonus(item, requiredBodyPart) +
@@ -851,6 +891,7 @@ async function searchPixabayStock(
   excludeIds: Set<number> = new Set(),
   isCover: boolean = false,
   italianPhrase: string | null = null,
+  filters: StockFilters = DEFAULT_STOCK_FILTERS,
 ): Promise<ImageResult> {
   try {
     console.log(`Slide ${index}: searching Pixabay for "${query}" (ctx: ${contextWords.length}, body: ${requiredBodyPart?.[0] ?? '-'}, italian: "${italianPhrase ?? '-'}", exclude: ${excludeIds.size}, cover: ${isCover})`);
@@ -861,15 +902,15 @@ async function searchPixabayStock(
     // tend to be the high-quality anatomical x-ray style the user prefers.
     const bodyTerm = requiredBodyPart && requiredBodyPart.length > 0 ? requiredBodyPart[0] : null;
     const settledSearches = await Promise.allSettled([
-      pixabaySearch(apiKey, query, 1, 50, contextWords, requiredBodyPart, excludeIds, isCover, "en"),
+      pixabaySearch(apiKey, query, 1, 50, contextWords, requiredBodyPart, excludeIds, isCover, "en", filters),
       bodyTerm
-        ? pixabaySearch(apiKey, `${bodyTerm} pain x-ray`, 1, 24, contextWords, requiredBodyPart, excludeIds, isCover, "en")
+        ? pixabaySearch(apiKey, `${bodyTerm} pain x-ray`, 1, 24, contextWords, requiredBodyPart, excludeIds, isCover, "en", filters)
         : Promise.resolve([] as ScoredItem[]),
       bodyTerm
-        ? pixabaySearch(apiKey, `${bodyTerm} anatomy human body`, 1, 24, contextWords, requiredBodyPart, excludeIds, isCover, "en")
+        ? pixabaySearch(apiKey, `${bodyTerm} anatomy human body`, 1, 24, contextWords, requiredBodyPart, excludeIds, isCover, "en", filters)
         : Promise.resolve([] as ScoredItem[]),
       italianPhrase
-        ? pixabaySearch(apiKey, `${italianPhrase} raggi x`, 1, 24, contextWords, requiredBodyPart, excludeIds, isCover, "it")
+        ? pixabaySearch(apiKey, `${italianPhrase} raggi x`, 1, 24, contextWords, requiredBodyPart, excludeIds, isCover, "it", filters)
         : Promise.resolve([] as ScoredItem[]),
     ]);
     const primaryResults = settledSearches[0].status === "fulfilled" ? settledSearches[0].value : [];
@@ -897,7 +938,7 @@ async function searchPixabayStock(
         .join(' ');
       if (stripped && stripped !== query.toLowerCase()) {
         console.log(`Slide ${index}: empty for "${query}", retry simplified "${stripped}"`);
-        scored = await pixabaySearch(apiKey, stripped, 1, 50, contextWords, requiredBodyPart, excludeIds, isCover);
+        scored = await pixabaySearch(apiKey, stripped, 1, 50, contextWords, requiredBodyPart, excludeIds, isCover, "en", filters);
         queryUsed = `${query} → ${stripped}`;
       }
     }
@@ -907,14 +948,14 @@ async function searchPixabayStock(
     if (scored.length === 0 && requiredBodyPart && requiredBodyPart.length > 0) {
       const bodyQuery = requiredBodyPart.slice(0, 2).join(' ');
       console.log(`Slide ${index}: body-part-only query "${bodyQuery}"`);
-      scored = await pixabaySearch(apiKey, bodyQuery, 1, 50, contextWords, requiredBodyPart, excludeIds, isCover);
+      scored = await pixabaySearch(apiKey, bodyQuery, 1, 50, contextWords, requiredBodyPart, excludeIds, isCover, "en", filters);
       queryUsed = `${query} → ${bodyQuery}`;
     }
 
     // 4) Try page 2 of original query (more diverse results, helps regenerate flow)
     if (scored.length === 0) {
       console.log(`Slide ${index}: trying page 2 of "${query}"`);
-      scored = await pixabaySearch(apiKey, query, 2, 50, contextWords, requiredBodyPart, excludeIds, isCover);
+      scored = await pixabaySearch(apiKey, query, 2, 50, contextWords, requiredBodyPart, excludeIds, isCover, "en", filters);
       queryUsed = `${query} → page 2`;
     }
 
@@ -923,7 +964,7 @@ async function searchPixabayStock(
       const firstTwo = query.split(/\s+/).filter(Boolean).slice(0, 2).join(' ');
       if (firstTwo && firstTwo !== query) {
         console.log(`Slide ${index}: still empty, retry first 2 words "${firstTwo}"`);
-        scored = await pixabaySearch(apiKey, firstTwo, 1, 50, contextWords, requiredBodyPart, excludeIds, isCover);
+        scored = await pixabaySearch(apiKey, firstTwo, 1, 50, contextWords, requiredBodyPart, excludeIds, isCover, "en", filters);
         queryUsed = `${query} → ${firstTwo}`;
       }
     }
@@ -931,18 +972,19 @@ async function searchPixabayStock(
     // 6) Generic wellness fallback (no body-part filter, otherwise we get nothing)
     if (scored.length === 0) {
       console.log(`Slide ${index}: pure fallback (dropping body-part filter)`);
-      scored = await pixabaySearch(apiKey, FALLBACK_QUERY, 1, 24, contextWords, null, excludeIds, isCover);
+      scored = await pixabaySearch(apiKey, FALLBACK_QUERY, 1, 24, contextWords, null, excludeIds, isCover, "en", filters);
       queryUsed = `${query} → ${FALLBACK_QUERY} (no body filter)`;
     }
 
-    // 7) LAST RESORT: pure "physiotherapy clinic patient" search, completely
-    //    unfiltered. Guarantees we always return SOMETHING coherent rather
-    //    than null. This is the safety net for very specific slides where
-    //    every other query path returned 0.
+    // 7) LAST RESORT: la query di ripiego della professione (es. "nutritionist
+    //    healthy food consultation"), senza filtro sulla parte del corpo.
+    //    Garantisce di restituire SEMPRE qualcosa di coerente col mestiere
+    //    invece di null, per le slide molto specifiche dove ogni altra
+    //    strada ha dato 0 risultati.
     if (scored.length === 0) {
-      console.log(`Slide ${index}: ULTIMATE fallback (physiotherapy clinic patient)`);
-      scored = await pixabaySearch(apiKey, "physiotherapy clinic patient", 1, 24, contextWords, null, excludeIds, isCover);
-      queryUsed = `${query} → physiotherapy clinic patient (last resort)`;
+      console.log(`Slide ${index}: ULTIMATE fallback (${filters.fallbackQuery})`);
+      scored = await pixabaySearch(apiKey, filters.fallbackQuery, 1, 24, contextWords, null, excludeIds, isCover, "en", filters);
+      queryUsed = `${query} → ${filters.fallbackQuery} (last resort)`;
     }
 
     if (scored.length === 0) {

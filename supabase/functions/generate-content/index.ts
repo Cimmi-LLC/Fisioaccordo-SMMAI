@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { logGeneration } from "../_shared/historyLogger.ts";
 import { requireWithinRateLimit } from "../_shared/auth.ts";
 import { callGeminiWithRetry } from "../_shared/gemini.ts";
+import { resolveProfession, professionPromptBlock, professionKeywordExamples, delLuogo, nelMioLuogo, ilCliente, alCliente } from "../_shared/brand/profession.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -73,7 +74,10 @@ serve(async (req) => {
 
           if (brand) {
             brandData = brand;
-            const persona = brand.persona_scrittura === "io" ? "prima persona singolare (io / il mio studio)" : "prima persona plurale (noi / nel nostro studio)";
+            const brandProf = resolveProfession(brand, topic);
+            const luogo = brandProf.profile.luogo;
+            const clienti = brandProf.profile.clientePlurale;
+            const persona = brand.persona_scrittura === "io" ? `prima persona singolare (io / il mio ${luogo})` : `prima persona plurale (noi / ${nelMioLuogo(brandProf.profile, true)})`;
             const cta = (brand.cta_suggerite || []).filter(Boolean);
             const vantaggi = (brand.vantaggi_competitivi || []).filter(Boolean);
             const paroleEvitare = (brand.parole_da_evitare || []).filter(Boolean);
@@ -87,14 +91,14 @@ ${brand.descrizione ? `Descrizione: ${brand.descrizione}` : ""}
 ${brand.mission ? `Mission: ${brand.mission}` : ""}
 ${brand.identita_core ? `Identità: ${brand.identita_core}` : ""}
 
-=== TARGET PAZIENTI (a chi stai parlando in OGNI slide) ===
+=== TARGET (a chi stai parlando in OGNI slide) ===
 ${brand.target_pazienti || "pubblico generale"}
 → Ogni hook, esempio, scenario DEVE risuonare con questo target. Mai parlare a "tutti".
 
 === VOCE OBBLIGATORIA ===
 Tono: ${brand.tono_voce || "professionale"}
 Persona: ${persona}
-${persona.includes("singolare") ? "→ Usa 'io', 'il mio studio', 'nel mio lavoro vedo…'. MAI 'noi' o 'il nostro team'." : "→ Usa 'noi', 'nel nostro studio', 'i nostri pazienti'. MAI 'io' o 'il mio lavoro'."}
+${persona.includes("singolare") ? `→ Usa 'io', 'il mio ${luogo}', 'nel mio lavoro vedo…'. MAI 'noi' o 'il nostro team'.` : `→ Usa 'noi', '${nelMioLuogo(brandProf.profile, true)}', 'i nostri ${clienti}'. MAI 'io' o 'il mio lavoro'.`}
 
 === SERVIZI DEL BRAND (riferisciti SOLO a questi) ===
 ${servizi.length > 0 ? servizi.join(" · ") : "(generici)"}
@@ -102,7 +106,7 @@ ${servizi.length > 0 ? servizi.join(" · ") : "(generici)"}
 
 ${vantaggi.length > 0 ? `=== VANTAGGI COMPETITIVI (cita almeno UNO in una slide content) ===
 ${vantaggi.map((v: string, i: number) => `${i + 1}. ${v}`).join("\n")}
-→ Almeno una slide deve trasformare uno di questi vantaggi in un beneficio concreto per il paziente.
+→ Almeno una slide deve trasformare uno di questi vantaggi in un beneficio concreto per ${ilCliente(brandProf.profile)}.
 ` : ""}
 ${cta.length > 0 ? `=== CTA APPROVATE DAL BRAND (scegline UNA per cta_finale / bottone_cta) ===
 ${cta.map((c: string) => `• ${c}`).join("\n")}
@@ -114,10 +118,10 @@ ${temi.length > 0 ? `=== TEMI CHIAVE del brand: ${temi.join(", ")}
 ${paroleEvitare.length > 0 ? `=== PAROLE/ESPRESSIONI BANDITE (output rifiutato se le usi) ===
 ${paroleEvitare.map((p: string) => `❌ ${p}`).join("\n")}
 ` : ""}
-${brand.categorie?.length ? `Categorie cliniche: ${brand.categorie.join(", ")}` : ""}
+${brand.categorie?.length ? `Categorie: ${brand.categorie.join(", ")}` : ""}
 COLORI BRAND: primario ${brand.colore_primario || "#554697"}, secondario ${brand.colore_secondario || "#E6007E"}
 
-REGOLA FONDAMENTALE: il contenuto deve sembrare scritto DA "${brand.nome_business || "lo studio"}", non da un'agenzia generica. Se rileggendo il copy non si capisce CHE È IL BRAND a parlare (vs. qualsiasi altro studio), riscrivilo.`;
+REGOLA FONDAMENTALE: il contenuto deve sembrare scritto DA "${brand.nome_business || `lo ${luogo}`}", non da un'agenzia generica. Se rileggendo il copy non si capisce CHE È IL BRAND a parlare (vs. qualsiasi altro ${luogo}), riscrivilo.`;
           }
 
         }
@@ -129,6 +133,11 @@ REGOLA FONDAMENTALE: il contenuto deve sembrare scritto DA "${brand.nome_busines
     const brandName = brandData?.nome_business || "Studio";
     const brandColor = brandData?.colore_primario || "#554697";
 
+    // Professione di chi pubblica: scelta nel brand kit, altrimenti rilevata
+    // dal brand e dal topic. Decide lessico, esempi e immagini del prompt.
+    const prof = resolveProfession(brandData, topic);
+    const P = prof.profile;
+
     // Tipo di copy: la scelta salvata sullo studio (card impostazioni) vince
     // su quella passata nel body.
     const avatar = (brandData?.avatar_type === "B2B" || brandData?.avatar_type === "B2C")
@@ -138,9 +147,9 @@ REGOLA FONDAMENTALE: il contenuto deve sembrare scritto DA "${brand.nome_busines
     const avatarBlock = `
 === A CHI PARLI: E LA REGOLA PIU IMPORTANTE DI TUTTE ===
 Avatar impostato: ${avatar}.
-Se Avatar vale B2C devi parlare DIRETTAMENTE ALLA PERSONA CHE HA IL PROBLEMA, dandole del tu, parlando dei suoi sintomi, della sua giornata e della sua vita: e VIETATO rivolgersi al terapista o al titolare dello studio, e sono VIETATE le parole posizionamento, autorevolezza, competenza, acquisizione pazienti, marketing, professionisti, colleghi, business, clienti, fatturato, percorso commerciale, differenziante.
-Se Avatar vale B2B allora parli al titolare dello studio e quelle parole sono ammesse.
-Il BRAND KIT qui sopra serve SOLO a sapere chi e lo studio che pubblica, NON decide a chi ti rivolgi: anche se lo studio si rivolge a professionisti, se Avatar vale B2C tu scrivi al paziente.
+Se Avatar vale B2C devi parlare DIRETTAMENTE ALLA PERSONA CHE HA IL PROBLEMA, dandole del tu, parlando dei suoi sintomi o bisogni, della sua giornata e della sua vita: e VIETATO rivolgersi al professionista o al titolare ${delLuogo(P)}, e sono VIETATE le parole posizionamento, autorevolezza, competenza, acquisizione ${P.clientePlurale}, marketing, professionisti, colleghi, business, fatturato, percorso commerciale, differenziante.
+Se Avatar vale B2B allora parli al titolare ${delLuogo(P)} e quelle parole sono ammesse.
+Il BRAND KIT qui sopra serve SOLO a sapere chi pubblica, NON decide a chi ti rivolgi: anche se il brand si rivolge a professionisti, se Avatar vale B2C tu scrivi ${alCliente(P)}.
 Prima di scrivere ogni frase verifica che sia rivolta al destinatario giusto secondo Avatar: ${avatar}.
 Obiettivo: ${obiettivo} (reach/nurture/convert/retain). Tipo: ${tipoContenuto} (valore o offerta).
 
@@ -156,8 +165,10 @@ Se tipo=valore: educa e basta, nessuna vendita, CTA soft (salva/segui/commenta).
 === COPY B2C vs B2B ===
 B2C: emozione, desiderio, vita quotidiana, frasi corte, tanto tu, esempi di vita. B2B: rischio, soldi, tempo, status; il tuo team e la tua azienda; KPI e numeri; piu prove, casi, screenshot.`;
 
-    const systemPrompt = `Sei un copywriter d'élite specializzato in contenuti social per il settore sanitario (fisioterapia, osteopatia, poliambulatori). Formazione: $100M Playbook di Alex Hormozi.
+    const systemPrompt = `Sei un copywriter d'élite specializzato in contenuti social per il settore ${P.settore} (${prof.label}). Formazione: $100M Playbook di Alex Hormozi.
 ${brandContext}
+
+${professionPromptBlock(prof)}
 ${avatarBlock}
 
 === FRAMEWORK HOOK ===
@@ -168,7 +179,7 @@ Usa i 7 tipi di hook di Hormozi:
 4) CONDIZIONALI - "Se [situazione], stai facendo [errore]"
 5) COMANDI - "Smetti di fare X. Leggi questo."
 6) AFFERMAZIONI AUDACI - Statement con numeri concreti
-7) STORIE - "Un giorno nel mio studio arriva..."
+7) STORIE - "Un giorno ${nelMioLuogo(P)} arriva..."
 
 === LIMITI ASSOLUTI PER OGNI SLIDE ===
 - Titolo: massimo 6 parole. Mai di più.
@@ -176,13 +187,13 @@ Usa i 7 tipi di hook di Hormozi:
 - Se hai più cose da dire, mettile in slide separate.
 - Ogni slide comunica UN solo concetto in modo fulmineo.
 
-ESEMPIO CORRETTO:
-Titolo: "Il dolore alla spalla non sparisce da solo."
-Testo: "Ignorarlo lo peggiora. Il tuo corpo sta chiedendo aiuto."
+ESEMPIO CORRETTO (formato, non argomento):
+Titolo: "Non è stanchezza. È un segnale."
+Testo: "Ignorarlo lo peggiora. Il problema non passa da solo."
 
 ESEMPIO SBAGLIATO:
 Titolo: "Il Tuo Corpo Ti Sta Parlando?"
-Testo: "Ogni giorno, il mal di schiena limita milioni di persone, impedendo movimenti fluidi, un sonno ristoratore e una vita di qualità. Spesso si cercano soluzioni temporanee..."
+Testo: "Ogni giorno, questo problema limita milioni di persone, impedendo una vita di qualità e un sonno ristoratore. Spesso si cercano soluzioni temporanee..."
 
 === REGOLE DI SCRITTURA ===
 - Ogni contenuto DEVE essere 100% specifico per il topic
@@ -210,8 +221,8 @@ Sono tutte sentite mille volte, indeboliscono il messaggio:
 ❌ "Ecco perché…"
 ❌ "Continua a leggere per scoprire…"
 ❌ Domande retoriche generiche tipo "Mai capitato che…?"
-USA INVECE: scenari concreti ("Ieri in studio…"), numeri specifici ("3 settimane dopo l'infortunio…"),
-contrasti netti ("Pensavi fosse stress. Era il diaframma."), label sul target ("A te che corri 30 km a settimana:").
+USA INVECE: scenari concreti ("Ieri in ${P.luogo}…"), numeri specifici ("3 settimane dopo…"),
+contrasti netti ("Pensavi fosse X. Era Y."), label sul target ("A te che …:"). Gli esempi sono di FORMA: l'argomento resta sempre quello di ${P.settore}.
 
 === ANTI-GENERICO (banned) ===
 ❌ "milioni di persone soffrono di…"
@@ -226,11 +237,11 @@ Sono frasi vuote. Sostituisci con casi concreti, persone reali del target.
 - Slide 1 (tipo "cover"): HOOK ad alta tensione che identifica il target o lo scenario specifico.
   Campi: hook (max 5 parole, niente domande generiche), sottotitolo (≤10 parole), keywords_stock.
 - Slide 2 (tipo "content"): PROBLEMA in scena concreta — un caso/scenario riconoscibile dal target.
-  Niente "molte persone soffrono di X". Sì "se hai dolore alla schiena dopo 30 minuti seduto…".
+  Niente "molte persone soffrono di X". Sì una scena precisa della giornata del target (dove, quando, cosa succede).
 - Slide 3 (tipo "content"): CAUSA NON OVVIA — l'insight che cambia prospettiva.
-  Tipo: "Non è la postura. È che il diaframma non si espande." Differenzia dal banale.
+  Schema: "Non è [la causa ovvia]. È [la causa reale]." Differenzia dal banale, restando nel campo di ${P.settore}.
 - Slide 4..N-1 (tipo "content"): SOLUZIONE con step misurabili / proof concreta.
-  Cita un servizio del brand quando ha senso. Includi tempo/numero ("in 3 sessioni…", "il 70% dei pazienti…")
+  Cita un servizio del brand quando ha senso. Includi tempo/numero ("in 3 incontri…", "il 70% dei ${P.clientePlurale}…")
   SOLO se il brand l'ha fornito nei vantaggi competitivi; altrimenti usa quantitativi generici verificabili.
 - Ultima Slide (tipo "cta"): CTA dalla lista BRAND. Aggancia il valore al servizio specifico.
   Es. "Prenota la valutazione gratuita" → riferisce a un servizio reale del brand.
@@ -239,34 +250,26 @@ Sono frasi vuote. Sostituisci con casi concreti, persone reali del target.
 Per ogni slide ragiona in QUESTO ORDINE prima di scrivere "keywords_stock":
 
 1. MESSAGGIO EMOTIVO della slide: qual è il sentimento o intento?
-   (es. "prevenzione" → un paziente che si prende cura di sé PRIMA che arrivi il dolore)
-2. SCENA VISIVA più rappresentativa di quel messaggio:
-   (es. NON "uomo muscoloso" ma "persona che fa stretching preventivo in uno studio medico")
+   (es. "prevenzione" → ${ilCliente(P)} che si prende cura di sé PRIMA che arrivi il problema)
+2. SCENA VISIVA più rappresentativa di quel messaggio, ambientata dove lavora chi pubblica:
+   ${P.imageScene}
 3. Traduci quella scena in 3 keywords inglesi CONCRETE e FOTOGRAFABILI per Pixabay.
 
 REGOLE keywords:
 - Devono descrivere una SCENA FOTOGRAFABILE, non un concetto astratto
 - Sempre in INGLESE (Pixabay risponde meglio)
-- Specifiche per fisioterapia/salute/benessere
-- EVITA parole troppo generiche: "health", "wellness", "people", "man", "woman", "person", "fitness", "lifestyle"
-- Preferisci soggetti specifici CON contesto clinico
+- Specifiche per ${P.settore}: ${P.imageSubject} deve essere riconoscibile
+- EVITA parole troppo generiche: "health", "wellness", "people", "man", "woman", "person", "lifestyle"
+- Preferisci soggetti specifici CON il contesto di ${prof.label}
 
-ESEMPI CORRETTI:
-- Slide "prevenzione dolore" → ["physiotherapy prevention", "spine checkup clinic", "back care specialist"]
-- Slide "mal di schiena cronico" → ["chronic back pain office", "lower back pain treatment", "physiotherapist spine therapy"]
-- Slide "postura corretta" → ["posture correction therapy", "spine alignment physiotherapy", "posture assessment clinic"]
-- Slide "cervicale" → ["neck pain physiotherapy", "cervical treatment specialist", "neck massage therapy clinic"]
-- Slide "osteopatia" → ["osteopathy manual therapy", "osteopath treatment session", "holistic spine treatment"]
-- Slide "esercizi riabilitativi" → ["rehabilitation exercise clinic", "therapeutic exercise physiotherapy", "guided recovery exercise"]
-- Slide "mal di schiena da scrivania" → ["lower back pain desk", "office ergonomic chair therapy", "physiotherapist back assessment"]
-- Slide "cervicale e cellulare" → ["tech neck physiotherapy", "cervical strain smartphone", "neck pain therapy specialist"]
-- Slide "ginocchio dello sportivo" → ["sport knee injury clinic", "knee rehabilitation specialist", "athlete knee therapy"]
+ESEMPI CORRETTI (stesso settore di chi pubblica):
+${professionKeywordExamples(prof)}
 
 ESEMPI SBAGLIATI da evitare:
-- "prevenzione" → NO: ["prevention", "healthy man", "muscular person", "fitness"] (concetti, non scene)
-- "dolore" → NO: ["pain", "sad person", "stress"] (troppo astratto)
+- "prevenzione" → NO: ["prevention", "healthy man", "happy person"] (concetti, non scene)
+- "problema" → NO: ["pain", "sad person", "stress"] (troppo astratto)
 - "benessere" → NO: ["wellness", "happy people", "nature"] (off-topic)
-- "esercizio" → NO: ["exercise", "gym", "fitness man"] (manca contesto medical)
+- Keywords di un ALTRO mestiere (es. "physiotherapy" per un nutrizionista): off-topic
 
 Rispondi SOLO con JSON valido.`;
 
@@ -300,10 +303,11 @@ REGOLE:
 4. Testo: MASSIMO 2 frasi brevi
 5. keywords_stock: 3-4 parole inglesi concrete per foto stock
 6. Niente frasi BANDITE (vedi system prompt), niente PAROLE BANDITE del brand
-7. La caption_instagram deve riferirsi al TARGET PAZIENTI del brand e chiudere con UNA CTA APPROVATA
+7. La caption_instagram deve riferirsi al TARGET del brand e chiudere con UNA CTA APPROVATA
 
 === SELF-CHECK PRIMA DI RISPONDERE ===
-[ ] Il TARGET PAZIENTI si riconosce dal post?
+[ ] Il TARGET si riconosce dal post?
+[ ] Il copy parla il linguaggio di ${prof.label} (non di un altro mestiere)?
 [ ] Voce io/noi rispettata?
 [ ] Nessuna frase/parola bandita?
 [ ] CTA dalla lista approvata?
@@ -359,7 +363,8 @@ REGOLE CRITICHE:
 === SELF-CHECK PRIMA DI RISPONDERE ===
 Rileggi mentalmente l'output e verifica:
 [ ] Nessuna frase nella lista BANDITE è presente?
-[ ] Il TARGET PAZIENTI si riconosce dal copy (non sembra scritto "per tutti")?
+[ ] Il TARGET si riconosce dal copy (non sembra scritto "per tutti")?
+[ ] Il copy parla il linguaggio di ${prof.label} (non di un altro mestiere)?
 [ ] La VOCE OBBLIGATORIA è rispettata (io vs noi)?
 [ ] Almeno una slide usa un VANTAGGIO COMPETITIVO del brand?
 [ ] La CTA finale è una di quelle approvate?
@@ -421,9 +426,9 @@ La caption_instagram DEVE essere formattata così:
         slides: Array.from({ length: slidesCount }, (_, i) => ({
           numero: i + 1,
           tipo: i === 0 ? "cover" : i === slidesCount - 1 ? "cta" : "content",
-          ...(i === 0 ? { hook: topic, sottotitolo: "Scopri di più", keywords_stock: ["physiotherapy", "wellness", "healthy lifestyle"] } : {}),
+          ...(i === 0 ? { hook: topic, sottotitolo: "Scopri di più", keywords_stock: P.stockFallbackQuery.split(" ").slice(0, 3) } : {}),
           ...(i > 0 ? { titolo: `PUNTO ${i}`, testo: rawContent.substring(i * 200, (i + 1) * 200) } : {}),
-          ...(i > 0 && i < slidesCount - 1 ? { keywords_stock: ["physiotherapy", "clinic", "treatment"] } : {}),
+          ...(i > 0 && i < slidesCount - 1 ? { keywords_stock: P.stockFallbackQuery.split(" ").slice(0, 3) } : {}),
           ...(i === slidesCount - 1 ? { testo_cta: "Contattaci", bottone_cta: "Prenota ora" } : {}),
         })),
         cta_finale: "Contattaci ora",
@@ -451,6 +456,8 @@ La caption_instagram DEVE essere formattata così:
         metadata: {
           postType: postType || "carosello",
           numSlides: slidesCount,
+          professione: prof.id,
+          professione_source: prof.source,
         },
         status: "success",
       });

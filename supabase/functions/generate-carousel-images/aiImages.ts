@@ -11,6 +11,8 @@
 // (in Deno gli isolate vengono riusati tra richieste concorrenti: era una
 // race condition che mischiava le diagnostiche di utenti diversi).
 
+import { getProfession, DEFAULT_PROFESSION_ID, type ProfessionProfile } from "../_shared/brand/profession.ts";
+
 const OPENAI_IMAGE_ENDPOINT = "https://api.openai.com/v1/images/generations";
 const AI_IMAGE_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/interactions";
 const GEMINI_MODELS_BASE = "https://generativelanguage.googleapis.com/v1beta/models/";
@@ -100,8 +102,18 @@ type SlideLike = {
   keywords_stock?: string[];
 };
 
-/** Prompt immagine: ramo notturno neon oppure fotografia editoriale clinica. */
-export function buildAiPrompt(slide: SlideLike | null, isCover: boolean, stile?: string): string {
+/**
+ * Prompt immagine: ramo notturno neon oppure fotografia editoriale ambientata
+ * dove lavora chi pubblica (studio di fisioterapia, cucina del nutrizionista,
+ * palestra del personal trainer...). Senza professione resta la fisioterapia.
+ */
+export function buildAiPrompt(
+  slide: SlideLike | null,
+  isCover: boolean,
+  stile?: string,
+  profession?: ProfessionProfile,
+): string {
+  const prof = profession || getProfession(DEFAULT_PROFESSION_ID);
   const tema = String(slide?.theme || slide?.topic || "").trim();
   const titolo = String(slide?.title || slide?.titolo || slide?.hook || "").trim();
   const corpo = String(slide?.body || slide?.testo || slide?.sottotitolo || "").trim();
@@ -112,7 +124,7 @@ export function buildAiPrompt(slide: SlideLike | null, isCover: boolean, stile?:
       "Immagine per social su fondo NERO ASSOLUTO.",
       tema
         ? "Soggetto: un solo oggetto reale e riconoscibile che rappresenta in modo simbolico " + tema + "."
-        : "Soggetto: un solo oggetto reale legato alla cura del corpo.",
+        : "Soggetto: un solo oggetto reale legato a " + prof.settore + ".",
       titolo ? "Il messaggio da evocare e: " + titolo + "." : "",
       "Render 3D fotorealistico di quel singolo oggetto, completamente scontornato, sospeso al centro su fondo nero puro.",
       "Illuminazione al neon: alone turchese acceso attorno all oggetto; accenti rosso neon solo se il tema riguarda dolore, errore o problema.",
@@ -122,15 +134,15 @@ export function buildAiPrompt(slide: SlideLike | null, isCover: boolean, stile?:
   }
 
   return [
-    "Fotografia editoriale professionale per un centro di fisioterapia e riabilitazione in Italia.",
+    "Fotografia editoriale professionale per " + prof.imageScene + ".",
     tema
-      ? "SOGGETTO CLINICO OBBLIGATORIO: la scena deve mostrare in modo riconoscibile il trattamento o la parte del corpo legata a: " + tema + ". Questo e il vincolo piu importante di tutti."
+      ? "SOGGETTO OBBLIGATORIO: la scena deve mostrare in modo riconoscibile " + prof.imageSubject + " legato a: " + tema + ". Questo e il vincolo piu importante di tutti. Resta nel mondo di " + prof.settore + ": niente ambienti o attrezzature di altri mestieri."
       : "",
     titolo ? "Contesto del messaggio: " + titolo + "." : "",
     corpo ? "Dettaglio: " + corpo.slice(0, 160) + "." : "",
     keywords ? "Elementi utili: " + keywords + "." : "",
-    "Stile: fotografia reale scattata con obiettivo 50mm, luce naturale morbida e diffusa, ambiente clinico moderno pulito e accogliente, palette calda e neutra (bianco, beige, legno chiaro, tocchi di verde salvia), profondita di campo cinematografica, altissimo dettaglio, aspetto autentico e non artefatto.",
-    "Persone: adulti europei realistici, corporatura normale, espressione serena e credibile, abbigliamento sportivo neutro o divisa sanitaria semplice. Mani e volti anatomicamente corretti.",
+    "Stile: fotografia reale scattata con obiettivo 50mm, luce naturale morbida e diffusa, ambiente moderno pulito e accogliente, palette calda e neutra (bianco, beige, legno chiaro, tocchi di verde salvia), profondita di campo cinematografica, altissimo dettaglio, aspetto autentico e non artefatto.",
+    "Persone: adulti europei realistici, corporatura normale, espressione serena e credibile, " + prof.imageOutfit + ". Mani e volti anatomicamente corretti.",
     isCover
       ? "Inquadratura di grande impatto con soggetto centrale e ampio spazio negativo in alto e in basso per inserire del testo."
       : "Inquadratura naturale con spazio negativo laterale per inserire del testo.",

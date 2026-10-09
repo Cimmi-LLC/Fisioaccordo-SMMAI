@@ -53,7 +53,7 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
       if (numVariations > 1) {
         loadingState.updateProgress(15, '💡 Trovo angoli diversi sul topic...');
         const { data: expand, error: expandErr } = await supabase.functions.invoke('expand-topic', {
-          body: { topic: formData.description, count: numVariations }
+          body: { topic: formData.description, count: numVariations, brandId: activeBrandId }
         });
         if (expandErr || expand?.error || !expand?.ideas?.length) {
           throw new Error(expand?.error || expandErr?.message || 'Errore espansione topic');

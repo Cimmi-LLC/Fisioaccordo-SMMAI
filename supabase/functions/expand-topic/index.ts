@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { resolveProfession, professionPromptBlock, type ResolvedProfession } from "../_shared/brand/profession.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -18,7 +19,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { topic, count } = await req.json();
+    const { topic, count, brandId } = await req.json();
 
     if (!topic || typeof topic !== "string" || topic.trim().length < 2) {
       return new Response(JSON.stringify({ error: "topic obbligatorio (min 2 caratteri)" }), {
@@ -31,8 +32,11 @@ serve(async (req) => {
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
-    // Optional brand context (lightweight, just for tone alignment)
+    // Optional brand context (lightweight, just for tone alignment).
+    // La professione decide il mestiere per cui si propongono le idee:
+    // scelta nel brand kit, altrimenti rilevata dal brand e dal topic.
     let brandHint = "";
+    let prof: ResolvedProfession = resolveProfession(null, topic);
     const authHeader = req.headers.get("authorization");
     if (authHeader) {
       try {
@@ -43,23 +47,32 @@ serve(async (req) => {
         const token = authHeader.replace("Bearer ", "");
         const { data: { user } } = await supabase.auth.getUser(token);
         if (user) {
-          const { data: brand } = await supabase
+          // brandId esplicito quando il client lo passa (utenti multi-brand);
+          // altrimenti il primo brand dell'utente, mai maybeSingle su piu righe.
+          let brandQuery = supabase
             .from("brands")
-            .select("nome_business, target_pazienti, categorie, temi_chiave")
-            .eq("user_id", user.id)
-            .maybeSingle();
+            .select("*")
+            .eq("user_id", user.id);
+          if (brandId) brandQuery = brandQuery.eq("id", brandId);
+          const { data: brand } = await brandQuery.order("created_at", { ascending: true }).limit(1).maybeSingle();
           if (brand) {
+            prof = resolveProfession(brand, topic);
             brandHint = `\n\nCONTESTO BRAND:
-- Studio: ${brand.nome_business || "studio fisioterapico"}
+- Chi pubblica: ${brand.nome_business || prof.label} (${prof.label})
 - Target: ${brand.target_pazienti || "pubblico generale"}
-- Categorie: ${(brand.categorie || []).join(", ") || "fisioterapia"}
+- Categorie: ${(brand.categorie || []).join(", ") || prof.profile.settore}
+- Servizi: ${(brand.servizi || []).join(", ") || "(non indicati)"}
 - Temi chiave: ${(brand.temi_chiave || []).join(", ")}`;
           }
         }
       } catch { /* non-blocking */ }
     }
 
-    const systemPrompt = `Sei un content strategist per studi di fisioterapia su Instagram. Devi proporre idee di post AUTONOME e COMPLETAMENTE DIVERSE tra loro, mai variazioni dello stesso angolo. Rispondi SOLO con JSON valido.`;
+    const systemPrompt = `Sei un content strategist per ${prof.profile.labelPlural} su Instagram. Devi proporre idee di post AUTONOME e COMPLETAMENTE DIVERSE tra loro, mai variazioni dello stesso angolo. Ogni idea deve restare nel campo di ${prof.profile.settore}: niente angoli presi da un altro mestiere.
+
+${professionPromptBlock(prof)}
+
+Rispondi SOLO con JSON valido.`;
 
     const userPrompt = `Topic generale: "${topic}"
 
@@ -68,14 +81,14 @@ Genera ESATTAMENTE ${n} idee di post Instagram DIVERSE TRA LORO sul topic sopra.
 - DIVERSA dalle altre per ANGOLO, FORMATO e FOCUS specifico
 - ESEGUIBILE come post a sé stante
 
-Mix obbligatorio di formati: educativo (lista numerata), mito da sfatare, segnali d'allarme, esercizi pratici, errori comuni, caso reale/storia, prevenzione, quando consultare uno specialista, miti vs realtà. Scegli ${n} formati DIVERSI.
+Mix obbligatorio di formati: educativo (lista numerata), mito da sfatare, segnali d'allarme, consigli pratici da fare subito, errori comuni, caso reale/storia, prevenzione, quando rivolgersi al professionista, miti vs realtà. Scegli ${n} formati DIVERSI.
 
-Esempio per topic "mal di schiena":
+Esempio di STRUTTURA (l'argomento dell'esempio non conta, conta la varietà degli angoli):
 [
-  {"titolo": "3 segnali d'allarme che il tuo mal di schiena non è solo stanchezza", "hook": "Non tutti i dolori lombari sono uguali. Ecco quando devi preoccuparti.", "formato": "segnali_allarme", "focus": "red_flag clinici da non sottovalutare"},
-  {"titolo": "2 esercizi che fanno sparire il dolore lombare in 5 minuti", "hook": "Provati su 200+ pazienti. Si fanno a casa, senza attrezzi.", "formato": "esercizi_pratici", "focus": "esercizi mobility lombare"},
-  {"titolo": "Smettila di credere che il riposo guarisca il mal di schiena", "hook": "Il movimento controllato batte il riposo nel 90% dei casi. Ecco perché.", "formato": "mito_sfatato", "focus": "movimento vs riposo"},
-  {"titolo": "I 4 errori che fai alla scrivania e che ti rovinano la schiena", "hook": "Postura, monitor, sedia, pause: il combo perfetto del disastro.", "formato": "errori_comuni", "focus": "ergonomia ufficio"}
+  {"titolo": "3 segnali che il problema non è solo stanchezza", "hook": "Non tutti i casi sono uguali. Ecco quando devi preoccuparti.", "formato": "segnali_allarme", "focus": "segnali da non sottovalutare"},
+  {"titolo": "2 cose da fare oggi che cambiano il risultato in 5 minuti", "hook": "Provate su 200+ ${prof.profile.clientePlurale}. Si fanno a casa, senza attrezzi.", "formato": "consigli_pratici", "focus": "azioni immediate"},
+  {"titolo": "Smettila di credere a questo mito", "hook": "La credenza più diffusa è anche la più sbagliata. Ecco perché.", "formato": "mito_sfatato", "focus": "mito vs realtà"},
+  {"titolo": "I 4 errori che fai ogni giorno senza accorgertene", "hook": "Abitudini, tempi, scelte: il combo perfetto del disastro.", "formato": "errori_comuni", "focus": "errori quotidiani"}
 ]
 
 Per il topic "${topic}", produci ${n} idee diverse seguendo questo schema esatto. ${brandHint}

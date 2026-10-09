@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { logGeneration } from "../_shared/historyLogger.ts";
 import { requireWithinRateLimit } from "../_shared/auth.ts";
 import { callGeminiWithRetry } from "../_shared/gemini.ts";
+import { resolveProfession, professionPromptBlock, type ResolvedProfession } from "../_shared/brand/profession.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -28,6 +29,7 @@ serve(async (req) => {
     // Load brand kit
     let brandContext = "";
     let brandCta = "Prenota ora";
+    let prof: ResolvedProfession = resolveProfession(null, topic);
     let resolvedUserId: string | null = null;
     let resolvedBrandId: string | null = null;
     const authHeader = req.headers.get("authorization");
@@ -57,14 +59,16 @@ serve(async (req) => {
           const { data: brand } = await brandQuery.limit(1).maybeSingle();
           if (brand) {
             resolvedBrandId = brand.id;
+            prof = resolveProfession(brand, topic);
             const isPlural = brand.persona_scrittura === "noi";
             brandCta = (brand.cta_suggerite || [])[0] || "Prenota ora";
             brandContext = `
 DATI DEL PROFESSIONISTA:
 Nome/Studio: ${brand.nome_business || "Studio"}
-Specializzazione: ${(brand.categorie || []).join(", ")}
+Professione: ${prof.label}
+Specializzazione: ${(brand.categorie || []).join(", ") || prof.profile.settore}
 Servizi principali: ${(brand.servizi || []).join(", ")}
-Target pazienti: ${brand.target_pazienti || "pubblico generale"}
+Target: ${brand.target_pazienti || "pubblico generale"}
 Tone of voice: ${brand.tono_voce || "professionale"}
 CTA preferita: ${brandCta}
 Persona: ${isPlural ? "PLURALE (noi, offriamo, aiutiamo)" : "SINGOLARE (io, offro, aiuto)"}
@@ -82,6 +86,8 @@ Sai che i primi 3 secondi sono tutto.
 Sai che lo scorrimento si interrompe per dolore, curiosità o sorpresa.
 E sai che le persone non condividono informazioni, ma la propria identità.
 ${brandContext}
+
+${professionPromptBlock(prof)}
 
 REGOLE ASSOLUTE:
 - Frasi max 10 parole
@@ -187,6 +193,7 @@ Rispondi con questo JSON:
         type: "reel",
         topic,
         title: parsed.titolo_reel || topic.substring(0, 80),
+        metadata: { professione: prof.id, professione_source: prof.source },
         preview: {
           durata_stimata: parsed.durata_stimata,
           script_preview: (parsed.script_completo || "").substring(0, 200),

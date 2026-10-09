@@ -85,7 +85,7 @@ async function extractColorsFromVI(viBase64, viMime, brandColors){
 
 async function analyzeClientText(text){
   try{
-    const raw=await callAI([{role:"user",content:"Analizza queste informazioni su uno studio di fisioterapia/osteopatia.\n\nINFO:\n"+text+"\n\nRispondi SOLO con JSON puro (no backtick, no markdown):\n{\"name\":\"nome studio\",\"city\":\"città\",\"focus\":\"specializzazione principale es. postura, atleti, mal di schiena\",\"description\":\"2-3 frasi cosa fanno\",\"services\":[\"s1\",\"s2\",\"s3\"],\"tone\":\"amichevole\",\"keywords\":[\"k1\",\"k2\"],\"brandVoice\":\"tono comunicativo\"}"}],1200);
+    const raw=await callAI([{role:"user",content:"Analizza queste informazioni sullo studio di un professionista della salute (fisioterapista, osteopata, nutrizionista, personal trainer, psicologo, dentista o altra figura sanitaria).\n\nINFO:\n"+text+"\n\nRispondi SOLO con JSON puro (no backtick, no markdown):\n{\"name\":\"nome studio\",\"city\":\"città\",\"focus\":\"professione e specializzazione principale es. nutrizionista sportivo, fisioterapista posturale, personal trainer over 40\",\"description\":\"2-3 frasi cosa fanno\",\"services\":[\"s1\",\"s2\",\"s3\"],\"tone\":\"amichevole\",\"keywords\":[\"k1\",\"k2\"],\"brandVoice\":\"tono comunicativo\"}"}],1200);
     console.log("[analyzeClientText] raw response:", raw);
     const m=raw.match(/\{[\s\S]*\}/);
     return JSON.parse(m?m[0]:raw.trim());
@@ -813,12 +813,16 @@ async function generateStories(client,qty,activeTypes){
   const allowedIds = new Set(activeTypes);
   const allowedTypes = activeTypes.map(id=>STORY_TYPES.find(s=>s.id===id)).filter(Boolean);
   const allowedList = allowedTypes.map(t=>`"${t.id}" (${t.label})`).join(", ");
-  const info=client.clientInfo&&!client.clientInfo.error?"\nInfo studio: "+(client.clientInfo.description||"")+"\nServizi: "+(client.clientInfo.services||[]).join(", "):"";
+  const info=client.clientInfo&&!client.clientInfo.error?"\nInfo studio: "+(client.clientInfo.description||"")+"\nServizi: "+(client.clientInfo.services||[]).join(", ")+(client.clientInfo.target_pazienti?"\nTarget: "+client.clientInfo.target_pazienti:""):"";
+  // Professione del brand: le storie parlano la lingua del mestiere, non di un altro.
+  const prof=client.profession||null;
+  const profBlock=prof?"\nPROFESSIONE DI CHI PUBBLICA: "+prof.label+" ("+prof.settore+"). "+prof.promptContext+" Chiama le persone che segue \""+prof.clientePlurale+"\". Niente contenuti presi da un altro mestiere (es. niente fisioterapia se non è il mestiere di chi pubblica).":"";
+  const photoHint=prof&&prof.photoExamples&&prof.photoExamples.length?"\n- Esempi coerenti con la professione (slide -> keywords): "+prof.photoExamples.slice(0,3).join(" | "):"";
   const content=[];
   if(client.viBase64&&client.viMime==="application/pdf")content.push({type:"document",source:{type:"base64",media_type:"application/pdf",data:client.viBase64}});
 
   const prompt = `Crea ESATTAMENTE ${qty} storie Instagram per "${client.name}"${client.city?", "+client.city:""}.
-Tono: ${client.tone}.${client.focus?"\nFocus: "+client.focus:""}${info}
+Tono: ${client.tone}.${client.focus?"\nFocus: "+client.focus:""}${info}${profBlock}
 
 REGOLA TASSATIVA TIPOLOGIE:
 Tipologie consentite: ${allowedList}
@@ -845,9 +849,9 @@ LUNGHEZZA per tipo:
 - prima_dopo: confronto breve prima/dopo (max 150 char)
 
 REGOLE per il campo "photoQuery":
-- 2-3 parole INGLESI semplici e generaliste, inerenti a SALUTE / BENESSERE / FISICO
+- 2-3 parole INGLESI semplici e generaliste, inerenti al mestiere di chi pubblica (${prof?prof.settore:"salute / benessere / fisico"})
 - Preferisci parole comuni che esistono SICURAMENTE in stock photography
-- Esempi BUONI: "back pain", "good posture", "stretching exercise", "yoga", "office desk", "running", "healthy food", "meditation", "elderly walking", "neck massage", "knee pain"
+- Esempi BUONI: "back pain", "good posture", "stretching exercise", "yoga", "office desk", "running", "healthy food", "meditation", "elderly walking", "neck massage", "knee pain"${photoHint}
 - Esempi DA EVITARE: parole inventate, frasi lunghe (>4 parole), metafore, termini medici tecnici troppo specifici
 - Per storie di tipo quiz_domanda / quiz_risposta usa null (non servono foto)
 - Per ogni altra storia di solito metti una query concreta

@@ -40,7 +40,7 @@ export const useCompetitorAnalysis = () => {
 
   useEffect(() => { fetchAnalyses(); }, [fetchAnalyses]);
 
-  const analyzeCompetitor = useCallback(async (input: { username: string; platform: string; manualInfo?: string }) => {
+  const analyzeCompetitor = useCallback(async (input: { username: string; platform: string; manualInfo?: string; brandId?: string | null }) => {
     if (!user) return null;
     setAnalyzing(true);
     try {

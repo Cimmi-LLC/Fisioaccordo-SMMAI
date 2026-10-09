@@ -22,7 +22,7 @@ const TOUR_STEPS: TourStep[] = [
   { target: '[data-tour="reel-input"]', title: 'Argomento Reel', content: 'L\'AI scrive script con hook nei primi 3 secondi, struttura virale e CTA.', placement: 'right', route: '/reel' },
   { target: '[data-tour="reel-quantity"]', title: 'Quanti script', content: 'Da 1 a 10. Con più script ottieni varianti diverse dello stesso topic.', placement: 'right', route: '/reel' },
   { target: '[data-tour="nav-brand"]', title: 'Brand Kit', content: 'Colori, font, target, servizi. L\'AI userà queste info in OGNI generazione.', placement: 'right', route: '/brand' },
-  { target: 'body', placement: 'center', title: 'Configura il Brand', content: 'Imposta colori, font, descrizione studio, target pazienti, servizi, mission. Tutto influenza l\'output AI.', route: '/brand' },
+  { target: 'body', placement: 'center', title: 'Configura il Brand', content: 'Imposta professione, colori, font, descrizione studio, target, servizi, mission. Tutto influenza l\'output AI.', route: '/brand' },
   { target: 'body', placement: 'center', title: 'Fatto', content: 'Per rilanciare il tour: Impostazioni → Account → Rivedi tutorial.' },
 ];
 

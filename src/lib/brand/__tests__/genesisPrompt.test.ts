@@ -6,6 +6,7 @@ import {
   PLACEHOLDER,
   type GenesisBrandKit,
 } from '../genesisPrompt.ts';
+import { placeholderCopyFor, resolveProfession } from '../profession.ts';
 import type { TemplateGenome } from '../genome.ts';
 import { ARCHETYPES, type ArchetypeId, type SlideRole } from '../archetypes.ts';
 
@@ -76,6 +77,18 @@ describe('buildGenesisPrompt', () => {
     expect(content).toContain(PLACEHOLDER.content.body);
     const cta = buildGenesisPrompt(KIT, genomeFor('split_panel'), 'cta', 1);
     expect(cta).toContain(PLACEHOLDER.cta.title);
+  });
+
+  it('usa il copy segnaposto della professione quando viene passato', () => {
+    const nutri = placeholderCopyFor(resolveProfession({ professione: 'nutrizionista' }));
+    const cover = buildGenesisPrompt(KIT, genomeFor('split_panel'), 'cover', 1, nutri);
+    expect(cover).toContain('Kicker text: "NUTRIZIONE"');
+    expect(cover).toContain(nutri.cover.title);
+    expect(cover).not.toContain(PLACEHOLDER.cover.title);
+    const content = buildGenesisPrompt(KIT, genomeFor('split_panel'), 'content', 1, nutri);
+    expect(content).toContain(nutri.content.body);
+    // Senza argomento resta il copy storico (fisioterapia).
+    expect(buildGenesisPrompt(KIT, genomeFor('split_panel'), 'cover', 1)).toContain('Kicker text: "FISIOTERAPIA"');
   });
 
   it('la zona illustrazione esplicativa c\'e solo sulle slide content', () => {
