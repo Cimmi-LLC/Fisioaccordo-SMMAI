@@ -98,6 +98,7 @@ const Onboarding = () => {
   const { toast } = useToast();
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [url, setUrl] = useState('');
+  const [nuovaCategoria, setNuovaCategoria] = useState('');
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
   const [brand, setBrand] = useState<BrandProfile>({ ...EMPTY_BRAND });
   const [saving, setSaving] = useState(false);
@@ -316,7 +317,16 @@ const Onboarding = () => {
     website_url: brand.website_url,
   };
   const effectiveProfession = brand.professione ?? detectProfession(professionSignals)?.id ?? null;
-  const categorieOptions = categorieOptionsFor(effectiveProfession, brand.categorie);
+  // Senza professione riconosciuta non propongo le categorie di fisioterapia:
+  // solo quelle generiche, piu quelle gia scelte o scritte dall'utente.
+  const categorieOptions = effectiveProfession
+    ? categorieOptionsFor(effectiveProfession, brand.categorie)
+    : Array.from(new Set(['Salute e Benessere', 'Studio Professionale', ...brand.categorie]));
+  const aggiungiCategoria = () => {
+    const c = nuovaCategoria.trim();
+    if (c && !brand.categorie.includes(c)) setBrand({ ...brand, categorie: [...brand.categorie, c] });
+    setNuovaCategoria('');
+  };
 
   if (authLoading) {
     return (
@@ -568,6 +578,25 @@ const Onboarding = () => {
                       </button>
                     );
                   })}
+                </div>
+                <div className="flex gap-1.5 mt-2 max-w-sm">
+                  <Input
+                    value={nuovaCategoria}
+                    onChange={e => setNuovaCategoria(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); aggiungiCategoria(); } }}
+                    placeholder="Non c'è la tua? Scrivila e premi Invio"
+                    maxLength={60}
+                    className="text-xs h-8"
+                    style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '8px' }}
+                  />
+                  <button
+                    onClick={aggiungiCategoria}
+                    disabled={!nuovaCategoria.trim()}
+                    className="px-2 h-8 rounded-lg text-xs font-bold disabled:opacity-30"
+                    style={{ backgroundColor: 'var(--viola-dim)', color: 'var(--viola)', border: 'none', cursor: 'pointer' }}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </div>
 

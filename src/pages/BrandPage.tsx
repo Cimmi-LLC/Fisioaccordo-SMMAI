@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Save, X, Plus, Pencil, Globe, Palette, Type, Upload, Image as ImageIcon, MapPin, User2 } from 'lucide-react';
 import { BrandProfile, EMPTY_BRAND, TONO_OPTIONS, PERSONA_OPTIONS, FONT_OPTIONS, categorieOptionsFor } from '@/types/brand';
-import { detectProfession, isProfessionId } from '@/lib/brand/profession';
+import { detectProfession, isProfessionId, getProfession } from '@/lib/brand/profession';
 import ProfessionSelect from '@/components/brand/ProfessionSelect';
 import { POST_TEMPLATES, POST_TEMPLATE_NONE, POST_TEMPLATE_RANDOM } from '@/data/postTemplates';
 import PostTemplateOverlay from '@/components/carousel/PostTemplateOverlay';
@@ -182,7 +182,15 @@ const BrandPage = () => {
   };
   const chosenProfession = isProfessionId(brand.professione) ? brand.professione : null;
   const effectiveProfession = chosenProfession ?? detectProfession(professionSignals)?.id ?? null;
-  const categorieOptions = categorieOptionsFor(effectiveProfession, brand.categorie);
+  // Categorie: quelle scelte restano sempre visibili e si tolgono con la X;
+  // i suggerimenti arrivano dalla professione (mai le voci di fisioterapia
+  // imposte a chi fa un altro mestiere) e se ne possono scrivere di proprie.
+  const CATEGORIE_GENERICHE = ['Salute e Benessere', 'Studio Professionale'];
+  const categorieSuggerite = (effectiveProfession ? categorieOptionsFor(effectiveProfession) : CATEGORIE_GENERICHE)
+    .filter(c => !brand.categorie.includes(c));
+  const etichettaProfessione = effectiveProfession
+    ? (effectiveProfession === 'altro' && brand.professione_custom ? brand.professione_custom : getProfession(effectiveProfession).label)
+    : '';
 
   const tabs = [
     { id: 'brand' as const, label: 'Brand Kit' },
@@ -249,14 +257,15 @@ const BrandPage = () => {
                   }}
                 />
 
-                {brand.website_url && (
-                  <EditableField label="Sito Web">
-                    <div className="flex items-center gap-2">
-                      <Globe className="h-3.5 w-3.5" style={{ color: 'var(--viola)' }} />
-                      <a href={normalizeWebsiteUrl(brand.website_url)} target="_blank" rel="noopener noreferrer" className="text-sm" style={{ color: 'var(--viola)' }}>{brand.website_url}</a>
-                    </div>
-                  </EditableField>
-                )}
+                <EditableField label="Sito Web">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--viola)' }} />
+                    <Input value={brand.website_url || ''} onChange={e => update('website_url', e.target.value)} placeholder="https://www.tuostudio.it" className="text-sm" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 9 }} />
+                    {brand.website_url && (
+                      <a href={normalizeWebsiteUrl(brand.website_url)} target="_blank" rel="noopener noreferrer" className="text-[11px] font-semibold flex-shrink-0" style={{ color: 'var(--viola)' }}>Apri</a>
+                    )}
+                  </div>
+                </EditableField>
 
                 <EditableField label="Descrizione">
                   <Textarea value={brand.descrizione} onChange={e => update('descrizione', e.target.value)} rows={3} className="text-sm" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 9 }} />
@@ -265,17 +274,40 @@ const BrandPage = () => {
             </div>
 
             {/* Categorie */}
-            <div className="flex flex-wrap gap-1.5 pt-2">
-              {categorieOptions.map(cat => {
-                const active = brand.categorie.includes(cat);
-                return (
-                  <button key={cat} onClick={() => update('categorie', active ? brand.categorie.filter(c => c !== cat) : [...brand.categorie, cat])}
-                    className="text-[11px] font-medium px-3 py-1 rounded-full transition-all"
-                    style={{ border: active ? '1px solid var(--viola)' : '1px solid var(--line)', backgroundColor: active ? 'var(--viola-dim)' : 'transparent', color: active ? 'var(--viola)' : 'var(--ink3)', cursor: 'pointer' }}>
+            <div className="pt-2 space-y-2">
+              <label className="text-[10px] font-black uppercase block" style={{ color: 'var(--ink2)', letterSpacing: '0.8px' }}>Categorie</label>
+              <div className="flex flex-wrap gap-1.5">
+                {brand.categorie.length === 0 && (
+                  <span className="text-[11px]" style={{ color: 'var(--ink3)' }}>Nessuna categoria: aggiungine dai suggerimenti o scrivila tu.</span>
+                )}
+                {brand.categorie.map(cat => (
+                  <span key={cat} className="inline-flex items-center gap-1 text-[11px] font-medium pl-3 pr-1 py-1 rounded-full"
+                    style={{ border: '1px solid var(--viola)', backgroundColor: 'var(--viola-dim)', color: 'var(--viola)' }}>
                     {cat}
-                  </button>
-                );
-              })}
+                    <button title="Togli categoria" onClick={() => update('categorie', brand.categorie.filter(c => c !== cat))}
+                      className="rounded-full p-0.5" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--viola)' }}>
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              {categorieSuggerite.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[10px] font-semibold mr-1" style={{ color: 'var(--ink3)' }}>
+                    {etichettaProfessione ? `Suggerite per ${etichettaProfessione}:` : 'Suggerite:'}
+                  </span>
+                  {categorieSuggerite.map(cat => (
+                    <button key={cat} onClick={() => update('categorie', [...brand.categorie, cat])}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium px-3 py-1 rounded-full transition-all"
+                      style={{ border: '1px dashed var(--line)', backgroundColor: 'transparent', color: 'var(--ink3)', cursor: 'pointer' }}>
+                      <Plus className="h-3 w-3" /> {cat}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="max-w-sm">
+                <TagInput tags={[]} onChange={v => { const nuova = (v[0] || '').trim(); if (nuova && !brand.categorie.includes(nuova)) update('categorie', [...brand.categorie, nuova]); }} placeholder="Scrivi una categoria tua e premi Invio" />
+              </div>
             </div>
           </div>
 
