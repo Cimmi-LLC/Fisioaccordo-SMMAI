@@ -3,18 +3,58 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Users, Loader2, TrendingUp, TrendingDown, Lightbulb, Sparkles, Hash, BarChart3, ArrowLeft } from 'lucide-react';
+import { Users, Loader2, TrendingUp, TrendingDown, Lightbulb, Sparkles, Hash, BarChart3, ArrowLeft, Pencil, Trash2, Save, X } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { useCompetitorAnalysis } from '@/hooks/useCompetitorAnalysis';
 import { useActiveBrand } from '@/hooks/useActiveBrand';
 
 const CompetitorAnalysis: React.FC = () => {
-  const { analyses, analyzing, analyzeCompetitor } = useCompetitorAnalysis();
+  const { analyses, analyzing, analyzeCompetitor, deleteAnalysis, updateAnalysis } = useCompetitorAnalysis();
   // L'analisi e "per" il brand attivo: nome e professione finiscono nel prompt.
   const { activeBrandId } = useActiveBrand();
   const [username, setUsername] = useState('');
   const [manualInfo, setManualInfo] = useState('');
   const [platform, setPlatform] = useState('instagram');
   const [result, setResult] = useState<any>(null);
+  // Riga dello storico a cui appartiene il risultato aperto (per modifica/elimina).
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editSummary, setEditSummary] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const openResult = (data: any, id: string | null) => {
+    setResult(data);
+    setCurrentId(id);
+    setEditing(false);
+  };
+
+  const startEdit = () => {
+    setEditName(result?.competitor_name || '');
+    setEditSummary(result?.summary || '');
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    if (!currentId) return;
+    setSavingEdit(true);
+    const updated = await updateAnalysis(currentId, { competitor_name: editName, summary: editSummary });
+    setSavingEdit(false);
+    if (updated) {
+      setResult(updated.analysis_data);
+      setEditing(false);
+    }
+  };
+
+  const removeAnalysis = async (id: string, name: string) => {
+    if (!window.confirm(`Eliminare l'analisi di ${name}? Non si può recuperare.`)) return;
+    const ok = await deleteAnalysis(id);
+    if (ok && id === currentId) {
+      setResult(null);
+      setCurrentId(null);
+      setEditing(false);
+    }
+  };
 
   const handleAnalyze = async () => {
     if (!username.trim() && !manualInfo.trim()) return;
@@ -24,7 +64,7 @@ const CompetitorAnalysis: React.FC = () => {
       manualInfo: manualInfo.trim() || undefined,
       brandId: activeBrandId,
     });
-    if (res) setResult(res);
+    if (res) openResult(res, (res as any)._rowId || null);
   };
 
   const scoreColor = (score: number) => {
@@ -68,12 +108,48 @@ const CompetitorAnalysis: React.FC = () => {
           <div className="space-y-5">
             <Button
               variant="outline"
-              onClick={() => { setResult(null); setUsername(''); setManualInfo(''); }}
+              onClick={() => { setResult(null); setCurrentId(null); setEditing(false); setUsername(''); setManualInfo(''); }}
               className="gap-2"
             >
               <ArrowLeft className="h-4 w-4" /> Nuova analisi
             </Button>
             {/* Header */}
+            {currentId && !editing && (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={startEdit} className="gap-1.5">
+                  <Pencil className="h-3.5 w-3.5" /> Modifica nome e sintesi
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => removeAnalysis(currentId, result.competitor_name || 'questo profilo')}
+                  className="gap-1.5"
+                  style={{ color: '#dc2626', borderColor: 'rgba(220,38,38,0.35)' }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Elimina analisi
+                </Button>
+              </div>
+            )}
+            {editing && (
+              <div className="space-y-3 p-5 rounded-xl border" style={{ borderColor: 'var(--viola)' }}>
+                <div>
+                  <label className="text-[10px] font-black uppercase mb-1 block" style={{ color: 'var(--ink2)', letterSpacing: '0.6px' }}>Nome</label>
+                  <Input value={editName} onChange={e => setEditName(e.target.value)} maxLength={120} />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black uppercase mb-1 block" style={{ color: 'var(--ink2)', letterSpacing: '0.6px' }}>Sintesi</label>
+                  <Textarea value={editSummary} onChange={e => setEditSummary(e.target.value)} rows={5} />
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={saveEdit} disabled={savingEdit || !editName.trim()} className="gap-1.5">
+                    {savingEdit ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Salva
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setEditing(false)} className="gap-1.5">
+                    <X className="h-3.5 w-3.5" /> Annulla
+                  </Button>
+                </div>
+              </div>
+            )}
             <div className="flex items-center justify-between p-5 rounded-xl" style={{ backgroundColor: 'var(--viola-dim)' }}>
               <div className="space-y-1">
                 <div className="font-bold text-lg" style={{ color: 'var(--ink)' }}>{result.competitor_name}</div>
@@ -266,19 +342,32 @@ const CompetitorAnalysis: React.FC = () => {
             <p className="text-sm font-semibold mb-3" style={{ color: 'var(--ink3)' }}>
               Storico analisi ({analyses.length})
             </p>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {analyses.slice(0, 10).map(a => (
-                <button
+            <div className="space-y-2 max-h-72 overflow-y-auto">
+              {analyses.slice(0, 20).map(a => (
+                <div
                   key={a.id}
-                  onClick={() => setResult(a.analysis_data)}
-                  className="flex items-center gap-3 text-sm p-3 rounded-lg w-full text-left transition-colors"
-                  style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', cursor: 'pointer' }}
+                  className="flex items-center gap-2 rounded-lg"
+                  style={{ backgroundColor: 'var(--bg)', border: a.id === currentId ? '1px solid var(--viola)' : '1px solid var(--line)' }}
                 >
-                  <Badge variant="outline" className="text-xs">{a.platform}</Badge>
-                  <span className="truncate flex-1 font-medium" style={{ color: 'var(--ink)' }}>{a.competitor_name}</span>
-                  <span className="font-bold" style={{ color: scoreColor(a.score) }}>{a.score}/100</span>
-                  <span className="text-xs" style={{ color: 'var(--ink3)' }}>{new Date(a.created_at).toLocaleDateString()}</span>
-                </button>
+                  <button
+                    onClick={() => openResult(a.analysis_data, a.id)}
+                    className="flex items-center gap-3 text-sm p-3 flex-1 min-w-0 text-left transition-colors"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
+                  >
+                    <Badge variant="outline" className="text-xs">{a.platform}</Badge>
+                    <span className="truncate flex-1 font-medium" style={{ color: 'var(--ink)' }}>{a.competitor_name}</span>
+                    <span className="font-bold" style={{ color: scoreColor(a.score) }}>{a.score}/100</span>
+                    <span className="text-xs" style={{ color: 'var(--ink3)' }}>{new Date(a.created_at).toLocaleDateString()}</span>
+                  </button>
+                  <button
+                    title="Elimina analisi"
+                    onClick={() => removeAnalysis(a.id, a.competitor_name)}
+                    className="p-2 mr-1 rounded-md hover:bg-red-50"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#dc2626' }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               ))}
             </div>
           </div>

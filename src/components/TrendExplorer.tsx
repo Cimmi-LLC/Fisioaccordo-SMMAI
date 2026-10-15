@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TrendingUp, Loader2, Sparkles, Search, ArrowRight, Film, Layers, MessageSquare } from 'lucide-react';
+import { TrendingUp, Loader2, Sparkles, Search, ArrowRight, Film, Layers, MessageSquare, X } from 'lucide-react';
 import { useTrends } from '@/hooks/useTrends';
 import { useActiveBrand } from '@/hooks/useActiveBrand';
 import { resolveProfession } from '@/lib/brand/profession';
@@ -39,7 +39,7 @@ const TARGET_META: Record<DevTarget, { label: string; icon: React.ComponentType<
 
 const TrendExplorer: React.FC<TrendExplorerProps> = ({ onUseTrend }) => {
   const navigate = useNavigate();
-  const { trends, searching, findTrends } = useTrends();
+  const { trends, searching, findTrends, removeTrend } = useTrends();
   const { activeBrand } = useActiveBrand();
   const [niche, setNiche] = useState('');
   // Nicchia proposta dal brand attivo (es. "nutrizione e alimentazione"):
@@ -116,6 +116,14 @@ const TrendExplorer: React.FC<TrendExplorerProps> = ({ onUseTrend }) => {
                     <Badge variant={trend.trend_score >= 70 ? 'default' : 'secondary'}>
                       {trend.trend_score}/100
                     </Badge>
+                    <button
+                      title="Togli questo trend"
+                      onClick={() => removeTrend(trend)}
+                      className="p-1 rounded-md hover:bg-red-50"
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#dc2626' }}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
                 {trend.source && <p className="text-xs text-muted-foreground">{trend.source}</p>}

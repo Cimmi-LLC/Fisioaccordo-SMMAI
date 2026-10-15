@@ -71,6 +71,7 @@ export const useViralAnalysis = () => {
 
       if (!saveErr && saved) {
         setAnalyses(prev => [saved as any, ...prev]);
+        (data as any)._rowId = (saved as any).id;
       }
 
       toast({ title: '🔍 Analisi completata!', description: `Score viralità: ${data.score}/100` });
@@ -83,5 +84,38 @@ export const useViralAnalysis = () => {
     }
   }, [user, toast]);
 
-  return { analyses, loading, analyzing, analyzePost, refetch: fetchAnalyses };
+  /** Elimina un'analisi dallo storico (RLS: solo le proprie). */
+  const deleteAnalysis = useCallback(async (id: string): Promise<boolean> => {
+    const { error } = await supabase.from('viral_analysis').delete().eq('id', id);
+    if (error) {
+      toast({ title: 'Non riesco a eliminarla', description: error.message, variant: 'destructive' });
+      return false;
+    }
+    setAnalyses(prev => prev.filter(a => a.id !== id));
+    toast({ title: 'Analisi eliminata' });
+    return true;
+  }, [toast]);
+
+  /** Modifica il testo dell'analisi; rilegge la riga per confermare il salvataggio. */
+  const updateAnalysis = useCallback(async (id: string, analysis: string): Promise<ViralAnalysisResult | null> => {
+    const current = analyses.find(a => a.id === id);
+    if (!current) return null;
+    const text = analysis.trim();
+    const engagement_data = { ...((current as any).engagement_data || {}), analysis: text };
+    const { data, error } = await (supabase as any)
+      .from('viral_analysis')
+      .update({ analysis_text: text, engagement_data })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error || !data) {
+      toast({ title: 'Modifica non salvata', description: error?.message || 'Riprova.', variant: 'destructive' });
+      return null;
+    }
+    setAnalyses(prev => prev.map(a => (a.id === id ? (data as any) : a)));
+    toast({ title: 'Analisi aggiornata' });
+    return data as ViralAnalysisResult;
+  }, [analyses, toast]);
+
+  return { analyses, loading, analyzing, analyzePost, deleteAnalysis, updateAnalysis, refetch: fetchAnalyses };
 };

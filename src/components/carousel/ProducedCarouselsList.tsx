@@ -4,7 +4,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Images, Loader2 } from 'lucide-react';
+import { Images, Loader2, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { signedUrls } from '@/lib/storage';
 
@@ -38,6 +38,28 @@ const ProducedCarouselsList: React.FC<ProducedCarouselsListProps> = ({ brandId, 
   const [rows, setRows] = useState<Row[]>([]);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  /** Elimina il carosello dalla lista e, se possibile, le sue PNG dallo storage. */
+  const removeRow = async (r: Row) => {
+    if (!window.confirm(`Eliminare «${r.title || 'Carosello'}»? Le slide non si potranno recuperare.`)) return;
+    setDeletingId(r.id);
+    try {
+      const { error } = await (supabase as any).from('produced_carousels').delete().eq('id', r.id);
+      if (error) {
+        window.alert('Non riesco a eliminarlo: ' + error.message);
+        return;
+      }
+      setRows((prev) => prev.filter((x) => x.id !== r.id));
+      const paths = (r.slides || []).map((sl) => sl.path).filter((p): p is string => !!p);
+      if (paths.length > 0) {
+        // Pulizia best effort: se lo storage la rifiuta, la riga e gia sparita.
+        try { await supabase.storage.from(r.storage_bucket || 'carousel-images').remove(paths); } catch { /* ignore */ }
+      }
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   useEffect(() => {
     if (!brandId) { setRows([]); return; }
@@ -96,8 +118,8 @@ const ProducedCarouselsList: React.FC<ProducedCarouselsListProps> = ({ brandId, 
             const st = STATUS_IT[r.status];
             const isActive = r.id === activeId;
             return (
+              <div key={r.id} className="relative flex-shrink-0 group">
               <button
-                key={r.id}
                 onClick={() => onOpen(r.id)}
                 className="flex-shrink-0 text-left rounded-xl overflow-hidden"
                 style={{
@@ -127,6 +149,17 @@ const ProducedCarouselsList: React.FC<ProducedCarouselsListProps> = ({ brandId, 
                   </div>
                 </div>
               </button>
+              <button
+                type="button"
+                title="Elimina carosello"
+                onClick={() => removeRow(r)}
+                disabled={deletingId === r.id}
+                className="absolute top-1.5 right-1.5 rounded-full p-1.5 opacity-80 group-hover:opacity-100 transition-opacity"
+                style={{ backgroundColor: 'rgba(255,255,255,0.92)', border: '1px solid var(--line)', cursor: 'pointer', color: '#dc2626' }}
+              >
+                {deletingId === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+              </button>
+              </div>
             );
           })}
         </div>
