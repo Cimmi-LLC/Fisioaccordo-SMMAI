@@ -6,6 +6,7 @@ import { AlertCircle, PenTool, Camera, Square, RectangleVertical } from 'lucide-
 import type { PaletteResult } from '@/lib/brand/extractor.ts';
 import type { BrandSemantics } from '@/lib/brand/artDirector.ts';
 import type { VisualStyle, SlideFormat } from '@/lib/brand/genome.ts';
+import CustomScalePanel from './CustomScalePanel';
 
 interface BrandConfirmStepProps {
   busy: boolean;
@@ -102,6 +103,7 @@ const BrandConfirmStep: React.FC<BrandConfirmStepProps> = ({
             </label>
           ))}
         </div>
+        <CustomScalePanel palette={palette} onPaletteChange={onPaletteChange} />
       </div>
 
       {/* Lettura semantica */}
