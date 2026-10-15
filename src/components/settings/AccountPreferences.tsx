@@ -5,6 +5,7 @@ import { User, Mail, Calendar, PlayCircle } from 'lucide-react';
 import { useOnboardingTour } from '@/hooks/useOnboardingTour';
 import { useNavigate } from 'react-router-dom';
 import AvatarTypeCard from './AvatarTypeCard';
+import ProfessionCard from './ProfessionCard';
 import ImageModelCard from './ImageModelCard';
 import SlideStyleCard from './SlideStyleCard';
 
@@ -70,6 +71,7 @@ const AccountPreferences: React.FC<AccountPreferencesProps> = ({ user }) => {
 
       {/* Preferenze di generazione per lo studio attivo (lavoro recuperato
           dal branch backup/lovable-2026-07-20, adattato alla pipeline attuale) */}
+      <ProfessionCard />
       <AvatarTypeCard />
       <ImageModelCard />
       <SlideStyleCard />
