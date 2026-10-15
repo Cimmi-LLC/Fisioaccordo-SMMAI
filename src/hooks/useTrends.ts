@@ -97,5 +97,25 @@ export const useTrends = () => {
     }
   }, [user, toast, fetchTrends]);
 
-  return { trends, loading, searching, findTrends, refetch: fetchTrends };
+  /**
+   * Toglie un trend dalla lista e dal database. I trend appena trovati hanno
+   * un id locale, quindi in database li cerco per argomento + nicchia.
+   */
+  const removeTrend = useCallback(async (trend: TrendingTopic): Promise<boolean> => {
+    if (!user) return false;
+    const { error } = await supabase
+      .from('trending_topics')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('topic', trend.topic)
+      .eq('category', trend.category);
+    if (error) {
+      toast({ title: 'Non riesco a toglierlo', description: error.message, variant: 'destructive' });
+      return false;
+    }
+    setTrends(prev => prev.filter(t => t.id !== trend.id));
+    return true;
+  }, [user, toast]);
+
+  return { trends, loading, searching, findTrends, removeTrend, refetch: fetchTrends };
 };

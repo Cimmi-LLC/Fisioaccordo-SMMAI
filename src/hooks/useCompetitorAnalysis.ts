@@ -65,6 +65,8 @@ export const useCompetitorAnalysis = () => {
 
         if (!saveErr && saved) {
           setAnalyses(prev => [saved as any, ...prev]);
+          // Id della riga: serve alla UI per modificare o eliminare subito il risultato.
+          (data as any)._rowId = (saved as any).id;
         }
       } catch (dbErr) {
         console.warn('Could not save competitor analysis:', dbErr);
@@ -80,5 +82,46 @@ export const useCompetitorAnalysis = () => {
     }
   }, [user, toast]);
 
-  return { analyses, loading, analyzing, analyzeCompetitor, refetch: fetchAnalyses };
+  /** Elimina un'analisi dallo storico (RLS: solo le proprie). */
+  const deleteAnalysis = useCallback(async (id: string): Promise<boolean> => {
+    const { error } = await (supabase as any).from('competitor_analysis').delete().eq('id', id);
+    if (error) {
+      toast({ title: 'Non riesco a eliminarla', description: error.message, variant: 'destructive' });
+      return false;
+    }
+    setAnalyses(prev => prev.filter(a => a.id !== id));
+    toast({ title: 'Analisi eliminata' });
+    return true;
+  }, [toast]);
+
+  /**
+   * Modifica nome e sintesi di un'analisi. La sintesi vive sia in
+   * analysis_text sia dentro analysis_data.summary: aggiorno entrambe e
+   * rileggo la riga, cosi la modifica e verificata e non solo a schermo.
+   */
+  const updateAnalysis = useCallback(async (
+    id: string,
+    patch: { competitor_name?: string; summary?: string }
+  ): Promise<CompetitorAnalysisResult | null> => {
+    const current = analyses.find(a => a.id === id);
+    if (!current) return null;
+    const name = patch.competitor_name !== undefined ? patch.competitor_name.trim() : current.competitor_name;
+    const summary = patch.summary !== undefined ? patch.summary.trim() : (current.analysis_text || '');
+    const analysis_data = { ...(current.analysis_data || {}), competitor_name: name, summary };
+    const { data, error } = await (supabase as any)
+      .from('competitor_analysis')
+      .update({ competitor_name: name, analysis_text: summary, analysis_data })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error || !data) {
+      toast({ title: 'Modifica non salvata', description: error?.message || 'Riprova.', variant: 'destructive' });
+      return null;
+    }
+    setAnalyses(prev => prev.map(a => (a.id === id ? (data as any) : a)));
+    toast({ title: 'Analisi aggiornata' });
+    return data as CompetitorAnalysisResult;
+  }, [analyses, toast]);
+
+  return { analyses, loading, analyzing, analyzeCompetitor, deleteAnalysis, updateAnalysis, refetch: fetchAnalyses };
 };
