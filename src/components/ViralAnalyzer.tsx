@@ -2,7 +2,8 @@ import React, { useState, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Loader2, Video, X, Upload, Zap, Image as ImageIcon, Volume2, Lightbulb, ArrowLeft } from 'lucide-react';
+import { Eye, Loader2, Video, X, Upload, Zap, Image as ImageIcon, Volume2, Lightbulb, ArrowLeft, Pencil, Trash2, Save } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { useViralAnalysis } from '@/hooks/useViralAnalysis';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,13 +12,38 @@ import { useAuth } from '@/contexts/AuthContext';
 const MAX_VIDEO_MB = 20;
 
 const ViralAnalyzer: React.FC = () => {
-  const { analyses, analyzing, analyzePost } = useViralAnalysis();
+  const { analyses, analyzing, analyzePost, deleteAnalysis, updateAnalysis } = useViralAnalysis();
   const { toast } = useToast();
   const { user } = useAuth();
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const saveEdit = async () => {
+    if (!currentId) return;
+    setSavingEdit(true);
+    const updated = await updateAnalysis(currentId, editText);
+    setSavingEdit(false);
+    if (updated) {
+      setResult((r: any) => ({ ...r, analysis: editText.trim() }));
+      setEditing(false);
+    }
+  };
+
+  const removeAnalysis = async (id: string) => {
+    if (!window.confirm("Eliminare questa analisi? Non si può recuperare.")) return;
+    const ok = await deleteAnalysis(id);
+    if (ok && id === currentId) {
+      setResult(null);
+      setCurrentId(null);
+      setEditing(false);
+    }
+  };
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const acceptFile = useCallback((f: File | undefined | null) => {
@@ -76,7 +102,7 @@ const ViralAnalyzer: React.FC = () => {
         platform: 'instagram',
         postType: 'reel',
       });
-      if (res) setResult(res);
+      if (res) { setResult(res); setCurrentId((res as any)._rowId || null); setEditing(false); }
     } finally {
       setUploading(false);
     }
@@ -90,6 +116,8 @@ const ViralAnalyzer: React.FC = () => {
   const resetAll = () => {
     setVideoFile(null);
     setResult(null);
+    setCurrentId(null);
+    setEditing(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -213,6 +241,36 @@ const ViralAnalyzer: React.FC = () => {
             >
               <ArrowLeft className="h-4 w-4" /> Nuova analisi
             </Button>
+            {currentId && !editing && (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => { setEditText(result.analysis || ''); setEditing(true); }}>
+                  <Pencil className="h-3.5 w-3.5" /> Modifica analisi
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => removeAnalysis(currentId)}
+                  style={{ color: '#dc2626', borderColor: 'rgba(220,38,38,0.35)' }}
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Elimina analisi
+                </Button>
+              </div>
+            )}
+            {editing && (
+              <div className="space-y-3 p-5 rounded-xl border" style={{ borderColor: 'var(--viola)' }}>
+                <label className="text-[10px] font-black uppercase block" style={{ color: 'var(--ink2)', letterSpacing: '0.6px' }}>Perché funziona</label>
+                <Textarea value={editText} onChange={e => setEditText(e.target.value)} rows={6} />
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={saveEdit} disabled={savingEdit} className="gap-1.5">
+                    {savingEdit ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Salva
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setEditing(false)} className="gap-1.5">
+                    <X className="h-3.5 w-3.5" /> Annulla
+                  </Button>
+                </div>
+              </div>
+            )}
             {/* Header score */}
             <div className="flex items-center justify-between p-5 rounded-xl" style={{ backgroundColor: 'var(--viola-dim)' }}>
               <div className="space-y-1">
@@ -353,23 +411,31 @@ const ViralAnalyzer: React.FC = () => {
             <p className="text-sm font-semibold mb-2" style={{ color: 'var(--ink3)' }}>
               Storico analisi ({analyses.length})
             </p>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {analyses.slice(0, 10).map(a => {
+            <div className="space-y-2 max-h-72 overflow-y-auto">
+              {analyses.slice(0, 20).map(a => {
                 const eng = (a as any).engagement_data || {};
                 const score = eng.score;
                 return (
-                  <button
+                  <div
                     key={a.id}
-                    onClick={() => setResult({
-                      score: eng.score,
-                      analysis: eng.analysis || a.analysis_text,
-                      patterns: a.patterns,
-                      visual_analysis: eng.visual_analysis,
-                      audio_analysis: eng.audio_analysis,
-                      takeaways: eng.takeaways || [],
-                    })}
-                    className="flex items-center gap-3 text-sm p-3 rounded-lg w-full text-left transition-colors"
-                    style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', cursor: 'pointer' }}
+                    className="flex items-center gap-2 rounded-lg"
+                    style={{ backgroundColor: 'var(--bg)', border: a.id === currentId ? '1px solid var(--viola)' : '1px solid var(--line)' }}
+                  >
+                  <button
+                    onClick={() => {
+                      setResult({
+                        score: eng.score,
+                        analysis: eng.analysis || a.analysis_text,
+                        patterns: a.patterns,
+                        visual_analysis: eng.visual_analysis,
+                        audio_analysis: eng.audio_analysis,
+                        takeaways: eng.takeaways || [],
+                      });
+                      setCurrentId(a.id);
+                      setEditing(false);
+                    }}
+                    className="flex items-center gap-3 text-sm p-3 flex-1 min-w-0 text-left transition-colors"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
                   >
                     <Badge variant="outline" className="text-xs">{a.platform}</Badge>
                     <span className="truncate flex-1 font-medium" style={{ color: 'var(--ink)' }}>
@@ -387,6 +453,15 @@ const ViralAnalyzer: React.FC = () => {
                       {new Date(a.created_at).toLocaleDateString()}
                     </span>
                   </button>
+                  <button
+                    title="Elimina analisi"
+                    onClick={() => removeAnalysis(a.id)}
+                    className="p-2 mr-1 rounded-md hover:bg-red-50"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#dc2626' }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                  </div>
                 );
               })}
             </div>
