@@ -92,7 +92,7 @@ const ProfessionSelect: React.FC<Props> = ({ value, custom, signals, onChange, l
       <label className="block text-[10px] font-black uppercase mb-1.5" style={{ color: 'var(--ink2)', letterSpacing: '0.8px' }}>
         {label}
       </label>
-      <div className="flex flex-col sm:flex-row gap-2">
+      <div className="flex flex-col gap-2">
         <Select
           value={selected}
           onValueChange={(v) => {
@@ -104,7 +104,7 @@ const ProfessionSelect: React.FC<Props> = ({ value, custom, signals, onChange, l
             } else if (isProfessionId(v)) onChange(v, '');
           }}
         >
-          <SelectTrigger className="h-9 text-xs flex-1" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '9px' }}>
+          <SelectTrigger className="h-9 text-xs w-full" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '9px' }}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -142,7 +142,7 @@ const ProfessionSelect: React.FC<Props> = ({ value, custom, signals, onChange, l
           </SelectContent>
         </Select>
         {selected === NEW && (
-          <div className="flex gap-1.5 sm:w-72">
+          <div className="flex gap-1.5 w-full">
             <Input
               value={draft || legacyCustom}
               onChange={(e) => { setDraft(e.target.value); onChange('altro', e.target.value); }}
