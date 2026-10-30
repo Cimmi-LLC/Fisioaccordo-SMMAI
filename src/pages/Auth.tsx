@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Loader2, Eye, EyeOff, MailCheck, RefreshCw } from "lucide-react";
 import logo from "@/assets/logo-fisioaccordo.png";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { withAuthRetry, isServerError, SERVER_BUSY_MESSAGE } from "@/lib/authRetry";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ const Auth = () => {
   const [sentToEmail, setSentToEmail] = useState('');
   // email-not-confirmed state
   const [emailNotConfirmed, setEmailNotConfirmed] = useState(false);
-  const [loginError, setLoginError] = useState<'invalid_credentials' | 'email_not_confirmed' | null>(null);
+  const [loginError, setLoginError] = useState<'invalid_credentials' | 'email_not_confirmed' | 'server_busy' | null>(null);
   const [resendLoading, setResendLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -59,18 +60,22 @@ const Auth = () => {
     setLoading(true);
     try {
       const redirectUrl = `${window.location.origin}/`;
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await withAuthRetry(() => supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
           emailRedirectTo: redirectUrl,
           data: { first_name: formData.firstName, last_name: formData.lastName, clinic_name: formData.clinicName }
         }
-      });
+      }));
       if (error) {
         if (error.message.includes('already registered') || (error as any).code === 'user_already_exists') {
           toast({ title: "Email già registrata", description: "Hai già un account! Ti portiamo al Login." });
           setActiveTab('signin');
+          return;
+        }
+        if (isServerError(error)) {
+          toast({ title: "Registrazione non completata", description: SERVER_BUSY_MESSAGE, variant: "destructive" });
           return;
         }
         toast({ title: "Errore di registrazione", description: error.message, variant: "destructive" });
@@ -83,7 +88,7 @@ const Auth = () => {
         setEmailSent(true);
       }
     } catch {
-      toast({ title: "Errore", description: "Errore durante la registrazione", variant: "destructive" });
+      toast({ title: "Registrazione non completata", description: SERVER_BUSY_MESSAGE, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -95,9 +100,11 @@ const Auth = () => {
     setLoginError(null);
     setEmailNotConfirmed(false);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email: formData.email, password: formData.password });
+      const { error } = await withAuthRetry(() => supabase.auth.signInWithPassword({ email: formData.email, password: formData.password }));
       if (error) {
-        if (error.message.includes('Email not confirmed') || (error as any).code === 'email_not_confirmed') {
+        if (isServerError(error)) {
+          setLoginError('server_busy');
+        } else if (error.message.includes('Email not confirmed') || (error as any).code === 'email_not_confirmed') {
           setEmailNotConfirmed(true);
           setLoginError('email_not_confirmed');
         } else {
@@ -108,7 +115,7 @@ const Auth = () => {
         // Navigation happens automatically via useEffect when AuthContext updates
       }
     } catch {
-      setLoginError('invalid_credentials');
+      setLoginError('server_busy');
     } finally {
       setLoading(false);
     }
@@ -117,9 +124,9 @@ const Auth = () => {
   const handleResendConfirmation = async () => {
     setResendLoading(true);
     try {
-      const { error } = await supabase.auth.resend({ type: 'signup', email: formData.email });
+      const { error } = await withAuthRetry(() => supabase.auth.resend({ type: 'signup', email: formData.email }));
       if (error) {
-        toast({ title: "Errore", description: error.message, variant: "destructive" });
+        toast({ title: "Errore", description: isServerError(error) ? SERVER_BUSY_MESSAGE : error.message, variant: "destructive" });
       } else {
         toast({ title: "Email inviata!", description: "Controlla la tua casella di posta e la cartella spam." });
         setEmailNotConfirmed(false);
@@ -284,7 +291,11 @@ const Auth = () => {
                           border: `1px solid ${loginError === 'email_not_confirmed' ? 'var(--line)' : 'rgba(230,0,126,0.2)'}`,
                         }}
                       >
-                        {loginError === 'invalid_credentials' ? (
+                        {loginError === 'server_busy' ? (
+                          <p className="text-[11px] font-semibold" style={{ color: 'var(--ink)' }}>
+                            ⏳ {SERVER_BUSY_MESSAGE}
+                          </p>
+                        ) : loginError === 'invalid_credentials' ? (
                           <>
                             <p className="text-[11px] font-semibold" style={{ color: 'var(--ink)' }}>
                               🔑 Email o password non corretti
@@ -449,18 +460,18 @@ const Auth = () => {
                 e.preventDefault();
                 setForgotLoading(true);
                 try {
-                  const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+                  const { error } = await withAuthRetry(() => supabase.auth.resetPasswordForEmail(forgotEmail, {
                     redirectTo: `${window.location.origin}/reset-password`
-                  });
+                  }));
                   if (error) {
-                    toast({ title: "Errore", description: error.message, variant: "destructive" });
+                    toast({ title: "Email non inviata", description: isServerError(error) ? SERVER_BUSY_MESSAGE : error.message, variant: "destructive" });
                   } else {
                     toast({ title: "Email inviata!", description: "Controlla la tua casella di posta per il link di recupero" });
                     setShowForgotPassword(false);
                     setForgotEmail('');
                   }
                 } catch {
-                  toast({ title: "Errore", description: "Errore nell'invio dell'email", variant: "destructive" });
+                  toast({ title: "Email non inviata", description: SERVER_BUSY_MESSAGE, variant: "destructive" });
                 } finally {
                   setForgotLoading(false);
                 }
