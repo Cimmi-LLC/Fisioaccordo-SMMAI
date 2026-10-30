@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { withAuthRetry, isServerError, SERVER_BUSY_MESSAGE } from "@/lib/authRetry";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 import logo from "@/assets/logo-fisioaccordo.png";
 
@@ -73,9 +74,9 @@ const ResetPassword = () => {
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password });
+      const { error } = await withAuthRetry(() => supabase.auth.updateUser({ password }));
       if (error) {
-        toast({ title: "Errore", description: error.message, variant: "destructive" });
+        toast({ title: "Errore", description: isServerError(error) ? SERVER_BUSY_MESSAGE : error.message, variant: "destructive" });
       } else {
         toast({ title: "✅ Password aggiornata!", description: "Ora puoi accedere con la nuova password" });
         navigate('/auth');
