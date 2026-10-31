@@ -26,7 +26,8 @@ import {
 import { useActiveBrand } from '@/hooks/useActiveBrand';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import BrandInstagramConnect from '@/components/BrandInstagramConnect';
-import { MetaService, type MetaConnectionData } from '@/services/metaService';
+import InstagramConnectResult from '@/components/InstagramConnectResult';
+import { MetaService, type ConnectResult, type MetaConnectionData } from '@/services/metaService';
 
 const BrandsListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -34,6 +35,9 @@ const BrandsListPage: React.FC = () => {
   const { brands, activeBrandId, setActiveBrand, deleteBrand, loading } = useActiveBrand();
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [igConnections, setIgConnections] = useState<MetaConnectionData[]>([]);
+  // Esito del collegamento appena tornato da Instagram (letto una volta sola).
+  const [igResult, setIgResult] = useState<ConnectResult | null>(() => MetaService.peekConnectResult());
+  useEffect(() => { MetaService.clearConnectResult(); }, []);
 
   const loadIgConnections = useCallback(async () => {
     setIgConnections(await MetaService.getConnections());
@@ -81,6 +85,14 @@ const BrandsListPage: React.FC = () => {
         </Button>
       </div>
 
+      {igResult && (
+        <InstagramConnectResult
+          result={igResult}
+          brandName={brands.find((b) => b.id === igResult.brandId)?.nome_business || null}
+          onClose={() => setIgResult(null)}
+        />
+      )}
+
       {loading ? (
         <Card className="panel-card">
           <CardContent style={{ padding: '40px', textAlign: 'center' }}>
@@ -110,12 +122,13 @@ const BrandsListPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {brands.map((b) => {
             const isActive = b.id === activeBrandId;
+            const justConnected = !!igResult?.success && igResult.brandId === b.id;
             return (
               <Card
                 key={b.id}
                 className="panel-card relative transition-all"
                 style={{
-                  border: isActive ? '2px solid var(--rosa)' : '1px solid var(--line)',
+                  border: justConnected ? '2px solid #16a34a' : isActive ? '2px solid var(--rosa)' : '1px solid var(--line)',
                   cursor: 'pointer',
                 }}
               >
@@ -192,6 +205,7 @@ const BrandsListPage: React.FC = () => {
                       brandId={b.id}
                       brandName={b.nome_business || 'questo brand'}
                       connection={igConnections.find((c) => c.brand_id === b.id) ?? null}
+                      justConnected={justConnected}
                       onChanged={loadIgConnections}
                     />
                   )}

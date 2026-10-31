@@ -4,10 +4,10 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Instagram, Link2, Unlink, Loader2, Pencil, Check, X } from "lucide-react";
-import { MetaService, type MetaConnectionData } from '@/services/metaService';
+import { MetaService, type ConnectResult, type MetaConnectionData } from '@/services/metaService';
+import InstagramConnectResult from './InstagramConnectResult';
 import { useToast } from '@/hooks/use-toast';
 import PersonalAccountGuide from './PersonalAccountGuide';
-import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from '@/integrations/supabase/client';
 import { useActiveBrand } from '@/hooks/useActiveBrand';
 
@@ -19,7 +19,9 @@ const MetaConnection: React.FC = () => {
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
   const [savingUsername, setSavingUsername] = useState(false);
-  const [agreedToConnect, setAgreedToConnect] = useState(false);
+  // Esito del collegamento appena tornato da Instagram (letto una volta sola).
+  const [igResult, setIgResult] = useState<ConnectResult | null>(() => MetaService.peekConnectResult());
+  useEffect(() => { MetaService.clearConnectResult(); }, []);
   const { toast } = useToast();
   const { brands, activeBrandId } = useActiveBrand();
   const brandName = (id: string | null) => brands.find(b => b.id === id)?.nome_business || null;
@@ -135,6 +137,13 @@ const MetaConnection: React.FC = () => {
         </CardTitle>
       </CardHeader>
       <CardContent style={{ padding: '22px 24px' }}>
+        {igResult && (
+          <InstagramConnectResult
+            result={igResult}
+            brandName={brandName(igResult.brandId ?? null)}
+            onClose={() => setIgResult(null)}
+          />
+        )}
         {activeConnection ? (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
@@ -231,23 +240,9 @@ const MetaConnection: React.FC = () => {
               Connetti il tuo account Instagram Business per pubblicare direttamente.
             </p>
 
-            <div className="flex items-start space-x-2">
-              <Checkbox
-                id="consent-connect"
-                checked={agreedToConnect}
-                onCheckedChange={(checked) => setAgreedToConnect(checked === true)}
-                className="mt-0.5"
-              />
-              <label htmlFor="consent-connect" className="text-xs leading-snug cursor-pointer" style={{ color: 'var(--ink3)' }}>
-                Acconsento a condividere i miei dati Instagram (username, access token) con questa app come descritto nella{' '}
-                <Link to="/privacy" className="underline" style={{ color: 'var(--viola)' }}>Privacy Policy</Link> e nei{' '}
-                <Link to="/terms" className="underline" style={{ color: 'var(--viola)' }}>Termini di Servizio</Link>.
-              </label>
-            </div>
-
             <button
               onClick={handleConnect}
-              disabled={connecting || !agreedToConnect}
+              disabled={connecting}
               className="w-full text-white text-[11px] font-black uppercase py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
               style={{
                 backgroundColor: 'var(--rosa)',
@@ -258,6 +253,13 @@ const MetaConnection: React.FC = () => {
               {connecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Instagram className="h-4 w-4" />}
               Connetti Instagram Business
             </button>
+
+            <p className="text-xs leading-snug" style={{ color: 'var(--ink3)' }}>
+              Si collega il profilo aperto ora su Instagram: se è un altro, prima cambia profilo su Instagram.
+              Continuando acconsenti a condividere i dati Instagram (username, access token) con questa app come descritto nella{' '}
+              <Link to="/privacy" className="underline" style={{ color: 'var(--viola)' }}>Privacy Policy</Link> e nei{' '}
+              <Link to="/terms" className="underline" style={{ color: 'var(--viola)' }}>Termini di Servizio</Link>.
+            </p>
 
             <div className="text-xs space-y-1" style={{ color: 'var(--ink3)' }}>
               <p className="font-bold" style={{ color: 'var(--ink2)' }}>Requisiti:</p>
