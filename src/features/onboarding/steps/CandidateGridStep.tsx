@@ -32,7 +32,15 @@ const CandidateGridStep: React.FC<CandidateGridStepProps> = ({
     candidates.filter((c) => c.slide_role === role).sort((a, b) => a.variant_index - b.variant_index);
 
   const allSelected = ROLES.every((r) => !!selection[r]);
-  const generating = candidates.some((c) => c.status === 'pending' || c.status === 'generating');
+  // Un candidato fermo in coda da piu di 4 minuti non arrivera piu: la
+  // generazione in background e stata interrotta. Senza questo controllo il
+  // wizard restava in attesa per sempre (caso reale: 7 su 9 pronti, 2 in coda).
+  const STALL_MS = 4 * 60 * 1000;
+  const isStalled = (c: TemplateCandidate) =>
+    (c.status === 'pending' || c.status === 'generating') &&
+    Date.now() - new Date(c.updated_at).getTime() > STALL_MS;
+  const stalledCount = candidates.filter(isStalled).length;
+  const generating = candidates.some((c) => (c.status === 'pending' || c.status === 'generating') && !isStalled(c));
 
   return (
     <div className="space-y-6">
@@ -44,6 +52,12 @@ const CandidateGridStep: React.FC<CandidateGridStepProps> = ({
           Tre varianti per ogni ruolo. Seleziona quella che ti rappresenta di piu.
           {generating && ' Le immagini appaiono man mano che vengono generate.'}
         </p>
+        {stalledCount > 0 && !generating && (
+          <p className="text-[12px] mt-2 p-2 rounded-lg" style={{ color: '#b45309', backgroundColor: 'rgba(245,158,11,0.1)' }}>
+            {stalledCount === 1 ? '1 variante non è stata completata' : `${stalledCount} varianti non sono state completate`}:
+            scegli tra quelle pronte oppure usa "Rigenera tutto".
+          </p>
+        )}
       </div>
 
       {ROLES.map((role) => (
@@ -54,8 +68,8 @@ const CandidateGridStep: React.FC<CandidateGridStepProps> = ({
           <div className="grid grid-cols-3 gap-3">
             {byRole(role).map((c) => {
               const selected = selection[role] === c.id;
-              const isLoading = c.status === 'pending' || c.status === 'generating';
-              const isFailed = c.status === 'failed';
+              const isLoading = (c.status === 'pending' || c.status === 'generating') && !isStalled(c);
+              const isFailed = c.status === 'failed' || isStalled(c);
               return (
                 <button
                   key={c.id}
