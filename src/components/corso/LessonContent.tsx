@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { normalize, taskId } from '@/lib/course/courseNav';
+import { normalize, taskId, INTRO_ID } from '@/lib/course/courseNav';
 
 interface Props {
   lessonId: string;
@@ -36,7 +36,8 @@ const LessonContent: React.FC<Props> = ({ lessonId, html, done, highlight, onTog
       wrap.append(label, btn, pre);
     });
 
-    root.querySelectorAll('.hw').forEach((box, i) => {
+    // Nella guida il riquadro "Compito" è solo la legenda: niente spunta.
+    if (lessonId !== INTRO_ID) root.querySelectorAll('.hw').forEach((box, i) => {
       if (box.querySelector('.hw-done')) return;
       const btn = document.createElement('button');
       btn.type = 'button';
