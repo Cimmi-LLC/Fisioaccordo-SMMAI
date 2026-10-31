@@ -15,6 +15,13 @@ export interface MetaConnectionData {
   updated_at: string;
 }
 
+export interface ConnectResult {
+  success: boolean;
+  brandId?: string | null;
+  username?: string | null;
+  error?: string;
+}
+
 export class MetaService {
   // Public OAuth App ID — not secret, but read from env for consistency with backend.
   // Falls back to the legacy literal so existing deployments don't break before .env is set.
@@ -31,6 +38,8 @@ export class MetaService {
 
   /** Brand e pagina di ritorno del collegamento in corso (sopravvivono al redirect). */
   private static readonly PENDING_KEY = 'fisioaccordo:ig_connect';
+  /** Esito dell'ultimo collegamento, mostrato dalla pagina a cui si torna. */
+  private static readonly RESULT_KEY = 'fisioaccordo:ig_connect_result';
 
   /**
    * Collega un profilo Instagram al brand indicato (ogni brand ha il suo).
@@ -90,6 +99,7 @@ export class MetaService {
         console.log('[MetaService] received code from popup, exchanging...');
         const result = await MetaService.exchangeCodeForToken(data.code, MetaService.takePendingConnect().brandId);
         cleanup();
+        MetaService.saveConnectResult(result);
         if (result.success) {
           // soft success — reload to refresh connection state in UI
           window.dispatchEvent(new CustomEvent('meta-auth-completed', { detail: { success: true } }));
@@ -141,10 +151,29 @@ export class MetaService {
     }
   }
 
+  static saveConnectResult(result: ConnectResult): void {
+    try { sessionStorage.setItem(MetaService.RESULT_KEY, JSON.stringify(result)); } catch { /* solo il toast */ }
+  }
+
+  /** Esito del collegamento appena tornato da Instagram (senza cancellarlo). */
+  static peekConnectResult(): ConnectResult | null {
+    try {
+      const raw = sessionStorage.getItem(MetaService.RESULT_KEY);
+      return raw ? JSON.parse(raw) as ConnectResult : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Va chiamato dopo averlo mostrato: l'esito si vede una volta sola. */
+  static clearConnectResult(): void {
+    try { sessionStorage.removeItem(MetaService.RESULT_KEY); } catch { /* niente da fare */ }
+  }
+
   static async exchangeCodeForToken(
     code: string,
     brandId?: string | null,
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<ConnectResult> {
     try {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error('Utente non autenticato');
@@ -162,7 +191,13 @@ export class MetaService {
       console.log('[MetaService] Risposta:', { data: response.data, error: response.error?.message });
 
       // Check data.error first (Supabase SDK puts real error in data when status is non-2xx)
-      if (response.data?.success) return { success: true };
+      if (response.data?.success) {
+        return {
+          success: true,
+          brandId: response.data.brand_id ?? brandId ?? null,
+          username: response.data.instagram_username ?? null,
+        };
+      }
       if (response.data?.error) throw new Error(response.data.error);
       if (response.error) throw new Error(response.error.message || 'Errore autenticazione Meta');
       

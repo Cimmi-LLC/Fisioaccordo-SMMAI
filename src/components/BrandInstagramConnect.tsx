@@ -1,14 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Instagram, Loader2, Unlink } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Checkbox } from '@/components/ui/checkbox';
+import { CheckCircle2, Instagram, Loader2, Unlink } from 'lucide-react';
 import { MetaService, type MetaConnectionData } from '@/services/metaService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -16,18 +8,18 @@ interface Props {
   brandId: string;
   brandName: string;
   connection: MetaConnectionData | null;
+  /** Collegato adesso (ritorno da Instagram): la riga si evidenzia. */
+  justConnected?: boolean;
   onChanged: () => void;
 }
 
 /**
  * Riga "Instagram" nella card di un brand: ogni brand ha il suo profilo.
- * Collegato → @username e Scollega; altrimenti "Collega Instagram" con il
- * consenso (lo stesso delle Impostazioni) prima di andare su Instagram.
+ * Collegato → "Collegato @username" e Scollega; altrimenti un clic porta
+ * su Instagram (si collega il profilo aperto lì) e si torna qui.
  */
-const BrandInstagramConnect: React.FC<Props> = ({ brandId, brandName, connection, onChanged }) => {
+const BrandInstagramConnect: React.FC<Props> = ({ brandId, brandName, connection, justConnected, onChanged }) => {
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
-  const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const connect = () => {
@@ -60,13 +52,25 @@ const BrandInstagramConnect: React.FC<Props> = ({ brandId, brandName, connection
 
   if (connection) {
     return (
-      <div className="flex items-center gap-2 mb-3 text-[12px]" style={{ color: 'var(--ink)' }}>
-        <Instagram className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--rosa)' }} />
-        <span className="font-semibold truncate">@{connection.instagram_username || 'profilo collegato'}</span>
+      <div
+        className="flex items-center gap-2 mb-3 px-2.5 py-2 rounded-lg text-[12px]"
+        style={{
+          backgroundColor: justConnected ? 'rgba(22,163,74,0.12)' : 'rgba(22,163,74,0.06)',
+          border: `1px solid rgba(22,163,74,${justConnected ? 0.5 : 0.2})`,
+          color: 'var(--ink)',
+        }}
+      >
+        <CheckCircle2 className="h-4 w-4 shrink-0" style={{ color: '#16a34a' }} />
+        <div className="min-w-0">
+          <div className="text-[9px] font-black uppercase" style={{ color: '#16a34a', letterSpacing: '0.5px' }}>
+            {justConnected ? 'Appena collegato' : 'Instagram collegato'}
+          </div>
+          <div className="font-semibold truncate">@{connection.instagram_username || 'profilo collegato'}</div>
+        </div>
         <button
           onClick={(e) => { e.stopPropagation(); disconnect(); }}
           disabled={busy}
-          className="ml-auto flex items-center gap-1 text-[10px] font-bold uppercase disabled:opacity-50"
+          className="ml-auto shrink-0 flex items-center gap-1 text-[10px] font-bold uppercase disabled:opacity-50"
           style={{ color: 'var(--ink3)' }}
         >
           {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Unlink className="h-3 w-3" />}
@@ -77,60 +81,22 @@ const BrandInstagramConnect: React.FC<Props> = ({ brandId, brandName, connection
   }
 
   return (
-    <>
+    <div className="mb-3">
       <button
-        onClick={(e) => { e.stopPropagation(); setOpen(true); }}
-        className="w-full mb-3 text-[11px] font-black uppercase py-2 rounded-lg flex items-center justify-center gap-2"
+        onClick={(e) => { e.stopPropagation(); connect(); }}
+        disabled={busy}
+        className="w-full text-[11px] font-black uppercase py-2 rounded-lg flex items-center justify-center gap-2 disabled:opacity-60"
         style={{ border: '1px solid var(--rosa)', color: 'var(--rosa)', backgroundColor: 'transparent' }}
       >
-        <Instagram className="h-3.5 w-3.5" />
+        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Instagram className="h-3.5 w-3.5" />}
         Collega Instagram
       </button>
-
-      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setAgreed(false); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Instagram className="h-5 w-5" style={{ color: 'var(--rosa)' }} />
-              Collega Instagram a {brandName}
-            </DialogTitle>
-            <DialogDescription>
-              Su Instagram entra con il profilo di questo brand: i post e i numeri di {brandName} useranno quel profilo.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="flex items-start space-x-2">
-              <Checkbox
-                id={`consent-${brandId}`}
-                checked={agreed}
-                onCheckedChange={(checked) => setAgreed(checked === true)}
-                className="mt-0.5"
-              />
-              <label htmlFor={`consent-${brandId}`} className="text-xs leading-snug cursor-pointer" style={{ color: 'var(--ink3)' }}>
-                Acconsento a condividere i miei dati Instagram (username, access token) con questa app come descritto nella{' '}
-                <Link to="/privacy" className="underline" style={{ color: 'var(--viola)' }}>Privacy Policy</Link> e nei{' '}
-                <Link to="/terms" className="underline" style={{ color: 'var(--viola)' }}>Termini di Servizio</Link>.
-              </label>
-            </div>
-
-            <button
-              onClick={connect}
-              disabled={busy || !agreed}
-              className="w-full text-white text-[11px] font-black uppercase py-3 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50"
-              style={{ backgroundColor: 'var(--rosa)', border: '1px solid var(--rosa)', letterSpacing: '0.5px' }}
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Instagram className="h-4 w-4" />}
-              Continua su Instagram
-            </button>
-
-            <p className="text-xs" style={{ color: 'var(--ink3)' }}>
-              Si collega il profilo aperto adesso su instagram.com: se è un altro, prima passa a quello di {brandName} su Instagram (foto profilo → Cambia account). Serve un account Business o Creator, con profilo pubblico.
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+      <p className="text-[10px] leading-snug mt-1.5" style={{ color: 'var(--ink3)' }}>
+        Si collega il profilo aperto ora su Instagram. Continuando accetti{' '}
+        <Link to="/privacy" className="underline" onClick={(e) => e.stopPropagation()}>Privacy</Link> e{' '}
+        <Link to="/terms" className="underline" onClick={(e) => e.stopPropagation()}>Termini</Link>.
+      </p>
+    </div>
   );
 };
 

@@ -65,8 +65,10 @@ const InstagramCallback: React.FC = () => {
       const pending = MetaService.takePendingConnect();
       const result = await MetaService.exchangeCodeForToken(code, pending.brandId);
       const back = pending.returnTo?.startsWith('/') && !pending.returnTo.startsWith('//') && !pending.returnTo.startsWith('/auth/') ? pending.returnTo : '/settings';
+      // La pagina a cui si torna mostra l'esito sulla card del brand.
+      MetaService.saveConnectResult({ ...result, brandId: result.brandId ?? pending.brandId });
       if (result.success) {
-        toast({ title: '🎉 Instagram Collegato!' });
+        toast({ title: '🎉 Instagram Collegato!', description: result.username ? `@${result.username}` : undefined });
       } else {
         toast({
           title: '❌ Errore Collegamento',
