@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { resolveProfession } from '@/lib/brand/profession';
@@ -25,12 +25,20 @@ import {
 } from 'lucide-react';
 import { useActiveBrand } from '@/hooks/useActiveBrand';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
+import BrandInstagramConnect from '@/components/BrandInstagramConnect';
+import { MetaService, type MetaConnectionData } from '@/services/metaService';
 
 const BrandsListPage: React.FC = () => {
   const navigate = useNavigate();
   const isAdmin = useIsAdmin();
   const { brands, activeBrandId, setActiveBrand, deleteBrand, loading } = useActiveBrand();
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [igConnections, setIgConnections] = useState<MetaConnectionData[]>([]);
+
+  const loadIgConnections = useCallback(async () => {
+    setIgConnections(await MetaService.getConnections());
+  }, []);
+  useEffect(() => { loadIgConnections(); }, [loadIgConnections]);
 
   const goToCreateBrand = () => navigate('/onboarding?new=1');
 
@@ -177,6 +185,15 @@ const BrandsListPage: React.FC = () => {
                       <UsersIcon className="h-3 w-3" />
                       {b.servizi!.length} servizi
                     </div>
+                  )}
+
+                  {b.id && (
+                    <BrandInstagramConnect
+                      brandId={b.id}
+                      brandName={b.nome_business || 'questo brand'}
+                      connection={igConnections.find((c) => c.brand_id === b.id) ?? null}
+                      onChanged={loadIgConnections}
+                    />
                   )}
 
                   <div className="flex gap-2 pt-2" style={{ borderTop: '1px solid var(--line)' }}>

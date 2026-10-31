@@ -255,15 +255,16 @@ Deno.serve(async (req) => {
     if (brandsErr) return jsonResponse(req, { error: brandsErr.message }, 500);
 
     // 2) skip brands whose Instagram account is already connected via Meta
-    //    OAuth (same user AND same username). Only that brand: the same user
-    //    can own other brands that only Apify follows. A connection whose
+    //    OAuth: the connection's brand_id, or (older connections) same user
+    //    AND same username. Only that brand: the same user can own other
+    //    brands that only Apify follows. A connection whose
     //    token has expired doesn't count: the Meta sync can't use it, so
     //    Apify must keep that brand's numbers coming.
     const userIds = Array.from(new Set((brands || []).map((b: any) => b.user_id)));
     const { data: conns } = userIds.length > 0
       ? await supabase
           .from("meta_connections")
-          .select("user_id, instagram_username")
+          .select("user_id, brand_id, instagram_username")
           .in("user_id", userIds)
           .eq("is_active", true)
           .or(`token_expires_at.is.null,token_expires_at.gt.${new Date().toISOString()}`)
@@ -274,6 +275,7 @@ Deno.serve(async (req) => {
         .filter((c: any) => c.instagram_username)
         .map((c: any) => connKey(c.user_id, c.instagram_username)),
     );
+    const connectedBrands = new Set((conns || []).map((c: any) => c.brand_id).filter(Boolean));
 
     // 3) tracked_handles (standalone, no brand)
     const { data: tracked, error: trackedErr } = await supabase
@@ -298,7 +300,9 @@ Deno.serve(async (req) => {
     }
 
     const brandTargets: SyncTarget[] = (brands || [])
-      .filter((b: any) => b.instagram_username && !connected.has(connKey(b.user_id, b.instagram_username)))
+      .filter((b: any) => b.instagram_username
+        && !connectedBrands.has(b.id)
+        && !connected.has(connKey(b.user_id, b.instagram_username)))
       .map((b: any) => ({
         brandId: b.id, trackedHandleId: null, userId: b.user_id,
         username: cleanUsername(b.instagram_username),

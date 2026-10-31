@@ -1517,6 +1517,7 @@ export type Database = {
       }
       meta_connections: {
         Row: {
+          brand_id: string | null
           created_at: string
           facebook_user_id: string | null
           id: string
@@ -1531,6 +1532,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          brand_id?: string | null
           created_at?: string
           facebook_user_id?: string | null
           id?: string
@@ -1545,6 +1547,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          brand_id?: string | null
           created_at?: string
           facebook_user_id?: string | null
           id?: string

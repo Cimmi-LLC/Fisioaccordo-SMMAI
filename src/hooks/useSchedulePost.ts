@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export interface MetaConnection {
   id: string;
+  brand_id: string | null;
   instagram_username: string | null;
   instagram_business_id: string | null;
   page_name: string | null;
@@ -34,11 +35,16 @@ export const useSchedulePost = () => {
     try {
       const { data, error } = await supabase
         .from('meta_connections')
-        .select('id, instagram_username, instagram_business_id, page_name, is_active')
+        .select('id, brand_id, instagram_username, instagram_business_id, page_name, is_active')
         .eq('user_id', user.id)
         .eq('is_active', true);
       if (error) throw error;
-      setConnections((data as MetaConnection[]) || []);
+      // Il profilo del brand attivo per primo: i dialoghi preselezionano il primo.
+      let activeBrandId: string | null = null;
+      try { activeBrandId = localStorage.getItem('fisioaccordo:active_brand_id'); } catch { /* storage bloccato */ }
+      const list = ((data as MetaConnection[]) || []).slice()
+        .sort((a, b) => Number(b.brand_id === activeBrandId) - Number(a.brand_id === activeBrandId));
+      setConnections(list);
     } catch (err) {
       console.error('Errore caricamento connessioni Meta:', err);
       setConnections([]);
