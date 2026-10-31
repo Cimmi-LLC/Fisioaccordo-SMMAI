@@ -3,6 +3,7 @@
 // Riprende dallo stato giusto in base a brands.genesis_status.
 
 import React, { useEffect, useMemo, useState } from 'react';
+import AccountStrip from '@/components/AccountStrip';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -54,9 +55,12 @@ const TemplateGenesisWizard: React.FC = () => {
         .select('genesis_status, logo_url')
         .eq('id', brandId)
         .maybeSingle();
-      if (data?.genesis_status === 'locked') navigate('/posts');
+      if (data?.genesis_status === 'locked') { navigate('/posts'); return; }
       if (data?.logo_url) setExistingLogoUrl(data.logo_url as string);
+      // Riprende dalla scelta delle varianti se la generazione era gia partita.
+      if (await genesis.resume()) setStep(2);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brandId, navigate]);
 
   const progress = useMemo(() => ((step + 1) / 4) * 100, [step]);
@@ -91,6 +95,7 @@ const TemplateGenesisWizard: React.FC = () => {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--bg)' }}>
+      <AccountStrip />
       <div className="max-w-3xl mx-auto px-4 py-8">
         <div className="text-center mb-6">
           <img src={logo} alt="Logo" className="h-10 w-auto mx-auto mb-4" />

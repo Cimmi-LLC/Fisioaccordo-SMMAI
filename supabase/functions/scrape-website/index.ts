@@ -181,6 +181,128 @@ async function tryApifyFallback(url: string): Promise<string | null> {
   }
 }
 
+// ── Colori del brand ────────────────────────────────────────────────
+// Colori che compaiono nel codice di quasi ogni sito ma non sono del brand:
+// editor e admin di WordPress, palette predefinita di Gutenberg, default di
+// Elementor e Bootstrap. Esempio reale: resetposturale.it risultava viola
+// (#7a00df = --wp-block-synced-color) e blu (#007cba = --wp-admin-theme-color)
+// mentre il sito e giallo #feca57 e corallo #ff6b6b.
+const FRAMEWORK_COLORS = new Set([
+  // WordPress editor/admin
+  "#7a00df", "#007cba", "#006ba1", "#005a87", "#3858e9", "#2271b1", "#135e96", "#32373c", "#1e1e1e", "#757575", "#cc1818", "#4ab866", "#f0b849", "#d94f4f",
+  // Palette e gradienti predefiniti di Gutenberg
+  "#abb8c3", "#f78da7", "#cf2e2e", "#ff6900", "#fcb900", "#7bdcb5", "#00d084", "#8ed1fc", "#0693e3", "#9b51e0",
+  "#7adcb4", "#00d082", "#ffcb70", "#c751c0", "#4158d0", "#caf880", "#71ce7e", "#020381", "#2874fc", "#4aeadc", "#9778d1", "#cf2aba", "#ee2c82", "#fb6962", "#fef84c",
+  "#ffceec", "#9896f0", "#fecda5", "#fe2d2d", "#6b003e", "#fff5cb", "#b6e3d4", "#33a7b5", "#a9b8c3", "#34e2e4", "#4721fb", "#ab1dfe", "#faaca8", "#fad0c4",
+  // Elementor (colori globali di default, se il sito non li ha cambiati)
+  "#6ec1e4", "#54595f", "#7a7a7a", "#61ce70",
+  // Bootstrap 4/5 (variabili --bs-* e componenti di default)
+  "#007bff", "#6c757d", "#28a745", "#dc3545", "#ffc107", "#17a2b8", "#343a40", "#f8f9fa", "#0d6efd", "#6610f2", "#6f42c1", "#d63384", "#fd7e14", "#198754", "#20c997", "#0dcaf0", "#adb5bd", "#495057", "#212529", "#e9ecef", "#dee2e6", "#ced4da",
+]);
+
+function normHex(raw: string): string | null {
+  let h = raw.trim().toLowerCase().replace(/^#/, "");
+  if (/^[0-9a-f]{3}$/.test(h)) h = h.split("").map((c) => c + c).join("");
+  if (/^[0-9a-f]{8}$/.test(h)) h = h.slice(0, 6); // ignora l'alpha
+  return /^[0-9a-f]{6}$/.test(h) ? "#" + h : null;
+}
+
+function hexInfo(hex: string): { lum: number; sat: number } {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const sat = max === min ? 0 : (l > 0.5 ? (max - min) / (2 - max - min) : (max - min) / (max + min));
+  return { lum: 0.2126 * r + 0.7152 * g + 0.0722 * b, sat };
+}
+
+/** Toglie dal codice i blocchi di stile e le variabili di WordPress/Bootstrap che non sono del brand. */
+function stripFrameworkCss(css: string): string {
+  return css
+    .replace(/<style[^>]*id=["'](?:wp-block-library|global-styles|wp-emoji-styles|classic-theme-styles|core-block-supports|wp-img-auto-sizes-contain|wp-block-[a-z-]+)[^"']*["'][^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/--(?:wp|bs)[-a-z0-9]*\s*:\s*[^;}]+/gi, " ");
+}
+
+/** Fogli di stile del tema (stesso dominio, niente core WordPress o plugin), max 3. */
+async function fetchThemeCss(html: string, baseUrl: string): Promise<string> {
+  const hrefs: string[] = [];
+  for (const m of html.matchAll(/<link[^>]+rel=["']stylesheet["'][^>]*>/gi)) {
+    const href = m[0].match(/href=["']([^"']+)["']/i)?.[1];
+    if (!href) continue;
+    let abs: URL;
+    try { abs = new URL(href, baseUrl); } catch { continue; }
+    if (abs.hostname !== new URL(baseUrl).hostname) continue;
+    const path = abs.pathname;
+    const isTheme = /\/wp-content\/themes\//.test(path) || /\/uploads\/elementor\/css\//.test(path) || !/\/wp-(?:includes|admin|content\/plugins)\//.test(path);
+    if (isTheme && !hrefs.includes(abs.href)) hrefs.push(abs.href);
+    if (hrefs.length >= 3) break;
+  }
+  const parts = await Promise.all(hrefs.map(async (u) => {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 5000);
+      const r = await fetch(u, { signal: ctrl.signal, headers: { "User-Agent": "Mozilla/5.0" } });
+      clearTimeout(t);
+      if (!r.ok) return "";
+      return (await r.text()).slice(0, 400_000);
+    } catch { return ""; }
+  }));
+  return parts.join("\n");
+}
+
+type BrandColor = { hex: string; count: number; source: "dichiarato" | "frequenza" };
+
+async function extractBrandColors(html: string, baseUrl: string): Promise<BrandColor[]> {
+  const external = await fetchThemeCss(html, baseUrl);
+  const pageCss = stripFrameworkCss(html);
+  const themeCss = stripFrameworkCss(external);
+
+  // Colori dichiarati come colori del brand (meta theme-color, colori globali
+  // di Elementor, variabili --primary/--brand...): piccolo bonus, non priorita
+  // assoluta, perche spesso sono i default del tema e il sito non li usa.
+  const declared = new Set<string>();
+  const themeColor = html.match(/<meta[^>]+name=["']theme-color["'][^>]*content=["']([^"']+)["']/i)?.[1];
+  if (themeColor) { const h = normHex(themeColor); if (h) declared.add(h); }
+  const declPatterns = [
+    /--e-global-color-[a-z0-9]+\s*:\s*(#[0-9a-fA-F]{3,8})/gi,
+    /--(?:color-)?(?:primary|secondary|accent|brand|main)(?:-color)?\s*:\s*(#[0-9a-fA-F]{3,8})/gi,
+  ];
+  for (const re of declPatterns) for (const m of (pageCss + "\n" + themeCss).matchAll(re)) { const h = normHex(m[1]); if (h) declared.add(h); }
+
+  // Frequenza: i colori scritti nella pagina (cio che il visitatore vede)
+  // pesano 3, quelli dei fogli di stile del tema pesano 1.
+  const score = new Map<string, number>();
+  const uses = new Map<string, number>();
+  const count = (text: string, weight: number) => {
+    const add = (h: string | null) => {
+      if (!h) return;
+      score.set(h, (score.get(h) || 0) + weight);
+      uses.set(h, (uses.get(h) || 0) + 1);
+    };
+    for (const m of text.matchAll(/#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/g)) add(normHex(m[1]));
+    for (const m of text.matchAll(/rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})/gi)) {
+      add("#" + [m[1], m[2], m[3]].map((n) => Math.min(255, parseInt(n)).toString(16).padStart(2, "0")).join(""));
+    }
+  };
+  count(pageCss, 3);
+  count(themeCss, 1);
+  for (const h of declared) if (!score.has(h)) { score.set(h, 0); uses.set(h, 0); }
+
+  const usable = (h: string) => {
+    if (FRAMEWORK_COLORS.has(h)) return false;
+    const { lum } = hexInfo(h);
+    return lum < 0.93 && lum > 0.02; // via bianchi e neri quasi puri
+  };
+
+  return [...score.entries()]
+    .filter(([h]) => usable(h))
+    // i grigi raramente sono il colore del brand: a parita di uso vincono i saturi
+    .map(([h, sc]) => ({ hex: h, rank: sc + (declared.has(h) ? 4 : 0) + hexInfo(h).sat * 3 }))
+    .sort((x, y) => y.rank - x.rank)
+    .slice(0, 12)
+    .map(({ hex }) => ({ hex, count: uses.get(hex) || 0, source: declared.has(hex) ? "dichiarato" as const : "frequenza" as const }));
+}
+
 function extractJsonLd(html: string): any[] {
   const results: any[] = [];
   const matches = html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
@@ -302,27 +424,21 @@ serve(async (req) => {
     const emailMatch = html.match(/(?:mailto:|href="mailto:)([^"'\s]+@[^"'\s]+)/i);
     const addressMatch = html.match(/(?:Via|Viale|Corso|Piazza|Largo|Strada)[^<,]{5,80}/i);
 
-    // Extract CSS colors from inline styles and style tags
-    const cssColors: string[] = [];
-    const colorMatches = html.matchAll(/(?:color|background-color|background|border-color)\s*:\s*(#[0-9a-fA-F]{3,8})/gi);
-    for (const m of colorMatches) {
-      const c = m[1].toLowerCase();
-      if (c !== "#fff" && c !== "#ffffff" && c !== "#000" && c !== "#000000" && c !== "#333" && c !== "#ccc" && c !== "#eee" && c !== "#ddd" && !cssColors.includes(c)) {
-        cssColors.push(c);
-      }
+    // Colori del brand: ripuliti dai colori interni di WordPress/Elementor/
+    // Bootstrap e ordinati per frequenza (prima venivano presi i primi 10 in
+    // ordine di apparizione, cioe quelli dell'editor di WordPress).
+    let brandColors: BrandColor[] = [];
+    try {
+      brandColors = await extractBrandColors(html, parsedUrl.href);
+    } catch (err) {
+      console.warn("estrazione colori fallita, continuo senza:", err);
     }
-    // Also check for rgb colors
-    const rgbMatches = html.matchAll(/(?:color|background-color|background)\s*:\s*rgb\((\d+),\s*(\d+),\s*(\d+)\)/gi);
-    for (const m of rgbMatches) {
-      const hex = "#" + [m[1], m[2], m[3]].map(n => parseInt(n).toString(16).padStart(2, "0")).join("");
-      if (!cssColors.includes(hex) && hex !== "#ffffff" && hex !== "#000000") {
-        cssColors.push(hex);
-      }
-    }
+    const cssColors = brandColors.map((c) => c.hex);
 
     const result = {
       success: true,
       cssColors: cssColors.slice(0, 10),
+      cssColorCounts: brandColors.slice(0, 10),
       title: ogTitle || title,
       description: ogDescription || description,
       headings,
