@@ -18,10 +18,17 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  // Evidenzia la casella dei termini se si preme "Crea account" senza spuntarla:
+  // prima il pulsante restava sbiadito e non succedeva nulla, senza spiegazioni.
+  const [termsMissing, setTermsMissing] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
+  // Email per cui e stato chiesto il recupero: Supabase risponde "ok" anche se
+  // l'account non esiste (per non rivelare chi e iscritto), quindi diciamo
+  // all'utente cosa fare se l'email non arriva.
+  const [forgotSentTo, setForgotSentTo] = useState<string | null>(null);
   const [forgotLoading, setForgotLoading] = useState(false);
   // post-signup state
   const [emailSent, setEmailSent] = useState(false);
@@ -54,7 +61,9 @@ const Auth = () => {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!agreedToTerms) {
-      toast({ title: "Termini e Condizioni", description: "Devi accettare i termini e condizioni per registrarti", variant: "destructive" });
+      setTermsMissing(true);
+      document.getElementById('terms-box')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      toast({ title: "Manca un passaggio", description: "Spunta la casella dei termini per creare l'account.", variant: "destructive" });
       return;
     }
     setLoading(true);
@@ -396,11 +405,25 @@ const Auth = () => {
                     </div>
 
                     <div
-                      className="p-4 rounded-xl space-y-2"
-                      style={{ backgroundColor: 'var(--viola-dim)', border: '1px solid var(--line)' }}
+                      id="terms-box"
+                      className="p-4 rounded-xl space-y-2 cursor-pointer"
+                      style={{
+                        backgroundColor: termsMissing ? 'rgba(220,38,38,0.06)' : 'var(--viola-dim)',
+                        border: termsMissing ? '2px solid #dc2626' : '1px solid var(--line)',
+                      }}
                     >
+                      {termsMissing && (
+                        <p className="text-[12px] font-bold" style={{ color: '#dc2626' }}>
+                          ☝️ Spunta qui per continuare
+                        </p>
+                      )}
                       <div className="flex items-start space-x-2">
-                        <Checkbox id="terms" checked={agreedToTerms} onCheckedChange={(c) => setAgreedToTerms(c as boolean)} />
+                        <Checkbox
+                          id="terms"
+                          className="h-5 w-5 mt-0.5 shrink-0"
+                          checked={agreedToTerms}
+                          onCheckedChange={(c) => { setAgreedToTerms(c as boolean); if (c) setTermsMissing(false); }}
+                        />
                         <label htmlFor="terms" className="text-[11px] leading-relaxed cursor-pointer" style={{ color: 'var(--ink3)' }}>
                           Accetto i <a href="/terms" className="underline font-semibold" style={{ color: 'var(--viola)' }}>Termini di Servizio</a>, la{' '}
                           <a href="/privacy" className="underline font-semibold" style={{ color: 'var(--viola)' }}>Privacy Policy</a> e autorizzo
@@ -412,7 +435,7 @@ const Auth = () => {
 
                     <button
                       type="submit"
-                      disabled={loading || !agreedToTerms}
+                      disabled={loading}
                       className="w-full text-white text-[12px] font-black uppercase py-3.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
                       style={{ backgroundColor: 'var(--rosa)', letterSpacing: '0.6px' }}
                     >
@@ -447,7 +470,7 @@ const Auth = () => {
         </div>
 
         {/* ── Forgot password dialog ── */}
-        <Dialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
+        <Dialog open={showForgotPassword} onOpenChange={(o) => { setShowForgotPassword(o); if (!o) setForgotSentTo(null); }}>
           <DialogContent style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)' }}>
             <DialogHeader>
               <DialogTitle style={{ color: 'var(--ink)', fontWeight: 800 }}>Reimposta Password</DialogTitle>
@@ -455,6 +478,43 @@ const Auth = () => {
                 Inserisci la tua email e ti invieremo un link per reimpostare la password.
               </DialogDescription>
             </DialogHeader>
+            {forgotSentTo ? (
+              <div className="space-y-3 mt-2">
+                <div className="p-3 rounded-xl" style={{ backgroundColor: 'var(--viola-dim)', border: '1px solid var(--line)' }}>
+                  <p className="text-[12px] font-semibold" style={{ color: 'var(--ink)' }}>
+                    Se <strong>{forgotSentTo}</strong> ha un account, il link arriva entro un paio di minuti.
+                  </p>
+                  <p className="text-[11px] mt-1.5" style={{ color: 'var(--ink3)' }}>
+                    Controlla anche Spam e Promozioni. Il mittente è "Fisioaccordo Social Manager AI".
+                  </p>
+                </div>
+                <p className="text-[12px] font-semibold" style={{ color: 'var(--ink)' }}>
+                  Non arriva nulla? Probabilmente con questa email non ti sei ancora registrato.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData({ ...formData, email: forgotSentTo });
+                    setActiveTab('signup');
+                    setShowForgotPassword(false);
+                    setForgotSentTo(null);
+                    setForgotEmail('');
+                  }}
+                  className="w-full text-white text-[12px] font-black uppercase py-3 rounded-xl"
+                  style={{ backgroundColor: 'var(--rosa)' }}
+                >
+                  Registrati con questa email
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForgotSentTo(null)}
+                  className="w-full text-[11px] font-semibold underline"
+                  style={{ color: 'var(--ink3)', background: 'transparent', border: 'none' }}
+                >
+                  Ho sbagliato email, riprova
+                </button>
+              </div>
+            ) : (
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
@@ -466,9 +526,7 @@ const Auth = () => {
                   if (error) {
                     toast({ title: "Email non inviata", description: isServerError(error) ? SERVER_BUSY_MESSAGE : error.message, variant: "destructive" });
                   } else {
-                    toast({ title: "Email inviata!", description: "Controlla la tua casella di posta per il link di recupero" });
-                    setShowForgotPassword(false);
-                    setForgotEmail('');
+                    setForgotSentTo(forgotEmail.trim());
                   }
                 } catch {
                   toast({ title: "Email non inviata", description: SERVER_BUSY_MESSAGE, variant: "destructive" });
@@ -504,6 +562,7 @@ const Auth = () => {
                 {forgotLoading ? <><Loader2 className="h-4 w-4 animate-spin" />Invio in corso...</> : 'Invia Link di Recupero'}
               </button>
             </form>
+            )}
           </DialogContent>
         </Dialog>
       </div>

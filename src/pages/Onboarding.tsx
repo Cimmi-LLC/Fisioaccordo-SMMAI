@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { cleanWebsiteUrl } from '@/utils/url';
+import { siteGroundedColors } from '@/lib/siteColors';
+import AccountStrip from '@/components/AccountStrip';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -91,6 +94,16 @@ const TagInput: React.FC<{
   );
 };
 
+/** Il tono proposto dall'analisi ("empatico e motivazionale"...) ricondotto alle 4 opzioni del menu. */
+function normalizeTono(raw: unknown): string {
+  const t = String(raw || '').toLowerCase();
+  if (TONO_OPTIONS.some(o => o.value === t)) return t;
+  if (t.includes('empat') || t.includes('caldo') || t.includes('accogl')) return 'empatico';
+  if (t.includes('inform') || t.includes('amichev') || t.includes('colloq')) return 'informale';
+  if (t.includes('tecnic') || t.includes('scientif')) return 'tecnico';
+  return 'professionale';
+}
+
 /* ── Main Onboarding Component ── */
 const Onboarding = () => {
   const navigate = useNavigate();
@@ -119,6 +132,31 @@ const Onboarding = () => {
       .then(({ count }) => { if (count && count > 0) navigate('/'); });
   }, [user, navigate, isNewBrandMode]);
 
+  // Bozza dell'onboarding: il profilo analizzato (un minuto di attesa) viveva
+  // solo in memoria. Con Indietro, ricarica o scheda chiusa si perdeva tutto e
+  // bisognava rifare l'analisi. Ora resta salvato sul dispositivo per 7 giorni.
+  const draftKey = user ? `fisioaccordo:onboarding_draft:${user.id}${isNewBrandMode ? ':new' : ''}` : null;
+  const clearDraft = () => { try { if (draftKey) localStorage.removeItem(draftKey); } catch { /* ignore */ } };
+  const [draftChecked, setDraftChecked] = useState(false);
+  useEffect(() => {
+    if (!draftKey || draftChecked) return;
+    setDraftChecked(true);
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (!raw) return;
+      const d = JSON.parse(raw) as { brand: BrandProfile; url: string; savedAt: number };
+      if (!d?.brand || Date.now() - (d.savedAt || 0) > 7 * 86400000) { localStorage.removeItem(draftKey); return; }
+      setBrand({ ...EMPTY_BRAND, ...d.brand });
+      setUrl(d.url || '');
+      setStep(2);
+      toast({ title: 'Ho ripreso il profilo che avevi analizzato', description: 'Controllalo e premi "Tutto corretto, iniziamo!".' });
+    } catch { /* bozza illeggibile: si riparte da zero */ }
+  }, [draftKey, draftChecked, toast]);
+  useEffect(() => {
+    if (!draftKey || step !== 2) return;
+    try { localStorage.setItem(draftKey, JSON.stringify({ brand, url, savedAt: Date.now() })); } catch { /* quota piena: pazienza */ }
+  }, [draftKey, step, brand, url]);
+
   // Loading messages rotation
   useEffect(() => {
     if (step !== 1) return;
@@ -130,7 +168,8 @@ const Onboarding = () => {
 
   // Step 1: Scrape + Analyze
   const handleAnalyze = async () => {
-    const trimmedUrl = url.trim();
+    // Link pulito: niente ?utm_source=ig&fbclid=... copiati dalla bio di Instagram.
+    const trimmedUrl = cleanWebsiteUrl(url.trim());
     if (!trimmedUrl) return;
 
     // Basic URL validation
@@ -214,15 +253,14 @@ const Onboarding = () => {
         categorie: profile.categorie || [],
         servizi: profile.servizi || [],
         target_pazienti: profile.target_pazienti || '',
-        tono_voce: profile.tono_voce || 'professionale',
+        tono_voce: normalizeTono(profile.tono_voce),
         vantaggi_competitivi: profile.vantaggi_competitivi || [],
         mission: profile.mission || '',
         temi_chiave: profile.temi_chiave || [],
         cta_suggerite: profile.cta_suggerite || [],
         persona_scrittura: profile.persona_scrittura || 'noi',
-        colore_primario: profile.colore_primario || '#554697',
-        colore_secondario: profile.colore_secondario || '#E6007E',
-        colore_terziario: profile.colore_terziario || '#1a1a2e',
+        // Solo colori realmente presenti sul sito (niente colori inventati o di WordPress).
+        ...siteGroundedColors(profile, (scrapeData.cssColors || []) as string[], { primario: '#554697', secondario: '#E6007E', terziario: '#1a1a2e' }),
         logo_url: processedLogo,
         website_url: trimmedUrl.startsWith('http') ? trimmedUrl : 'https://' + trimmedUrl,
         raw_analysis: profile,
@@ -294,6 +332,7 @@ const Onboarding = () => {
           ? 'Il nuovo brand è ora attivo. Puoi generare contenuti per questo cliente.'
           : 'Il tuo brand è pronto. Iniziamo a creare contenuti!',
       });
+      clearDraft();
       // Dopo il salvataggio del brand si entra nel Template Genesis:
       // senza template approvato la generazione caroselli e bloccata.
       navigate(inserted?.id ? `/onboarding/template?brand=${inserted.id}` : (isNewBrandMode ? '/brands' : '/posts'));
@@ -338,6 +377,7 @@ const Onboarding = () => {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--bg)' }}>
+      <AccountStrip />
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '40px 20px' }}>
         {/* Logo */}
         <div className="text-center mb-10">
@@ -482,7 +522,7 @@ const Onboarding = () => {
                   Abbiamo analizzato il tuo sito e trovato queste informazioni. Puoi modificare qualsiasi campo.
                 </p>
                 <button
-                  onClick={() => { setBrand(EMPTY_BRAND); setStep(0); }}
+                  onClick={() => { clearDraft(); setBrand(EMPTY_BRAND); setStep(0); }}
                   className="text-[11px] font-bold flex-shrink-0"
                   style={{ color: 'var(--viola)', background: 'transparent', border: '1px solid var(--viola)', borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}
                 >
@@ -695,7 +735,7 @@ const Onboarding = () => {
             {/* Actions */}
             <div className="flex gap-3 mt-6">
               <button
-                onClick={() => setStep(0)}
+                onClick={() => { clearDraft(); setStep(0); }}
                 className="flex-shrink-0 text-[12px] font-semibold py-3 px-5 rounded-xl"
                 style={{ border: '1px solid var(--line)', color: 'var(--ink3)', background: 'transparent', cursor: 'pointer' }}
               >
