@@ -31,7 +31,10 @@ export class MetaService {
   static initiateAuth(): void {
     const scopes = [
       'instagram_business_basic',
-      'instagram_business_content_publish'
+      'instagram_business_content_publish',
+      // Statistiche dei post (copertura, visualizzazioni, salvataggi) per
+      // sync-instagram-metrics: senza, dalla sync arrivano solo i follower.
+      'instagram_business_manage_insights'
     ].join(',');
 
     const authUrl = `https://www.instagram.com/oauth/authorize?client_id=${this.META_APP_ID}&redirect_uri=${encodeURIComponent(this.REDIRECT_URI)}&scope=${scopes}&response_type=code&state=meta_auth&enable_fb_login=0`;
