@@ -214,7 +214,39 @@ export function useGenesis(brandId: string | null) {
     }
   }, [toast]);
 
+  /**
+   * Ripresa: se per questo brand esistono gia dei candidati (generazione in
+   * corso, interrotta o in attesa di approvazione), ricarica genoma, versione
+   * e palette dal database. Prima lo stato viveva solo in memoria: chi usciva
+   * durante la generazione (tasto Indietro) rientrava dal caricamento del logo.
+   * Ritorna true se il wizard puo saltare alla scelta delle varianti.
+   */
+  const resume = useCallback(async (): Promise<boolean> => {
+    if (!brandId) return false;
+    const { data: brand } = await (supabase as any)
+      .from('brands')
+      .select('genesis_status, genome')
+      .eq('id', brandId)
+      .maybeSingle();
+    const status = brand?.genesis_status as string | undefined;
+    if (!status || !['generating', 'awaiting_approval', 'failed'].includes(status)) return false;
+    const { data: last } = await (supabase as any)
+      .from('template_candidates')
+      .select('genome_version')
+      .eq('brand_id', brandId)
+      .order('genome_version', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!last?.genome_version || !brand?.genome) return false;
+    const { palette: savedPalette, ...savedGenome } = brand.genome as TemplateGenome & { palette?: PaletteResult };
+    setGenome(savedGenome as TemplateGenome);
+    setGenomeVersion(last.genome_version as number);
+    if (savedPalette) setPalette({ ...savedPalette, candidates: savedPalette.candidates || [] });
+    return true;
+  }, [brandId]);
+
   return {
+    resume,
     busy,
     progress,
     palette, setPalette,
