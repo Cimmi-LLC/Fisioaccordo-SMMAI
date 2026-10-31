@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { cleanWebsiteUrl } from '@/utils/url';
 import { siteGroundedColors } from '@/lib/siteColors';
+import { checkBrandGate, type BrandGate } from '@/lib/brandGate';
 import AccountStrip from '@/components/AccountStrip';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -125,12 +126,25 @@ const Onboarding = () => {
     if (!authLoading && !user) navigate('/auth');
   }, [user, authLoading, navigate]);
 
-  // First-onboarding redirect: skip if we're explicitly adding a new brand
+  // First-onboarding redirect: skip if we're explicitly adding a new brand.
+  // The form shows only once the server has said "zero brands": before, a
+  // user already registered saw the site field for a few seconds and then
+  // got sent away mid-typing.
+  const [gate, setGate] = useState<'checking' | BrandGate>(isNewBrandMode ? 'none' : 'checking');
+  const [gateAttempt, setGateAttempt] = useState(0);
   useEffect(() => {
     if (!user || isNewBrandMode) return;
-    supabase.from('brands').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
-      .then(({ count }) => { if (count && count > 0) navigate('/'); });
-  }, [user, navigate, isNewBrandMode]);
+    let cancelled = false;
+    setGate('checking');
+    checkBrandGate((signal) =>
+      supabase.from('brands').select('id', { count: 'exact', head: true }).eq('user_id', user.id).abortSignal(signal),
+    ).then((g) => {
+      if (cancelled) return;
+      if (g === 'has') navigate('/');
+      else setGate(g);
+    });
+    return () => { cancelled = true; };
+  }, [user, navigate, isNewBrandMode, gateAttempt]);
 
   // Bozza dell'onboarding: il profilo analizzato (un minuto di attesa) viveva
   // solo in memoria. Con Indietro, ricarica o scheda chiusa si perdeva tutto e
@@ -367,7 +381,27 @@ const Onboarding = () => {
     setNuovaCategoria('');
   };
 
-  if (authLoading) {
+  if (gate === 'error') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={{ backgroundColor: 'var(--bg)' }}>
+        <div className="max-w-sm text-center space-y-4">
+          <p className="text-lg font-bold" style={{ color: 'var(--ink)' }}>Il server non risponde</p>
+          <p className="text-sm" style={{ color: 'var(--ink)', opacity: 0.75 }}>
+            I tuoi dati sono al sicuro: il problema è solo di collegamento. Riprova tra qualche secondo.
+          </p>
+          <button
+            onClick={() => setGateAttempt((n) => n + 1)}
+            className="px-5 py-2 rounded-lg font-semibold text-white"
+            style={{ background: 'var(--rosa)' }}
+          >
+            Riprova
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (authLoading || gate === 'checking') {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--bg)' }}>
         <Loader2 className="h-8 w-8 animate-spin" style={{ color: 'var(--viola)' }} />
