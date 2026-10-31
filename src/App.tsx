@@ -39,6 +39,7 @@ const BrandsListPage = lazy(() => import("./pages/BrandsListPage"));
 const CalendarPage = lazy(() => import("./pages/CalendarPage"));
 const HistoryPage = lazy(() => import("./pages/HistoryPage"));
 const ArchivePage = lazy(() => import("./pages/ArchivePage"));
+const CorsoPage = lazy(() => import("./pages/CorsoPage"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const TemplateGenesisWizard = lazy(() => import("./features/onboarding/TemplateGenesisWizard"));
 
@@ -106,6 +107,8 @@ const App = () => (
                       <Route path="/calendario" element={<CalendarPage />} />
                       <Route path="/storico" element={<HistoryPage />} />
                       <Route path="/archivio" element={<ArchivePage />} />
+                      <Route path="/corso" element={<CorsoPage />} />
+                      <Route path="/corso/:lessonId" element={<CorsoPage />} />
                       <Route path="/brands" element={<BrandsListPage />} />
                       <Route path="/admin" element={<AdminPage />} />
                       <Route path="/admin/performance" element={<PerformanceDashboard />} />
