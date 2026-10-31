@@ -52,16 +52,43 @@ function captionExcerpt(s: string | undefined | null): string | null {
   return s.replace(/\s+/g, " ").trim().slice(0, 240);
 }
 
-/** Get the latest brand for a given user (1 user → typically 1 brand). */
-async function findBrandForUser(supabase: ReturnType<typeof adminClient>, userId: string): Promise<string | null> {
+function cleanUsername(username: string | null | undefined): string {
+  return (username || "")
+    .replace(/^@/, "")
+    .replace(/^https?:\/\/(www\.)?instagram\.com\//, "")
+    .replace(/\/$/, "")
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Brand of the connected account. A user can own several brands (the team
+ * account manages FisioAccordo, Farina, Cerromed…): pick the one whose
+ * instagram_username matches the connection, else the latest brand.
+ */
+async function findBrandForUser(
+  supabase: ReturnType<typeof adminClient>,
+  userId: string,
+  igUsername: string | null,
+): Promise<string | null> {
   const { data } = await supabase
     .from("brands")
-    .select("id")
+    .select("id, instagram_username")
     .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return (data as any)?.id ?? null;
+    .order("created_at", { ascending: false });
+  const brands = (data || []) as any[];
+  const wanted = cleanUsername(igUsername);
+  const match = wanted ? brands.find((b) => cleanUsername(b.instagram_username) === wanted) : null;
+  return (match ?? brands[0])?.id ?? null;
+}
+
+/**
+ * Same post id Apify writes (the shortcode in the permalink), so a post
+ * synced by both sources is one post in the dashboard, not two.
+ */
+function postIdFromPermalink(permalink: string | undefined, fallback: string): string {
+  const m = (permalink || "").match(/\/(?:p|reel|tv)\/([^/?#]+)/);
+  return m?.[1] ?? fallback;
 }
 
 /**
@@ -131,7 +158,7 @@ async function syncOneConnection(
     }
     const token = await refreshTokenIfNeeded(supabase, conn.id, decoded.page_access_token, decoded.token_expires_at);
     const igId = decoded.instagram_business_id as string;
-    const brandId = await findBrandForUser(supabase, conn.user_id);
+    const brandId = await findBrandForUser(supabase, conn.user_id, conn.instagram_username);
     const today = todayIso();
 
     // 2) Account-level snapshot (follower_count is point-in-time).
@@ -147,16 +174,19 @@ async function syncOneConnection(
       console.warn(`[${conn.id}] account fields failed:`, (e as Error).message);
     }
 
-    // Previous day's followers_total → compute new_followers.
-    const { data: yesterdayRows } = await supabase
+    // Previous day's followers_total → compute new_followers. Per brand:
+    // the same user can have other brands followed by Apify.
+    const prevQuery = supabase
       .from("post_metrics")
       .select("followers_total, snapshot_date")
-      .eq("user_id", conn.user_id)
       .eq("channel", "instagram")
       .eq("is_account_level", true)
       .lt("snapshot_date", today)
       .order("snapshot_date", { ascending: false })
       .limit(1);
+    const { data: yesterdayRows } = brandId
+      ? await prevQuery.eq("brand_id", brandId)
+      : await prevQuery.eq("user_id", conn.user_id);
     const prevFollowers = ((yesterdayRows || [])[0] as any)?.followers_total ?? followers;
     const newFollowers = followers - prevFollowers;
 
@@ -206,7 +236,7 @@ async function syncOneConnection(
             user_id: conn.user_id,
             brand_id: brandId,
             channel: "instagram",
-            external_post_id: m.id,
+            external_post_id: postIdFromPermalink(m.permalink, m.id),
             snapshot_date: today,
             caption_excerpt: captionExcerpt(m.caption),
             reach: flat.reach ?? null,
