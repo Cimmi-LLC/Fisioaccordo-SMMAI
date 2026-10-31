@@ -59,20 +59,22 @@ const InstagramCallback: React.FC = () => {
         return;
       }
 
-      // DIRECT NAV (no popup): do the exchange in-place (legacy fallback)
+      // DIRECT NAV (no popup): do the exchange in-place, on the brand the
+      // user clicked "Collega Instagram" for, then back to that page.
       console.log('[InstagramCallback] no opener, in-place exchange');
-      const result = await MetaService.exchangeCodeForToken(code);
+      const pending = MetaService.takePendingConnect();
+      const result = await MetaService.exchangeCodeForToken(code, pending.brandId);
+      const back = pending.returnTo?.startsWith('/') && !pending.returnTo.startsWith('//') && !pending.returnTo.startsWith('/auth/') ? pending.returnTo : '/settings';
       if (result.success) {
         toast({ title: '🎉 Instagram Collegato!' });
-        navigate('/settings');
       } else {
         toast({
           title: '❌ Errore Collegamento',
           description: result.error || 'Errore sconosciuto',
           variant: 'destructive',
         });
-        navigate('/settings');
       }
+      navigate(back);
     };
 
     handleCallback();

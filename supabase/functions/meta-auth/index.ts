@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
     // Use verified user ID from JWT — never trust client-supplied user_id
     const verified_user_id = user.id
 
-    const { code, redirect_uri } = await req.json()
+    const { code, redirect_uri, brand_id } = await req.json()
 
     if (!code || !redirect_uri) {
       return new Response(
@@ -190,6 +190,29 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // Ogni brand ha il suo Instagram. Il brand arriva dal client (pulsante
+    // "Collega Instagram" del brand); senza, si usa il brand attivo
+    // dell'utente, poi il primo creato. Mai un brand di un altro utente.
+    let brandId: string | null = null
+    if (brand_id) {
+      const { data: owned } = await supabase
+        .from('brands').select('id').eq('id', brand_id).eq('user_id', verified_user_id).maybeSingle()
+      if (!owned) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Brand non trovato' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      brandId = owned.id
+    } else {
+      const { data: settings } = await supabase
+        .from('user_settings').select('active_brand_id').eq('user_id', verified_user_id).maybeSingle()
+      const { data: userBrands } = await supabase
+        .from('brands').select('id').eq('user_id', verified_user_id).order('created_at', { ascending: true })
+      const ids = (userBrands || []).map((b: { id: string }) => b.id)
+      brandId = ids.includes(settings?.active_brand_id) ? settings!.active_brand_id : (ids[0] ?? null)
+    }
+
     const { error: rpcError } = await supabase.rpc('upsert_meta_connection', {
       p_user_id: verified_user_id,
       p_page_access_token: finalToken,
@@ -199,6 +222,7 @@ Deno.serve(async (req) => {
       p_facebook_user_id: null,
       p_page_id: null,
       p_page_name: null,
+      p_brand_id: brandId,
     })
 
     if (rpcError) {
@@ -210,12 +234,20 @@ Deno.serve(async (req) => {
       )
     }
 
+    // Il brand senza username Instagram prende quello collegato: serve ad
+    // Apify per continuare coi numeri se un giorno il token scade.
+    if (brandId && igUsername) {
+      await supabase.from('brands').update({ instagram_username: igUsername })
+        .eq('id', brandId).is('instagram_username', null)
+    }
+
     console.log(`Connessione salvata con successo: @${igUsername}, token type: ${tokenType}, igId: ${igBusinessId}`)
 
     return new Response(
       JSON.stringify({
         success: true,
         instagram_username: igUsername,
+        brand_id: brandId,
         account_type: accountType,
         token_type: tokenType,
         needs_username: !igUsername

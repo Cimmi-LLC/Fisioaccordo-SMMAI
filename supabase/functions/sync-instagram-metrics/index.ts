@@ -133,7 +133,7 @@ interface SyncOutcome {
 
 async function syncOneConnection(
   supabase: ReturnType<typeof adminClient>,
-  conn: { id: string; user_id: string; instagram_business_id: string | null; instagram_username: string | null },
+  conn: { id: string; user_id: string; brand_id: string | null; instagram_business_id: string | null; instagram_username: string | null },
 ): Promise<SyncOutcome> {
   const outcome: SyncOutcome = {
     connectionId: conn.id,
@@ -158,7 +158,8 @@ async function syncOneConnection(
     }
     const token = await refreshTokenIfNeeded(supabase, conn.id, decoded.page_access_token, decoded.token_expires_at);
     const igId = decoded.instagram_business_id as string;
-    const brandId = await findBrandForUser(supabase, conn.user_id, conn.instagram_username);
+    // Connessioni nuove: il brand è sulla connessione. Vecchie: per username.
+    const brandId = conn.brand_id ?? await findBrandForUser(supabase, conn.user_id, conn.instagram_username);
     const today = todayIso();
 
     // 2) Account-level snapshot (follower_count is point-in-time).
@@ -277,7 +278,7 @@ Deno.serve(async (req) => {
 
     const { data: conns, error: connsErr } = await supabase
       .from("meta_connections")
-      .select("id, user_id, instagram_business_id, instagram_username")
+      .select("id, user_id, brand_id, instagram_business_id, instagram_username")
       .eq("is_active", true);
     if (connsErr) return jsonResponse(req, { error: connsErr.message }, 500);
 

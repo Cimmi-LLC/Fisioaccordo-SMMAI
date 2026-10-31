@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import PersonalAccountGuide from './PersonalAccountGuide';
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from '@/integrations/supabase/client';
+import { useActiveBrand } from '@/hooks/useActiveBrand';
 
 const MetaConnection: React.FC = () => {
   const [connections, setConnections] = useState<MetaConnectionData[]>([]);
@@ -20,6 +21,8 @@ const MetaConnection: React.FC = () => {
   const [savingUsername, setSavingUsername] = useState(false);
   const [agreedToConnect, setAgreedToConnect] = useState(false);
   const { toast } = useToast();
+  const { brands, activeBrandId } = useActiveBrand();
+  const brandName = (id: string | null) => brands.find(b => b.id === id)?.nome_business || null;
 
   const loadConnections = useCallback(async () => {
     setLoading(true);
@@ -55,7 +58,7 @@ const MetaConnection: React.FC = () => {
   const handleConnect = () => {
     setConnecting(true);
     try {
-      MetaService.initiateAuth();
+      MetaService.initiateAuth(activeBrandId);
     } catch (error) {
       toast({
         title: "Errore",
@@ -100,7 +103,12 @@ const MetaConnection: React.FC = () => {
     }
   };
 
-  const activeConnection = connections.find(c => c.is_active);
+  // Ogni brand ha il suo Instagram: qui quello del brand attivo (le
+  // connessioni senza brand sono quelle di prima, una per utente).
+  const activeConnection =
+    connections.find(c => c.brand_id === activeBrandId) ?? connections.find(c => !c.brand_id) ?? null;
+  const otherConnections = connections.filter(c => c.id !== activeConnection?.id);
+  const activeBrandName = brandName(activeBrandId);
 
   if (loading) {
     return (
@@ -121,6 +129,9 @@ const MetaConnection: React.FC = () => {
         >
           <Link2 className="h-4 w-4" style={{ color: 'var(--viola)' }} />
           Connessione Social
+          {activeBrandName && (
+            <span className="font-semibold" style={{ color: 'var(--ink3)' }}>· {activeBrandName}</span>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent style={{ padding: '22px 24px' }}>
@@ -256,6 +267,30 @@ const MetaConnection: React.FC = () => {
                 <li>Se hai un account personale, convertilo: <span className="font-medium" style={{ color: 'var(--ink2)' }}>Impostazioni → Account → Passa a un account professionale</span></li>
               </ol>
             </div>
+          </div>
+        )}
+
+        {otherConnections.length > 0 && (
+          <div className="mt-5 pt-4 space-y-2" style={{ borderTop: '1px solid var(--line)' }}>
+            <p className="text-[10px] font-black uppercase" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>
+              Altri profili collegati
+            </p>
+            {otherConnections.map(c => (
+              <div key={c.id} className="flex items-center gap-2 text-sm" style={{ color: 'var(--ink)' }}>
+                <Instagram className="h-4 w-4 shrink-0" style={{ color: 'var(--rosa)' }} />
+                <span className="font-medium truncate">@{c.instagram_username || 'profilo'}</span>
+                {brandName(c.brand_id) && (
+                  <span className="text-xs truncate" style={{ color: 'var(--ink3)' }}>· {brandName(c.brand_id)}</span>
+                )}
+                <button
+                  onClick={() => handleDisconnect(c.id)}
+                  className="ml-auto shrink-0 flex items-center gap-1 text-[10px] font-bold uppercase"
+                  style={{ color: 'var(--ink3)' }}
+                >
+                  <Unlink className="h-3 w-3" /> Scollega
+                </button>
+              </div>
+            ))}
           </div>
         )}
 

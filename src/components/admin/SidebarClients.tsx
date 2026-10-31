@@ -110,11 +110,12 @@ const SidebarClients: React.FC<SidebarClientsProps> = ({ selectedId, onSelect })
       if (userIds.length > 0) {
         const { data: conns } = await (supabase as any)
           .from('meta_connections')
-          .select('user_id, instagram_username')
+          .select('user_id, brand_id, instagram_username')
           .in('user_id', userIds)
           .eq('is_active', true);
+        // Per brand quando la connessione lo dice, altrimenti per utente (connessioni di prima).
         for (const c of (conns || []) as any[]) {
-          if (c.instagram_username) handleMap[c.user_id] = c.instagram_username;
+          if (c.instagram_username) handleMap[c.brand_id || c.user_id] = c.instagram_username;
         }
       }
       const brandList: ClientBrand[] = (rows || []).map((b: any) => ({
@@ -122,7 +123,7 @@ const SidebarClients: React.FC<SidebarClientsProps> = ({ selectedId, onSelect })
         id: b.id,
         user_id: b.user_id,
         nome_business: b.nome_business || '(senza nome)',
-        instagram_username: handleMap[b.user_id] || null,
+        instagram_username: handleMap[b.id] || handleMap[b.user_id] || null,
         color: pickColor(b.id),
       }));
 

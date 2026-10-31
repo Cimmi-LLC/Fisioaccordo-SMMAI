@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 export interface MetaConnectionData {
   id: string;
   user_id: string;
+  brand_id: string | null;
   facebook_user_id: string | null;
   page_id: string | null;
   page_name: string | null;
@@ -28,7 +29,21 @@ export class MetaService {
    */
   private static readonly USE_POPUP_AUTH = false;
 
-  static initiateAuth(): void {
+  /** Brand e pagina di ritorno del collegamento in corso (sopravvivono al redirect). */
+  private static readonly PENDING_KEY = 'fisioaccordo:ig_connect';
+
+  /**
+   * Collega un profilo Instagram al brand indicato (ogni brand ha il suo).
+   * Senza brand, il server usa il brand attivo dell'utente.
+   */
+  static initiateAuth(brandId?: string | null): void {
+    try {
+      sessionStorage.setItem(MetaService.PENDING_KEY, JSON.stringify({
+        brandId: brandId || null,
+        returnTo: window.location.pathname,
+      }));
+    } catch { /* storage bloccato: si torna alle impostazioni sul brand attivo */ }
+
     const scopes = [
       'instagram_business_basic',
       'instagram_business_content_publish',
@@ -37,7 +52,9 @@ export class MetaService {
       'instagram_business_manage_insights'
     ].join(',');
 
-    const authUrl = `https://www.instagram.com/oauth/authorize?client_id=${this.META_APP_ID}&redirect_uri=${encodeURIComponent(this.REDIRECT_URI)}&scope=${scopes}&response_type=code&state=meta_auth&enable_fb_login=0`;
+    // force_reauth: Instagram chiede sempre con quale profilo entrare, così
+    // si può collegare un profilo diverso per ogni brand.
+    const authUrl = `https://www.instagram.com/oauth/authorize?client_id=${this.META_APP_ID}&redirect_uri=${encodeURIComponent(this.REDIRECT_URI)}&scope=${scopes}&response_type=code&state=meta_auth&enable_fb_login=0&force_reauth=true`;
 
     // Redirect nella stessa scheda invece del popup: i browser mobile e i
     // blocchi popup rendevano il flusso inaffidabile. Al ritorno la pagina
@@ -69,7 +86,7 @@ export class MetaService {
       if (data.type === 'meta-auth-code' && data.code && !exchangeInProgress) {
         exchangeInProgress = true;
         console.log('[MetaService] received code from popup, exchanging...');
-        const result = await MetaService.exchangeCodeForToken(data.code);
+        const result = await MetaService.exchangeCodeForToken(data.code, MetaService.takePendingConnect().brandId);
         cleanup();
         if (result.success) {
           // soft success — reload to refresh connection state in UI
@@ -110,7 +127,22 @@ export class MetaService {
     setTimeout(() => { cleanup(); }, 300000);
   }
 
-  static async exchangeCodeForToken(code: string): Promise<{ success: boolean; error?: string }> {
+  /** Legge e cancella il collegamento in corso salvato da initiateAuth. */
+  static takePendingConnect(): { brandId: string | null; returnTo: string | null } {
+    try {
+      const raw = sessionStorage.getItem(MetaService.PENDING_KEY);
+      sessionStorage.removeItem(MetaService.PENDING_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return { brandId: parsed?.brandId ?? null, returnTo: parsed?.returnTo ?? null };
+    } catch {
+      return { brandId: null, returnTo: null };
+    }
+  }
+
+  static async exchangeCodeForToken(
+    code: string,
+    brandId?: string | null,
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error('Utente non autenticato');
@@ -119,7 +151,8 @@ export class MetaService {
       const response = await supabase.functions.invoke('meta-auth', {
         body: {
           code,
-          redirect_uri: this.REDIRECT_URI
+          redirect_uri: this.REDIRECT_URI,
+          brand_id: brandId || undefined,
           // user_id is determined server-side from JWT — not sent by client
         }
       });
