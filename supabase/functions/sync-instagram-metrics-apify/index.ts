@@ -254,7 +254,9 @@ Deno.serve(async (req) => {
       .not("instagram_username", "is", null);
     if (brandsErr) return jsonResponse(req, { error: brandsErr.message }, 500);
 
-    // 2) skip brands whose user already has an active Meta OAuth connection
+    // 2) skip brands whose user already has an active Meta OAuth connection.
+    //    A connection whose token has expired doesn't count: the Meta sync
+    //    can't use it, so Apify must keep that brand's numbers coming.
     const userIds = Array.from(new Set((brands || []).map((b: any) => b.user_id)));
     const { data: conns } = userIds.length > 0
       ? await supabase
@@ -262,6 +264,7 @@ Deno.serve(async (req) => {
           .select("user_id")
           .in("user_id", userIds)
           .eq("is_active", true)
+          .or(`token_expires_at.is.null,token_expires_at.gt.${new Date().toISOString()}`)
       : { data: [] as any[] };
     const skipUsers = new Set((conns || []).map((c: any) => c.user_id));
 

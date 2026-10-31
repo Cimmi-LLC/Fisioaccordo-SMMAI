@@ -24,9 +24,11 @@ import { adminClient } from "../_shared/auth.ts";
 import { requireCronSecret } from "../_shared/auth.ts";
 import { jsonResponse, handlePreflight } from "../_shared/cors.ts";
 
-const META_API = "https://graph.instagram.com/v20.0";
+const META_HOST = "https://graph.instagram.com";
+const META_API = `${META_HOST}/v20.0`;
 const LOOKBACK_DAYS = 14;       // media published in the last N days
 const ACCOUNT_PLACEHOLDER = "ig_account";
+const REFRESH_BEFORE_DAYS = 20; // rinnova il token quando ne mancano meno
 
 type BrandRow = { id: string; user_id: string; instagram_business_id?: string | null };
 
@@ -62,6 +64,37 @@ async function findBrandForUser(supabase: ReturnType<typeof adminClient>, userId
   return (data as any)?.id ?? null;
 }
 
+/**
+ * Il token Instagram dura 60 giorni e si rinnova solo finché è valido.
+ * Quando mancano meno di REFRESH_BEFORE_DAYS giorni lo rinnoviamo e lo
+ * salviamo cifrato; se il rinnovo fallisce si continua col token attuale.
+ */
+async function refreshTokenIfNeeded(
+  supabase: ReturnType<typeof adminClient>,
+  connectionId: string,
+  token: string,
+  expiresAt: string | null,
+): Promise<string> {
+  if (expiresAt && Date.parse(expiresAt) - Date.now() > REFRESH_BEFORE_DAYS * 86400_000) return token;
+  try {
+    const url = `${META_HOST}/refresh_access_token?grant_type=ig_refresh_token&access_token=${encodeURIComponent(token)}`;
+    const data = await fetchJson(url, "token refresh");
+    if (!data?.access_token) throw new Error("no access_token in refresh response");
+    const newExpiry = new Date(Date.now() + (Number(data.expires_in) || 60 * 86400) * 1000).toISOString();
+    const { error } = await supabase.rpc("update_meta_connection_token", {
+      p_connection_id: connectionId,
+      p_page_access_token: data.access_token,
+      p_token_expires_at: newExpiry,
+    });
+    if (error) throw new Error(`save refreshed token: ${error.message}`);
+    console.log(`[${connectionId}] token rinnovato, scade ${newExpiry}`);
+    return data.access_token as string;
+  } catch (e) {
+    console.warn(`[${connectionId}] token refresh failed:`, (e as Error).message);
+    return token;
+  }
+}
+
 interface SyncOutcome {
   connectionId: string;
   igId: string | null;
@@ -94,9 +127,9 @@ async function syncOneConnection(
     const decoded = Array.isArray(connRows) ? connRows[0] : null;
     if (!decoded?.page_access_token) throw new Error("no decoded token");
     if (decoded.token_expires_at && new Date(decoded.token_expires_at) < new Date()) {
-      throw new Error("token expired");
+      throw new Error("token expired: Instagram va ricollegato dall'app");
     }
-    const token = decoded.page_access_token as string;
+    const token = await refreshTokenIfNeeded(supabase, conn.id, decoded.page_access_token, decoded.token_expires_at);
     const igId = decoded.instagram_business_id as string;
     const brandId = await findBrandForUser(supabase, conn.user_id);
     const today = todayIso();
