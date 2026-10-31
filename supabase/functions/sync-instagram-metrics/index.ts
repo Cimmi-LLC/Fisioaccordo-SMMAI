@@ -187,9 +187,10 @@ async function syncOneConnection(
     for (const m of recentMedia) {
       try {
         const isVideo = m.media_type === "VIDEO" || m.media_type === "REELS";
-        const metricSet = isVideo
-          ? "plays,reach,saved,total_interactions,comments,likes,shares"
-          : "engagement,impressions,reach,saved";
+        // Instagram ha sostituito plays/impressions con `views` ed engagement
+        // con `total_interactions`: le metriche ritirate fanno fallire tutta
+        // la richiesta, quindi si chiedono solo quelle attuali.
+        const metricSet = "reach,views,saved,total_interactions,comments,likes,shares";
         const insUrl = `${META_API}/${m.id}/insights?metric=${metricSet}&access_token=${encodeURIComponent(token)}`;
         const ins = await fetchJson(insUrl, `media ${m.id}`);
         const flat: Record<string, number> = {};
@@ -197,9 +198,8 @@ async function syncOneConnection(
           const val = item?.values?.[0]?.value ?? 0;
           flat[item.name] = Number(val) || 0;
         }
-        const engagement = isVideo
-          ? (flat.total_interactions ?? (flat.likes + flat.comments + flat.saved + flat.shares))
-          : (flat.engagement ?? 0);
+        const engagement = flat.total_interactions
+          ?? ((flat.likes ?? 0) + (flat.comments ?? 0) + (flat.saved ?? 0) + (flat.shares ?? 0));
         await supabase
           .from("post_metrics")
           .upsert({
@@ -210,13 +210,13 @@ async function syncOneConnection(
             snapshot_date: today,
             caption_excerpt: captionExcerpt(m.caption),
             reach: flat.reach ?? null,
-            impressions: flat.impressions ?? null,
+            impressions: flat.views ?? null,
             engagement,
             likes: flat.likes ?? null,
             comments: flat.comments ?? null,
             saves: flat.saved ?? null,
             shares: flat.shares ?? null,
-            video_views: isVideo ? (flat.plays ?? null) : null,
+            video_views: isVideo ? (flat.views ?? null) : null,
             followers_total: followers, // denormalized for fast LAST-in-period
             is_account_level: false,
             synced_at: new Date().toISOString(),
