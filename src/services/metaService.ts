@@ -52,9 +52,11 @@ export class MetaService {
       'instagram_business_manage_insights'
     ].join(',');
 
-    // force_reauth: Instagram chiede sempre con quale profilo entrare, così
-    // si può collegare un profilo diverso per ogni brand.
-    const authUrl = `https://www.instagram.com/oauth/authorize?client_id=${this.META_APP_ID}&redirect_uri=${encodeURIComponent(this.REDIRECT_URI)}&scope=${scopes}&response_type=code&state=meta_auth&enable_fb_login=0&force_reauth=true`;
+    // Si collega il profilo aperto in quel momento su instagram.com. Niente
+    // force_reauth: rifare il login fa scattare i controlli di sicurezza di
+    // Instagram (reCAPTCHA) e dopo il login Instagram resta sulla sua home
+    // invece di tornare all'app.
+    const authUrl = `https://www.instagram.com/oauth/authorize?client_id=${this.META_APP_ID}&redirect_uri=${encodeURIComponent(this.REDIRECT_URI)}&scope=${scopes}&response_type=code&state=meta_auth&enable_fb_login=0`;
 
     // Redirect nella stessa scheda invece del popup: i browser mobile e i
     // blocchi popup rendevano il flusso inaffidabile. Al ritorno la pagina

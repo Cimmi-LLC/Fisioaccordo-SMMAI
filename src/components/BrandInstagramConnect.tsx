@@ -125,7 +125,7 @@ const BrandInstagramConnect: React.FC<Props> = ({ brandId, brandName, connection
             </button>
 
             <p className="text-xs" style={{ color: 'var(--ink3)' }}>
-              Instagram ti chiede con quale profilo entrare: scegli quello di {brandName}. Serve un account Business o Creator, con profilo pubblico.
+              Si collega il profilo aperto adesso su instagram.com: se è un altro, prima passa a quello di {brandName} su Instagram (foto profilo → Cambia account). Serve un account Business o Creator, con profilo pubblico.
             </p>
           </div>
         </DialogContent>
