@@ -4,7 +4,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { normalizeWebsiteUrl, cleanWebsiteUrl } from '@/utils/url';
 import { analyzeWebsite, type SiteAnalysis } from '@/services/siteAnalysis';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { markAnalyzed, type BrandSite } from '@/services/brandSites';
+import { snapshotFromDatabase } from '@/services/brandVersions';
+import { pickSnapshot, diffSnapshot, type BrandSnapshot } from '@/lib/brandSnapshot';
+import BrandSitesCard from '@/components/brand/BrandSitesCard';
+import SiteAnalysisDialog from '@/components/brand/SiteAnalysisDialog';
+import BrandVersionsCard from '@/components/brand/BrandVersionsCard';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -112,50 +117,75 @@ const BrandPage = () => {
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [activeTab, setActiveTab] = useState<'brand' | 'gallery' | 'preferences'>('brand');
-  // "Rianalizza il sito": rilegge il sito e propone i nuovi dati, che finiscono
-  // nel modulo e si salvano solo con "Salva modifiche".
-  const [reanalyzing, setReanalyzing] = useState(false);
+  // Ultimo stato salvato (o caricato): serve ad "Annulla modifiche".
+  const [savedBrand, setSavedBrand] = useState<BrandProfile | null>(null);
+  // Rianalisi di un sito collegato: risultato, sito, e stato del modulo prima
+  // di applicarla (per "Annulla" subito dopo).
+  const [analyzingSiteId, setAnalyzingSiteId] = useState<string | null>(null);
   const [siteResult, setSiteResult] = useState<SiteAnalysis | null>(null);
+  const [analyzedSite, setAnalyzedSite] = useState<BrandSite | null>(null);
+  const [preApply, setPreApply] = useState<{ brand: BrandProfile; label: string } | null>(null);
+  // Motivo da scrivere nello storico al prossimo salvataggio.
+  const [pendingReason, setPendingReason] = useState<string>('');
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const runReanalysis = async () => {
-    setReanalyzing(true);
+  const analyzeSite = async (site: BrandSite) => {
+    setAnalyzingSiteId(site.id);
     try {
-      const res = await analyzeWebsite(brand.website_url || '');
+      const res = await analyzeWebsite(site.url);
+      setAnalyzedSite(site);
       setSiteResult(res);
+      await markAnalyzed(site.id, res.siteColors);
+      setRefreshKey((k) => k + 1);
     } catch (e: any) {
       toast({ title: 'Analisi non riuscita', description: e?.message || String(e), variant: 'destructive' });
     } finally {
-      setReanalyzing(false);
+      setAnalyzingSiteId(null);
     }
   };
 
-  const applySiteResult = (mode: 'colors' | 'all') => {
-    if (!siteResult) return;
-    const p = siteResult.profile;
-    const pick = (v: unknown, fallback: string) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : fallback);
-    setBrand(prev => {
-      const next: BrandProfile = {
-        ...prev,
-        website_url: siteResult.url,
-        colore_primario: pick(p.colore_primario, prev.colore_primario),
-        colore_secondario: pick(p.colore_secondario, prev.colore_secondario),
-        colore_terziario: pick(p.colore_terziario, prev.colore_terziario),
-      };
-      if (mode === 'all') {
-        if (p.descrizione) next.descrizione = p.descrizione;
-        if (Array.isArray(p.servizi) && p.servizi.length) next.servizi = p.servizi;
-        if (p.target_pazienti) next.target_pazienti = p.target_pazienti;
-        if (Array.isArray(p.vantaggi_competitivi) && p.vantaggi_competitivi.length) next.vantaggi_competitivi = p.vantaggi_competitivi;
-        if (p.mission) next.mission = p.mission;
-        if (Array.isArray(p.temi_chiave) && p.temi_chiave.length) next.temi_chiave = p.temi_chiave;
-        if (Array.isArray(p.cta_suggerite) && p.cta_suggerite.length) next.cta_suggerite = p.cta_suggerite;
-        if (Array.isArray(p.categorie) && p.categorie.length) next.categorie = p.categorie;
-      }
-      return next;
-    });
+  const applyAnalysis = (patch: Partial<BrandProfile>, labels: string[]) => {
+    const label = `dati di ${analyzedSite?.label || analyzedSite?.url?.replace(/^https?:\/\//, '') || 'sito'} (${labels.join(', ')})`;
+    setPreApply({ brand, label });
+    setBrand((prev) => ({ ...prev, ...patch }));
     setHasChanges(true);
+    setPendingReason(`Prima di applicare i ${label}`);
     setSiteResult(null);
-    toast({ title: 'Dati aggiornati nel modulo', description: 'Controllali e premi "Salva modifiche" in fondo alla pagina.' });
+    toast({ title: 'Dati portati nel modulo', description: 'Controllali e premi "Salva modifiche". Puoi ancora annullare.' });
+  };
+
+  const undoApply = () => {
+    if (!preApply) return;
+    setBrand(preApply.brand);
+    setPreApply(null);
+    setPendingReason('');
+    const stillChanged = savedBrand ? diffSnapshot(pickSnapshot(preApply.brand as any), pickSnapshot(savedBrand as any)).length > 0 : false;
+    setHasChanges(stillChanged);
+    toast({ title: 'Annullato', description: 'Il modulo è tornato com\'era prima.' });
+  };
+
+  const discardChanges = () => {
+    if (!savedBrand) return;
+    if (!window.confirm('Annullare tutte le modifiche non salvate? Il Brand Kit torna all\'ultimo salvataggio.')) return;
+    setBrand(savedBrand);
+    setPreApply(null);
+    setPendingReason('');
+    setHasChanges(false);
+  };
+
+  const restoreVersion = (snap: BrandSnapshot, when: string) => {
+    setPreApply({ brand, label: `versione del ${when}` });
+    setBrand((prev) => ({ ...prev, ...(snap as Partial<BrandProfile>) }));
+    setHasChanges(true);
+    setPendingReason(`Prima di ripristinare la versione del ${when}`);
+    toast({ title: `Versione del ${when} caricata`, description: 'Premi "Salva modifiche" per confermarla, oppure annulla.' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  /** Il sito principale e cambiato dalla scheda Siti (gia salvato nel database). */
+  const handlePrimaryChange = (url: string | null) => {
+    setBrand((prev) => ({ ...prev, website_url: url || '' }));
+    setSavedBrand((prev) => (prev ? { ...prev, website_url: url || '' } : prev));
   };
 
   useEffect(() => {
@@ -175,10 +205,9 @@ const BrandPage = () => {
       const { data } = await query.order('created_at', { ascending: true }).limit(1).maybeSingle();
 
       if (data) {
-        setBrand(prev => ({
-          ...prev,
-          ...Object.fromEntries(Object.entries(data).filter(([_, v]) => v != null)),
-        }));
+        const loaded = { ...EMPTY_BRAND, ...Object.fromEntries(Object.entries(data).filter(([_, v]) => v != null)) } as BrandProfile;
+        setBrand(loaded);
+        setSavedBrand(loaded);
       }
       setLoading(false);
     })();
@@ -193,20 +222,39 @@ const BrandPage = () => {
     if (!user || !brand.id) return;
     setSaving(true);
     try {
+      // 1. La versione attuale del database va nello storico, prima di sovrascriverla.
+      try {
+        await snapshotFromDatabase(brand.id, user.id, pendingReason || 'Prima del salvataggio');
+      } catch (e) {
+        console.warn('versione non salvata nello storico:', e);
+      }
+      // 2. Salvataggio.
       const { raw_analysis, id, user_id, ...saveData } = brand;
-      // Update by brand id (not user_id) to avoid touching other brands of the same user
-      const { error } = await supabase.from('brands').update({
+      const payload = {
         ...saveData,
         website_url: cleanWebsiteUrl(brand.website_url) || null,
         professione: isProfessionId(brand.professione) ? brand.professione : null,
         professione_custom: brand.professione === 'altro' ? (brand.professione_custom || '') : '',
         updated_at: new Date().toISOString(),
-      } as any).eq('id', brand.id);
+      };
+      // Update by brand id (not user_id) to avoid touching other brands of the same user
+      const { error } = await supabase.from('brands').update(payload as any).eq('id', brand.id);
       if (error) throw error;
+      // 3. Verifica: rileggo dal database e confronto i campi del Brand Kit.
+      const { data: check, error: readErr } = await (supabase as any).from('brands').select('*').eq('id', brand.id).single();
+      if (readErr || !check) throw new Error(readErr?.message || 'Non riesco a rileggere il brand');
+      const diff = diffSnapshot(pickSnapshot(check as any), pickSnapshot(payload as any));
+      if (diff.length > 0) throw new Error('Alcuni campi non risultano salvati: ' + diff.join(', '));
+      const fresh = { ...EMPTY_BRAND, ...Object.fromEntries(Object.entries(check).filter(([_, v]) => v != null)) } as BrandProfile;
+      setBrand(fresh);
+      setSavedBrand(fresh);
       setHasChanges(false);
-      toast({ title: 'Salvato!', description: 'Profilo brand aggiornato.' });
+      setPreApply(null);
+      setPendingReason('');
+      setRefreshKey((k) => k + 1);
+      toast({ title: 'Salvato e verificato', description: 'La versione precedente è nello storico in fondo alla pagina.' });
     } catch (err: any) {
-      toast({ title: 'Errore', description: err.message, variant: 'destructive' });
+      toast({ title: 'Errore nel salvataggio', description: err.message, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -271,6 +319,19 @@ const BrandPage = () => {
       {/* ══════════════════════════════════════════ */}
       {activeTab === 'brand' && (
         <div className="space-y-8">
+          {preApply && (
+            <div className="rounded-xl p-3 flex flex-col sm:flex-row sm:items-center gap-2" data-testid="undo-banner"
+              style={{ backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.4)' }}>
+              <p className="text-[12px] flex-1" style={{ color: 'var(--ink)' }}>
+                Hai portato nel modulo i {preApply.label}. Non è ancora salvato.
+              </p>
+              <button type="button" onClick={undoApply}
+                className="text-[11px] font-bold px-3 py-1.5 rounded-lg flex-shrink-0"
+                style={{ backgroundColor: 'transparent', color: '#b45309', border: '1px solid #b45309', cursor: 'pointer' }}>
+                ← Torna a com'era
+              </button>
+            </div>
+          )}
           {/* Title */}
           <div>
             <h1 className="text-2xl font-black mb-1" style={{ color: 'var(--ink)', letterSpacing: '-0.5px' }}>
@@ -305,32 +366,16 @@ const BrandPage = () => {
                   }}
                 />
 
-                <EditableField label="Sito Web">
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-3.5 w-3.5 flex-shrink-0" style={{ color: 'var(--viola)' }} />
-                    <Input
-                      value={brand.website_url || ''}
-                      onChange={e => update('website_url', e.target.value)}
-                      onBlur={e => { const c = cleanWebsiteUrl(e.target.value); if (c !== (brand.website_url || '')) update('website_url', c); }}
-                      placeholder="https://www.tuostudio.it"
-                      className="text-sm"
-                      style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 9 }}
-                    />
-                    {brand.website_url && (
-                      <a href={normalizeWebsiteUrl(brand.website_url)} target="_blank" rel="noopener noreferrer" className="text-[11px] font-semibold flex-shrink-0" style={{ color: 'var(--viola)' }}>Apri</a>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={runReanalysis}
-                    disabled={reanalyzing || !brand.website_url}
-                    className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-lg disabled:opacity-50"
-                    style={{ backgroundColor: 'var(--viola-dim)', color: 'var(--viola)', border: 'none', cursor: 'pointer' }}
-                  >
-                    {reanalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                    {reanalyzing ? 'Leggo il sito… (fino a un minuto)' : 'Rianalizza il sito'}
-                  </button>
-                </EditableField>
+                {brand.id && user && (
+                  <BrandSitesCard
+                    brandId={brand.id}
+                    userId={user.id}
+                    onPrimaryChange={handlePrimaryChange}
+                    onAnalyze={analyzeSite}
+                    analyzingId={analyzingSiteId}
+                    refreshKey={refreshKey}
+                  />
+                )}
 
                 <EditableField label="Descrizione">
                   <Textarea value={brand.descrizione} onChange={e => update('descrizione', e.target.value)} rows={3} className="text-sm" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 9 }} />
@@ -510,6 +555,9 @@ const BrandPage = () => {
               <TagInput tags={brand.vantaggi_competitivi} onChange={v => update('vantaggi_competitivi', v)} placeholder="Aggiungi vantaggio" />
             </EditableField>
           </div>
+          {brand.id && (
+            <BrandVersionsCard brandId={brand.id} current={brand as any} onRestore={restoreVersion} refreshKey={refreshKey} />
+          )}
         </div>
       )}
 
@@ -670,71 +718,29 @@ const BrandPage = () => {
         </div>
       )}
 
-      {/* Risultato di "Rianalizza il sito" */}
-      <Dialog open={!!siteResult} onOpenChange={(o) => { if (!o) setSiteResult(null); }}>
-        <DialogContent style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)' }}>
-          <DialogHeader>
-            <DialogTitle style={{ color: 'var(--ink)', fontWeight: 800 }}>Cosa ho trovato sul sito</DialogTitle>
-            <DialogDescription style={{ color: 'var(--ink3)' }}>
-              Scegli cosa aggiornare. Niente viene salvato finché non premi "Salva modifiche".
-            </DialogDescription>
-          </DialogHeader>
-          {siteResult && (
-            <div className="space-y-4">
-              <div>
-                <div className="text-[10px] font-black uppercase mb-2" style={{ color: 'var(--ink2)', letterSpacing: '0.6px' }}>Colori proposti</div>
-                <div className="flex gap-3">
-                  {(['colore_primario', 'colore_secondario', 'colore_terziario'] as const).map((k) => {
-                    const v = siteResult.profile[k];
-                    const ok = typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
-                    return (
-                      <div key={k} className="flex flex-col items-center gap-1">
-                        <span style={{ width: 40, height: 40, borderRadius: '50%', backgroundColor: ok ? v : 'transparent', border: ok ? '2px solid var(--line)' : '2px dashed var(--line)', display: 'block' }} />
-                        <span className="text-[10px] font-mono" style={{ color: 'var(--ink3)' }}>{ok ? v : 'non trovato'}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                {siteResult.siteColors.length > 0 ? (
-                  <p className="text-[11px] mt-2" style={{ color: 'var(--ink3)' }}>
-                    Colori più usati sul sito: {siteResult.siteColors.slice(0, 6).join(', ')}
-                  </p>
-                ) : (
-                  <p className="text-[11px] mt-2" style={{ color: 'var(--ink3)' }}>
-                    Il sito non permette di leggerne la grafica: i colori attuali restano. Puoi sceglierli a mano in "Colori del Brand" qui sotto.
-                  </p>
-                )}
-              </div>
-              {siteResult.profile.descrizione && (
-                <div>
-                  <div className="text-[10px] font-black uppercase mb-1" style={{ color: 'var(--ink2)', letterSpacing: '0.6px' }}>Descrizione</div>
-                  <p className="text-[12px]" style={{ color: 'var(--ink2)' }}>{String(siteResult.profile.descrizione).slice(0, 280)}</p>
-                </div>
-              )}
-              <div className="flex flex-col gap-2">
-                <button type="button" onClick={() => applySiteResult('colors')}
-                  className="w-full text-[12px] font-black uppercase py-3 rounded-xl"
-                  style={{ backgroundColor: 'var(--viola-dim)', color: 'var(--viola)', border: 'none', cursor: 'pointer' }}>
-                  Aggiorna solo i colori
-                </button>
-                <button type="button" onClick={() => applySiteResult('all')}
-                  className="w-full text-white text-[12px] font-black uppercase py-3 rounded-xl"
-                  style={{ backgroundColor: 'var(--rosa)', border: 'none', cursor: 'pointer' }}>
-                  Aggiorna colori, testi e servizi
-                </button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Risultato della rianalisi di un sito: confronto campo per campo */}
+      <SiteAnalysisDialog
+        result={siteResult}
+        current={brand}
+        onCancel={() => { setSiteResult(null); setAnalyzedSite(null); }}
+        onApply={applyAnalysis}
+      />
 
       {/* Floating save button */}
       {hasChanges && (
-        <div className="sticky bottom-4 mt-6 z-10">
+        <div className="sticky bottom-4 mt-6 z-10 flex gap-2">
+          <button
+            onClick={discardChanges}
+            disabled={saving}
+            className="flex-shrink-0 flex items-center justify-center gap-1.5 text-[12px] font-bold uppercase py-3.5 px-4 rounded-xl disabled:opacity-50"
+            style={{ backgroundColor: 'var(--surface)', color: 'var(--ink2)', border: '1px solid var(--line)', cursor: 'pointer', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
+          >
+            <X className="h-4 w-4" /> Annulla modifiche
+          </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="w-full flex items-center justify-center gap-2 text-[13px] font-black uppercase py-3.5 rounded-xl text-white disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 text-[13px] font-black uppercase py-3.5 rounded-xl text-white disabled:opacity-50"
             style={{ backgroundColor: 'var(--rosa)', border: 'none', cursor: 'pointer', letterSpacing: '0.5px', boxShadow: '0 4px 20px rgba(230,0,126,0.3)' }}
           >
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
