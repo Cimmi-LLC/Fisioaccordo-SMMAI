@@ -22,6 +22,7 @@ import { POST_TEMPLATES, POST_TEMPLATE_NONE, POST_TEMPLATE_RANDOM } from '@/data
 import PostTemplateOverlay from '@/components/carousel/PostTemplateOverlay';
 import SinglePhotoUpload from '@/components/brand/SinglePhotoUpload';
 import BrandPhotoGallery from '@/components/brand/BrandPhotoGallery';
+import PilotaScoperteCard from '@/components/brand/PilotaScoperteCard';
 
 /* ── Editable Field wrapper ── */
 const EditableField: React.FC<{ label: string; children: React.ReactNode; onEdit?: () => void }> = ({ label, children, onEdit }) => (
@@ -690,31 +691,21 @@ const BrandPage = () => {
             ))}
           </div>
 
-          {/* Pubblicazione automatica */}
-          <div className="rounded-2xl p-6" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)' }}>
-            <h2 className="text-lg font-black mb-2" style={{ color: 'var(--ink)' }}>Pubblicazione</h2>
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-[14px] font-bold" style={{ color: 'var(--ink)' }}>Pubblicazione automatica</div>
-                <div className="text-[12px]" style={{ color: 'var(--ink3)' }}>Connetti almeno un account social per abilitare.</div>
-              </div>
-              <button
-                onClick={() => update('pubblicazione_automatica', !brand.pubblicazione_automatica)}
-                style={{
-                  width: 44, height: 24, borderRadius: 12, padding: 2,
-                  backgroundColor: brand.pubblicazione_automatica ? 'var(--viola)' : 'var(--line)',
-                  border: 'none', cursor: 'pointer', transition: 'background-color 0.2s',
-                  display: 'flex', alignItems: 'center',
-                }}
-              >
-                <span style={{
-                  width: 20, height: 20, borderRadius: '50%', backgroundColor: '#fff',
-                  transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
-                  transform: brand.pubblicazione_automatica ? 'translateX(20px)' : 'translateX(0)',
-                }} />
-              </button>
-            </div>
-          </div>
+          {/* Pubblicazione automatica: scoperte scientifiche */}
+          {brand.id && (
+            <PilotaScoperteCard
+              brandId={brand.id}
+              pubblicazioneAutomatica={!!brand.pubblicazione_automatica}
+              autoOrari={brand.auto_orari}
+              autoTemi={brand.auto_temi}
+              temiChiave={brand.temi_chiave}
+              servizi={brand.servizi}
+              onSaved={(campi) => {
+                setBrand(prev => ({ ...prev, ...campi }));
+                setSavedBrand(prev => (prev ? { ...prev, ...campi } : prev));
+              }}
+            />
+          )}
         </div>
       )}
 

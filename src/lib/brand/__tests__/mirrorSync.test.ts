@@ -7,7 +7,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 const ROOT = resolve(__dirname, '../../../..');
-const MIRRORED = ['archetypes.ts', 'genome.ts', 'genesisPrompt.ts', 'artDirector.ts', 'profession.ts'];
+const MIRRORED = ['archetypes.ts', 'genome.ts', 'genesisPrompt.ts', 'artDirector.ts', 'profession.ts', 'scoperte.ts'];
 
 describe('sincronizzazione mirror Vite <-> Deno', () => {
   it.each(MIRRORED)('%s e byte-identico tra src e _shared', (file) => {
