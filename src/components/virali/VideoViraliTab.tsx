@@ -119,7 +119,7 @@ const VideoViraliTab: React.FC<{ soloHandle?: string[] | null }> = ({ soloHandle
           opzioni={[{ id: 'brand', label: `La mia (${etichettaProfessione(professioneBrand)})` }, { id: 'tutte', label: 'Tutte' }, ...OPZIONI_PROFESSIONE]} />
         <Filtro etichetta="Pubblicati" valore={String(filtri.giorni ?? 0)} onChange={(v) => set('giorni', Number(v) || null)} larghezza="w-40"
           opzioni={[{ id: '30', label: 'Ultimo mese' }, { id: '90', label: 'Ultimi 3 mesi' }, { id: '180', label: 'Ultimi 6 mesi' }, { id: '0', label: 'Sempre' }]} />
-        <Filtro etichetta="Ordina per" valore={filtri.ordine} onChange={(v) => set('ordine', v as FiltriVideo['ordine'])} larghezza="w-52"
+        <Filtro etichetta="Ordina per" valore={filtri.ordine} onChange={(v) => set('ordine', v as FiltriVideo['ordine'])} larghezza="w-64"
           opzioni={[{ id: 'outlier', label: 'Più sopra la media (outlier)' }, { id: 'views', label: 'Più visualizzazioni' }, { id: 'salvati', label: 'Più salvati (TikTok)' }]} />
         <label className="flex items-center gap-2 text-xs font-semibold pb-2" style={{ color: 'var(--ink3)' }}>
           <Switch checked={filtri.nascondiSponsorizzate} onCheckedChange={(c) => set('nascondiSponsorizzate', c)} />

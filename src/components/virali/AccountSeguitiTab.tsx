@@ -50,11 +50,11 @@ const RigaAccount: React.FC<{
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-3 py-2 border-b last:border-0 text-sm" style={{ color: 'var(--ink)' }}>
-      <a href={urlProfilo(a.piattaforma, a.handle)} target="_blank" rel="noopener noreferrer" className="font-bold flex items-center gap-1 min-w-[180px]">
-        @{a.handle} <ExternalLink className="h-3 w-3" style={{ color: 'var(--ink3)' }} />
+    <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 py-2 border-b last:border-0 text-sm" style={{ color: 'var(--ink)' }}>
+      <a href={urlProfilo(a.piattaforma, a.handle)} target="_blank" rel="noopener noreferrer" className="font-bold flex items-center gap-1 w-[220px] shrink-0 truncate">
+        @{a.handle} <ExternalLink className="h-3 w-3 shrink-0" style={{ color: 'var(--ink3)' }} />
       </a>
-      <span className="text-xs" style={{ color: 'var(--ink3)' }}>
+      <span className="text-xs min-w-0 flex-1 sm:truncate" style={{ color: 'var(--ink3)' }} title={a.vende || undefined}>
         {etichettaPiattaforma(a.piattaforma)} · {etichettaPaese(a.paese)} · {etichettaProfessione(a.professione)}
         {a.follower ? ` · ${numeroBreve(a.follower)} follower` : ''}
         {a.media_views ? ` · media ${numeroBreve(a.media_views)} visualizzazioni` : ''}
@@ -62,10 +62,10 @@ const RigaAccount: React.FC<{
         {a.ultimo_giro ? ` · letto il ${dataBreve(a.ultimo_giro)}` : ' · mai letto'}
       </span>
       {a.ultimo_errore && (
-        <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--rosa)' }}><AlertTriangle className="h-3 w-3" /> {a.ultimo_errore}</span>
+        <span className="flex items-center gap-1 text-xs shrink-0" style={{ color: 'var(--rosa)' }}><AlertTriangle className="h-3 w-3" /> {a.ultimo_errore}</span>
       )}
       {modificabile && (
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-2 shrink-0">
           <Switch checked={a.attivo} onCheckedChange={attiva} title="Seguito" />
           <Button size="sm" variant="ghost" onClick={aggiorna} disabled={lavoro} title="Leggi adesso">
             {lavoro ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}

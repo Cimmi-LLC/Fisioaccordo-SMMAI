@@ -114,7 +114,7 @@ const InserzioniTab: React.FC = () => {
           opzioni={[{ id: 'brand', label: `La mia (${etichettaProfessione(professioneBrand)})` }, { id: 'tutte', label: 'Tutte' }, ...OPZIONI_PROFESSIONE]} />
         <Filtro etichetta="Accese da almeno" valore={String(filtri.giorniMinimi)} onChange={(v) => set('giorniMinimi', Number(v))} larghezza="w-36"
           opzioni={[{ id: '0', label: 'Tutte' }, { id: '30', label: '30 giorni' }, { id: '60', label: '60 giorni' }, { id: '90', label: '90 giorni' }]} />
-        <Filtro etichetta="Ordina per" valore={filtri.ordine} onChange={(v) => set('ordine', v as FiltriInserzioni['ordine'])} larghezza="w-48"
+        <Filtro etichetta="Ordina per" valore={filtri.ordine} onChange={(v) => set('ordine', v as FiltriInserzioni['ordine'])} larghezza="w-56"
           opzioni={[{ id: 'giorni', label: 'Accese da più tempo' }, { id: 'varianti', label: 'Più varianti' }]} />
       </div>
       <p className="text-xs" style={{ color: 'var(--ink3)' }}>

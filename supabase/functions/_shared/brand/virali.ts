@@ -556,7 +556,7 @@ export function promptCopione(input: {
   const { analisi, tipo, brand, origine } = input;
   const parlato = analisi.trascrizione.map((r) => (r.it ? `${r.testo} [${r.it}]` : r.testo)).join('\n');
   const regolaCopia = tipo === 'esatta'
-    ? `COPIA ESATTA: cambi UN solo mattoncino, il topic, portandolo sulla professione e sui servizi del brand. Tieni uguali format, struttura frase per frase, tipo di hook parlato, hook visivo, layout, lunghezza (più o meno 10%) e tipo di CTA. mattoncini_cambiati = ["topic"].`
+    ? `COPIA ESATTA: cambi UN solo mattoncino, il topic, portandolo sulla professione e sui servizi del brand. Tieni uguali format, struttura frase per frase (a ogni frase dell'originale corrisponde una frase nuova con la stessa funzione: hook, contrasto, perché, passo 1, passo 2...), tipo di hook parlato, hook visivo, layout, lunghezza (più o meno 10%) e tipo di CTA. mattoncini_cambiati = ["topic"].`
     : `COPIA VICINA: cambi 2 o 3 mattoncini (topic, contrarian take, e hook oppure CTA) e tieni format, struttura, layout e lunghezza. Scrivi in mattoncini_cambiati quali hai cambiato.`;
   const lista = (v?: string[] | null) => (v && v.length ? v.join(', ') : '(non indicato)');
   return `VIDEO ORIGINALE (${origine.piattaforma}, @${origine.handle}, ${origine.paese === 'US' ? 'americano' : origine.paese === 'IT' ? 'italiano' : 'estero'}${origine.views ? `, ${origine.views} visualizzazioni` : ''})
@@ -587,7 +587,8 @@ REGOLE
 - ${regolaCopia}
 - Il target si richiama da subito: la prima frase detta e il testo in alto dicono chi è la persona o il suo problema (es. «Hai male alla spalla quando alzi il braccio?»), prima del concetto. Mai parole generiche che non dicono con chi parli.
 - Hook allineato: parlato, testo in alto e visivo dicono la stessa cosa nello stesso momento. Testo in alto al massimo 6 parole, grande, mai in basso.
-- Valore entro 5 secondi e almeno un consiglio pratico che si applica subito. Ogni frase deve valere: se non la pagheresti 100 dollari, toglila.
+- Valore entro 5 secondi e almeno un consiglio pratico che si applica subito, concreto come nell'originale: numeri, tempi, posizioni, ripetizioni (es. «dieci respiri lenti da sdraiato», non «fai esercizi di stabilità»). Ogni frase deve valere: se non la pagheresti 100 dollari, toglila.
+- Nel corpo del video solo valore: niente frasi che presentano lo studio o il professionista («noi ti guidiamo…», «nel nostro studio…»). Lo studio compare solo nella CTA.
 - Una sola CTA, nativa, estensione del video: meglio un lead magnet legato al video con una parola chiave da scrivere nei commenti. Mai «scrivimi in DM» automatico ai nuovi follower.
 - ${origine.paese === 'IT' ? 'Il video è italiano: non riusare le sue frasi, riscrivile con parole tue.' : 'Il video è straniero: non tradurre, adatta al pubblico italiano (modi di dire, sistema sanitario, esempi).'}
 - Niente nomi, marchi o prodotti del video originale. Niente diagnosi, niente promesse di guarigione. Mai la parola «sbloccare»: si dice aiutare, risolvere in meno tempo, più risultati.
@@ -608,7 +609,7 @@ JSON:
   "lead_magnet": "cosa riceve chi commenta, o vuoto",
   "testi_a_schermo": [{ "quando": "0-3 s", "testo": "..." }],
   "come_girarlo": ["inquadratura, luce, durata, cosa tenere in mano: come l'originale"],
-  "didascalia": "prima frase del video + segui per... + 5 hashtag",
+  "didascalia": "prima frase del video + segui per... + 5 hashtag, senza @ né nomi di profili",
   "durata_stimata_s": 45,
   "semplice": true,
   "cosa_serve": ["solo telefono e voce"]
