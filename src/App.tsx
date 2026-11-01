@@ -22,6 +22,7 @@ const StoriesGenerator = lazy(() => import("./pages/StoriesGenerator"));
 const TrendPage = lazy(() => import("./pages/TrendPage"));
 const CompetitorPage = lazy(() => import("./pages/CompetitorPage"));
 const ViralePage = lazy(() => import("./pages/ViralePage"));
+const ViraliPage = lazy(() => import("./pages/ViraliPage"));
 const ReelPage = lazy(() => import("./pages/ReelPage"));
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const PerformanceDashboard = lazy(() => import("./pages/admin/PerformanceDashboard"));
@@ -103,6 +104,7 @@ const App = () => (
                       <Route path="/trend" element={<TrendPage />} />
                       <Route path="/competitor" element={<CompetitorPage />} />
                       <Route path="/virale" element={<ViralePage />} />
+                      <Route path="/virali" element={<ViraliPage />} />
                       <Route path="/reel" element={<ReelPage />} />
                       <Route path="/calendario" element={<CalendarPage />} />
                       <Route path="/storico" element={<HistoryPage />} />
