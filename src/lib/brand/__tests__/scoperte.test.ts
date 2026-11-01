@@ -22,6 +22,14 @@ import {
   slotPiuLibero,
   problemiDelTesto,
   etichettaContenuto,
+  segmenti,
+  testoPiano,
+  leggiCopyEditoriale,
+  numeriFuoriFonte,
+  problemiEditoriale,
+  leggiGiudizio,
+  promptCaroselloEditoriale,
+  etichettaEditoriale,
   type CopyScoperta,
 } from '../scoperte';
 
@@ -251,5 +259,73 @@ describe('correzioni dopo la prova del 01/11 su Terapista Stellato', () => {
     expect(p).not.toContain('(noi, nel nostro studio)');
     expect(p).toContain('Non scrivere "nel nostro studio"');
     expect(p).toContain('UNA sola azione');
+  });
+});
+
+describe('carosello editoriale (template approvato il 01/11 sul laser)', () => {
+  const studio = {
+    titolo: 'Laser e mal di schiena', sintesi: ['148 persone, differenza di dolore di 0,4 punti.'],
+    fonte: 'Journal of physiotherapy', url: 'https://pubmed.ncbi.nlm.nih.gov/42864195/', data: '2026-10-01', tipo_fonte: 'study',
+    abstract: 'A total of 148 participants were randomised (74 per group). Pain intensity (0 to 10). MD -0.4 points. 6 weeks. 12 months. 3 months.',
+  };
+  const slides = [
+    { tipo: 'copertina', sopra: 'Mal di schiena · 148 persone · 12 mesi', titolo: 'Il laser [[spento]] ha funzionato uguale' },
+    { tipo: 'riconosci', titolo: 'Ti [[riconosci?]]', righe: ['Sdraiato sul lettino.', 'Esci e va meglio.', 'Poi il dolore torna.'], chiusa: 'Ti riguarda.' },
+    { tipo: 'confronto', titolo: 'Un laser vero. Un laser [[spento]].', testo: 'Esercizi per 6 settimane.', a: { numero: '74', etichetta: 'laser vero' }, b: { numero: '74', etichetta: 'laser spento' }, nota: 'Nessuno sapeva quale.' },
+    { tipo: 'numero', titolo: 'Differenza di [[dolore]]', numero: '0,4', unita: 'su 10', scala: 10, testo: 'Dopo 12 mesi: **ancora uguale**.' },
+    { tipo: 'punto', titolo: 'Il laser non ha [[aggiunto]] niente', testo: 'Stesso punto.', citazione: '' },
+    { tipo: 'passi', titolo: 'Provalo stasera: il [[bird dog]]', sottotitolo: 'Controllo motorio.', passi: ['A quattro zampe.', 'Tieni 5 secondi.', '8 volte per lato, fermati se fa male.'] },
+    { tipo: 'domanda', titolo: 'Se ti propongono il laser, [[chiedi:]]', domanda: '«Quali esercizi farò?»', nota: 'Nello studio: 6 settimane.' },
+    { tipo: 'cta', titolo: '[[Mandalo]] a chi sta pagando il laser', testo: 'Così chiede quali esercizi farà.' },
+  ];
+  const json = (over: Record<string, unknown> = {}) => JSON.stringify({ caption: 'Il laser spento. Fonte: Journal, 2026', hashtags: '#a', foto_copertina: 'laser', foto_passi: 'bird dog', slides, ...over });
+
+  it('legge le 8 slide e rifiuta quelle fuori posto', () => {
+    const c = leggiCopyEditoriale(json())!;
+    expect(c.slides).toHaveLength(8);
+    expect(c.titolo_carosello).toBe('Il laser spento ha funzionato uguale');
+    expect(leggiCopyEditoriale(json({ slides: [...slides].reverse() }))).toBeNull();
+    expect(leggiCopyEditoriale(json({ slides: slides.slice(0, 7) }))).toBeNull();
+    expect(leggiCopyEditoriale(json({ caption: '' }))).toBeNull();
+  });
+
+  it('fascia intera, accento e punteggiatura attaccata', () => {
+    expect(segmenti('Provalo: il [[bird dog]].')).toEqual([
+      { testo: 'Provalo:', stile: 'normale' }, { testo: 'il', stile: 'normale' },
+      { testo: 'bird dog', stile: 'fascia' }, { testo: '.', stile: 'normale', attacca: true },
+    ]);
+    expect(segmenti('torna. **E prenoti.**').map((x) => x.attacca ?? false)).toEqual([false, false, false]);
+    expect(segmenti('durato **6 settimane**.')[3]).toEqual({ testo: '.', stile: 'normale', attacca: true });
+    expect(testoPiano('Il [[laser]] **spento**')).toBe('Il laser spento');
+  });
+
+  it('ogni numero deve venire dallo studio, tranne i passi e gli anni', () => {
+    const c = leggiCopyEditoriale(json())!;
+    expect(numeriFuoriFonte(c, studio)).toEqual([]);
+    const inventato = leggiCopyEditoriale(json({ caption: 'Il 70% sta meglio. Fonte: 2026' }))!;
+    expect(numeriFuoriFonte(inventato, studio)).toEqual(['70']);
+    expect(problemiEditoriale(inventato, studio, {})).toContain('numeri che non sono nello studio: 70');
+    const sigla = leggiCopyEditoriale(json({ caption: 'SMD: 0.57' }))!;
+    expect(problemiEditoriale(sigla, studio, {})).toContain('sigle statistiche nel testo');
+    const vietata = leggiCopyEditoriale(json({ caption: 'Ti sblocchiamo la schiena' }))!;
+    expect(problemiEditoriale(vietata, studio, {})[0]).toMatch(/parole vietate/);
+  });
+
+  it('il giudice passa solo con tutti i voti almeno a 4', () => {
+    const voti = { aggancio: 5, riconoscibile: 4, pratico: 4, non_ovvio: 4, fedele: 5, italiano: 5 };
+    expect(leggiGiudizio(JSON.stringify({ voti, problemi: [] })).ok).toBe(true);
+    const basso = leggiGiudizio(JSON.stringify({ voti: { ...voti, pratico: 3 }, problemi: ['slide 6 vaga'] }));
+    expect(basso.ok).toBe(false);
+    expect(basso.problemi).toEqual(['slide 6 vaga']);
+    expect(leggiGiudizio('non json').ok).toBe(false);
+  });
+
+  it('prompt col metodo e etichette fisse', () => {
+    const p = promptCaroselloEditoriale({ nome_business: 'Terapista Stellato', descrizione: 'Piattaforma.' }, studio);
+    expect(p).toContain('RICONOSCERSI');
+    expect(p).toContain('MAI una categoria di persone');
+    expect(p).toContain('A total of 148 participants');
+    expect(etichettaEditoriale(0, 'Terapista Stellato')).toBe('NUOVO STUDIO');
+    expect(etichettaEditoriale(7, 'Terapista Stellato')).toBe('TERAPISTA STELLATO');
   });
 });

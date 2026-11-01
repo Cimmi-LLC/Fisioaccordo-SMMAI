@@ -22,6 +22,14 @@ export type Scoperta = {
   url: string;
   data: string | null;
   tipo_fonte: string;
+  /** Cosa crede la persona comune su questo tema (terreno comune). */
+  credenza?: string;
+  /** Cosa dice invece lo studio: la presa di posizione controcorrente. */
+  verita?: string;
+  /** Cosa può fare il paziente già oggi. */
+  azione?: string;
+  /** Abstract originale: serve a controllare che ogni numero del carosello venga dallo studio. */
+  abstract?: string;
 };
 
 export type SlideRuolo = 'cover' | 'content' | 'cta';
@@ -269,9 +277,11 @@ export function richiestaScelta(
         text:
           `Sei il divulgatore scientifico di uno studio sanitario che si occupa di: ${temi}.\n` +
           `Qui sotto ci sono studi recenti presi da PubMed. Scegline al massimo ${quante}, diversi fra loro, ` +
-          'utili ai pazienti di questo studio: che smentiscono una credenza comune o danno qualcosa di pratico da fare ' +
-          '(esercizio, movimento, postura, terapie manuali, abitudini, alimentazione). Scarta studi su farmaci, iniezioni, ' +
-          'chirurgia, macchinari da ospedale, studi su animali o con risultati poco chiari.\n' +
+          'utili ai pazienti di questo studio. Tieni SOLO gli studi da cui esce una presa di posizione controcorrente ' +
+          '(«la gente crede X, lo studio dice Y») che un paziente capisce in un minuto, meglio se smonta qualcosa che ' +
+          'si paga o si fa per abitudine (macchinari, riposo, posture, integratori, miti). Scarta gli studi che dicono ' +
+          'solo «è complicato», «servono altri studi», «è stato accettato bene», e quelli su farmaci, iniezioni, ' +
+          'chirurgia, macchinari da ospedale, animali o con risultati poco chiari.\n' +
           (esclusi.length > 0 ? `Non ripetere argomenti già usati:\n${esclusi.map((t) => `- ${t}`).join('\n')}\n` : '') +
           'Preferisci gli studi con numeri che un paziente capisce (quante persone, quanti studi, percentuali, minuti, ' +
           'settimane).\n' +
@@ -282,7 +292,9 @@ export function richiestaScelta(
             `[PMID ${s.pmid}] ${s.rivista} · ${s.data || 'data n.d.'} · ${s.tipi.join(', ')}\n${s.titolo}\n${s.abstract.slice(0, 1400)}`,
           ).join('\n\n') +
           '\n\nRispondi SOLO con JSON: {"items":[{"pmid":"numero","title":"titolo breve in italiano, comprensibile a tutti",' +
-          '"takeaways":["2-4 frasi brevi in italiano con i numeri veri, senza sigle statistiche"]}]}',
+          '"takeaways":["2-4 frasi brevi in italiano con i numeri veri, senza sigle statistiche"],' +
+          '"credenza":"cosa crede la persona comune, in una frase","verita":"cosa dice invece lo studio, in una frase",' +
+          '"azione":"una cosa concreta che il paziente può fare già oggi, coerente con lo studio"}]}',
       }],
     }],
     generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
@@ -351,6 +363,7 @@ export function leggiScelta(
       .filter(Boolean)
       .slice(0, 4);
     if (!titolo || sintesi.length === 0) continue;
+    const frase = (x: unknown) => String(x ?? '').trim().slice(0, 300) || undefined;
     visti.add(k);
     scoperte.push({
       titolo: titolo.slice(0, 200),
@@ -359,6 +372,10 @@ export function leggiScelta(
       url,
       data: studio.data,
       tipo_fonte: tipoFonte(studio.tipi),
+      credenza: frase(o.credenza),
+      verita: frase(o.verita),
+      azione: frase(o.azione),
+      abstract: studio.abstract.slice(0, 3000),
     });
   }
   return scoperte;
@@ -525,10 +542,12 @@ export function leggiCopy(testo: string, brand: BrandPerScoperte = {}): CopyScop
 
 /** Parole vietate rimaste nel testo (per scartare il carosello). */
 export function paroleVietateTrovate(copy: CopyScoperta, brand: BrandPerScoperte): string[] {
-  const testo = [copy.titolo_carosello, copy.caption, ...copy.slides.flatMap((s) => [s.title, s.body])]
-    .join(' ')
-    .toLowerCase();
-  return vietate(brand).filter((p) => new RegExp(`\\b${p.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\w*`).test(testo));
+  return vietateNelTesto([copy.titolo_carosello, copy.caption, ...copy.slides.flatMap((s) => [s.title, s.body])].join(' '), brand);
+}
+
+function vietateNelTesto(testo: string, brand: BrandPerScoperte): string[] {
+  const t = testo.toLowerCase();
+  return vietate(brand).filter((p) => new RegExp(`\\b${p.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\w*`).test(t));
 }
 
 /** Sigle statistiche che il paziente non capisce: se restano, il carosello non esce. */
@@ -556,4 +575,298 @@ export const ETICHETTE_CONTENUTO = ['LA SITUAZIONE', 'LO STUDIO', 'PERCHÉ SUCCE
 
 export function etichettaContenuto(posizione: number): string {
   return ETICHETTE_CONTENUTO[posizione] ?? 'IN PRATICA';
+}
+
+// ── Carosello «editoriale» (Terapista Stellato, 01/11/2026) ─────────────
+// Le slide le disegna il server (testo esatto, niente refusi). Struttura del
+// metodo Kallaway approvata da Attilio sul carosello del laser: copertina
+// controcorrente, «ti riconosci?» (terreno comune), lo studio, il risultato,
+// cosa vuol dire, cosa fare stasera coi passi, cosa chiedere al terapista,
+// chiusura che chiede di mandarlo a qualcuno.
+// Nei testi: [[parola]] = fascia gialla (titoli), **parola** = giallo.
+
+export type SlideEditoriale =
+  | { tipo: 'copertina'; sopra: string; titolo: string }
+  | { tipo: 'riconosci'; titolo: string; righe: string[]; chiusa: string }
+  | {
+    tipo: 'confronto'; titolo: string; testo: string;
+    a: { numero: string; etichetta: string }; b: { numero: string; etichetta: string }; nota: string;
+  }
+  | { tipo: 'numero'; titolo: string; numero: string; unita: string; scala: number | null; testo: string }
+  | { tipo: 'punto'; titolo: string; testo: string; citazione: string }
+  | { tipo: 'passi'; titolo: string; sottotitolo: string; passi: string[] }
+  | { tipo: 'domanda'; titolo: string; domanda: string; nota: string }
+  | { tipo: 'cta'; titolo: string; testo: string };
+
+export type CopyEditoriale = {
+  titolo_carosello: string;
+  caption: string;
+  hashtags: string;
+  /** Descrizione in inglese della foto di copertina (senza testo). */
+  foto_copertina: string;
+  /** Descrizione in inglese della foto della slide coi passi. */
+  foto_passi: string;
+  slides: SlideEditoriale[];
+};
+
+/** Tipi ammessi per ognuna delle 8 posizioni. */
+export const STRUTTURA_EDITORIALE: SlideEditoriale['tipo'][][] = [
+  ['copertina'], ['riconosci'], ['confronto', 'punto'], ['numero', 'punto'],
+  ['punto'], ['passi'], ['domanda'], ['cta'],
+];
+
+const ETICHETTE_EDITORIALI = [
+  'NUOVO STUDIO', 'TI SUCCEDE?', 'LO STUDIO', 'IL RISULTATO', 'COSA VUOL DIRE', 'COSA PUOI FARE', 'AL TUO TERAPISTA',
+];
+
+/** Etichetta in alto a sinistra della slide (l'ultima porta il nome del brand). */
+export function etichettaEditoriale(indice: number, nomeBrand: string): string {
+  return ETICHETTE_EDITORIALI[indice] ?? nomeBrand.toUpperCase();
+}
+
+export type Segmento = {
+  testo: string;
+  stile: 'normale' | 'fascia' | 'accento';
+  /** Va attaccato al pezzo prima, senza spazio (punteggiatura dopo una parola colorata). */
+  attacca?: boolean;
+};
+
+/**
+ * Divide un testo in pezzi con il loro stile ([[fascia]], **accento**). La
+ * fascia resta un pezzo solo (una banda continua); il resto va parola per
+ * parola, e la punteggiatura subito dopo un pezzo colorato gli resta attaccata.
+ */
+export function segmenti(testo: string): Segmento[] {
+  const out: Segmento[] = [];
+  // Il pezzo prima finiva senza spazio? Allora il primo pezzo di questo gli resta attaccato.
+  let prima = false;
+  for (const pezzo of testo.split(/(\[\[[^\]]+\]\]|\*\*[^*]+\*\*)/)) {
+    if (!pezzo) continue;
+    if (/^\[\[.*\]\]$/.test(pezzo)) {
+      const t = pezzo.slice(2, -2).trim();
+      if (t) out.push(prima && out.length > 0 ? { testo: t, stile: 'fascia', attacca: true } : { testo: t, stile: 'fascia' });
+      prima = true;
+      continue;
+    }
+    let stile: Segmento['stile'] = 'normale';
+    let t = pezzo;
+    if (/^\*\*.*\*\*$/.test(pezzo)) { stile = 'accento'; t = pezzo.slice(2, -2); }
+    t = t.replace(/\[\[|\]\]|\*\*/g, '');
+    const attaccato = prima && out.length > 0 && /^\S/.test(t);
+    t.split(/\s+/).forEach((parola, i) => {
+      if (parola) out.push(i === 0 && attaccato ? { testo: parola, stile, attacca: true } : { testo: parola, stile });
+    });
+    prima = /\S$/.test(t);
+  }
+  return out;
+}
+
+/** Testo senza i segni di stile. */
+export function testoPiano(testo: string): string {
+  return testo.replace(/\[\[|\]\]|\*\*/g, '');
+}
+
+/** Tutto il testo che il lettore vede nelle slide (per i controlli). */
+export function testoSlide(s: SlideEditoriale): string {
+  switch (s.tipo) {
+    case 'copertina': return `${s.sopra} ${s.titolo}`;
+    case 'riconosci': return [s.titolo, ...s.righe, s.chiusa].join(' ');
+    case 'confronto': return [s.titolo, s.testo, s.a.numero, s.a.etichetta, s.b.numero, s.b.etichetta, s.nota].join(' ');
+    case 'numero': return [s.titolo, s.numero, s.unita, s.testo].join(' ');
+    case 'punto': return [s.titolo, s.testo, s.citazione].join(' ');
+    case 'passi': return [s.titolo, s.sottotitolo, ...s.passi].join(' ');
+    case 'domanda': return [s.titolo, s.domanda, s.nota].join(' ');
+    case 'cta': return `${s.titolo} ${s.testo}`;
+  }
+}
+
+/** Prompt per Gemini: dalla scoperta al carosello editoriale in 8 slide. */
+export function promptCaroselloEditoriale(brand: BrandPerScoperte, s: Scoperta): string {
+  const persona = brand.persona_scrittura === 'io' ? 'prima persona singolare (io)' : 'prima persona plurale (noi)';
+  const chi = (brand.descrizione || '').trim();
+  const anno = s.data ? s.data.slice(0, 4) : '';
+  return `Sei il copywriter di "${brand.nome_business || 'lo studio'}" su Instagram. Scrivi UN carosello di 8 slide in ITALIANO CORRETTO col metodo dei contenuti brevi di Kallaway, partendo da questo studio vero.
+${chi ? `\nCHI SIETE\n${chi}\n` : ''}
+A CHI PARLI
+${brand.target_pazienti || 'persone comuni con dolori o fastidi, non professionisti'}. Dai del tu a chi ha il problema. Tono: ${brand.tono_voce || 'diretto'}. Voce: ${persona}.
+
+LO STUDIO
+Titolo: ${s.titolo}
+Fonte: ${s.fonte}${anno ? ` (${anno})` : ''}
+Cosa dice: ${s.sintesi.join(' ')}
+Cosa crede la gente: ${s.credenza || '(da capire dallo studio)'}
+Cosa dice invece lo studio: ${s.verita || '(da capire dallo studio)'}
+Cosa può fare il paziente: ${s.azione || '(da proporre, coerente con lo studio)'}
+Abstract (inglese, è la fonte dei fatti e dei numeri):
+${(s.abstract || '').slice(0, 2500)}
+
+LE REGOLE DEL METODO
+- Un'idea sola: la presa di posizione controcorrente («la gente crede X, lo studio dice Y»). Alza i toni come un giornale: frasi nette, emozione forte (sorpresa, paura di sprecare tempo e soldi). Il "nemico" è la pratica o la credenza, MAI una categoria di persone (terapisti, medici): voi siete la parte neutrale che porta i fatti.
+- Il lettore deve RICONOSCERSI: scene concrete che ha vissuto (dove si trova, cosa fa, cosa sente), parole di tutti i giorni, livello prima media.
+- Valore pratico: almeno una cosa da fare subito, con i passi, le quantità e quando fermarsi.
+- Numeri: SOLO quelli dell'abstract o di "Cosa dice" (fa eccezione la slide 6 coi passi). Niente sigle statistiche (SMD, OR, IC, p): l'effetto si dice a parole o con il numero su una scala che tutti capiscono.
+- Mai inventare fatti; niente diagnosi né promesse di guarigione; niente "nel nostro studio"; non contare le sedute; non nominare marchi di macchinari.
+- Parole vietate (mai, nemmeno coniugate): ${vietate(brand).join(', ')}.
+- Nei titoli metti tra [[doppie quadre]] UNA parola chiave da evidenziare in giallo; nei testi puoi mettere tra **doppi asterischi** al massimo 2 pezzi da colorare.
+
+LE 8 SLIDE (in quest'ordine)
+1. "copertina": "titolo" = la presa di posizione in massimo 7 parole, già in tema nelle prime parole, col contrasto; "sopra" = riga breve coi dati: tema · quante persone · per quanto tempo (es. "Mal di schiena · 148 persone · 12 mesi").
+2. "riconosci": "titolo" = "Ti [[riconosci?]]" o simile; "righe" = 3 frasi brevi (max 9 parole) con la scena che il lettore ha vissuto; "chiusa" = una frase tipo "Se ti è successo, questo studio ti riguarda."
+3. Lo studio, com'è fatto: "confronto" se ci sono due gruppi ("a" e "b" con numero di persone ed etichetta breve, il gruppo che conta in "a"; "testo" = chi erano e cosa hanno fatto; "nota" = un dettaglio che dà fiducia, es. chi non sapeva cosa) oppure "punto".
+4. Il risultato: "numero" col dato chiave grande ("numero" max 6 caratteri, "unita" breve, "scala" = il massimo della scala se il numero sta su una scala, altrimenti null; "testo" = cosa vuol dire, max 2 frasi) oppure "punto".
+5. "punto": cosa vuol dire per il lettore ("titolo" netto, "testo" max 2 frasi, "citazione" = la conclusione dell'abstract tradotta fedelmente in max 20 parole, oppure "").
+6. "passi": la cosa da fare stasera. "titolo" tipo "Provalo stasera: …"; "sottotitolo" = come si collega allo studio, senza inventare; "passi" = 3 passi brevi (max 14 parole) con quantità (secondi, volte, minuti) e l'ultimo con quando fermarsi.
+7. "domanda": "titolo" tipo "Se ti propongono …, chiedi:"; "domanda" = la frase da dire al terapista, tra «»; "nota" = una frase con un dato dello studio.
+8. "cta": "titolo" = UNA sola azione, meglio mandarlo a qualcuno (es. "[[Mandalo]] a chi sta pagando il laser"), max 6 parole; "testo" = una frase.
+
+ALTRO
+- "caption": la prima riga è la copertina detta a parole; poi 5-8 righe brevi che ripercorrono il carosello, la cosa da fare, la stessa azione dell'ultima slide, e alla fine "Fonte: ${s.fonte}${anno ? `, ${anno}` : ''}" con tipo di studio e numero di persone. Niente link.
+- "hashtags": 5 hashtag italiani pertinenti.
+- "foto_copertina": in INGLESE, una foto realistica del tema della copertina (la pratica o il gesto di cui si parla, sulla parte del corpo giusta), studio buio quasi nero, luce laterale giallo oro, nessun testo, nessun volto, metà alta dell'immagine scura e vuota.
+- "foto_passi": in INGLESE, una foto realistica di una persona che fa la cosa della slide 6, stessa luce, nessun testo.
+
+Rispondi SOLO con questo JSON:
+{"titolo_carosello":"","caption":"","hashtags":"","foto_copertina":"","foto_passi":"","slides":[
+{"tipo":"copertina","sopra":"","titolo":""},
+{"tipo":"riconosci","titolo":"","righe":["","",""],"chiusa":""},
+{"tipo":"confronto","titolo":"","testo":"","a":{"numero":"","etichetta":""},"b":{"numero":"","etichetta":""},"nota":""},
+{"tipo":"numero","titolo":"","numero":"","unita":"","scala":10,"testo":""},
+{"tipo":"punto","titolo":"","testo":"","citazione":""},
+{"tipo":"passi","titolo":"","sottotitolo":"","passi":["","",""]},
+{"tipo":"domanda","titolo":"","domanda":"","nota":""},
+{"tipo":"cta","titolo":"","testo":""}]}`;
+}
+
+const corto = (x: unknown, max: number) => String(x ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+const elenco = (x: unknown, max: number, n: number) =>
+  (Array.isArray(x) ? x : []).map((v) => corto(v, max)).filter(Boolean).slice(0, n);
+
+function leggiSlideEditoriale(o: Record<string, unknown>): SlideEditoriale | null {
+  const titolo = corto(o.titolo, 70);
+  if (!titolo) return null;
+  switch (o.tipo) {
+    case 'copertina': return { tipo: 'copertina', titolo, sopra: corto(o.sopra, 60) };
+    case 'riconosci': {
+      const righe = elenco(o.righe, 80, 4);
+      return righe.length >= 2 ? { tipo: 'riconosci', titolo, righe, chiusa: corto(o.chiusa, 80) } : null;
+    }
+    case 'confronto': {
+      const a = (o.a || {}) as Record<string, unknown>;
+      const b = (o.b || {}) as Record<string, unknown>;
+      const lato = (x: Record<string, unknown>) => ({ numero: corto(x.numero, 6), etichetta: corto(x.etichetta, 32) });
+      const la = lato(a), lb = lato(b);
+      if (!la.numero || !lb.numero || !la.etichetta || !lb.etichetta) return null;
+      return { tipo: 'confronto', titolo, testo: corto(o.testo, 200), a: la, b: lb, nota: corto(o.nota, 90) };
+    }
+    case 'numero': {
+      const numero = corto(o.numero, 6);
+      if (!numero) return null;
+      const sc = Number(o.scala);
+      const scala = Number.isFinite(sc) && sc >= 2 && sc <= 100 ? sc : null;
+      return { tipo: 'numero', titolo, numero, unita: corto(o.unita, 16), scala, testo: corto(o.testo, 180) };
+    }
+    case 'punto': return { tipo: 'punto', titolo, testo: corto(o.testo, 200), citazione: corto(o.citazione, 160) };
+    case 'passi': {
+      const passi = elenco(o.passi, 110, 4);
+      return passi.length >= 2 ? { tipo: 'passi', titolo, sottotitolo: corto(o.sottotitolo, 90), passi } : null;
+    }
+    case 'domanda': {
+      const domanda = corto(o.domanda, 90);
+      return domanda ? { tipo: 'domanda', titolo, domanda, nota: corto(o.nota, 160) } : null;
+    }
+    case 'cta': return { tipo: 'cta', titolo, testo: corto(o.testo, 120) };
+    default: return null;
+  }
+}
+
+/** Valida il JSON del carosello editoriale: 8 slide, ogni tipo al suo posto. */
+export function leggiCopyEditoriale(testo: string): CopyEditoriale | null {
+  const j = estraiJson(testo) as Record<string, unknown> | null;
+  if (!j || !Array.isArray(j.slides) || j.slides.length !== STRUTTURA_EDITORIALE.length) return null;
+  const slides: SlideEditoriale[] = [];
+  for (let i = 0; i < STRUTTURA_EDITORIALE.length; i++) {
+    const sl = leggiSlideEditoriale((j.slides[i] || {}) as Record<string, unknown>);
+    if (!sl || !STRUTTURA_EDITORIALE[i].includes(sl.tipo)) return null;
+    slides.push(sl);
+  }
+  const caption = String(j.caption || '').trim();
+  if (!caption) return null;
+  return {
+    titolo_carosello: corto(j.titolo_carosello, 120) || testoPiano(slides[0].titolo),
+    caption,
+    hashtags: corto(j.hashtags, 200),
+    foto_copertina: corto(j.foto_copertina, 700),
+    foto_passi: corto(j.foto_passi, 700),
+    slides,
+  };
+}
+
+function numeriIn(testo: string): string[] {
+  return (testo.match(/\d+(?:[.,]\d+)*/g) || []).map((n) => {
+    // 1.480 / 1,480 come migliaia → 1480; 0,4 → 0.4
+    if (/^\d{1,3}([.,]\d{3})+$/.test(n)) return n.replace(/[.,]/g, '');
+    return n.replace(',', '.').replace(/\.0+$/, '');
+  });
+}
+
+/**
+ * Numeri del carosello che non stanno nello studio (abstract o sintesi).
+ * Fanno eccezione la slide coi passi (secondi, volte) e gli anni.
+ */
+export function numeriFuoriFonte(copy: CopyEditoriale, s: Scoperta): string[] {
+  const fonte = new Set(numeriIn(`${s.abstract || ''} ${s.sintesi.join(' ')}`));
+  const passi = copy.slides.filter((x) => x.tipo === 'passi').map(testoSlide).join(' ');
+  const daPassi = new Set(numeriIn(passi));
+  const testo = [...copy.slides.filter((x) => x.tipo !== 'passi').map(testoSlide), copy.caption].join(' ');
+  const fuori = numeriIn(testo).filter((n) =>
+    !fonte.has(n) && !daPassi.has(n) && !/^(19|20)\d{2}$/.test(n) && !['1', '2'].includes(n));
+  return Array.from(new Set(fuori));
+}
+
+/** Problemi che bloccano il carosello editoriale prima di fare le immagini. */
+export function problemiEditoriale(copy: CopyEditoriale, s: Scoperta, brand: BrandPerScoperte): string[] {
+  const tutto = [copy.caption, ...copy.slides.map(testoSlide)].join(' ');
+  const problemi: string[] = [];
+  const v = vietateNelTesto(testoPiano(tutto), brand);
+  if (v.length > 0) problemi.push(`parole vietate: ${v.join(', ')}`);
+  if (SIGLE_STATISTICHE.test(tutto)) problemi.push('sigle statistiche nel testo');
+  const fuori = numeriFuoriFonte(copy, s);
+  if (fuori.length > 0) problemi.push(`numeri che non sono nello studio: ${fuori.join(', ')}`);
+  if (/nel nostro studio|i nostri pazienti/i.test(tutto) && !/studio/i.test(brand.descrizione || '')) {
+    problemi.push('"nel nostro studio" ma il brand non è uno studio');
+  }
+  return problemi;
+}
+
+/** Seconda chiamata: un editor severo giudica il carosello col metodo. */
+export function promptGiudice(copy: CopyEditoriale, s: Scoperta): string {
+  return `Sei un editor severo di contenuti Instagram per pazienti, col metodo di Kallaway. Giudica questo carosello (8 slide) scritto a partire dallo studio qui sotto.
+
+STUDIO: ${s.titolo} (${s.fonte}). ${s.sintesi.join(' ')}
+ABSTRACT: ${(s.abstract || '').slice(0, 2000)}
+
+CAROSELLO:
+${JSON.stringify({ slides: copy.slides, caption: copy.caption })}
+
+Dai un voto da 1 a 5 a:
+- "aggancio": la copertina parla del problema del lettore nelle prime parole e lo sorprende con un contrasto netto?
+- "riconoscibile": nella slide 2 il lettore si rivede in una scena concreta che ha vissuto?
+- "pratico": la slide 6 dà una cosa da fare subito, chiara, con passi e quantità, sicura?
+- "non_ovvio": il lettore impara qualcosa che non aveva già sentito?
+- "fedele": ogni fatto e numero (esclusi i passi della slide 6) viene dallo studio, senza esagerare quello che lo studio dimostra?
+- "italiano": italiano naturale, corretto, frasi brevi?
+Scrivi in "problemi" cosa correggere, in modo concreto (slide e frase).
+Rispondi SOLO con JSON: {"voti":{"aggancio":0,"riconoscibile":0,"pratico":0,"non_ovvio":0,"fedele":0,"italiano":0},"problemi":[""]}`;
+}
+
+export const VOTO_MINIMO = 4;
+
+/** Legge il giudizio: passa solo se ogni voto è almeno VOTO_MINIMO. */
+export function leggiGiudizio(testo: string): { ok: boolean; voti: Record<string, number>; problemi: string[] } {
+  const j = estraiJson(testo) as { voti?: Record<string, unknown>; problemi?: unknown[] } | null;
+  const chiavi = ['aggancio', 'riconoscibile', 'pratico', 'non_ovvio', 'fedele', 'italiano'];
+  const voti: Record<string, number> = {};
+  for (const k of chiavi) voti[k] = Number(j?.voti?.[k]) || 0;
+  const problemi = elenco(j?.problemi, 300, 8);
+  return { ok: chiavi.every((k) => voti[k] >= VOTO_MINIMO), voti, problemi };
 }

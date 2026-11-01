@@ -24,6 +24,7 @@ import { COST_NB2_IMAGE_1K } from "../_shared/brand/costs.ts";
 import { resolveProfession, type ProfessionBrandLike } from "../_shared/brand/profession.ts";
 import type { ArchetypeId, SlideRole } from "../_shared/brand/archetypes.ts";
 import { leggiLogo, slideConLogo, type Logo } from "../_shared/logoSlide.ts";
+import { dimensioniImmagine, disegnaSlideEditoriale, type Colori, type Immagine } from "../_shared/slideEditoriali.ts";
 import {
   CONCURRENCY,
   MODEL_CASCADES,
@@ -41,6 +42,14 @@ import {
 import {
   chiaveUrl,
   etichettaContenuto,
+  etichettaEditoriale,
+  leggiCopyEditoriale,
+  leggiGiudizio,
+  problemiEditoriale,
+  promptCaroselloEditoriale,
+  promptGiudice,
+  testoPiano,
+  testoSlide,
   leggiArticoliPubmed,
   leggiCopy,
   leggiIdPubmed,
@@ -59,6 +68,7 @@ import {
   urlCercaPubmed,
   urlPubmed,
   type BrandPerScoperte,
+  type CopyEditoriale,
   type CopyScoperta,
   type Scoperta,
 } from "../_shared/brand/scoperte.ts";
@@ -77,7 +87,13 @@ type BrandRow = BrandPerScoperte & {
   pubblicazione_automatica?: boolean | null;
   auto_orari?: string[] | null;
   logo_url?: string | null;
-  genome?: { archetype?: ArchetypeId; palette?: { bg_a?: string; text_on_light?: string } } | null;
+  colore_primario?: string | null;
+  genome?: {
+    archetype?: ArchetypeId;
+    palette?: { bg_a?: string; text_on_light?: string };
+    /** "editoriale" = slide disegnate dal server col metodo Kallaway (Terapista Stellato). */
+    stile_pilota?: string;
+  } | null;
 };
 
 type Contesto = {
@@ -91,6 +107,8 @@ type Contesto = {
   colors: PaletteColors;
   /** Logo del Brand Kit, già letto: va sovrapposto a ogni slide (null = brand senza logo). */
   logo: Logo | null;
+  /** Stile editoriale: colori e logo per le slide disegnate dal server (null = template del brand). */
+  editoriale: { colori: Colori; logo: Immagine | null } | null;
 };
 
 serve(async (req) => {
@@ -198,6 +216,41 @@ async function prepara(
     return { ok: false, motivo: "Collega prima un profilo Instagram a questo brand" };
   }
 
+  if (!Deno.env.get("GEMINI_API_KEY")) return { ok: false, motivo: "Manca la chiave GEMINI_API_KEY sul server" };
+  const modelKey = String((b as { image_model?: string }).image_model || "nano-2");
+  const palette = b.genome?.palette;
+
+  // Stile editoriale: niente template né modello per il testo, le slide le disegna il server.
+  if (b.genome?.stile_pilota === "editoriale") {
+    let logoEd: Immagine | null = null;
+    if (b.logo_url) {
+      logoEd = await logoPerSatori(b.logo_url);
+      if (!logoEd) return { ok: false, motivo: "Logo del brand non leggibile: caricalo in PNG o JPG nel Brand Kit" };
+    }
+    return {
+      ok: true,
+      ctx: {
+        brand: b,
+        connectionId: (conn as { id: string }).id,
+        byRole: new Map(),
+        refCache: new Map(),
+        format: "4:5",
+        models: MODEL_CASCADES[modelKey] || MODEL_CASCADES["nano-2"],
+        kicker: "",
+        colors: { bg_color: "", title_color: "", body_color: "" },
+        logo: null,
+        editoriale: {
+          colori: {
+            sfondo: palette?.bg_a || "#111111",
+            testo: palette?.text_on_light || "#FFFFFF",
+            accento: b.colore_primario || "#FFD700",
+          },
+          logo: logoEd,
+        },
+      },
+    };
+  }
+
   const { data: variants } = await supabase
     .from("template_variants")
     .select("slide_role, storage_bucket, storage_path, prompt_skeleton, genome")
@@ -207,8 +260,6 @@ async function prepara(
   if (!byRole.has("cover") || !byRole.has("content") || !byRole.has("cta")) {
     return { ok: false, motivo: "Approva prima il template delle slide di questo brand" };
   }
-
-  if (!Deno.env.get("GEMINI_API_KEY")) return { ok: false, motivo: "Manca la chiave GEMINI_API_KEY sul server" };
 
   const refCache = new Map<SlideRole, string>();
   for (const role of ["cover", "content", "cta"] as SlideRole[]) {
@@ -226,9 +277,7 @@ async function prepara(
     if (!logo) return { ok: false, motivo: "Logo del brand non leggibile: caricalo in PNG o JPG nel Brand Kit" };
   }
 
-  const modelKey = String((b as { image_model?: string }).image_model || "nano-2");
   // Stessi colori che usa l'app (useNb2Carousel): palette del genoma del brand.
-  const palette = b.genome?.palette;
   return {
     ok: true,
     ctx: {
@@ -245,8 +294,35 @@ async function prepara(
         body_color: palette?.text_on_light || "#1a1a1a",
       },
       logo,
+      editoriale: null,
     },
   };
+}
+
+function base64(u: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+/** Il logo come data URL con le sue misure (Satori le vuole). Solo PNG o JPEG. */
+async function logoPerSatori(url: string): Promise<Immagine | null> {
+  try {
+    let bytes: Uint8Array;
+    if (url.startsWith("data:")) {
+      bytes = Uint8Array.from(atob(url.slice(url.indexOf(",") + 1)), (c) => c.charCodeAt(0));
+    } else {
+      const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      if (!r.ok) return null;
+      bytes = new Uint8Array(await r.arrayBuffer());
+    }
+    const d = dimensioniImmagine(bytes);
+    if (!d || d.w === 0 || d.h === 0) return null;
+    const tipo = bytes[0] === 0x89 ? "image/png" : "image/jpeg";
+    return { src: `data:${tipo};base64,${base64(bytes)}`, ...d };
+  } catch {
+    return null;
+  }
 }
 
 /** La slide col logo del brand sopra; senza logo resta com'è. */
@@ -379,13 +455,13 @@ async function chiediPubmed(url: string): Promise<string> {
   return await r.text();
 }
 
-async function chiediGemini(prompt: string): Promise<string> {
+async function chiediGemini(prompt: string, temperature = 0.7): Promise<string> {
   const res = await callGeminiWithRetry({
     apiKey: Deno.env.get("GEMINI_API_KEY")!,
     model: COPY_MODEL,
     body: {
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json", temperature: 0.7 },
+      generationConfig: { responseMimeType: "application/json", temperature },
     },
   });
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${(res.errorBody || "").slice(0, 200)}`);
@@ -412,6 +488,7 @@ async function aggiornaScoperta(supabase: Admin, id: string, campi: Record<strin
 }
 
 async function unCarosello(supabase: Admin, ctx: Contesto, s: Scoperta, scopertaId: string, quando: Date): Promise<void> {
+  if (ctx.editoriale) return unCaroselloEditoriale(supabase, ctx, s, scopertaId, quando);
   const { brand } = ctx;
   await aggiornaScoperta(supabase, scopertaId, { stato: "in_produzione" });
   try {
@@ -457,57 +534,213 @@ async function unCarosello(supabase: Admin, ctx: Contesto, s: Scoperta, scoperta
       CONCURRENCY,
     );
     const ok = risultati.filter((r) => r.status === "done").length;
-    const stato = ok === slides.length ? "ready" : ok > 0 ? "partial" : "failed";
-    await supabase
-      .from("produced_carousels")
-      .update({
-        slides: [...risultati].sort((a, b) => a.index - b.index),
-        status: stato,
-        ok_count: ok,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", carouselId);
-    await logGeneration({
-      userId: brand.user_id,
-      brandId: brand.id,
-      type: "carousel",
-      topic: s.titolo,
-      title: copy.titolo_carosello,
-      status: stato === "ready" ? "success" : stato === "partial" ? "partial" : "failed",
-      metadata: { phase: "scoperte-automatiche", carouselId, fonte: s.url, estimated_cost_usd: ok * COST_NB2_IMAGE_1K },
-    });
-    // Un carosello a metà non si pubblica: resta nell'archivio da sistemare a mano.
-    if (stato !== "ready") throw new Error(`Slide prodotte ${ok} di ${slides.length}`);
-
-    const paths = [...risultati].sort((a, b) => a.index - b.index).map((r) => r.path as string);
-    const { data: post, error: postErr } = await supabase
-      .from("published_posts")
-      .insert({
-        user_id: brand.user_id,
-        content: copy.caption,
-        hashtags: copy.hashtags || null,
-        image_urls: null,
-        image_paths: paths,
-        image_bucket: OUTPUT_BUCKET,
-        platforms: ["instagram"],
-        connection_id: ctx.connectionId,
-        status: "scheduled",
-        scheduled_for: quando.toISOString(),
-        attempts: 0,
-        media_type: "post",
-      })
-      .select("id")
-      .single();
-    if (postErr || !post) throw new Error("Programmazione: " + (postErr?.message || ""));
-
-    await aggiornaScoperta(supabase, scopertaId, {
-      stato: "programmata",
-      post_id: (post as { id: string }).id,
-      programmata_per: quando.toISOString(),
-      errore: null,
+    await chiudiCarosello(supabase, ctx, s, scopertaId, quando, carouselId, risultati, {
+      titolo: copy.titolo_carosello, caption: copy.caption, hashtags: copy.hashtags, costoUsd: ok * COST_NB2_IMAGE_1K,
     });
   } catch (e) {
     console.error("Carosello non riuscito per", s.url, e);
+    await aggiornaScoperta(supabase, scopertaId, { stato: "errore", errore: (e as Error).message.slice(0, 500) });
+  }
+}
+
+/**
+ * Coda comune ai due stili: stato del carosello, storico, e se tutte le
+ * slide sono pronte il post in programmazione.
+ */
+async function chiudiCarosello(
+  supabase: Admin,
+  ctx: Contesto,
+  s: Scoperta,
+  scopertaId: string,
+  quando: Date,
+  carouselId: string,
+  risultati: SlideRecord[],
+  testo: { titolo: string; caption: string; hashtags: string; costoUsd: number },
+): Promise<void> {
+  const { brand } = ctx;
+  const ok = risultati.filter((r) => r.status === "done").length;
+  const stato = ok === risultati.length ? "ready" : ok > 0 ? "partial" : "failed";
+  await supabase
+    .from("produced_carousels")
+    .update({
+      slides: [...risultati].sort((a, b) => a.index - b.index),
+      status: stato,
+      ok_count: ok,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", carouselId);
+  await logGeneration({
+    userId: brand.user_id,
+    brandId: brand.id,
+    type: "carousel",
+    topic: s.titolo,
+    title: testo.titolo,
+    status: stato === "ready" ? "success" : stato === "partial" ? "partial" : "failed",
+    metadata: { phase: "scoperte-automatiche", carouselId, fonte: s.url, estimated_cost_usd: testo.costoUsd },
+  });
+  // Un carosello a metà non si pubblica: resta nell'archivio da sistemare a mano.
+  if (stato !== "ready") throw new Error(`Slide prodotte ${ok} di ${risultati.length}`);
+
+  const paths = [...risultati].sort((a, b) => a.index - b.index).map((r) => r.path as string);
+  const { data: post, error: postErr } = await supabase
+    .from("published_posts")
+    .insert({
+      user_id: brand.user_id,
+      content: testo.caption,
+      hashtags: testo.hashtags || null,
+      image_urls: null,
+      image_paths: paths,
+      image_bucket: OUTPUT_BUCKET,
+      platforms: ["instagram"],
+      connection_id: ctx.connectionId,
+      status: "scheduled",
+      scheduled_for: quando.toISOString(),
+      attempts: 0,
+      media_type: "post",
+    })
+    .select("id")
+    .single();
+  if (postErr || !post) throw new Error("Programmazione: " + (postErr?.message || ""));
+
+  await aggiornaScoperta(supabase, scopertaId, {
+    stato: "programmata",
+    post_id: (post as { id: string }).id,
+    programmata_per: quando.toISOString(),
+    errore: null,
+  });
+}
+
+/**
+ * Testo del carosello editoriale: stesura, controlli fissi (numeri, sigle,
+ * parole vietate) e giudice col metodo. Una seconda stesura coi problemi
+ * trovati; se non passa neanche quella, il carosello non si fa.
+ */
+async function scriviCopyEditoriale(
+  brand: BrandRow,
+  s: Scoperta,
+): Promise<{ copy: CopyEditoriale; voti: Record<string, number> }> {
+  let problemi: string[] = [];
+  for (let tentativo = 0; tentativo < 2; tentativo++) {
+    const correzioni = problemi.length > 0
+      ? `\n\nLA STESURA PRECEDENTE È STATA SCARTATA PER QUESTI PROBLEMI, CORREGGILI:\n${problemi.map((p) => `- ${p}`).join("\n")}`
+      : "";
+    const copy = leggiCopyEditoriale(await chiediGemini(promptCaroselloEditoriale(brand, s) + correzioni));
+    if (!copy) { problemi = ["JSON non valido o slide fuori posto: rispetta le 8 slide e i loro tipi"]; continue; }
+    problemi = problemiEditoriale(copy, s, brand);
+    if (problemi.length > 0) continue;
+    const giudizio = leggiGiudizio(await chiediGemini(promptGiudice(copy, s), 0.2));
+    if (giudizio.ok) return { copy, voti: giudizio.voti };
+    problemi = [
+      ...Object.entries(giudizio.voti).filter(([, v]) => v < 4).map(([k, v]) => `voto ${k}: ${v}/5`),
+      ...giudizio.problemi,
+    ];
+  }
+  throw new Error("Carosello scartato: " + problemi.join("; ").slice(0, 400));
+}
+
+/** Foto realistica senza testo (copertina o passi), come data URL; null se il modello non la dà. */
+async function generaFoto(descrizione: string, formato: string, modelli: string[]): Promise<string | null> {
+  if (!descrizione) return null;
+  for (const model of modelli) {
+    try {
+      const r = await callGeminiWithRetry({
+        apiKey: Deno.env.get("GEMINI_API_KEY")!,
+        model,
+        body: {
+          contents: [{
+            role: "user",
+            parts: [{ text: `${descrizione}\nPhotorealistic photo. Absolutely no text, letters, numbers, logos or watermarks.` }],
+          }],
+          generationConfig: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: formato, imageSize: "1K" } },
+        },
+      });
+      const parts = r?.data?.candidates?.[0]?.content?.parts as Array<Record<string, unknown>> | undefined;
+      const inline = parts?.find((p) => p.inlineData) as { inlineData?: { data?: string; mimeType?: string } } | undefined;
+      if (inline?.inlineData?.data) return `data:${inline.inlineData.mimeType || "image/png"};base64,${inline.inlineData.data}`;
+    } catch (e) {
+      console.warn(`Foto con ${model} fallita:`, (e as Error).message);
+    }
+  }
+  return null;
+}
+
+/** Carosello editoriale: testo col metodo, 2 foto, 8 slide disegnate dal server. */
+async function unCaroselloEditoriale(supabase: Admin, ctx: Contesto, s: Scoperta, scopertaId: string, quando: Date): Promise<void> {
+  const { brand } = ctx;
+  const ed = ctx.editoriale!;
+  await aggiornaScoperta(supabase, scopertaId, { stato: "in_produzione" });
+  try {
+    const { copy, voti } = await scriviCopyEditoriale(brand, s);
+    const [fotoCopertina, fotoPassi] = await Promise.all([
+      generaFoto(copy.foto_copertina, "4:3", ctx.models),
+      generaFoto(copy.foto_passi, "16:9", ctx.models),
+    ]);
+    const anno = s.data ? s.data.slice(0, 4) : "";
+    const fonte = `${s.fonte}${anno ? `, ${anno}` : ""}`;
+    const ultima = copy.slides.length - 1;
+    const slides: SlideInput[] = copy.slides.map((sl, index) => ({
+      index,
+      role: (index === 0 ? "cover" : index === ultima ? "cta" : "content") as SlideRole,
+      title: testoPiano(sl.titolo),
+      body: testoPiano(testoSlide(sl)),
+    }));
+
+    const { data: riga, error: insErr } = await supabase
+      .from("produced_carousels")
+      .insert({
+        user_id: brand.user_id,
+        brand_id: brand.id,
+        title: copy.titolo_carosello,
+        copy: {
+          ...copy,
+          stile: "editoriale",
+          giudizio: voti,
+          foto: { copertina: !!fotoCopertina, passi: !!fotoPassi },
+          fonte: { titolo: s.titolo, fonte: s.fonte, url: s.url, data: s.data },
+        },
+        slides: slides.map((sl) => ({ ...sl, path: null, error: null, status: "pending" })),
+        storage_bucket: OUTPUT_BUCKET,
+        format: "4:5",
+        status: "producing",
+        total: slides.length,
+      })
+      .select("id")
+      .single();
+    if (insErr || !riga) throw new Error("Creazione carosello: " + (insErr?.message || ""));
+    const carouselId = (riga as { id: string }).id;
+    await aggiornaScoperta(supabase, scopertaId, { carousel_id: carouselId });
+
+    // Una slide alla volta: il disegno usa la CPU, in parallelo non si guadagna niente.
+    const risultati: SlideRecord[] = [];
+    for (const sl of slides) {
+      const dati = copy.slides[sl.index];
+      let r: SlideRecord;
+      try {
+        const png = await disegnaSlideEditoriale(dati, {
+          indice: sl.index,
+          totale: slides.length,
+          etichetta: etichettaEditoriale(sl.index, brand.nome_business || ""),
+          colori: ed.colori,
+          logo: ed.logo,
+          foto: dati.tipo === "copertina" ? fotoCopertina : dati.tipo === "passi" ? fotoPassi : null,
+          fonte,
+        });
+        const path = `${brand.user_id}/${carouselId}/slide_${sl.index + 1}_${Date.now()}.png`;
+        const { error } = await supabase.storage.from(OUTPUT_BUCKET).upload(path, png, { contentType: "image/png", upsert: true });
+        r = error ? { ...sl, path: null, error: error.message, status: "failed" } : { ...sl, path, error: null, status: "done" };
+      } catch (e) {
+        r = { ...sl, path: null, error: "disegno: " + ((e as Error).message || String(e)), status: "failed" };
+      }
+      risultati.push(r);
+      await patchSlide(supabase, carouselId, r);
+    }
+
+    const foto = [fotoCopertina, fotoPassi].filter(Boolean).length;
+    await chiudiCarosello(supabase, ctx, s, scopertaId, quando, carouselId, risultati, {
+      titolo: copy.titolo_carosello, caption: copy.caption, hashtags: copy.hashtags, costoUsd: foto * COST_NB2_IMAGE_1K,
+    });
+  } catch (e) {
+    console.error("Carosello editoriale non riuscito per", s.url, e);
     await aggiornaScoperta(supabase, scopertaId, { stato: "errore", errore: (e as Error).message.slice(0, 500) });
   }
 }
