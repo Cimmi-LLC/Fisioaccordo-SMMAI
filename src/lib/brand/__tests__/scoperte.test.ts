@@ -16,6 +16,10 @@ import {
   richiestaTermini,
   paroleVietateTrovate,
   promptCarosello,
+  slotLogoScalato,
+  posizioneLogo,
+  slotLogoDelBrand,
+  slotPiuLibero,
 } from '../scoperte';
 
 describe('orari di pubblicazione', () => {
@@ -116,6 +120,42 @@ describe('ricerca su PubMed', () => {
 
   it('normalizza gli URL per il confronto', () => {
     expect(chiaveUrl('https://www.Nature.com/articoli/1/?utm_medium=x#top')).toBe(chiaveUrl('https://nature.com/articoli/1'));
+  });
+});
+
+describe('logo sulle slide del pilota', () => {
+  it('porta lo slot dal canvas 1080 al 4:5 come fa l’app', () => {
+    expect(slotLogoScalato({ x: 90, y: 900, w: 200 }, 1350)).toEqual({ x: 90, y: 1125, w: 200 });
+    expect(slotLogoScalato({ x: 620, y: 620, w: 380, h: 380 }, 1350)).toEqual({ x: 620, y: 775, w: 380, h: 475 });
+    expect(slotLogoScalato({ x: 90, y: 900, w: 200 }, 1080)).toEqual({ x: 90, y: 900, w: 200 });
+  });
+
+  it('adatta il logo allo slot senza deformarlo e lo centra', () => {
+    // Logo orizzontale 1400x400 in uno slot 200 di lato: largo 200, alto 57, centrato in verticale.
+    expect(posizioneLogo({ x: 90, y: 1125, w: 200 }, 1400, 400)).toEqual({ x: 90, y: 1197, w: 200, h: 57 });
+    // Logo quadrato: occupa tutto lo slot.
+    expect(posizioneLogo({ x: 90, y: 1125, w: 200 }, 512, 512)).toEqual({ x: 90, y: 1125, w: 200, h: 200 });
+  });
+
+  it('tiene solo le posizioni del brand valide', () => {
+    expect(slotLogoDelBrand({
+      archetype: 'text_heavy_left',
+      logo_slots: [
+        { x: 90, y: 924, w: 200, h: 46 },
+        { x: 950, y: 56, w: 200 }, // esce dal bordo destro
+        { x: '790', y: 56, w: 200 }, // non numerico
+        { x: 440, y: 1050, w: 200, h: 40 }, // esce dal fondo
+        { x: 790, y: 56, w: 200, h: 46 },
+      ],
+    })).toEqual([{ x: 90, y: 924, w: 200, h: 46 }, { x: 790, y: 56, w: 200, h: 46 }]);
+    expect(slotLogoDelBrand({ archetype: 'text_heavy_left' })).toEqual([]);
+    expect(slotLogoDelBrand(null)).toEqual([]);
+  });
+
+  it('sceglie la posizione più libera, a parità la prima', () => {
+    expect(slotPiuLibero([0.3, 0, 0.1])).toBe(1);
+    expect(slotPiuLibero([0, 0, 0.2])).toBe(0);
+    expect(slotPiuLibero([0.5])).toBe(0);
   });
 });
 

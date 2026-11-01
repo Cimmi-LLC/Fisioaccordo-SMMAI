@@ -359,6 +359,67 @@ export function leggiScelta(
   return scoperte;
 }
 
+type SlotLogo = { x: number; y: number; w: number; h?: number };
+
+/**
+ * Slot del logo dell'archetipo (definito sul canvas 1080) portato
+ * all'altezza del formato: stessa regola di slotsForRole nell'app.
+ */
+export function slotLogoScalato(slot: SlotLogo, altezzaCanvas: number): SlotLogo {
+  const k = altezzaCanvas / 1080;
+  return {
+    ...slot,
+    y: Math.round(slot.y * k),
+    ...(slot.h !== undefined ? { h: Math.round(slot.h * k) } : {}),
+  };
+}
+
+/**
+ * Posizioni del logo scelte per un singolo brand (genome.logo_slots, sul
+ * canvas 1080), quando quella dell'archetipo cade su un elemento del suo
+ * template. Il pilota mette il logo nella più libera della slide; l'app
+ * usa la prima. Vuoto = si usa lo slot dell'archetipo.
+ */
+export function slotLogoDelBrand(genome: unknown): SlotLogo[] {
+  const lista = (genome as { logo_slots?: unknown } | null)?.logo_slots;
+  if (!Array.isArray(lista)) return [];
+  const validi: SlotLogo[] = [];
+  for (const s of lista.slice(0, 6)) {
+    const { x, y, w, h } = (s || {}) as { x?: unknown; y?: unknown; w?: unknown; h?: unknown };
+    if (![x, y, w].every((v) => typeof v === 'number' && Number.isFinite(v))) continue;
+    if (h !== undefined && !(typeof h === 'number' && Number.isFinite(h))) continue;
+    const [nx, ny, nw] = [x, y, w] as number[];
+    const nh = h as number | undefined;
+    if (nw < 40 || nw > 600 || nx < 0 || ny < 0 || nx + nw > 1080) continue;
+    if (nh !== undefined && (nh < 20 || nh > 600)) continue;
+    if (ny + (nh ?? nw) > 1080) continue;
+    validi.push(nh !== undefined ? { x: nx, y: ny, w: nw, h: nh } : { x: nx, y: ny, w: nw });
+  }
+  return validi;
+}
+
+/** Indice della posizione più libera (a parità vince la prima). */
+export function slotPiuLibero(occupazione: number[]): number {
+  let migliore = 0;
+  for (let i = 1; i < occupazione.length; i++) {
+    if (occupazione[i] < occupazione[migliore]) migliore = i;
+  }
+  return migliore;
+}
+
+/**
+ * Dove e quanto grande va il logo: contain-fit centrato nello slot, come
+ * compositeLogo dell'app (senza altezza dello slot vale la sua larghezza).
+ */
+export function posizioneLogo(slot: SlotLogo, logoW: number, logoH: number): { x: number; y: number; w: number; h: number } {
+  const maxW = slot.w;
+  const maxH = slot.h ?? slot.w;
+  const scala = Math.min(maxW / logoW, maxH / logoH);
+  const w = Math.max(1, Math.round(logoW * scala));
+  const h = Math.max(1, Math.round(logoH * scala));
+  return { x: Math.round(slot.x + (maxW - w) / 2), y: Math.round(slot.y + (maxH - h) / 2), w, h };
+}
+
 function vietate(brand: BrandPerScoperte): string[] {
   return Array.from(new Set([...(brand.parole_da_evitare || []), ...PAROLE_SEMPRE_VIETATE]
     .map((p) => String(p).trim())

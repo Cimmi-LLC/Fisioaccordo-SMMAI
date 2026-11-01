@@ -22,7 +22,8 @@ import { callGeminiWithRetry } from "../_shared/gemini.ts";
 import { logGeneration } from "../_shared/historyLogger.ts";
 import { COST_NB2_IMAGE_1K } from "../_shared/brand/costs.ts";
 import { resolveProfession, type ProfessionBrandLike } from "../_shared/brand/profession.ts";
-import type { SlideRole } from "../_shared/brand/archetypes.ts";
+import type { ArchetypeId, SlideRole } from "../_shared/brand/archetypes.ts";
+import { leggiLogo, slideConLogo, type Logo } from "../_shared/logoSlide.ts";
 import {
   CONCURRENCY,
   MODEL_CASCADES,
@@ -73,7 +74,8 @@ type BrandRow = BrandPerScoperte & {
   user_id: string;
   pubblicazione_automatica?: boolean | null;
   auto_orari?: string[] | null;
-  genome?: { palette?: { bg_a?: string; text_on_light?: string } } | null;
+  logo_url?: string | null;
+  genome?: { archetype?: ArchetypeId; palette?: { bg_a?: string; text_on_light?: string } } | null;
 };
 
 type Contesto = {
@@ -85,6 +87,8 @@ type Contesto = {
   models: string[];
   kicker: string;
   colors: PaletteColors;
+  /** Logo del Brand Kit, già letto: va sovrapposto a ogni slide (null = brand senza logo). */
+  logo: Logo | null;
 };
 
 serve(async (req) => {
@@ -212,6 +216,14 @@ async function prepara(
     refCache.set(role, b64);
   }
 
+  // Il logo non sta nei template: si legge qui una volta e va su ogni slide
+  // (nell'app lo sovrappone il browser quando programmi a mano).
+  let logo: Logo | null = null;
+  if (b.logo_url) {
+    logo = await leggiLogo(b.logo_url);
+    if (!logo) return { ok: false, motivo: "Logo del brand non leggibile: caricalo in PNG o JPG nel Brand Kit" };
+  }
+
   const modelKey = String((b as { image_model?: string }).image_model || "nano-2");
   // Stessi colori che usa l'app (useNb2Carousel): palette del genoma del brand.
   const palette = b.genome?.palette;
@@ -230,8 +242,18 @@ async function prepara(
         title_color: palette?.text_on_light || "#1a1a1a",
         body_color: palette?.text_on_light || "#1a1a1a",
       },
+      logo,
     },
   };
+}
+
+/** La slide col logo del brand sopra; senza logo resta com'è. */
+async function conLogo(bytes: Uint8Array, ctx: Contesto, role: SlideRole): Promise<Uint8Array> {
+  if (!ctx.logo) return bytes;
+  const genome = ctx.brand.genome;
+  if (!genome?.archetype) throw new Error("Genoma del template senza archetipo: non so dove mettere il logo");
+  const { png } = await slideConLogo(bytes, ctx.logo, { ...genome, archetype: genome.archetype }, ctx.format, role);
+  return png;
 }
 
 /** Toglie gli orari troppo vicini a un post già in programmazione sullo stesso profilo. */
@@ -480,8 +502,14 @@ async function produciSlide(supabase: Admin, ctx: Contesto, carouselId: string, 
   const prompt = resolveSkeleton(variant.prompt_skeleton, slide, ctx.colors, ctx.kicker);
   const bytes = await generateSlide(Deno.env.get("GEMINI_API_KEY")!, ctx.refCache.get(slide.role)!, prompt, ctx.format, ctx.models);
   if (!bytes) return { ...slide, path: null, error: "nessuna immagine dal modello", status: "failed" };
+  let finale: Uint8Array;
+  try {
+    finale = await conLogo(bytes, ctx, slide.role);
+  } catch (e) {
+    return { ...slide, path: null, error: "logo: " + ((e as Error).message || String(e)), status: "failed" };
+  }
   const path = `${ctx.brand.user_id}/${carouselId}/slide_${slide.index + 1}_${Date.now()}.png`;
-  const { error } = await supabase.storage.from(OUTPUT_BUCKET).upload(path, bytes, { contentType: "image/png", upsert: true });
+  const { error } = await supabase.storage.from(OUTPUT_BUCKET).upload(path, finale, { contentType: "image/png", upsert: true });
   if (error) return { ...slide, path: null, error: error.message, status: "failed" };
   return { ...slide, path, error: null, status: "done" };
 }
