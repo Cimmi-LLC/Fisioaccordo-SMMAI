@@ -233,8 +233,8 @@ async function avviaCoda(admin: Admin, token: string): Promise<number> {
     if (!res.ok) {
       const testo = (await res.text()).slice(0, 300);
       console.error(`Apify non avvia ${giro.tipo}: ${res.status} ${testo}`);
-      // Memoria o giri contemporanei finiti: si riprova al prossimo giro.
-      if (res.status === 402 || res.status === 429 || /memory|concurrent/i.test(testo)) break;
+      // Memoria, giri contemporanei o tetto di spesa mensile di Apify: si riprova al prossimo giro.
+      if (res.status === 402 || res.status === 429 || /memory|concurrent|limit exceeded|platform-feature-disabled/i.test(testo)) break;
       await admin.from("virali_giri").update({ stato: "errore", errore: `Avvio: ${res.status} ${testo}` }).eq("id", giro.id);
       continue;
     }
@@ -272,6 +272,13 @@ async function raccogli(admin: Admin, token: string, inizio: number) {
         esiti.push({ giro: giro.id, tipo: giro.tipo, salvati });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        if (/^Dataset 40[23]$/.test(msg)) {
+          // Il giro è finito ma Apify non dà i dati finché il conto è oltre il tetto mensile:
+          // resta in corso e si rilegge al prossimo giro, senza pagarlo due volte.
+          await admin.from("virali_giri").update({ errore: "Apify: tetto mensile superato, dataset da rileggere" }).eq("id", giro.id);
+          esiti.push({ giro: giro.id, attesa: msg });
+          continue;
+        }
         await admin.from("virali_giri").update({ stato: "errore", errore: msg.slice(0, 500) }).eq("id", giro.id);
         esiti.push({ giro: giro.id, errore: msg });
       }
