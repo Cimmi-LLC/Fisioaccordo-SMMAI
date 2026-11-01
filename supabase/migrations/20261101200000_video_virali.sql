@@ -216,7 +216,7 @@ INSERT INTO public.virali_ricerche (paese, professione, ricerca) VALUES
   ('US', 'fisioterapista', 'back pain'),
   ('US', 'fisioterapista', 'shoulder pain'),
   ('US', 'fisioterapista', 'neck pain'),
-  ('US', 'chiropratico', 'chiropractor'),
+  ('US', 'osteopata', 'chiropractor'),
   ('US', 'nutrizionista', 'nutritionist'),
   ('US', 'nutrizionista', 'weight loss program'),
   ('US', 'personal_trainer', 'online coaching')
