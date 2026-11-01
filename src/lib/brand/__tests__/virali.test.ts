@@ -8,6 +8,9 @@ import {
   leggiReelInstagram,
   leggiVideoTiktok,
   leggiInserzione,
+  senzaSegnaposto,
+  promptCategorie,
+  leggiCategorie,
   handleInErrore,
   giorniFra,
   medieCanale,
@@ -125,6 +128,17 @@ describe('lettura dati Apify', () => {
     expect(leggiInserzione({ adArchiveID: '1', snapshot: { images: [{}] } }, OGGI)).toBeNull();
   });
 
+  it('toglie i segnaposto delle inserzioni di catalogo', () => {
+    expect(senzaSegnaposto('{{product.brand}}')).toBe('');
+    expect(senzaSegnaposto('Materasso {{product.name}} in offerta')).toBe('Materasso in offerta');
+    const a = leggiInserzione({
+      adArchiveID: '7', pageName: 'Negozio', isActive: true,
+      snapshot: { body: { text: '{{product.brand}}' }, title: '{{product.name}}', videos: [{ videoSdUrl: 'https://f/sd.mp4' }] },
+    }, OGGI);
+    expect(a!.testo).toBe('');
+    expect(a!.titolo).toBe('');
+  });
+
   it('conta i giorni con gli estremi compresi', () => {
     expect(giorniFra('2026-10-01', '2026-10-01')).toBe(1);
     expect(giorniFra('2026-10-01', '2026-10-31T23:00:00Z')).toBe(31);
@@ -235,5 +249,27 @@ describe('analisi e copione', () => {
     });
     expect(v).toContain('COPIA VICINA');
     expect(v).toContain('non riusare le sue frasi');
+  });
+});
+
+describe('categorie delle inserzioni', () => {
+  const lista = [
+    { pagina: 'MIND Fisioterapia', testo: 'Valutazione a 19 euro', titolo: '', link: 'https://www.mindfisio.it/prenota', professione: 'fisioterapista' },
+    { pagina: 'Koprez', testo: 'Plantar fasciitis sleeves', titolo: 'Shop now', link: 'notaurl', professione: 'fisioterapista' },
+    { pagina: 'Joel Osteen', testo: '', titolo: '', link: null, professione: 'fisioterapista' },
+  ];
+
+  it('numera le inserzioni e mostra il sito senza www', () => {
+    const p = promptCategorie(lista);
+    expect(p).toContain('1. Pagina: MIND Fisioterapia | Ricerca per: fisioterapista | Sito: mindfisio.it | Testo: Valutazione a 19 euro');
+    expect(p).toContain('2. Pagina: Koprez | Ricerca per: fisioterapista | Testo: Shop now · Plantar fasciitis sleeves');
+    expect(p).toContain('3. Pagina: Joel Osteen | Ricerca per: fisioterapista | Testo: (nessun testo)');
+  });
+
+  it('legge le categorie in ordine e scarta quelle non valide', () => {
+    const raw = '```json\n{"risposte":[{"n":1,"categoria":"studio"},{"n":2,"categoria":"Prodotto"},{"n":3,"categoria":"fuori tema"},{"n":9,"categoria":"studio"}]}\n```';
+    expect(leggiCategorie(raw, 3)).toEqual(['studio', 'prodotto', 'fuori_tema']);
+    expect(leggiCategorie('{"risposte":[{"n":2,"categoria":"boh"}]}', 3)).toEqual([null, null, null]);
+    expect(leggiCategorie('{"altro":1}', 2)).toEqual([null, null]);
   });
 });
