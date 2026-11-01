@@ -131,6 +131,7 @@ const InserzioniTab: React.FC = () => {
       {!caricando && lista.length === 0 && !errore && (
         <div className="rounded-2xl p-8 text-center text-sm" style={{ backgroundColor: 'var(--viola-dim)', color: 'var(--ink)' }}>
           Nessuna inserzione con questi filtri. Le inserzioni si aggiornano una volta al mese.
+          {!filtri.ancheProdotti && ' Prova «Mostra anche i prodotti» o un\'altra professione.'}
         </div>
       )}
 
