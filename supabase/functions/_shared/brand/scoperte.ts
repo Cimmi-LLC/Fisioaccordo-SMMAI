@@ -5,7 +5,8 @@
 // (guardia in __tests__/mirrorSync.test.ts).
 //
 // Passi del pilota automatico (funzione scoperte-automatiche):
-//   1. ricerca su Perplexity (sonar) solo su fonti autorevoli, ultimo mese
+//   1. ricerca con Gemini + Google Search (gratis entro i limiti giornalieri
+//      dell'API) solo su fonti autorevoli, ultimo mese
 //   2. per ogni scoperta nuova, Gemini scrive il carosello in italiano
 //   3. seconda passata di controllo dell'italiano
 //   4. le slide escono col template approvato del brand e il post va in
@@ -41,7 +42,7 @@ export type BrandPerScoperte = {
   auto_temi?: string | null;
 };
 
-/** Domini da cui Perplexity può pescare (il filtro di Perplexity ne accetta al massimo 20). */
+/** Siti da cui si accettano le scoperte: tutto il resto viene scartato. */
 export const DOMINI_AUTOREVOLI = [
   'pubmed.ncbi.nlm.nih.gov',
   'pmc.ncbi.nlm.nih.gov',
@@ -142,62 +143,52 @@ export function temiRicerca(brand: BrandPerScoperte): string {
   return 'dolore muscoloscheletrico, mal di schiena, cervicale, riabilitazione, fisioterapia, osteopatia, postura';
 }
 
-/** Corpo della chiamata a Perplexity (chat/completions, modello sonar). */
-export function richiestaRicerca(temi: string, quante: number, urlGiaUsati: string[]): Record<string, unknown> {
+/** Il sito è fra quelli autorevoli (anche come sottodominio)? */
+export function dominioAutorevole(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    return DOMINI_AUTOREVOLI.some((d) => host === d || host.endsWith('.' + d));
+  } catch {
+    return false;
+  }
+}
+
+/** Corpo della chiamata a Gemini con la ricerca Google attiva. */
+export function richiestaRicerca(temi: string, quante: number, urlGiaUsati: string[], oggi: Date): Record<string, unknown> {
   const esclusi = urlGiaUsati.slice(0, 40);
+  const giorno = oggi.toISOString().slice(0, 10);
   return {
-    model: 'sonar',
-    temperature: 0.2,
-    search_recency_filter: 'month',
-    search_domain_filter: DOMINI_AUTOREVOLI,
-    messages: [
-      {
-        role: 'system',
-        content:
-          'You are a medical research scout. You find RECENT, REAL studies, official guidelines and ' +
-          'authoritative science news. Never invent studies, numbers, dates or URLs: every item must ' +
-          'come from a page you actually found, with its exact URL. Answer only with JSON.',
-      },
-      {
-        role: 'user',
-        content:
-          `Find ${quante} different recent scientific findings (last 30 days if possible, otherwise the most recent) ` +
-          `useful for ordinary people about: ${temi}.\n` +
-          'Prefer: peer-reviewed studies, meta-analyses, official guidelines, university press releases.\n' +
-          'Each finding must change or surprise a common belief, or give something practical people can do.\n' +
-          (esclusi.length > 0 ? `Do NOT return these URLs, already used:\n${esclusi.join('\n')}\n` : '') +
-          'For each item give: title (short, in Italian), takeaways (2-4 short sentences in Italian with the real ' +
-          'numbers from the source), source (journal or institution), url (exact page), date (YYYY-MM-DD or empty), ' +
-          'source_type (study, meta-analysis, guideline, news).',
-      },
-    ],
-    response_format: {
-      type: 'json_schema',
-      json_schema: {
-        schema: {
-          type: 'object',
-          properties: {
-            items: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  title: { type: 'string' },
-                  takeaways: { type: 'array', items: { type: 'string' } },
-                  source: { type: 'string' },
-                  url: { type: 'string' },
-                  date: { type: 'string' },
-                  source_type: { type: 'string' },
-                },
-                required: ['title', 'takeaways', 'source', 'url'],
-              },
-            },
-          },
-          required: ['items'],
-        },
-      },
-    },
+    contents: [{
+      role: 'user',
+      parts: [{
+        text:
+          `Oggi è il ${giorno}. Cerca con Google ${quante} scoperte scientifiche diverse e RECENTI (ultimi 30 giorni se possibile, ` +
+          `altrimenti le più recenti) utili alle persone comuni su: ${temi}.\n` +
+          `Usa SOLO pagine di questi siti: ${DOMINI_AUTOREVOLI.join(', ')}.\n` +
+          'Preferisci studi peer-review, meta-analisi, linee guida ufficiali, comunicati di università.\n' +
+          'Ogni scoperta deve smentire una credenza comune o dare qualcosa di pratico da fare.\n' +
+          'Non inventare studi, numeri, date o link: ogni voce deve venire da una pagina che hai trovato, con il suo indirizzo esatto ' +
+          '(l\'indirizzo vero del sito, non un link di Google).\n' +
+          (esclusi.length > 0 ? `NON usare questi indirizzi, già usati:\n${esclusi.join('\n')}\n` : '') +
+          'Rispondi SOLO con questo JSON, senza altro testo:\n' +
+          '{"items":[{"title":"titolo breve in italiano","takeaways":["2-4 frasi brevi in italiano con i numeri veri della fonte"],' +
+          '"source":"rivista o istituto","url":"https://...","date":"AAAA-MM-GG o vuoto","source_type":"study|meta-analysis|guideline|news"}]}',
+      }],
+    }],
+    tools: [{ google_search: {} }],
+    generationConfig: { temperature: 0.2 },
   };
+}
+
+/** Pagine che Gemini ha davvero consultato (link di rimando di Google, da risolvere). */
+export function fontiConsultate(risposta: unknown): Array<{ uri: string; title: string }> {
+  const r = risposta as {
+    candidates?: Array<{ groundingMetadata?: { groundingChunks?: Array<{ web?: { uri?: string; title?: string } }> } }>;
+  } | null;
+  const chunks = r?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+  return chunks
+    .map((c) => ({ uri: String(c?.web?.uri || ''), title: String(c?.web?.title || '') }))
+    .filter((c) => /^https?:\/\//i.test(c.uri));
 }
 
 function estraiJson(testo: string): unknown {
@@ -228,34 +219,34 @@ export function chiaveUrl(url: string): string {
   }
 }
 
+export type ScopertaLetta = Scoperta & {
+  /** true se l'indirizzo è fra le pagine consultate da Gemini; altrimenti va verificato aprendolo. */
+  consultata: boolean;
+};
+
 /**
- * Legge la risposta di Perplexity. Tiene solo le voci con un URL vero che
- * Perplexity ha davvero consultato (search_results/citations), così non
- * finiscono nei post link inventati dal modello.
+ * Legge la risposta di Gemini. Tiene solo voci di siti autorevoli, con un
+ * indirizzo vero e non già usato. `urlConsultati` sono le pagine della
+ * ricerca Google già risolte: le voci fuori da quella lista restano con
+ * consultata=false e la funzione le apre prima di usarle, così nei post non
+ * finiscono link inventati dal modello.
  */
-export function leggiRicerca(risposta: unknown, urlGiaUsati: string[] = []): Scoperta[] {
-  const r = risposta as {
-    choices?: Array<{ message?: { content?: string } }>;
-    citations?: string[];
-    search_results?: Array<{ url?: string; date?: string; title?: string }>;
-  } | null;
-  const contenuto = r?.choices?.[0]?.message?.content || '';
+export function leggiRicerca(risposta: unknown, urlGiaUsati: string[] = [], urlConsultati: string[] = []): ScopertaLetta[] {
+  const r = risposta as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> } | null;
+  const contenuto = (r?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('');
   const json = estraiJson(contenuto) as { items?: unknown[] } | null;
   const voci = Array.isArray(json?.items) ? json!.items : [];
 
-  const consultati = new Map<string, { date?: string }>();
-  for (const s of r?.search_results || []) if (s?.url) consultati.set(chiaveUrl(s.url), { date: s.date });
-  for (const c of r?.citations || []) if (c && !consultati.has(chiaveUrl(c))) consultati.set(chiaveUrl(c), {});
+  const consultati = new Set(urlConsultati.map(chiaveUrl));
   const usati = new Set(urlGiaUsati.map(chiaveUrl));
   const visti = new Set<string>();
 
-  const out: Scoperta[] = [];
+  const out: ScopertaLetta[] = [];
   for (const v of voci) {
     const o = v as Record<string, unknown>;
     const url = String(o.url || '').trim();
-    if (!/^https?:\/\//i.test(url)) continue;
+    if (!/^https?:\/\//i.test(url) || !dominioAutorevole(url)) continue;
     const k = chiaveUrl(url);
-    if (consultati.size > 0 && !consultati.has(k)) continue;
     if (usati.has(k) || visti.has(k)) continue;
     const titolo = String(o.title || '').trim();
     const sintesi = (Array.isArray(o.takeaways) ? o.takeaways : [])
@@ -263,7 +254,7 @@ export function leggiRicerca(risposta: unknown, urlGiaUsati: string[] = []): Sco
       .filter(Boolean)
       .slice(0, 4);
     if (!titolo || sintesi.length === 0) continue;
-    const dataGrezza = String(o.date || consultati.get(k)?.date || '').trim();
+    const dataGrezza = String(o.date || '').trim();
     const data = /^\d{4}-\d{2}-\d{2}/.test(dataGrezza) ? dataGrezza.slice(0, 10) : null;
     visti.add(k);
     out.push({
@@ -273,6 +264,7 @@ export function leggiRicerca(risposta: unknown, urlGiaUsati: string[] = []): Sco
       url,
       data,
       tipo_fonte: String(o.source_type || '').trim().slice(0, 40) || 'study',
+      consultata: consultati.has(k),
     });
   }
   return out;

@@ -8,6 +8,8 @@
 //       quanti sono gli orari scelti, programmati per oggi o domani.
 //   prova (utente loggato + brandId)        → un solo carosello subito,
 //       programmato al prossimo orario libero. Funziona anche a pilota spento.
+//   anteprima (utente loggato + brandId + soloRicerca) → solo la ricerca,
+//       senza salvare niente.
 //
 // Ogni scoperta trovata finisce in public.scoperte con lo stato del suo
 // giro (nuova, in_produzione, programmata, errore), così l'app mostra da
@@ -37,6 +39,7 @@ import {
 } from "../_shared/carouselProduction.ts";
 import {
   leggiCopy,
+  fontiConsultate,
   leggiRicerca,
   normalizzaOrari,
   paroleVietateTrovate,
@@ -52,7 +55,9 @@ import {
 
 type Admin = ReturnType<typeof adminClient>;
 
-const PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions";
+// Ricerca con Google Search dentro Gemini: gratis entro i limiti giornalieri
+// dell'API, e qui serve una chiamata per brand al giorno.
+const RESEARCH_MODEL = "gemini-2.5-flash";
 const COPY_MODEL = "gemini-2.5-flash";
 // Un post non va programmato a meno di 20 minuti da un altro dello stesso profilo.
 const DISTANZA_MINIMA_MS = 20 * 60 * 1000;
@@ -128,6 +133,16 @@ serve(async (req) => {
     const rl = await requireWithinRateLimit(supabase, auth.userId, "scoperte-automatiche", 3, 3600);
     if (!rl.ok) return jsonResponse(req, { error: rl.error }, rl.status);
 
+    // Anteprima: solo la ricerca, niente salvato. Non servono template né Instagram.
+    if (body.soloRicerca === true) {
+      const { data: brand } = await supabase.from("brands").select("*").eq("id", brandId).maybeSingle();
+      if (!brand) return jsonResponse(req, { error: "Brand non trovato" }, 404);
+      const { data: usate } = await supabase.from("scoperte").select("url").eq("brand_id", brandId).limit(200);
+      const temi = temiRicerca(brand as BrandRow);
+      const trovate = await cerca(temi, 4, ((usate || []) as Array<{ url: string }>).map((r) => r.url));
+      return jsonResponse(req, { temi, scoperte: trovate });
+    }
+
     const prep = await prepara(supabase, brandId);
     if (!prep.ok) return jsonResponse(req, { error: prep.motivo }, 409);
     const candidati = prossimiSlot(normalizzaOrari(prep.ctx.brand.auto_orari), new Date(), 20);
@@ -176,7 +191,6 @@ async function prepara(
     return { ok: false, motivo: "Approva prima il template delle slide di questo brand" };
   }
 
-  if (!Deno.env.get("PERPLEXITY_API_KEY")) return { ok: false, motivo: "Manca la chiave PERPLEXITY_API_KEY sul server" };
   if (!Deno.env.get("GEMINI_API_KEY")) return { ok: false, motivo: "Manca la chiave GEMINI_API_KEY sul server" };
 
   const refCache = new Map<SlideRole, string>();
@@ -275,16 +289,49 @@ async function giro(supabase: Admin, ctx: Contesto, slot: Date[]): Promise<void>
 }
 
 async function cerca(temi: string, quante: number, urlUsati: string[]): Promise<Scoperta[]> {
-  const r = await fetch(PERPLEXITY_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${Deno.env.get("PERPLEXITY_API_KEY")}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(richiestaRicerca(temi, quante, urlUsati)),
+  const res = await callGeminiWithRetry({
+    apiKey: Deno.env.get("GEMINI_API_KEY")!,
+    model: RESEARCH_MODEL,
+    body: richiestaRicerca(temi, quante, urlUsati, new Date()),
   });
-  if (!r.ok) throw new Error(`Perplexity ${r.status}: ${(await r.text()).slice(0, 300)}`);
-  return leggiRicerca(await r.json(), urlUsati);
+  if (!res.ok) throw new Error(`Ricerca Gemini ${res.status}: ${(res.errorBody || "").slice(0, 300)}`);
+
+  // Le fonti arrivano come rimandi di Google: si seguono fino alla pagina vera.
+  const fonti = fontiConsultate(res.data);
+  const risolte = await Promise.all(fonti.map((f) => paginaVera(f.uri)));
+  const consultate = risolte.filter((u): u is string => !!u);
+
+  const lette = leggiRicerca(res.data, urlUsati, consultate);
+  // Le voci che non sono fra le pagine consultate si tengono solo se la pagina esiste davvero.
+  const verificate = await Promise.all(lette.map(async (s) => (s.consultata || (await paginaEsiste(s.url))) ? s : null));
+  const ok = verificate.filter((s): s is NonNullable<typeof s> => !!s);
+  console.log(`Ricerca: ${lette.length} voci, ${fonti.length} pagine consultate, ${ok.length} tenute`);
+  return ok.map(({ consultata: _c, ...s }) => s);
+}
+
+async function paginaVera(uri: string): Promise<string | null> {
+  try {
+    const r = await fetch(uri, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(8000) });
+    await r.body?.cancel();
+    return r.headers.get("location") || (r.status < 400 ? uri : null);
+  } catch {
+    return null;
+  }
+}
+
+async function paginaEsiste(url: string): Promise<boolean> {
+  try {
+    const r = await fetch(url, {
+      method: "GET",
+      redirect: "follow",
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; FisioaccordoBot/1.0)" },
+      signal: AbortSignal.timeout(8000),
+    });
+    await r.body?.cancel();
+    return r.status < 400;
+  } catch {
+    return false;
+  }
 }
 
 async function chiediGemini(prompt: string): Promise<string> {

@@ -8,9 +8,10 @@ import {
   chiaveUrl,
   temiRicerca,
   richiestaRicerca,
+  fontiConsultate,
+  dominioAutorevole,
   paroleVietateTrovate,
   promptCarosello,
-  DOMINI_AUTOREVOLI,
 } from '../scoperte';
 
 describe('orari di pubblicazione', () => {
@@ -43,10 +44,12 @@ describe('orari di pubblicazione', () => {
   });
 });
 
-describe('ricerca su Perplexity', () => {
-  const risposta = (items: unknown[], extra: Record<string, unknown> = {}) => ({
-    choices: [{ message: { content: JSON.stringify({ items }) } }],
-    ...extra,
+describe('ricerca con Gemini + Google', () => {
+  const risposta = (items: unknown[], chunks: string[] = []) => ({
+    candidates: [{
+      content: { parts: [{ text: JSON.stringify({ items }) }] },
+      groundingMetadata: { groundingChunks: chunks.map((uri) => ({ web: { uri, title: 'x' } })) },
+    }],
   });
   const voce = (url: string, titolo = 'Studio sul mal di schiena') => ({
     title: titolo,
@@ -57,37 +60,52 @@ describe('ricerca su Perplexity', () => {
     source_type: 'study',
   });
 
-  it('tiene solo URL davvero consultati da Perplexity', () => {
-    const r = risposta(
-      [voce('https://www.thelancet.com/a'), voce('https://inventato.com/b')],
-      { search_results: [{ url: 'https://thelancet.com/a/', date: '2026-10-12' }] },
-    );
-    const out = leggiRicerca(r);
-    expect(out).toHaveLength(1);
-    expect(out[0].url).toBe('https://www.thelancet.com/a');
+  it('tiene solo siti autorevoli e segna quelli consultati da Google', () => {
+    const r = risposta([voce('https://www.thelancet.com/a'), voce('https://blog-qualsiasi.com/b'), voce('https://bmj.com/c')]);
+    const out = leggiRicerca(r, [], ['https://thelancet.com/a/']);
+    expect(out.map((s) => [s.url, s.consultata])).toEqual([
+      ['https://www.thelancet.com/a', true],
+      ['https://bmj.com/c', false],
+    ]);
     expect(out[0].data).toBe('2026-10-12');
   });
 
-  it('scarta gli URL già usati e i doppioni', () => {
-    const r = risposta([voce('https://bmj.com/x?utm_source=a'), voce('https://bmj.com/x'), voce('https://bmj.com/y')]);
+  it('scarta gli URL già usati, i doppioni e i link di Google', () => {
+    const r = risposta([
+      voce('https://bmj.com/x?utm_source=a'), voce('https://bmj.com/x'), voce('https://bmj.com/y'),
+      voce('https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc'),
+    ]);
     const out = leggiRicerca(r, ['https://www.bmj.com/y']);
     expect(out.map((s) => s.url)).toEqual(['https://bmj.com/x?utm_source=a']);
   });
 
-  it('regge JSON dentro ```json e voci incomplete', () => {
-    const r = { choices: [{ message: { content: '```json\n{"items":[{"title":"","url":"https://a.it"},' +
-      JSON.stringify(voce('https://nih.gov/z')) + ']}\n```' } }] };
+  it('regge JSON dentro ```json, testo spezzato e voci incomplete', () => {
+    const testo = '```json\n{"items":[{"title":"","url":"https://nih.gov/a"},' + JSON.stringify(voce('https://nih.gov/z')) + ']}\n```';
+    const r = { candidates: [{ content: { parts: [{ text: testo.slice(0, 20) }, { text: testo.slice(20) }] } }] };
     expect(leggiRicerca(r).map((s) => s.url)).toEqual(['https://nih.gov/z']);
     expect(leggiRicerca(null)).toEqual([]);
   });
 
-  it('chiede solo domini autorevoli, ultimo mese, e passa gli URL da escludere', () => {
-    const body = richiestaRicerca('mal di schiena', 4, ['https://bmj.com/old']) as Record<string, any>;
-    expect(body.model).toBe('sonar');
-    expect(body.search_recency_filter).toBe('month');
-    expect(body.search_domain_filter).toEqual(DOMINI_AUTOREVOLI);
-    expect(DOMINI_AUTOREVOLI.length).toBeLessThanOrEqual(20);
-    expect(body.messages[1].content).toContain('https://bmj.com/old');
+  it('legge le pagine consultate dai metadati di Google', () => {
+    const r = risposta([], ['https://vertexaisearch.cloud.google.com/grounding-api-redirect/1', 'non-url']);
+    expect(fontiConsultate(r).map((f) => f.uri)).toEqual(['https://vertexaisearch.cloud.google.com/grounding-api-redirect/1']);
+    expect(fontiConsultate(null)).toEqual([]);
+  });
+
+  it('accende la ricerca Google, passa la data e gli URL da escludere', () => {
+    const body = richiestaRicerca('mal di schiena', 4, ['https://bmj.com/old'], new Date('2026-11-01T06:00:00Z')) as Record<string, any>;
+    expect(body.tools).toEqual([{ google_search: {} }]);
+    const testo = body.contents[0].parts[0].text as string;
+    expect(testo).toContain('2026-11-01');
+    expect(testo).toContain('https://bmj.com/old');
+    expect(testo).toContain('pubmed.ncbi.nlm.nih.gov');
+  });
+
+  it('riconosce i domini autorevoli anche come sottodomini', () => {
+    expect(dominioAutorevole('https://www.nature.com/articles/x')).toBe(true);
+    expect(dominioAutorevole('https://news.harvard.edu/x')).toBe(false);
+    expect(dominioAutorevole('https://pubmed.ncbi.nlm.nih.gov/123')).toBe(true);
+    expect(dominioAutorevole('https://fakenature.com/x')).toBe(false);
   });
 
   it('normalizza gli URL per il confronto', () => {

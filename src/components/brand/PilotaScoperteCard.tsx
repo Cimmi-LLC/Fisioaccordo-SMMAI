@@ -59,6 +59,8 @@ export default function PilotaScoperteCard(props: Props) {
   const [provando, setProvando] = useState(false);
   const [requisiti, setRequisiti] = useState<{ instagram: string | null; template: boolean } | null>(null);
   const [scoperte, setScoperte] = useState<ScopertaRow[]>([]);
+  const [anteprima, setAnteprima] = useState<{ temi: string; scoperte: Array<{ titolo: string; sintesi: string[]; fonte: string; url: string; data: string | null }> } | null>(null);
+  const [cercando, setCercando] = useState(false);
 
   const caricaScoperte = useCallback(async () => {
     const { data } = await (supabase as any)
@@ -150,6 +152,23 @@ export default function PilotaScoperteCard(props: Props) {
     }
   };
 
+  const vediAnteprima = async () => {
+    setCercando(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('scoperte-automatiche', { body: { brandId: props.brandId, soloRicerca: true } });
+      if (error) {
+        let msg = error.message;
+        try { msg = (await (error as any).context?.json())?.error || msg; } catch { /* resta il messaggio generico */ }
+        throw new Error(msg);
+      }
+      setAnteprima(data as any);
+    } catch (e: any) {
+      toast({ title: 'Ricerca non riuscita', description: e.message, variant: 'destructive' });
+    } finally {
+      setCercando(false);
+    }
+  };
+
   const scarta = async (id: string) => {
     await (supabase as any).from('scoperte').update({ stato: 'scartata', updated_at: new Date().toISOString() }).eq('id', id);
     caricaScoperte();
@@ -166,7 +185,7 @@ export default function PilotaScoperteCard(props: Props) {
             <FlaskConical className="h-5 w-5" /> Pubblicazione automatica: scoperte scientifiche
           </h2>
           <p className="text-[12px] mt-1" style={{ color: 'var(--ink3)' }}>
-            Ogni mattina cerca studi e notizie recenti da fonti autorevoli (PubMed, Lancet, BMJ, OMS…), scrive il carosello in italiano
+            Ogni mattina cerca con Google studi e notizie recenti da fonti autorevoli (PubMed, Lancet, BMJ, OMS…), scrive il carosello in italiano
             con la fonte, crea le slide col tuo template e lo programma su Instagram agli orari che scegli.
           </p>
         </div>
@@ -269,7 +288,38 @@ export default function PilotaScoperteCard(props: Props) {
           {provando ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />}
           Prova adesso con un carosello
         </button>
+        <button
+          onClick={vediAnteprima}
+          disabled={cercando || modificato}
+          className="flex items-center gap-2 text-[13px] font-bold px-4 py-2 rounded-lg"
+          style={{ color: 'var(--ink)', border: '1px solid var(--line)', opacity: modificato ? 0.5 : 1 }}
+          title={modificato ? 'Salva prima le modifiche' : 'Solo la ricerca: non crea né programma niente'}
+        >
+          {cercando && <Loader2 className="h-4 w-4 animate-spin" />} Vedi cosa troverebbe oggi
+        </button>
       </div>
+
+      {anteprima && (
+        <div className="rounded-xl p-3 space-y-3" style={{ backgroundColor: 'var(--bg)', border: '1px dashed var(--line)' }}>
+          <div className="text-[12px]" style={{ color: 'var(--ink3)' }}>
+            Anteprima, niente salvato. Cercato su: {anteprima.temi}
+          </div>
+          {anteprima.scoperte.length === 0 && (
+            <div className="text-[13px]" style={{ color: 'var(--ink)' }}>Nessuna scoperta nuova da fonti autorevoli.</div>
+          )}
+          {anteprima.scoperte.map((s) => (
+            <div key={s.url} className="text-[13px]">
+              <div className="font-bold" style={{ color: 'var(--ink)' }}>{s.titolo}</div>
+              <ul className="list-disc pl-5" style={{ color: 'var(--ink)' }}>
+                {s.sintesi.map((t, i) => <li key={i}>{t}</li>)}
+              </ul>
+              <a href={s.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[12px] underline" style={{ color: 'var(--ink3)' }}>
+                {s.fonte}{s.data ? ` · ${new Date(s.data).toLocaleDateString('it-IT')}` : ''} <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
 
       {scoperte.length > 0 && (
         <div>
