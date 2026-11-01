@@ -36,6 +36,9 @@ export interface BrandProfile {
   // Content preferences
   parole_da_evitare: string[];
   pubblicazione_automatica: boolean;
+  // Pilota automatico delle scoperte: orari italiani "HH:MM" e argomenti
+  auto_orari?: string[];
+  auto_temi?: string;
   identita_core: string;
   story_templates?: string[];
   // Post template (decorative SVG overlay)
