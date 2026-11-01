@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -9,8 +9,8 @@ import { useActiveBrand } from '@/hooks/useActiveBrand';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { handleValido, normalizzaHandle, numeroBreve, piattaformaDaLink, urlProfilo, type Paese, type Piattaforma } from '@/lib/brand/virali';
 import {
-  aggiornaLibreria, aggiungiAccount, aggiungiRicerca, eliminaAccount, eliminaRicerca, modificaAccount, raccogliAccount,
-  type AccountSeguito, type RicercaInserzioni,
+  aggiornaLibreria, aggiungiAccount, aggiungiRicerca, contoApify, eliminaAccount, eliminaRicerca, modificaAccount, raccogliAccount,
+  type AccountSeguito, type ContoApify, type RicercaInserzioni,
 } from '@/services/virali';
 import { Filtro, OPZIONI_PROFESSIONE, dataBreve, etichettaPaese, etichettaPiattaforma, etichettaProfessione } from './comuni';
 
@@ -97,6 +97,12 @@ const AccountSeguitiTab: React.FC<{
   const [salvo, setSalvo] = useState(false);
   const [aggiornoTutto, setAggiornoTutto] = useState(false);
   const [nuovaRicerca, setNuovaRicerca] = useState({ paese: 'IT' as Paese, professione: 'fisioterapista', ricerca: '' });
+
+  const [conto, setConto] = useState<ContoApify | null>(null);
+  useEffect(() => {
+    if (!isAdmin) return;
+    contoApify().then(setConto).catch((e) => setConto({ ok: false, error: e instanceof Error ? e.message : String(e) }));
+  }, [isAdmin]);
 
   const miei = account.filter((a) => a.user_id === user?.id && a.brand_id === activeBrandId);
   const libreria = account.filter((a) => a.brand_id === null);
@@ -227,6 +233,13 @@ const AccountSeguitiTab: React.FC<{
         <p className="text-sm" style={{ color: 'var(--ink3)' }}>
           Professionisti della salute che fanno tante visualizzazioni e vendono con i video. Si rileggono da soli ogni domenica.
         </p>
+        {isAdmin && conto && (
+          <div className="rounded-xl px-3 py-2 text-xs" style={{ backgroundColor: 'var(--viola-dim)', color: 'var(--ink)' }}>
+            {conto.ok
+              ? <>Conto Apify: <b>{conto.utente}</b>{conto.email ? ` (${conto.email})` : ''}{conto.piano ? ` · piano ${conto.piano}` : ''} · speso questo mese <b>{conto.usato_usd != null ? `${conto.usato_usd.toFixed(2)} $` : '?'}</b> su un tetto di <b>{conto.tetto_usd != null ? `${conto.tetto_usd} $` : '?'}</b>{conto.ciclo_fine ? ` · si azzera il ${dataBreve(conto.ciclo_fine)}` : ''}</>
+              : <>Conto Apify non leggibile: {conto.error}</>}
+          </div>
+        )}
         {[...gruppi.entries()].map(([titolo, lista]) => (
           <div key={titolo} className="rounded-2xl border p-4 bg-white">
             <div className="text-xs font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--ink3)' }}>{titolo} · {lista.length}</div>

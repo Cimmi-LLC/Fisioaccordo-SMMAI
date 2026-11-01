@@ -247,6 +247,21 @@ export function raccogliAccount(accountId: string) {
   return chiama<{ ok: boolean; video?: number; errore?: string | null; error?: string }>('virali-raccolta', { azione: 'account', accountId });
 }
 
+export type ContoApify = {
+  ok: boolean;
+  utente?: string | null;
+  email?: string | null;
+  piano?: string | null;
+  usato_usd?: number | null;
+  tetto_usd?: number | null;
+  ciclo_fine?: string | null;
+  error?: string;
+};
+
+export function contoApify() {
+  return chiama<ContoApify>('virali-raccolta', { azione: 'conto' });
+}
+
 export function aggiornaLibreria() {
   return chiama<{ ok: boolean; giri?: number; avviati?: number; messaggio?: string }>('virali-raccolta', { azione: 'avvia' });
 }

@@ -9,6 +9,8 @@
 //   admin {azione:'avvia'}     → come il cron, dal pulsante «Aggiorna la libreria»
 //   utente {azione:'account', accountId} → un solo account, subito: serve per
 //                                 i competitor appena aggiunti
+//   admin/cron {azione:'conto'}  → di chi è il conto Apify, quanto ha speso nel
+//                                 mese e qual è il tetto (la chiave resta qui)
 //
 // Su Apify i giri durano minuti: si avviano senza aspettarli e si leggono
 // al giro dopo. Il punteggio outlier si ricalcola su tutto lo storico del
@@ -96,6 +98,7 @@ serve(async (req) => {
       if (!cron.ok) return jsonResponse(req, { error: cron.error }, cron.status);
       if (azione === "avvia") return jsonResponse(req, await avvia(admin, token));
       if (azione === "raccogli") return jsonResponse(req, await raccogli(admin, token, inizio));
+      if (azione === "conto") return jsonResponse(req, await contoApify(token));
       return jsonResponse(req, { error: "azione sconosciuta" }, 400);
     }
 
@@ -109,6 +112,11 @@ serve(async (req) => {
     if (azione === "avvia") {
       if (!eAdmin) return jsonResponse(req, { error: "Solo l'admin aggiorna la libreria comune" }, 403);
       return jsonResponse(req, await avvia(admin, token));
+    }
+
+    if (azione === "conto") {
+      if (!eAdmin) return jsonResponse(req, { error: "Solo l'admin vede il conto Apify" }, 403);
+      return jsonResponse(req, await contoApify(token));
     }
 
     if (azione === "account") {
@@ -127,6 +135,26 @@ serve(async (req) => {
     return jsonResponse(req, { error: e instanceof Error ? e.message : "Errore sconosciuto" }, 500);
   }
 });
+
+/** Di chi è il conto Apify, piano, spesa del mese e tetto. Senza la chiave. */
+async function contoApify(token: string) {
+  const leggi = async (percorso: string) => {
+    const res = await fetch(`${APIFY}${percorso}?token=${token}`);
+    return res.ok ? ((await res.json())?.data || null) : null;
+  };
+  const [utente, limiti] = await Promise.all([leggi("/users/me"), leggi("/users/me/limits")]);
+  if (!utente) return { ok: false, error: "Apify non risponde con questa chiave" };
+  return {
+    ok: true,
+    utente: utente.username || null,
+    email: utente.email || null,
+    piano: utente.plan?.id || utente.plan?.description || null,
+    usato_usd: limiti?.current?.monthlyUsageUsd ?? null,
+    tetto_usd: limiti?.limits?.maxMonthlyUsageUsd ?? null,
+    ciclo_inizio: limiti?.monthlyUsageCycle?.startAt ?? null,
+    ciclo_fine: limiti?.monthlyUsageCycle?.endAt ?? null,
+  };
+}
 
 async function isAdmin(admin: Admin, userId: string): Promise<boolean> {
   const { data } = await admin.from("user_roles").select("role").eq("user_id", userId).eq("role", "admin").maybeSingle();
