@@ -40,6 +40,7 @@ import {
 } from "../_shared/carouselProduction.ts";
 import {
   chiaveUrl,
+  etichettaContenuto,
   leggiArticoliPubmed,
   leggiCopy,
   leggiIdPubmed,
@@ -47,6 +48,7 @@ import {
   leggiTermini,
   normalizzaOrari,
   paroleVietateTrovate,
+  problemiDelTesto,
   promptCarosello,
   promptControlloItaliano,
   prossimiSlot,
@@ -400,6 +402,8 @@ async function scriviCopy(brand: BrandRow, s: Scoperta): Promise<CopyScoperta> {
   const copy = corretta && corretta.slides.length === bozza.slides.length ? corretta : bozza;
   const vietate = paroleVietateTrovate(copy, brand);
   if (vietate.length > 0) throw new Error("Parole vietate nel testo: " + vietate.join(", "));
+  const problemi = problemiDelTesto(copy, s);
+  if (problemi.length > 0) throw new Error("Testo da rifare: " + problemi.join(", "));
   return copy;
 }
 
@@ -412,11 +416,13 @@ async function unCarosello(supabase: Admin, ctx: Contesto, s: Scoperta, scoperta
   await aggiornaScoperta(supabase, scopertaId, { stato: "in_produzione" });
   try {
     const copy = await scriviCopy(brand, s);
+    let contenuti = 0;
     const slides: SlideInput[] = copy.slides.map((sl, index) => ({
       index,
       role: sl.role as SlideRole,
       title: sl.title,
       body: sl.body,
+      ...(sl.role === "content" ? { label: etichettaContenuto(contenuti++) } : {}),
     }));
 
     const { data: riga, error: insErr } = await supabase
@@ -438,10 +444,14 @@ async function unCarosello(supabase: Admin, ctx: Contesto, s: Scoperta, scoperta
     const carouselId = (riga as { id: string }).id;
     await aggiornaScoperta(supabase, scopertaId, { carousel_id: carouselId });
 
+    // patchSlide rilegge e riscrive tutto l'elenco: in parallelo una slide
+    // cancellava l'altra (5 su 6 restavano «pending» nell'archivio). In fila.
+    let coda: Promise<void> = Promise.resolve();
     const risultati = await runPool(
       slides.map((sl) => async () => {
         const r = await produciSlide(supabase, ctx, carouselId, sl);
-        await patchSlide(supabase, carouselId, r);
+        coda = coda.then(() => patchSlide(supabase, carouselId, r));
+        await coda;
         return r;
       }),
       CONCURRENCY,
@@ -450,7 +460,12 @@ async function unCarosello(supabase: Admin, ctx: Contesto, s: Scoperta, scoperta
     const stato = ok === slides.length ? "ready" : ok > 0 ? "partial" : "failed";
     await supabase
       .from("produced_carousels")
-      .update({ status: stato, ok_count: ok, updated_at: new Date().toISOString() })
+      .update({
+        slides: [...risultati].sort((a, b) => a.index - b.index),
+        status: stato,
+        ok_count: ok,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", carouselId);
     await logGeneration({
       userId: brand.user_id,
@@ -499,7 +514,12 @@ async function unCarosello(supabase: Admin, ctx: Contesto, s: Scoperta, scoperta
 
 async function produciSlide(supabase: Admin, ctx: Contesto, carouselId: string, slide: SlideInput): Promise<SlideRecord> {
   const variant = ctx.byRole.get(slide.role)!;
-  const prompt = resolveSkeleton(variant.prompt_skeleton, slide, ctx.colors, ctx.kicker);
+  let prompt = resolveSkeleton(variant.prompt_skeleton, slide, ctx.colors, ctx.kicker);
+  // Nella prova del 01/11 il titolo della chiusura è andato sopra al testo.
+  if (slide.role === "cta") {
+    prompt += "\nLayout of the text block: the headline may wrap onto at most 2 lines; the supporting line sits BELOW " +
+      "the last headline line, with the same gap as in the reference. Text must never overlap other text.";
+  }
   const bytes = await generateSlide(Deno.env.get("GEMINI_API_KEY")!, ctx.refCache.get(slide.role)!, prompt, ctx.format, ctx.models);
   if (!bytes) return { ...slide, path: null, error: "nessuna immagine dal modello", status: "failed" };
   let finale: Uint8Array;

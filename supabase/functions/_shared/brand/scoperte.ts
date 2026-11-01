@@ -35,6 +35,7 @@ export type CopyScoperta = {
 
 export type BrandPerScoperte = {
   nome_business?: string | null;
+  descrizione?: string | null;
   target_pazienti?: string | null;
   tono_voce?: string | null;
   persona_scrittura?: string | null;
@@ -272,12 +273,16 @@ export function richiestaScelta(
           '(esercizio, movimento, postura, terapie manuali, abitudini, alimentazione). Scarta studi su farmaci, iniezioni, ' +
           'chirurgia, macchinari da ospedale, studi su animali o con risultati poco chiari.\n' +
           (esclusi.length > 0 ? `Non ripetere argomenti già usati:\n${esclusi.map((t) => `- ${t}`).join('\n')}\n` : '') +
-          'Usa solo i dati dell\'abstract, con i numeri veri; non aggiungere nulla.\n\nSTUDI\n' +
+          'Preferisci gli studi con numeri che un paziente capisce (quante persone, quanti studi, percentuali, minuti, ' +
+          'settimane).\n' +
+          'Usa solo i dati dell\'abstract, con i numeri veri; non aggiungere nulla. Scrivi sempre quanti studi o quante ' +
+          'persone ha esaminato, se l\'abstract lo dice. Le sigle statistiche (SMD, OR, RR, IC, p) non vanno scritte: ' +
+          'di\' a parole se l\'effetto è piccolo, moderato o grande.\n\nSTUDI\n' +
           studi.map((s) =>
             `[PMID ${s.pmid}] ${s.rivista} · ${s.data || 'data n.d.'} · ${s.tipi.join(', ')}\n${s.titolo}\n${s.abstract.slice(0, 1400)}`,
           ).join('\n\n') +
           '\n\nRispondi SOLO con JSON: {"items":[{"pmid":"numero","title":"titolo breve in italiano, comprensibile a tutti",' +
-          '"takeaways":["2-4 frasi brevi in italiano con i numeri veri"]}]}',
+          '"takeaways":["2-4 frasi brevi in italiano con i numeri veri, senza sigle statistiche"]}]}',
       }],
     }],
     generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
@@ -429,14 +434,15 @@ function vietate(brand: BrandPerScoperte): string[] {
 /** Prompt per Gemini: dal risultato della ricerca al carosello in italiano. */
 export function promptCarosello(brand: BrandPerScoperte, s: Scoperta, numSlide = 6): string {
   const n = Math.min(Math.max(numSlide, 5), 7);
-  const persona = brand.persona_scrittura === 'io'
-    ? "prima persona singolare (io, nel mio studio)"
-    : "prima persona plurale (noi, nel nostro studio)";
+  // Niente "nel nostro studio": non tutti i brand sono uno studio (Terapista
+  // Stellato è una piattaforma). Chi siete lo dice la descrizione.
+  const persona = brand.persona_scrittura === 'io' ? "prima persona singolare (io)" : "prima persona plurale (noi)";
+  const chi = (brand.descrizione || '').trim();
   const cta = (brand.cta_suggerite || []).filter(Boolean);
   const anno = s.data ? s.data.slice(0, 4) : '';
   return `Sei il copywriter di "${brand.nome_business || 'lo studio'}", che pubblica su Instagram contenuti di divulgazione scientifica sulla salute.
 Scrivi UN carosello Instagram in ITALIANO CORRETTO partendo da questa scoperta reale.
-
+${chi ? `\nCHI SIETE\n${chi}\n` : ''}
 SCOPERTA
 Titolo: ${s.titolo}
 Fonte: ${s.fonte}${anno ? ` (${anno})` : ''}
@@ -450,16 +456,18 @@ Tono: ${brand.tono_voce || 'autorevole ma caldo'}. Voce: ${persona}.
 
 STRUTTURA (${n} slide)
 1. cover: hook giornalistico che ferma lo scroll e rompe una credenza comune. Puoi aprire con "Ultima scoperta:" o con il dato più sorprendente. Il lettore deve capire subito che parla di lui.
-2-${n - 1}. content, nell'ordine: la situazione di tutti i giorni in cui il lettore si riconosce; cosa ha trovato lo studio (con il numero vero, se c'è); perché succede, spiegato da terza media; cosa può fare già oggi (consiglio pratico e sicuro).
-${n}. cta: chiusura con una CTA morbida${cta.length > 0 ? ` scelta fra: ${cta.join(' · ')}` : ' (salva il post, mandalo a chi ne ha bisogno, segui la pagina)'}.
+2-${n - 1}. content, nell'ordine: la situazione di tutti i giorni in cui il lettore si riconosce; cosa ha trovato lo studio, con almeno un numero vero della scoperta (quante persone o quanti studi, oppure il risultato); perché succede, spiegato da terza media; cosa può fare già oggi (consiglio pratico e sicuro).
+${n}. cta: chiusura con UNA sola azione morbida${cta.length > 0 ? ` scelta fra: ${cta.join(' · ')}` : ' (salva il post, oppure mandalo a chi ne ha bisogno, oppure segui la pagina)'}. Titolo di massimo 3 parole, testo di UNA frase di massimo 8 parole.
 
 REGOLE
 - Titolo di ogni slide: massimo 6 parole. Testo: massimo 2 frasi brevi.
 - Usa SOLO i dati della scoperta qui sopra. Non inventare numeri, percentuali, università o studi.
+- Niente sigle statistiche (SMD, OR, RR, IC, p): l'effetto si dice a parole, i numeri sono persone, studi, percentuali, tempi.
+- Non scrivere "nel nostro studio", "i nostri pazienti" o "veniamo a trovarci" se in CHI SIETE non c'è scritto che siete uno studio.
 - Niente diagnosi né promesse di guarigione; niente vendita diretta.
 - Frasi corte, parole semplici, italiano naturale come lo scriverebbe un terapista italiano. Niente traduzioni letterali dall'inglese.
 - Parole vietate (mai usarle, nemmeno coniugate): ${vietate(brand).join(', ')}.
-- caption: 5-10 righe che riprendono il carosello, poi una riga "Fonte: ${s.fonte}${anno ? `, ${anno}` : ''}" (senza link).
+- caption: 5-10 righe che riprendono il carosello, con lo stesso numero dello studio; la prima riga è l'hook, non chi siete. Poi una riga "Fonte: ${s.fonte}${anno ? `, ${anno}` : ''}" (senza link).
 - hashtags: 5-8 hashtag italiani pertinenti, separati da spazio.
 
 Rispondi SOLO con questo JSON:
@@ -471,7 +479,8 @@ export function promptControlloItaliano(copy: CopyScoperta, brand: BrandPerScope
   return `Sei un correttore di bozze italiano madrelingua. Rileggi questo carosello Instagram e correggi:
 grammatica, accordi, punteggiatura, parole inglesi o calchi dall'inglese, frasi innaturali, maiuscole sbagliate.
 Non cambiare i fatti, i numeri, la struttura, i ruoli delle slide o il numero di slide.
-Titoli di massimo 6 parole, testi di massimo 2 frasi.
+Titoli di massimo 6 parole, testi di massimo 2 frasi; l'ultima slide (cta) ha titolo di massimo 3 parole e una frase sola.
+Se ci sono sigle statistiche (SMD, OR, RR, IC, p), riscrivi l'effetto a parole tenendo gli altri numeri.
 Togli queste parole se compaiono: ${vietate(brand).join(', ')}.
 Rispondi SOLO con lo stesso JSON corretto.
 
@@ -500,6 +509,10 @@ export function leggiCopy(testo: string, brand: BrandPerScoperte = {}): CopyScop
   for (const s of slides) {
     if (contaParole(s.title) > 8) s.title = s.title.split(/\s+/).slice(0, 8).join(' ');
   }
+  // Nella chiusura del template c'è posto per una riga sotto il titolo: un
+  // testo lungo finisce sopra al titolo. Si tiene solo la prima frase.
+  const chiusura = slides[slides.length - 1];
+  chiusura.body = (chiusura.body.match(/^[^.!?]*[.!?]?/)?.[0] || chiusura.body).trim();
   const copy: CopyScoperta = {
     titolo_carosello: String(j.titolo_carosello || slides[0].title).trim(),
     caption: String(j.caption || '').trim(),
@@ -516,4 +529,31 @@ export function paroleVietateTrovate(copy: CopyScoperta, brand: BrandPerScoperte
     .join(' ')
     .toLowerCase();
   return vietate(brand).filter((p) => new RegExp(`\\b${p.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\w*`).test(testo));
+}
+
+/** Sigle statistiche che il paziente non capisce: se restano, il carosello non esce. */
+const SIGLE_STATISTICHE = /\b(SMD|OR|RR|HR|IC|CI|MD|p\s*[<=>])\s*[:=]?\s*[\d(]/;
+
+/**
+ * Problemi di contenuto che bloccano il carosello prima di fare le immagini:
+ * sigle statistiche, oppure nessun numero nelle slide quando la scoperta ne ha.
+ */
+export function problemiDelTesto(copy: CopyScoperta, s: Scoperta): string[] {
+  const slide = copy.slides.map((x) => `${x.title} ${x.body}`).join(' ');
+  const problemi: string[] = [];
+  if (SIGLE_STATISTICHE.test(`${slide} ${copy.caption}`)) problemi.push('sigle statistiche nel testo');
+  const numeri = (t: string) => (t.replace(/\b(19|20)\d{2}\b/g, '').match(/\d/g) || []).length;
+  if (numeri(s.sintesi.join(' ')) > 0 && numeri(slide) === 0) problemi.push('nessun numero dello studio nelle slide');
+  return problemi;
+}
+
+/**
+ * Etichetta sopra il titolo delle slide di contenuto, fissa e nell'ordine
+ * della struttura del carosello: il modello delle immagini, lasciato libero,
+ * inventa parole come "Contraddittorio".
+ */
+export const ETICHETTE_CONTENUTO = ['LA SITUAZIONE', 'LO STUDIO', 'PERCHÉ SUCCEDE', 'COSA PUOI FARE'];
+
+export function etichettaContenuto(posizione: number): string {
+  return ETICHETTE_CONTENUTO[posizione] ?? 'IN PRATICA';
 }

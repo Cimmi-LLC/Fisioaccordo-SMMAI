@@ -20,6 +20,9 @@ import {
   posizioneLogo,
   slotLogoDelBrand,
   slotPiuLibero,
+  problemiDelTesto,
+  etichettaContenuto,
+  type CopyScoperta,
 } from '../scoperte';
 
 describe('orari di pubblicazione', () => {
@@ -201,5 +204,52 @@ describe('carosello', () => {
     expect(p).toContain('Terapista Stellato');
     expect(p).toContain('Fonte: The Lancet, 2026');
     expect(p).toContain('sbloccare');
+  });
+});
+
+describe('correzioni dopo la prova del 01/11 su Terapista Stellato', () => {
+  const scoperta = {
+    titolo: 'Colloquio motivazionale e mal di schiena',
+    sintesi: ['Meta-analisi di 12 studi su 1.480 persone.', 'Effetto moderato sull\'attività fisica.'],
+    fonte: 'Annals of behavioral medicine', url: 'https://pubmed.ncbi.nlm.nih.gov/1/', data: '2026-10-20', tipo_fonte: 'meta-analysis',
+  };
+  const copy = (slides: CopyScoperta['slides'], caption = 'Hook. Fonte: Annals, 2026'): CopyScoperta =>
+    ({ titolo_carosello: 't', caption, hashtags: '', slides });
+
+  it('la chiusura tiene una sola frase sotto il titolo', () => {
+    const c = leggiCopy(JSON.stringify({
+      caption: 'c',
+      slides: [
+        { role: 'cover', title: 'A', body: '' },
+        { role: 'content', title: 'B', body: 'b' },
+        { role: 'cta', title: 'Non restare fermo!', body: 'Salva questo post. Segui la pagina e condividi.' },
+      ],
+    }))!;
+    expect(c.slides[2].body).toBe('Salva questo post.');
+  });
+
+  it('blocca le sigle statistiche e le slide senza numeri quando lo studio li ha', () => {
+    const senzaNumeri = copy([{ role: 'content', title: 'Lo studio', body: 'Risultati significativi.' }]);
+    expect(problemiDelTesto(senzaNumeri, scoperta)).toEqual(['nessun numero dello studio nelle slide']);
+    const conSigla = copy([{ role: 'content', title: 'Lo studio', body: '12 studi, SMD: 0.57.' }]);
+    expect(problemiDelTesto(conSigla, scoperta)).toEqual(['sigle statistiche nel testo']);
+    const buono = copy([{ role: 'content', title: 'Lo studio', body: '12 studi su 1.480 persone: si muovono di più.' }]);
+    expect(problemiDelTesto(buono, scoperta)).toEqual([]);
+    // L'anno della fonte non conta come numero dello studio.
+    expect(problemiDelTesto(copy([{ role: 'content', title: 'Studio del 2026', body: 'x' }]), scoperta))
+      .toEqual(['nessun numero dello studio nelle slide']);
+    expect(problemiDelTesto(senzaNumeri, { ...scoperta, sintesi: ['Senza numeri.'] })).toEqual([]);
+  });
+
+  it('etichette fisse sulle slide di contenuto', () => {
+    expect([0, 1, 2, 3, 4].map(etichettaContenuto)).toEqual(['LA SITUAZIONE', 'LO STUDIO', 'PERCHÉ SUCCEDE', 'COSA PUOI FARE', 'IN PRATICA']);
+  });
+
+  it('il prompt non dà per scontato uno studio e usa la descrizione del brand', () => {
+    const p = promptCarosello({ nome_business: 'Terapista Stellato', descrizione: 'Piattaforma che seleziona i migliori terapisti.' }, scoperta);
+    expect(p).toContain('CHI SIETE\nPiattaforma che seleziona i migliori terapisti.');
+    expect(p).not.toContain('(noi, nel nostro studio)');
+    expect(p).toContain('Non scrivere "nel nostro studio"');
+    expect(p).toContain('UNA sola azione');
   });
 });

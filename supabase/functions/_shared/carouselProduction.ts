@@ -31,6 +31,8 @@ export type SlideInput = {
   body?: string;
   number?: string;
   illustration?: string;
+  /** Etichetta esatta accanto al numero (pilota scoperte); senza, la sceglie il modello. */
+  label?: string;
 };
 
 export type SlideRecord = SlideInput & {
@@ -64,10 +66,13 @@ export function resolveSkeleton(skeleton: string, slide: SlideInput, colors: Pal
   // generati prima del fix il segnaposto era la parola letterale "Label".
   // Istruzione globale: mai copiarla, sostituirla con una parola vera.
   if (slide.role === "content") {
+    prompt += slide.label
+      ? `\nThe small label above the headline (next to the index number, where the reference has its label) must be ` +
+        `exactly "${slide.label}". Write no other word there.`
+      : "\nIf the layout includes a short label next to the index number, write there ONE real Italian word " +
+        "that categorizes this slide content (for example Postura, Metodo, Consiglio). " +
+        "Never write placeholder words such as Label, Testo or Categoria.";
     prompt +=
-      "\nIf the layout includes a short label next to the index number, write there ONE real Italian word " +
-      "that categorizes this slide content (for example Postura, Metodo, Consiglio). " +
-      "Never write placeholder words such as Label, Testo or Categoria." +
       "\nAny image or illustration on this slide must be a CUTOUT: subject isolated along its own silhouette " +
       "directly on the flat background, like a sticker. Never place images inside rectangles: " +
       "no straight photo edges, no frames, no photo boxes.";
