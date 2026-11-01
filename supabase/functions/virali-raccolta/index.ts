@@ -223,7 +223,8 @@ function inputApify(giro: Pick<Giro, "tipo" | "parametri">): Grezzo {
       username: p.handles,
       resultsLimit: p.limite,
       ...(p.recenti ? { onlyPostsNewerThan: "35 days" } : {}),
-      skipPinnedPosts: false,
+      // I video fissati in cima sono vecchi successi: costano e falsano l'outlier.
+      skipPinnedPosts: true,
       includeSharesCount: true,
     };
   }
@@ -233,7 +234,7 @@ function inputApify(giro: Pick<Giro, "tipo" | "parametri">): Grezzo {
       resultsPerPage: p.limite,
       profileScrapeSections: ["videos"],
       profileSorting: "latest",
-      excludePinnedPosts: false,
+      excludePinnedPosts: true,
       shouldDownloadVideos: false,
       shouldDownloadCovers: false,
       shouldDownloadSubtitles: false,

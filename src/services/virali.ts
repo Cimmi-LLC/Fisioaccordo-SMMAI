@@ -99,12 +99,12 @@ export function urlCopertina(percorso: string | null): string | null {
 }
 
 export async function listaVideo(f: FiltriVideo, pagina: number): Promise<VideoVirale[]> {
-  let q = db.from('virali_video').select('*');
+  let q = db.from('virali_video_vista').select('*');
   if (f.paese !== 'tutti') q = q.eq('paese', f.paese);
   if (f.piattaforma !== 'tutte') q = q.eq('piattaforma', f.piattaforma);
   if (f.professione !== 'tutte') q = q.eq('professione', f.professione);
   if (f.giorni) q = q.gte('pubblicato_il', new Date(Date.now() - f.giorni * 86400000).toISOString());
-  if (f.nascondiSponsorizzate) q = q.or('engagement.gte.0.02,engagement.is.null');
+  if (f.nascondiSponsorizzate) q = q.eq('sponsorizzata_probabile', false);
   if (f.soloHandle && f.soloHandle.length) q = q.in('handle', f.soloHandle);
   if (f.ordine === 'salvati') q = q.not('salvataggi', 'is', null).order('salvataggi', { ascending: false });
   else if (f.ordine === 'views') q = q.order('views', { ascending: false, nullsFirst: false });

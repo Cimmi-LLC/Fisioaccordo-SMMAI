@@ -121,7 +121,8 @@ const VideoViraliTab: React.FC<{ soloHandle?: string[] | null }> = ({ soloHandle
           opzioni={[{ id: '30', label: 'Ultimo mese' }, { id: '90', label: 'Ultimi 3 mesi' }, { id: '180', label: 'Ultimi 6 mesi' }, { id: '0', label: 'Sempre' }]} />
         <Filtro etichetta="Ordina per" valore={filtri.ordine} onChange={(v) => set('ordine', v as FiltriVideo['ordine'])} larghezza="w-64"
           opzioni={[{ id: 'outlier', label: 'Più sopra la media (outlier)' }, { id: 'views', label: 'Più visualizzazioni' }, { id: 'salvati', label: 'Più salvati (TikTok)' }]} />
-        <label className="flex items-center gap-2 text-xs font-semibold pb-2" style={{ color: 'var(--ink3)' }}>
+        <label className="flex items-center gap-2 text-xs font-semibold pb-2" style={{ color: 'var(--ink3)' }}
+          title="Video con meno di un terzo delle interazioni tipiche del canale: di solito sono spinti con le inserzioni.">
           <Switch checked={filtri.nascondiSponsorizzate} onCheckedChange={(c) => set('nascondiSponsorizzate', c)} />
           Nascondi le probabili sponsorizzate
         </label>

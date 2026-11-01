@@ -6,7 +6,8 @@
 // wiki/concepts/metodo-contenuti-organici-kallaway.md):
 //   - outlier = visualizzazioni ÷ media del canale negli ultimi 3 mesi;
 //     da studiare sopra 5x, il sistema a batch cerca il 10x;
-//   - engagement sotto il 2% = probabile sponsorizzata, si scarta;
+//   - le probabili sponsorizzate (engagement sotto un terzo di quello tipico
+//     del canale) si nascondono: lo calcola la vista virali_video_vista;
 //   - copia esatta = cambia 1 mattoncino, copia vicina = ne cambia 2-3.
 // Per i soldi: un'inserzione che resta accesa per settimane sta vendendo,
 // nessuno paga per mesi un video che non rende.
@@ -27,8 +28,6 @@ export const PAESI: Array<{ id: Paese; label: string }> = [
 /** Outlier da studiare (Kallaway 2.4) e outlier forte (sistema a batch). */
 export const OUTLIER_DA_STUDIARE = 5;
 export const OUTLIER_FORTE = 10;
-/** Sotto questo engagement il video è probabilmente sponsorizzato. */
-export const ENGAGEMENT_MINIMO = 0.02;
 /** Giorni della media mobile del canale. */
 export const GIORNI_MEDIA = 90;
 /** Sotto questi video negli ultimi 90 giorni la media usa tutti quelli letti. */
@@ -569,7 +568,7 @@ Hook visivo: ${analisi.hook.visivo}
 Struttura: ${analisi.struttura.join(' → ')}
 CTA (${analisi.cta.tipo}): ${analisi.cta.testo}
 Layout: ${analisi.layout} · Inquadratura: ${analisi.inquadratura}
-Elementi: ${analisi.elementi.join(', ')}
+Elementi: ${analisi.elementi.join(', ')}${analisi.durata_s ? `\nDurata: ${Math.round(analisi.durata_s)} secondi` : ''}
 Parlato:
 ${parlato}
 
@@ -585,7 +584,7 @@ Parole da evitare: ${lista(brand.parole_da_evitare)}
 
 REGOLE
 - ${regolaCopia}
-- Il target si richiama da subito: la prima frase detta e il testo in alto dicono chi è la persona o il suo problema (es. «Hai male alla spalla quando alzi il braccio?»), prima del concetto. Mai parole generiche che non dicono con chi parli.
+- Il target si richiama da subito: la prima frase detta e il testo in alto dicono chi è la persona o il suo problema (es. «Hai male alla spalla quando alzi il braccio?»), prima del concetto. Mai parole generiche che non dicono con chi parli. Testo in alto, prima frase e resto del video parlano dello stesso problema (se apri sul collo, non passi alla schiena).
 - Hook allineato: parlato, testo in alto e visivo dicono la stessa cosa nello stesso momento. Testo in alto al massimo 6 parole, grande, mai in basso.
 - Valore entro 5 secondi e almeno un consiglio pratico che si applica subito, concreto come nell'originale: numeri, tempi, posizioni, ripetizioni (es. «dieci respiri lenti da sdraiato», non «fai esercizi di stabilità»). Ogni frase deve valere: se non la pagheresti 100 dollari, toglila.
 - Nel corpo del video solo valore: niente frasi che presentano lo studio o il professionista («noi ti guidiamo…», «nel nostro studio…»). Lo studio compare solo nella CTA.
@@ -594,6 +593,7 @@ REGOLE
 - Niente nomi, marchi o prodotti del video originale. Niente diagnosi, niente promesse di guarigione. Mai la parola «sbloccare»: si dice aiutare, risolvere in meno tempo, più risultati.
 - "frasi" contiene tutto il parlato, dall'hook alla CTA compresi, una frase per riga, nell'ordine in cui si dice.
 - "semplice" è true solo se si registra da soli col telefono parlando in camera, senza altre persone, oggetti particolari o b-roll da girare.
+- "durata_stimata_s" è la durata dell'originale, più o meno 10%. "come_girarlo" dà solo indicazioni utili (inquadratura, luce, ritmo, cosa mostrare): niente dettagli dell'originale che non servono, come vestiti od oggetti a caso.
 
 JSON:
 {
