@@ -41,6 +41,8 @@ import {
   leggiCopy,
   fontiConsultate,
   leggiRicerca,
+  richiestaEstrazione,
+  testoConFonti,
   normalizzaOrari,
   paroleVietateTrovate,
   promptCarosello,
@@ -130,17 +132,22 @@ serve(async (req) => {
     if (!brandId) return jsonResponse(req, { error: "brandId obbligatorio" }, 400);
     const own = await assertBrandOwnership(supabase, auth.userId, brandId);
     if (!own.ok) return jsonResponse(req, { error: own.error }, own.status);
-    const rl = await requireWithinRateLimit(supabase, auth.userId, "scoperte-automatiche", 3, 3600);
+    // Anteprima (solo ricerca) e prova (carosello vero) hanno limiti separati.
+    const anteprima = body.soloRicerca === true;
+    const rl = await requireWithinRateLimit(
+      supabase, auth.userId, anteprima ? "scoperte-anteprima" : "scoperte-automatiche", anteprima ? 10 : 3, 3600,
+    );
     if (!rl.ok) return jsonResponse(req, { error: rl.error }, rl.status);
 
     // Anteprima: solo la ricerca, niente salvato. Non servono template né Instagram.
-    if (body.soloRicerca === true) {
+    if (anteprima) {
       const { data: brand } = await supabase.from("brands").select("*").eq("id", brandId).maybeSingle();
       if (!brand) return jsonResponse(req, { error: "Brand non trovato" }, 404);
-      const { data: usate } = await supabase.from("scoperte").select("url").eq("brand_id", brandId).limit(200);
+      const { data: usate } = await supabase
+        .from("scoperte").select("url, titolo").eq("brand_id", brandId).order("created_at", { ascending: false }).limit(200);
       const temi = temiRicerca(brand as BrandRow);
-      const trovate = await cerca(temi, 4, ((usate || []) as Array<{ url: string }>).map((r) => r.url));
-      return jsonResponse(req, { temi, scoperte: trovate });
+      const { scoperte: trovate, diagnosi } = await cerca(temi, 4, (usate || []) as Array<{ url: string; titolo: string }>);
+      return jsonResponse(req, { temi, scoperte: trovate, diagnosi });
     }
 
     const prep = await prepara(supabase, brandId);
@@ -245,13 +252,12 @@ async function giro(supabase: Admin, ctx: Contesto, slot: Date[]): Promise<void>
   try {
     const { data: usate } = await supabase
       .from("scoperte")
-      .select("url")
+      .select("url, titolo")
       .eq("brand_id", brand.id)
       .order("created_at", { ascending: false })
       .limit(200);
-    const urlUsati = ((usate || []) as Array<{ url: string }>).map((r) => r.url);
 
-    const scoperte = await cerca(temiRicerca(brand), Math.max(slot.length * 2, 4), urlUsati);
+    const { scoperte } = await cerca(temiRicerca(brand), Math.max(slot.length * 2, 4), (usate || []) as Array<{ url: string; titolo: string }>);
     if (scoperte.length === 0) {
       console.warn("Nessuna scoperta nuova per", brand.id);
       return;
@@ -288,25 +294,44 @@ async function giro(supabase: Admin, ctx: Contesto, slot: Date[]): Promise<void>
   }
 }
 
-async function cerca(temi: string, quante: number, urlUsati: string[]): Promise<Scoperta[]> {
+type Diagnosi = { pagine: number; risolte: number; frasi: number; tenute: number; siti_scartati: string[] };
+
+/**
+ * Ricerca in due passi: Gemini cerca con Google e scrive in testo libero;
+ * poi, senza ricerca, mette le scoperte in JSON scegliendo per ognuna il
+ * numero di una pagina consultata. L'indirizzo si prende da quella pagina.
+ */
+async function cerca(
+  temi: string,
+  quante: number,
+  usate: { url: string; titolo: string }[],
+): Promise<{ scoperte: Scoperta[]; diagnosi: Diagnosi }> {
+  const apiKey = Deno.env.get("GEMINI_API_KEY")!;
   const res = await callGeminiWithRetry({
-    apiKey: Deno.env.get("GEMINI_API_KEY")!,
+    apiKey,
     model: RESEARCH_MODEL,
-    body: richiestaRicerca(temi, quante, urlUsati, new Date()),
+    body: richiestaRicerca(temi, quante, usate.map((u) => u.titolo), new Date()),
   });
   if (!res.ok) throw new Error(`Ricerca Gemini ${res.status}: ${(res.errorBody || "").slice(0, 300)}`);
 
+  const { testo, frasi } = testoConFonti(res.data);
   // Le fonti arrivano come rimandi di Google: si seguono fino alla pagina vera.
-  const fonti = fontiConsultate(res.data);
-  const risolte = await Promise.all(fonti.map((f) => paginaVera(f.uri)));
-  const consultate = risolte.filter((u): u is string => !!u);
+  const consultate = fontiConsultate(res.data);
+  const risolte = await Promise.all(consultate.map(async (f) => ({ n: f.n, sito: f.title, url: await paginaVera(f.uri) })));
+  const fonti = risolte.filter((f): f is { n: number; sito: string; url: string } => !!f.url);
+  const diagnosi: Diagnosi = { pagine: consultate.length, risolte: fonti.length, frasi: frasi.length, tenute: 0, siti_scartati: [] };
+  if (!testo.trim() || fonti.length === 0) {
+    console.log("Ricerca senza pagine consultate:", JSON.stringify(diagnosi), testo.slice(0, 300));
+    return { scoperte: [], diagnosi };
+  }
 
-  const lette = leggiRicerca(res.data, urlUsati, consultate);
-  // Le voci che non sono fra le pagine consultate si tengono solo se la pagina esiste davvero.
-  const verificate = await Promise.all(lette.map(async (s) => (s.consultata || (await paginaEsiste(s.url))) ? s : null));
-  const ok = verificate.filter((s): s is NonNullable<typeof s> => !!s);
-  console.log(`Ricerca: ${lette.length} voci, ${fonti.length} pagine consultate, ${ok.length} tenute`);
-  return ok.map(({ consultata: _c, ...s }) => s);
+  const estr = await callGeminiWithRetry({ apiKey, model: COPY_MODEL, body: richiestaEstrazione(testo, frasi, fonti) });
+  if (!estr.ok) throw new Error(`Estrazione Gemini ${estr.status}: ${(estr.errorBody || "").slice(0, 300)}`);
+  const { scoperte, scartate } = leggiRicerca(estr.data, fonti, usate.map((u) => u.url));
+  diagnosi.tenute = scoperte.length;
+  diagnosi.siti_scartati = Array.from(new Set(scartate));
+  console.log("Ricerca:", JSON.stringify(diagnosi));
+  return { scoperte, diagnosi };
 }
 
 async function paginaVera(uri: string): Promise<string | null> {
@@ -316,21 +341,6 @@ async function paginaVera(uri: string): Promise<string | null> {
     return r.headers.get("location") || (r.status < 400 ? uri : null);
   } catch {
     return null;
-  }
-}
-
-async function paginaEsiste(url: string): Promise<boolean> {
-  try {
-    const r = await fetch(url, {
-      method: "GET",
-      redirect: "follow",
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; FisioaccordoBot/1.0)" },
-      signal: AbortSignal.timeout(8000),
-    });
-    await r.body?.cancel();
-    return r.status < 400;
-  } catch {
-    return false;
   }
 }
 

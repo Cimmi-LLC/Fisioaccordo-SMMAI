@@ -9,6 +9,8 @@ import {
   temiRicerca,
   richiestaRicerca,
   fontiConsultate,
+  testoConFonti,
+  richiestaEstrazione,
   dominioAutorevole,
   paroleVietateTrovate,
   promptCarosello,
@@ -45,60 +47,66 @@ describe('orari di pubblicazione', () => {
 });
 
 describe('ricerca con Gemini + Google', () => {
-  const risposta = (items: unknown[], chunks: string[] = []) => ({
+  const grounded = {
     candidates: [{
-      content: { parts: [{ text: JSON.stringify({ items }) }] },
-      groundingMetadata: { groundingChunks: chunks.map((uri) => ({ web: { uri, title: 'x' } })) },
+      content: { parts: [{ text: 'Uno studio su The Lancet ' }, { text: 'mostra che camminare riduce il mal di schiena del 40%.' }] },
+      groundingMetadata: {
+        groundingChunks: [
+          { web: { uri: 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/A', title: 'thelancet.com' } },
+          { web: { uri: 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/B', title: 'blog.it' } },
+          { web: {} },
+        ],
+        groundingSupports: [
+          { segment: { text: 'camminare riduce il mal di schiena del 40%' }, groundingChunkIndices: [0, 1] },
+          { segment: { text: 'senza fonte' }, groundingChunkIndices: [] },
+        ],
+      },
     }],
-  });
-  const voce = (url: string, titolo = 'Studio sul mal di schiena') => ({
-    title: titolo,
-    takeaways: ['Il 60% migliora camminando', 'Bastano 30 minuti'],
-    source: 'The Lancet',
-    url,
-    date: '2026-10-12',
-    source_type: 'study',
+  };
+  const estrazione = (items: unknown[]) => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ items }) }] } }] });
+  const voce = (fonte: number, titolo = 'Camminare e mal di schiena') => ({
+    fonte, title: titolo, takeaways: ['Il 40% in meno di dolore', 'Bastano 30 minuti'], source: 'The Lancet', date: '2026-10-12', source_type: 'study',
   });
 
-  it('tiene solo siti autorevoli e segna quelli consultati da Google', () => {
-    const r = risposta([voce('https://www.thelancet.com/a'), voce('https://blog-qualsiasi.com/b'), voce('https://bmj.com/c')]);
-    const out = leggiRicerca(r, [], ['https://thelancet.com/a/']);
-    expect(out.map((s) => [s.url, s.consultata])).toEqual([
-      ['https://www.thelancet.com/a', true],
-      ['https://bmj.com/c', false],
-    ]);
-    expect(out[0].data).toBe('2026-10-12');
-  });
-
-  it('scarta gli URL già usati, i doppioni e i link di Google', () => {
-    const r = risposta([
-      voce('https://bmj.com/x?utm_source=a'), voce('https://bmj.com/x'), voce('https://bmj.com/y'),
-      voce('https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc'),
-    ]);
-    const out = leggiRicerca(r, ['https://www.bmj.com/y']);
-    expect(out.map((s) => s.url)).toEqual(['https://bmj.com/x?utm_source=a']);
-  });
-
-  it('regge JSON dentro ```json, testo spezzato e voci incomplete', () => {
-    const testo = '```json\n{"items":[{"title":"","url":"https://nih.gov/a"},' + JSON.stringify(voce('https://nih.gov/z')) + ']}\n```';
-    const r = { candidates: [{ content: { parts: [{ text: testo.slice(0, 20) }, { text: testo.slice(20) }] } }] };
-    expect(leggiRicerca(r).map((s) => s.url)).toEqual(['https://nih.gov/z']);
-    expect(leggiRicerca(null)).toEqual([]);
-  });
-
-  it('legge le pagine consultate dai metadati di Google', () => {
-    const r = risposta([], ['https://vertexaisearch.cloud.google.com/grounding-api-redirect/1', 'non-url']);
-    expect(fontiConsultate(r).map((f) => f.uri)).toEqual(['https://vertexaisearch.cloud.google.com/grounding-api-redirect/1']);
+  it('numera le pagine consultate e lega le frasi alle fonti', () => {
+    expect(fontiConsultate(grounded).map((f) => [f.n, f.title])).toEqual([[1, 'thelancet.com'], [2, 'blog.it']]);
+    const { testo, frasi } = testoConFonti(grounded);
+    expect(testo).toContain('The Lancet mostra');
+    expect(frasi).toEqual([{ frase: 'camminare riduce il mal di schiena del 40%', fonti: [1, 2] }]);
     expect(fontiConsultate(null)).toEqual([]);
+    expect(testoConFonti(null)).toEqual({ testo: '', frasi: [] });
   });
 
-  it('accende la ricerca Google, passa la data e gli URL da escludere', () => {
-    const body = richiestaRicerca('mal di schiena', 4, ['https://bmj.com/old'], new Date('2026-11-01T06:00:00Z')) as Record<string, any>;
-    expect(body.tools).toEqual([{ google_search: {} }]);
-    const testo = body.contents[0].parts[0].text as string;
-    expect(testo).toContain('2026-11-01');
-    expect(testo).toContain('https://bmj.com/old');
-    expect(testo).toContain('pubmed.ncbi.nlm.nih.gov');
+  it('prende l’indirizzo dalla pagina scelta, mai dal modello, e scarta i siti non autorevoli', () => {
+    const fonti = [
+      { n: 1, url: 'https://www.thelancet.com/journals/x' },
+      { n: 2, url: 'https://blog-qualsiasi.it/post' },
+    ];
+    const r = estrazione([{ ...voce(1), url: 'https://inventato.com' }, voce(2), voce(9)]);
+    const { scoperte, scartate } = leggiRicerca(r, fonti);
+    expect(scoperte.map((s) => s.url)).toEqual(['https://www.thelancet.com/journals/x']);
+    expect(scoperte[0].data).toBe('2026-10-12');
+    expect(scartate).toEqual(['blog-qualsiasi.it']);
+  });
+
+  it('scarta pagine già usate, doppioni e voci incomplete', () => {
+    const fonti = [{ n: 1, url: 'https://bmj.com/x?utm_source=a' }, { n: 2, url: 'https://bmj.com/y' }];
+    const r = estrazione([voce(1), voce(1, 'Doppione'), voce(2), { fonte: 1, title: '', takeaways: [] }]);
+    expect(leggiRicerca(r, fonti, ['https://www.bmj.com/y']).scoperte.map((s) => s.titolo)).toEqual(['Camminare e mal di schiena']);
+    expect(leggiRicerca(null, fonti).scoperte).toEqual([]);
+  });
+
+  it('prima chiamata con Google e senza indirizzi chiesti al modello; seconda in JSON senza ricerca', () => {
+    const ric = richiestaRicerca('mal di schiena', 4, ['Titolo già usato'], new Date('2026-11-01T06:00:00Z')) as Record<string, any>;
+    expect(ric.tools).toEqual([{ google_search: {} }]);
+    const t = ric.contents[0].parts[0].text as string;
+    expect(t).toContain('2026-11-01');
+    expect(t).toContain('Titolo già usato');
+    expect(t).toContain('pubmed.ncbi.nlm.nih.gov');
+    const estr = richiestaEstrazione('testo', [{ frase: 'f', fonti: [1] }], [{ n: 1, sito: 'bmj.com', url: 'https://bmj.com/a' }]) as Record<string, any>;
+    expect(estr.tools).toBeUndefined();
+    expect(estr.generationConfig.responseMimeType).toBe('application/json');
+    expect(estr.contents[0].parts[0].text).toContain('[1] bmj.com https://bmj.com/a');
   });
 
   it('riconosce i domini autorevoli anche come sottodomini', () => {

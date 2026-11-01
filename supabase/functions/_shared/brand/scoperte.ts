@@ -153,10 +153,15 @@ export function dominioAutorevole(url: string): boolean {
   }
 }
 
-/** Corpo della chiamata a Gemini con la ricerca Google attiva. */
-export function richiestaRicerca(temi: string, quante: number, urlGiaUsati: string[], oggi: Date): Record<string, unknown> {
-  const esclusi = urlGiaUsati.slice(0, 40);
+/**
+ * Prima chiamata (con la ricerca Google): Gemini cerca e scrive le scoperte
+ * in testo libero. Gli indirizzi NON li chiediamo a lui: con la ricerca
+ * attiva vede solo rimandi di Google e li inventerebbe. Le fonti si prendono
+ * dai metadati delle pagine consultate.
+ */
+export function richiestaRicerca(temi: string, quante: number, titoliGiaUsati: string[], oggi: Date): Record<string, unknown> {
   const giorno = oggi.toISOString().slice(0, 10);
+  const esclusi = titoliGiaUsati.slice(0, 30);
   return {
     contents: [{
       role: 'user',
@@ -164,15 +169,12 @@ export function richiestaRicerca(temi: string, quante: number, urlGiaUsati: stri
         text:
           `Oggi è il ${giorno}. Cerca con Google ${quante} scoperte scientifiche diverse e RECENTI (ultimi 30 giorni se possibile, ` +
           `altrimenti le più recenti) utili alle persone comuni su: ${temi}.\n` +
-          `Usa SOLO pagine di questi siti: ${DOMINI_AUTOREVOLI.join(', ')}.\n` +
+          `Cerca su questi siti: ${DOMINI_AUTOREVOLI.join(', ')}.\n` +
           'Preferisci studi peer-review, meta-analisi, linee guida ufficiali, comunicati di università.\n' +
           'Ogni scoperta deve smentire una credenza comune o dare qualcosa di pratico da fare.\n' +
-          'Non inventare studi, numeri, date o link: ogni voce deve venire da una pagina che hai trovato, con il suo indirizzo esatto ' +
-          '(l\'indirizzo vero del sito, non un link di Google).\n' +
-          (esclusi.length > 0 ? `NON usare questi indirizzi, già usati:\n${esclusi.join('\n')}\n` : '') +
-          'Rispondi SOLO con questo JSON, senza altro testo:\n' +
-          '{"items":[{"title":"titolo breve in italiano","takeaways":["2-4 frasi brevi in italiano con i numeri veri della fonte"],' +
-          '"source":"rivista o istituto","url":"https://...","date":"AAAA-MM-GG o vuoto","source_type":"study|meta-analysis|guideline|news"}]}',
+          (esclusi.length > 0 ? `Non ripetere queste, già usate:\n${esclusi.map((t) => `- ${t}`).join('\n')}\n` : '') +
+          'Per ogni scoperta scrivi un paragrafo con: titolo, cosa ha trovato (con i numeri veri), rivista o istituto, data. ' +
+          'Non inventare nulla: scrivi solo quello che trovi nelle pagine.',
       }],
     }],
     tools: [{ google_search: {} }],
@@ -180,15 +182,63 @@ export function richiestaRicerca(temi: string, quante: number, urlGiaUsati: stri
   };
 }
 
-/** Pagine che Gemini ha davvero consultato (link di rimando di Google, da risolvere). */
-export function fontiConsultate(risposta: unknown): Array<{ uri: string; title: string }> {
+/** Pagine consultate da Gemini, numerate da 1 (uri = rimando di Google da risolvere). */
+export function fontiConsultate(risposta: unknown): Array<{ n: number; uri: string; title: string }> {
   const r = risposta as {
     candidates?: Array<{ groundingMetadata?: { groundingChunks?: Array<{ web?: { uri?: string; title?: string } }> } }>;
   } | null;
   const chunks = r?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
   return chunks
-    .map((c) => ({ uri: String(c?.web?.uri || ''), title: String(c?.web?.title || '') }))
+    .map((c, i) => ({ n: i + 1, uri: String(c?.web?.uri || ''), title: String(c?.web?.title || '') }))
     .filter((c) => /^https?:\/\//i.test(c.uri));
+}
+
+/** Testo della risposta e, per ogni frase appoggiata a una pagina, i numeri delle fonti. */
+export function testoConFonti(risposta: unknown): { testo: string; frasi: Array<{ frase: string; fonti: number[] }> } {
+  const r = risposta as {
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string }> };
+      groundingMetadata?: { groundingSupports?: Array<{ segment?: { text?: string }; groundingChunkIndices?: number[] }> };
+    }>;
+  } | null;
+  const c = r?.candidates?.[0];
+  const testo = (c?.content?.parts || []).map((p) => p?.text || '').join('');
+  const frasi = (c?.groundingMetadata?.groundingSupports || [])
+    .map((s) => ({
+      frase: String(s?.segment?.text || '').trim(),
+      fonti: (s?.groundingChunkIndices || []).filter((i) => Number.isInteger(i)).map((i) => i + 1),
+    }))
+    .filter((f) => f.frase && f.fonti.length > 0);
+  return { testo, frasi };
+}
+
+/**
+ * Seconda chiamata (senza ricerca, risposta JSON): mette in ordine le
+ * scoperte e per ognuna sceglie il numero della pagina che la sostiene.
+ */
+export function richiestaEstrazione(
+  testo: string,
+  frasi: Array<{ frase: string; fonti: number[] }>,
+  fonti: Array<{ n: number; sito: string; url: string }>,
+): Record<string, unknown> {
+  return {
+    contents: [{
+      role: 'user',
+      parts: [{
+        text:
+          'Qui sotto ci sono delle scoperte scientifiche trovate con Google, le frasi con il numero della pagina che le sostiene, ' +
+          'e l\'elenco delle pagine.\n\nTESTO\n' + testo +
+          '\n\nFRASI E FONTI\n' + frasi.map((f) => `[${f.fonti.join(',')}] ${f.frase}`).join('\n') +
+          '\n\nPAGINE\n' + fonti.map((f) => `[${f.n}] ${f.sito} ${f.url}`).join('\n') +
+          '\n\nPer ogni scoperta scegli UNA pagina fra quelle elencate che la sostiene davvero (preferisci lo studio o il sito ' +
+          'scientifico alla notizia). Se nessuna pagina la sostiene, lasciala fuori. Usa solo i dati del testo, non aggiungere nulla.\n' +
+          'Rispondi SOLO con JSON: {"items":[{"fonte":numero,"title":"titolo breve in italiano",' +
+          '"takeaways":["2-4 frasi brevi in italiano con i numeri veri"],"source":"rivista o istituto","date":"AAAA-MM-GG o vuoto",' +
+          '"source_type":"study|meta-analysis|guideline|news"}]}',
+      }],
+    }],
+    generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+  };
 }
 
 function estraiJson(testo: string): unknown {
@@ -219,33 +269,34 @@ export function chiaveUrl(url: string): string {
   }
 }
 
-export type ScopertaLetta = Scoperta & {
-  /** true se l'indirizzo è fra le pagine consultate da Gemini; altrimenti va verificato aprendolo. */
-  consultata: boolean;
-};
-
 /**
- * Legge la risposta di Gemini. Tiene solo voci di siti autorevoli, con un
- * indirizzo vero e non già usato. `urlConsultati` sono le pagine della
- * ricerca Google già risolte: le voci fuori da quella lista restano con
- * consultata=false e la funzione le apre prima di usarle, così nei post non
- * finiscono link inventati dal modello.
+ * Legge il JSON della seconda chiamata. L'indirizzo di ogni scoperta è quello
+ * vero della pagina scelta (mai scritto dal modello); si tengono solo siti
+ * autorevoli e pagine non già usate.
  */
-export function leggiRicerca(risposta: unknown, urlGiaUsati: string[] = [], urlConsultati: string[] = []): ScopertaLetta[] {
+export function leggiRicerca(
+  risposta: unknown,
+  fonti: Array<{ n: number; url: string }>,
+  urlGiaUsati: string[] = [],
+): { scoperte: Scoperta[]; scartate: string[] } {
   const r = risposta as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> } | null;
   const contenuto = (r?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('');
   const json = estraiJson(contenuto) as { items?: unknown[] } | null;
   const voci = Array.isArray(json?.items) ? json!.items : [];
-
-  const consultati = new Set(urlConsultati.map(chiaveUrl));
+  const urlDi = new Map(fonti.map((f) => [f.n, f.url]));
   const usati = new Set(urlGiaUsati.map(chiaveUrl));
   const visti = new Set<string>();
+  const scartate: string[] = [];
 
-  const out: ScopertaLetta[] = [];
+  const scoperte: Scoperta[] = [];
   for (const v of voci) {
     const o = v as Record<string, unknown>;
-    const url = String(o.url || '').trim();
-    if (!/^https?:\/\//i.test(url) || !dominioAutorevole(url)) continue;
+    const url = urlDi.get(Number(o.fonte)) || '';
+    if (!/^https?:\/\//i.test(url)) continue;
+    if (!dominioAutorevole(url)) {
+      try { scartate.push(new URL(url).hostname.replace(/^www\./, '')); } catch { /* indirizzo non valido */ }
+      continue;
+    }
     const k = chiaveUrl(url);
     if (usati.has(k) || visti.has(k)) continue;
     const titolo = String(o.title || '').trim();
@@ -255,19 +306,17 @@ export function leggiRicerca(risposta: unknown, urlGiaUsati: string[] = [], urlC
       .slice(0, 4);
     if (!titolo || sintesi.length === 0) continue;
     const dataGrezza = String(o.date || '').trim();
-    const data = /^\d{4}-\d{2}-\d{2}/.test(dataGrezza) ? dataGrezza.slice(0, 10) : null;
     visti.add(k);
-    out.push({
+    scoperte.push({
       titolo: titolo.slice(0, 200),
       sintesi,
       fonte: String(o.source || '').trim().slice(0, 120) || new URL(url).hostname.replace(/^www\./, ''),
       url,
-      data,
+      data: /^\d{4}-\d{2}-\d{2}/.test(dataGrezza) ? dataGrezza.slice(0, 10) : null,
       tipo_fonte: String(o.source_type || '').trim().slice(0, 40) || 'study',
-      consultata: consultati.has(k),
     });
   }
-  return out;
+  return { scoperte, scartate };
 }
 
 function vietate(brand: BrandPerScoperte): string[] {

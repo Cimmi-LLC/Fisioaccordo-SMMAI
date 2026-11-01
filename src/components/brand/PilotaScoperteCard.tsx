@@ -59,7 +59,11 @@ export default function PilotaScoperteCard(props: Props) {
   const [provando, setProvando] = useState(false);
   const [requisiti, setRequisiti] = useState<{ instagram: string | null; template: boolean } | null>(null);
   const [scoperte, setScoperte] = useState<ScopertaRow[]>([]);
-  const [anteprima, setAnteprima] = useState<{ temi: string; scoperte: Array<{ titolo: string; sintesi: string[]; fonte: string; url: string; data: string | null }> } | null>(null);
+  const [anteprima, setAnteprima] = useState<{
+    temi: string;
+    scoperte: Array<{ titolo: string; sintesi: string[]; fonte: string; url: string; data: string | null }>;
+    diagnosi?: { pagine: number; risolte: number; tenute: number; siti_scartati: string[] };
+  } | null>(null);
   const [cercando, setCercando] = useState(false);
 
   const caricaScoperte = useCallback(async () => {
@@ -303,6 +307,11 @@ export default function PilotaScoperteCard(props: Props) {
         <div className="rounded-xl p-3 space-y-3" style={{ backgroundColor: 'var(--bg)', border: '1px dashed var(--line)' }}>
           <div className="text-[12px]" style={{ color: 'var(--ink3)' }}>
             Anteprima, niente salvato. Cercato su: {anteprima.temi}
+            {anteprima.diagnosi && (
+              <> · pagine lette {anteprima.diagnosi.pagine}, tenute {anteprima.diagnosi.tenute}
+                {anteprima.diagnosi.siti_scartati.length > 0 && <> · siti non autorevoli scartati: {anteprima.diagnosi.siti_scartati.join(', ')}</>}
+              </>
+            )}
           </div>
           {anteprima.scoperte.length === 0 && (
             <div className="text-[13px]" style={{ color: 'var(--ink)' }}>Nessuna scoperta nuova da fonti autorevoli.</div>
