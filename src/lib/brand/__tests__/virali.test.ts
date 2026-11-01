@@ -259,9 +259,10 @@ describe('categorie delle inserzioni', () => {
     { pagina: 'Joel Osteen', testo: '', titolo: '', link: null, professione: 'fisioterapista' },
   ];
 
-  it('numera le inserzioni e mostra il sito senza www', () => {
-    const p = promptCategorie(lista);
-    expect(p).toContain('1. Pagina: MIND Fisioterapia | Ricerca per: fisioterapista | Sito: mindfisio.it | Testo: Valutazione a 19 euro');
+  it('numera le inserzioni e mostra dove porta il link, senza www né parametri', () => {
+    const p = promptCategorie([...lista, { pagina: 'Active After 60', testo: 'Storia', titolo: '', link: 'https://try.relivex.com/lander?utm=fb', professione: 'osteopata' }]);
+    expect(p).toContain('1. Pagina: MIND Fisioterapia | Ricerca per: fisioterapista | Sito: mindfisio.it/prenota | Testo: Valutazione a 19 euro');
+    expect(p).toContain('4. Pagina: Active After 60 | Ricerca per: osteopata | Sito: try.relivex.com/lander | Testo: Storia');
     expect(p).toContain('2. Pagina: Koprez | Ricerca per: fisioterapista | Testo: Shop now · Plantar fasciitis sleeves');
     expect(p).toContain('3. Pagina: Joel Osteen | Ricerca per: fisioterapista | Testo: (nessun testo)');
   });

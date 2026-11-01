@@ -316,10 +316,13 @@ export const SISTEMA_CATEGORIE = `Classifichi inserzioni della Libreria inserzio
 
 export function promptCategorie(lista: InserzioneDaClassificare[]): string {
   const righe = lista.map((a, i) => {
-    let dominio = '';
-    try { dominio = a.link ? new URL(a.link).hostname.replace(/^www\./, '') : ''; } catch { /* link non valido */ }
+    let sito = '';
+    try {
+      const u = a.link ? new URL(a.link) : null;
+      if (u) sito = (u.hostname.replace(/^www\./, '') + (u.pathname === '/' ? '' : u.pathname)).slice(0, 80);
+    } catch { /* link non valido */ }
     const corpo = [a.titolo, a.testo].filter(Boolean).join(' · ').replace(/\s+/g, ' ').slice(0, 500);
-    return `${i + 1}. Pagina: ${a.pagina} | Ricerca per: ${a.professione}${dominio ? ` | Sito: ${dominio}` : ''} | Testo: ${corpo || '(nessun testo)'}`;
+    return `${i + 1}. Pagina: ${a.pagina} | Ricerca per: ${a.professione}${sito ? ` | Sito: ${sito}` : ''} | Testo: ${corpo || '(nessun testo)'}`;
   });
   return `Per ogni inserzione scegli una categoria.
 
@@ -327,6 +330,7 @@ export function promptCategorie(lista: InserzioneDaClassificare[]): string {
 "prodotto": vende un oggetto o un prodotto per la salute, il dolore o il peso senza un professionista che offre il proprio servizio: creme, integratori, solette, tutori, cuscini, materassi, dispositivi, app, farmaci da banco, pasti.
 "fuori_tema": tutto il resto: non parla di salute, dolore, movimento o alimentazione (animali, religione, bevande, abbigliamento, corsi su altro), oppure si rivolge ai professionisti invece che ai pazienti (formazione, corsi ECM, software, attrezzature per studi).
 
+Una pagina col nome di una persona o di una community che racconta una storia e porta a un negozio o a una pagina di vendita (try…, shop, /products/, /lander, offer, vsl) è "prodotto": conta dove porta il link, non il nome.
 Nel dubbio fra "studio" e "prodotto" scegli "prodotto". Se il testo manca, decidi dal nome della pagina e dal sito.
 
 ${righe.join('\n')}
