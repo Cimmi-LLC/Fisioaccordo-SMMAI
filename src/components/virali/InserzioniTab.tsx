@@ -124,7 +124,7 @@ const InserzioniTab: React.FC = () => {
       {errore && <div className="text-sm" style={{ color: 'var(--rosa)' }}>{errore}</div>}
       {!caricando && lista.length === 0 && !errore && (
         <div className="rounded-2xl p-8 text-center text-sm" style={{ backgroundColor: 'var(--viola-dim)', color: 'var(--ink)' }}>
-          Nessuna inserzione con questi filtri. Le inserzioni si aggiornano ogni domenica.
+          Nessuna inserzione con questi filtri. Le inserzioni si aggiornano una volta al mese.
         </div>
       )}
 

@@ -3,7 +3,7 @@
 // settimane nella Libreria inserzioni di Meta.
 //
 // Modi di chiamata:
-//   cron {azione:'avvia'}      → la domenica: mette in coda i giri della settimana
+//   cron {azione:'avvia'}      → il 2 del mese: mette in coda i giri del mese
 //   cron {azione:'raccogli'}   → ogni 10 minuti: avvia i giri in coda (3 alla
 //                                 volta) e salva quelli finiti
 //   admin {azione:'avvia'}     → come il cron, dal pulsante «Aggiorna la libreria»
@@ -44,11 +44,16 @@ const ATTORI = {
   inserzioni: "apify~facebook-ads-scraper",
 } as const;
 
-// Primo giro: ~3 mesi di video per avere la media del canale. Dopo: solo le
-// ultime settimane, per i video nuovi e i numeri di quelli giovani.
-const VIDEO_PRIMO_GIRO = 30;
-const VIDEO_GIRI_DOPO = 12;
-const INSERZIONI_PER_RICERCA = 40;
+// Si sta dentro la quota gratuita di Apify (5 $ al mese, Attilio 01/11/2026:
+// «non spendere neanche un euro»): un giro al mese, pochi video per canale.
+// Primo giro: abbastanza video per la media del canale. Dopo: solo l'ultimo
+// mese, per i video nuovi e i numeri di quelli giovani.
+const VIDEO_PRIMO_GIRO = 15;
+const VIDEO_GIRI_DOPO = 10;
+const INSERZIONI_PER_RICERCA = 15;
+// La quota è condivisa con la sync delle statistiche dei clienti (~0,6 $ al
+// mese): i giri dei video virali si fermano prima, lasciando questo margine.
+const RISERVA_STATISTICHE_USD = 1;
 const ACCOUNT_PER_GIRO = 40;
 const GIRI_INSIEME = 3;
 // Copertine salvate per canale (8×8 di Kallaway) più tutti gli outlier forti.
@@ -244,8 +249,30 @@ function inputApify(giro: Pick<Giro, "tipo" | "parametri">): Grezzo {
   };
 }
 
-/** Avvia i giri in coda finché ce ne sono al massimo 3 in corso. */
+/** C'è ancora quota Apify per i video virali, tenendo il margine per le statistiche dei clienti? */
+async function spazioApify(token: string): Promise<{ ok: boolean; usato?: number; tetto?: number }> {
+  try {
+    const res = await fetch(`${APIFY}/users/me/limits?token=${token}`);
+    if (!res.ok) return { ok: true };
+    const d = (await res.json())?.data;
+    const usato = d?.current?.monthlyUsageUsd;
+    const tetto = d?.limits?.maxMonthlyUsageUsd;
+    if (typeof usato !== "number" || typeof tetto !== "number") return { ok: true };
+    return { ok: usato < tetto - RISERVA_STATISTICHE_USD, usato, tetto };
+  } catch {
+    return { ok: true };
+  }
+}
+
+/** Avvia i giri in coda finché ce ne sono al massimo 3 in corso e c'è quota. */
 async function avviaCoda(admin: Admin, token: string): Promise<number> {
+  const { count: inCoda } = await admin.from("virali_giri").select("id", { count: "exact", head: true }).eq("stato", "in_coda");
+  if (!inCoda) return 0;
+  const spazio = await spazioApify(token);
+  if (!spazio.ok) {
+    console.warn(`Quota Apify del mese quasi finita (${spazio.usato} $ su ${spazio.tetto} $): i giri restano in coda`);
+    return 0;
+  }
   const { count: inCorso } = await admin.from("virali_giri").select("id", { count: "exact", head: true }).eq("stato", "in_corso");
   let liberi = GIRI_INSIEME - (inCorso ?? 0);
   if (liberi <= 0) return 0;
@@ -296,7 +323,12 @@ async function raccogli(admin: Admin, token: string, inizio: number) {
         const salvati = giro.tipo === "inserzioni"
           ? await salvaInserzioni(admin, items, giro.parametri)
           : await salvaVideo(admin, giro.tipo, items, (giro.parametri.handles as string[]) || []);
-        await admin.from("virali_giri").update({ stato: "raccolto", risultati: salvati, raccolto_il: new Date().toISOString() }).eq("id", giro.id);
+        await admin.from("virali_giri").update({
+          stato: "raccolto",
+          risultati: salvati,
+          costo_usd: typeof run.usageTotalUsd === "number" ? run.usageTotalUsd : null,
+          raccolto_il: new Date().toISOString(),
+        }).eq("id", giro.id);
         esiti.push({ giro: giro.id, tipo: giro.tipo, salvati });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -337,6 +369,11 @@ async function leggiDataset(token: string, datasetId: string): Promise<Grezzo[]>
 
 /** Un solo account, subito (competitor appena aggiunto). */
 async function raccogliAccount(admin: Admin, token: string, acc: AccountRiga) {
+  const spazio = await spazioApify(token);
+  if (!spazio.ok) {
+    await admin.from("virali_account").update({ ultimo_errore: "Quota Apify del mese finita: si legge al prossimo giro" }).eq("id", acc.id);
+    return { ok: false, error: "La quota Apify gratuita del mese è finita: il competitor si legge al prossimo giro." };
+  }
   const giro = { tipo: acc.piattaforma, parametri: { handles: [acc.handle], limite: VIDEO_PRIMO_GIRO, recenti: false } } as const;
   const res = await fetch(`${APIFY}/acts/${ATTORI[acc.piattaforma]}/run-sync-get-dataset-items?token=${token}&timeout=150`, {
     method: "POST",

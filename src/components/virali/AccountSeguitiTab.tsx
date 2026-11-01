@@ -9,7 +9,7 @@ import { useActiveBrand } from '@/hooks/useActiveBrand';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { handleValido, normalizzaHandle, numeroBreve, piattaformaDaLink, urlProfilo, type Paese, type Piattaforma } from '@/lib/brand/virali';
 import {
-  aggiornaLibreria, aggiungiAccount, aggiungiRicerca, contoApify, eliminaAccount, eliminaRicerca, modificaAccount, raccogliAccount,
+  accendiRicerca, aggiornaLibreria, aggiungiAccount, aggiungiRicerca, contoApify, eliminaAccount, eliminaRicerca, modificaAccount, raccogliAccount,
   type AccountSeguito, type ContoApify, type RicercaInserzioni,
 } from '@/services/virali';
 import { Filtro, OPZIONI_PROFESSIONE, dataBreve, etichettaPaese, etichettaPiattaforma, etichettaProfessione } from './comuni';
@@ -150,7 +150,7 @@ const AccountSeguitiTab: React.FC<{
   };
 
   const aggiornaTutto = async () => {
-    if (!window.confirm('Rileggo tutti gli account e le inserzioni adesso? Costa qualche dollaro di Apify, come il giro della domenica.')) return;
+    if (!window.confirm('Rileggo tutti gli account e le inserzioni adesso? Usa la quota gratuita di Apify del mese, come il giro mensile.')) return;
     setAggiornoTutto(true);
     try {
       const r = await aggiornaLibreria();
@@ -231,7 +231,7 @@ const AccountSeguitiTab: React.FC<{
           )}
         </div>
         <p className="text-sm" style={{ color: 'var(--ink3)' }}>
-          Professionisti della salute che fanno tante visualizzazioni e vendono con i video. Si rileggono da soli ogni domenica.
+          Professionisti della salute che fanno tante visualizzazioni e vendono con i video. Si rileggono da soli una volta al mese.
         </p>
         {isAdmin && conto && (
           <div className="rounded-xl px-3 py-2 text-xs" style={{ backgroundColor: 'var(--viola-dim)', color: 'var(--ink)' }}>
@@ -251,7 +251,7 @@ const AccountSeguitiTab: React.FC<{
       {isAdmin && (
         <section className="rounded-2xl border p-4 space-y-3 bg-white">
           <div className="font-black" style={{ color: 'var(--ink)' }}>Parole cercate nella Libreria inserzioni</div>
-          <p className="text-sm" style={{ color: 'var(--ink3)' }}>Ogni domenica si cercano le inserzioni video accese con queste parole, in Italia e in America.</p>
+          <p className="text-sm" style={{ color: 'var(--ink3)' }}>Una volta al mese si cercano le inserzioni video accese con queste parole, in Italia e in America. Clicca una parola per accenderla o spegnerla.</p>
           <div className="flex flex-wrap items-end gap-3">
             <Filtro etichetta="Paese" valore={nuovaRicerca.paese} onChange={(v) => setNuovaRicerca((r) => ({ ...r, paese: v as Paese }))} opzioni={OPZIONI_PAESE.slice(0, 2)} larghezza="w-32" />
             <Filtro etichetta="Professione" valore={nuovaRicerca.professione} onChange={(v) => setNuovaRicerca((r) => ({ ...r, professione: v }))} opzioni={OPZIONI_PROFESSIONE} larghezza="w-52" />
@@ -263,8 +263,14 @@ const AccountSeguitiTab: React.FC<{
           </div>
           <div className="flex flex-wrap gap-2">
             {ricerche.map((r) => (
-              <span key={r.id} className="flex items-center gap-1 rounded-full border px-3 py-1 text-xs" style={{ color: 'var(--ink)' }}>
-                {etichettaPaese(r.paese)} · {r.ricerca}
+              <span key={r.id} className="flex items-center gap-1 rounded-full border px-3 py-1 text-xs" style={{ color: 'var(--ink)', opacity: r.attiva ? 1 : 0.45 }}>
+                <button
+                  onClick={async () => { await accendiRicerca(r.id, !r.attiva).catch(() => undefined); onCambia(); }}
+                  title={r.attiva ? 'Accesa: clicca per spegnerla' : 'Spenta: clicca per accenderla'}
+                  style={{ textDecoration: r.attiva ? 'none' : 'line-through' }}
+                >
+                  {etichettaPaese(r.paese)} · {r.ricerca}
+                </button>
                 <button onClick={async () => { await eliminaRicerca(r.id).catch(() => undefined); onCambia(); }} title="Togli"><Trash2 className="h-3 w-3" /></button>
               </span>
             ))}

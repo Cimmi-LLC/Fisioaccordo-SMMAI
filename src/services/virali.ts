@@ -181,6 +181,11 @@ export async function aggiungiRicerca(riga: Omit<RicercaInserzioni, 'id' | 'atti
   if (error) throw error;
 }
 
+export async function accendiRicerca(id: string, attiva: boolean) {
+  const { error } = await db.from('virali_ricerche').update({ attiva }).eq('id', id);
+  if (error) throw error;
+}
+
 export async function eliminaRicerca(id: string) {
   const { error } = await db.from('virali_ricerche').delete().eq('id', id);
   if (error) throw error;

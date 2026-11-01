@@ -134,7 +134,7 @@ const VideoViraliTab: React.FC<{ soloHandle?: string[] | null }> = ({ soloHandle
 
       {!caricando && video.length === 0 && !errore && (
         <div className="rounded-2xl p-8 text-center text-sm" style={{ backgroundColor: 'var(--viola-dim)', color: 'var(--ink)' }}>
-          Nessun video con questi filtri. La libreria si aggiorna ogni domenica: prova «Tutte» le professioni o un periodo più lungo.
+          Nessun video con questi filtri. La libreria si aggiorna una volta al mese: prova «Tutte» le professioni o un periodo più lungo.
         </div>
       )}
 
