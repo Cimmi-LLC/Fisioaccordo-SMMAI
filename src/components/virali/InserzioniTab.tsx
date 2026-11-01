@@ -119,7 +119,7 @@ const InserzioniTab: React.FC = () => {
           opzioni={[{ id: 'giorni', label: 'Accese da più tempo' }, { id: 'varianti', label: 'Più varianti' }]} />
         <label className="flex items-center gap-2 text-xs font-semibold pb-2" style={{ color: 'var(--ink3)' }}
           title="Creme, solette, tutori, materassi: inserzioni che vendono un prodotto invece di una visita o di un percorso.">
-          <Switch checked={filtri.ancheProdotti} onCheckedChange={(c) => set('ancheProdotti', c)} />
+          <Switch className="data-[state=unchecked]:bg-black/20" checked={filtri.ancheProdotti} onCheckedChange={(c) => set('ancheProdotti', c)} />
           Mostra anche i prodotti
         </label>
       </div>
