@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ExternalLink, Loader2, CalendarDays, Layers } from 'lucide-react';
 import { useActiveBrand } from '@/hooks/useActiveBrand';
@@ -79,7 +80,7 @@ const InserzioneDialog: React.FC<{ a: InserzioneVirale | null; onClose: () => vo
 const InserzioniTab: React.FC = () => {
   const { activeBrand } = useActiveBrand();
   const professioneBrand = (activeBrand as { professione?: string | null } | null)?.professione || 'fisioterapista';
-  const [filtri, setFiltri] = useState<FiltriInserzioni>({ paese: 'tutti', professione: 'brand', giorniMinimi: 30, ordine: 'giorni' });
+  const [filtri, setFiltri] = useState<FiltriInserzioni>({ paese: 'tutti', professione: 'brand', giorniMinimi: 30, ordine: 'giorni', ancheProdotti: false });
   const [lista, setLista] = useState<InserzioneVirale[]>([]);
   const [pagina, setPagina] = useState(0);
   const [altri, setAltri] = useState(false);
@@ -116,15 +117,21 @@ const InserzioniTab: React.FC = () => {
           opzioni={[{ id: '0', label: 'Tutte' }, { id: '30', label: '30 giorni' }, { id: '60', label: '60 giorni' }, { id: '90', label: '90 giorni' }]} />
         <Filtro etichetta="Ordina per" valore={filtri.ordine} onChange={(v) => set('ordine', v as FiltriInserzioni['ordine'])} larghezza="w-56"
           opzioni={[{ id: 'giorni', label: 'Accese da più tempo' }, { id: 'varianti', label: 'Più varianti' }]} />
+        <label className="flex items-center gap-2 text-xs font-semibold pb-2" style={{ color: 'var(--ink3)' }}
+          title="Creme, solette, tutori, materassi: inserzioni che vendono un prodotto invece di una visita o di un percorso.">
+          <Switch checked={filtri.ancheProdotti} onCheckedChange={(c) => set('ancheProdotti', c)} />
+          Mostra anche i prodotti
+        </label>
       </div>
       <p className="text-xs" style={{ color: 'var(--ink3)' }}>
-        Un'inserzione che resta accesa per settimane sta facendo soldi: nessuno paga per mesi un video che non vende. Tante varianti dello stesso video = lo stanno spingendo.
+        Un'inserzione che resta accesa per settimane sta facendo soldi: nessuno paga per mesi un video che non vende. Tante varianti dello stesso video = lo stanno spingendo. Di serie vedi solo le inserzioni di studi e professionisti della salute.
       </p>
 
       {errore && <div className="text-sm" style={{ color: 'var(--rosa)' }}>{errore}</div>}
       {!caricando && lista.length === 0 && !errore && (
         <div className="rounded-2xl p-8 text-center text-sm" style={{ backgroundColor: 'var(--viola-dim)', color: 'var(--ink)' }}>
           Nessuna inserzione con questi filtri. Le inserzioni si aggiornano una volta al mese.
+          {!filtri.ancheProdotti && ' Prova «Mostra anche i prodotti» o un\'altra professione.'}
         </div>
       )}
 
@@ -137,6 +144,7 @@ const InserzioniTab: React.FC = () => {
               <div className="absolute bottom-2 left-2 flex gap-1">
                 <Badge className="text-white" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>{a.giorni ?? '?'} giorni</Badge>
                 {a.varianti > 1 && <Badge className="text-white" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>{a.varianti} varianti</Badge>}
+                {a.categoria === 'prodotto' && <Badge className="text-white" style={{ backgroundColor: 'var(--viola)' }}>Prodotto</Badge>}
               </div>
             </div>
             <div className="p-2 space-y-0.5">
