@@ -5,11 +5,14 @@
 // (guardia in __tests__/mirrorSync.test.ts).
 //
 // Passi del pilota automatico (funzione scoperte-automatiche):
-//   1. ricerca con Gemini + Google Search (gratis entro i limiti giornalieri
-//      dell'API) solo su fonti autorevoli, ultimo mese
-//   2. per ogni scoperta nuova, Gemini scrive il carosello in italiano
-//   3. seconda passata di controllo dell'italiano
-//   4. le slide escono col template approvato del brand e il post va in
+//   1. Gemini traduce gli argomenti del brand in termini di ricerca inglesi
+//   2. PubMed (gratis, senza chiave) dà gli studi clinici, le meta-analisi e
+//      le linee guida dell'ultimo mese, con abstract
+//   3. Gemini sceglie quelli utili ai pazienti e li riassume in italiano;
+//      indirizzo, rivista e data vengono da PubMed, mai dal modello
+//   4. per ogni scoperta Gemini scrive il carosello, poi una passata di
+//      controllo dell'italiano
+//   5. le slide escono col template approvato del brand e il post va in
 //      programmazione all'orario scelto (ora italiana)
 
 export type Scoperta = {
@@ -42,29 +45,13 @@ export type BrandPerScoperte = {
   auto_temi?: string | null;
 };
 
-/** Siti da cui si accettano le scoperte: tutto il resto viene scartato. */
-export const DOMINI_AUTOREVOLI = [
-  'pubmed.ncbi.nlm.nih.gov',
-  'pmc.ncbi.nlm.nih.gov',
-  'nih.gov',
-  'who.int',
-  'cochranelibrary.com',
-  'thelancet.com',
-  'bmj.com',
-  'jamanetwork.com',
-  'nejm.org',
-  'nature.com',
-  'sciencedirect.com',
-  'frontiersin.org',
-  'jospt.org',
-  'health.harvard.edu',
-  'mayoclinic.org',
-  'sciencedaily.com',
-  'medicalxpress.com',
-  'iss.it',
-  'salute.gov.it',
-  'epicentro.iss.it',
-];
+/** E-utilities di PubMed: gratis, senza chiave, massimo 3 richieste al secondo. */
+export const PUBMED_EUTILS = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils';
+
+/** Solo studi clinici, meta-analisi, revisioni sistematiche e linee guida, con abstract, in inglese. */
+const FILTRO_PUBMED =
+  '(randomized controlled trial[pt] OR meta-analysis[pt] OR systematic review[pt] OR practice guideline[pt] OR guideline[pt])' +
+  ' AND hasabstract AND english[la]';
 
 /** Parole che non devono mai comparire nei contenuti, qualunque sia il brand. */
 export const PAROLE_SEMPRE_VIETATE = ['sbloccare', 'sblocca', 'sblocchi', 'sblocco'];
@@ -143,101 +130,157 @@ export function temiRicerca(brand: BrandPerScoperte): string {
   return 'dolore muscoloscheletrico, mal di schiena, cervicale, riabilitazione, fisioterapia, osteopatia, postura';
 }
 
-/** Il sito è fra quelli autorevoli (anche come sottodominio)? */
-export function dominioAutorevole(url: string): boolean {
-  try {
-    const host = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
-    return DOMINI_AUTOREVOLI.some((d) => host === d || host.endsWith('.' + d));
-  } catch {
-    return false;
-  }
+export type StudioPubmed = {
+  pmid: string;
+  titolo: string;
+  rivista: string;
+  data: string | null;
+  tipi: string[];
+  abstract: string;
+};
+
+/** Indirizzo della scheda PubMed di uno studio. */
+export function urlPubmed(pmid: string): string {
+  return `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`;
 }
 
 /**
- * Prima chiamata (con la ricerca Google): Gemini cerca e scrive le scoperte
- * in testo libero. Gli indirizzi NON li chiediamo a lui: con la ricerca
- * attiva vede solo rimandi di Google e li inventerebbe. Le fonti si prendono
- * dai metadati delle pagine consultate.
+ * Prima chiamata: Gemini traduce gli argomenti (in italiano, scritti dal
+ * brand) in termini di ricerca PubMed in inglese.
  */
-export function richiestaRicerca(temi: string, quante: number, titoliGiaUsati: string[], oggi: Date): Record<string, unknown> {
-  const giorno = oggi.toISOString().slice(0, 10);
+export function richiestaTermini(temi: string): Record<string, unknown> {
+  return {
+    contents: [{
+      role: 'user',
+      parts: [{
+        text:
+          `Argomenti di uno studio sanitario: ${temi}.\n` +
+          'Traducili in 3-5 termini di ricerca per PubMed, in inglese medico, brevi (2-4 parole), uno per argomento ' +
+          'principale (es. "low back pain", "neck pain", "rotator cuff"). Niente operatori, niente virgolette.\n' +
+          'Rispondi SOLO con JSON: {"termini":["..."]}',
+      }],
+    }],
+    generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+  };
+}
+
+/** Termini puliti (solo lettere, numeri e trattini), massimo 5. */
+export function leggiTermini(risposta: unknown): string[] {
+  const json = estraiJson(testoRisposta(risposta)) as { termini?: unknown[] } | null;
+  const termini = (Array.isArray(json?.termini) ? json!.termini : [])
+    .map((t) => String(t).replace(/[^A-Za-z0-9 '\-/]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60))
+    .filter((t) => t.length >= 3);
+  const unici = Array.from(new Set(termini.map((t) => t.toLowerCase()))).slice(0, 5);
+  return unici.length > 0 ? unici : ['musculoskeletal pain'];
+}
+
+/** Ricerca PubMed: studi aggiunti negli ultimi `giorni`, i più pertinenti prima. */
+export function urlCercaPubmed(termine: string, giorni: number, max = 8): string {
+  const term = `(${termine}) AND ${FILTRO_PUBMED}`;
+  return `${PUBMED_EUTILS}/esearch.fcgi?db=pubmed&retmode=json&sort=relevance&datetype=edat` +
+    `&reldate=${giorni}&retmax=${max}&tool=fisioaccordo-smm&term=${encodeURIComponent(term)}`;
+}
+
+export function leggiIdPubmed(risposta: unknown): string[] {
+  const ids = (risposta as { esearchresult?: { idlist?: unknown[] } } | null)?.esearchresult?.idlist || [];
+  return ids.map((id) => String(id)).filter((id) => /^\d{1,10}$/.test(id));
+}
+
+/** Abstract completi degli studi, in XML. */
+export function urlAbstractPubmed(ids: string[]): string {
+  return `${PUBMED_EUTILS}/efetch.fcgi?db=pubmed&retmode=xml&tool=fisioaccordo-smm&id=${ids.join(',')}`;
+}
+
+function testoXml(s: string): string {
+  return s
+    .replace(/<[^>]+>/g, '')
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const MESI: Record<string, string> = {
+  jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+  jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+};
+
+function dataXml(blocco: string | undefined): string | null {
+  if (!blocco) return null;
+  const anno = /<Year>(\d{4})<\/Year>/.exec(blocco)?.[1];
+  if (!anno) return null;
+  const meseGrezzo = (/<Month>([^<]+)<\/Month>/.exec(blocco)?.[1] || '').trim();
+  const mese = /^\d{1,2}$/.test(meseGrezzo) ? meseGrezzo.padStart(2, '0') : MESI[meseGrezzo.slice(0, 3).toLowerCase()] || '01';
+  const giorno = (/<Day>(\d{1,2})<\/Day>/.exec(blocco)?.[1] || '01').padStart(2, '0');
+  return `${anno}-${mese}-${giorno}`;
+}
+
+/** Dall'XML di efetch: PMID, titolo, rivista, data, tipo di studio e abstract. */
+export function leggiArticoliPubmed(xml: string): StudioPubmed[] {
+  const articoli = xml.match(/<PubmedArticle>[\s\S]*?<\/PubmedArticle>/g) || [];
+  const studi: StudioPubmed[] = [];
+  for (const a of articoli) {
+    const pmid = /<PMID[^>]*>(\d+)<\/PMID>/.exec(a)?.[1];
+    const titolo = testoXml(/<ArticleTitle[^>]*>([\s\S]*?)<\/ArticleTitle>/.exec(a)?.[1] || '');
+    const abstract = Array.from(a.matchAll(/<AbstractText([^>]*)>([\s\S]*?)<\/AbstractText>/g))
+      .map((m) => {
+        const etichetta = /Label="([^"]+)"/.exec(m[1])?.[1];
+        const t = testoXml(m[2]);
+        return etichetta ? `${etichetta}: ${t}` : t;
+      })
+      .filter(Boolean)
+      .join(' ');
+    if (!pmid || !titolo || !abstract) continue;
+    // Nome della rivista senza sottotitolo ("The spine journal : official journal…" → "The spine journal").
+    const rivista = testoXml(/<Journal>[\s\S]*?<Title>([\s\S]*?)<\/Title>/.exec(a)?.[1] || '').split(/ [:=] /)[0].trim() ||
+      testoXml(/<ISOAbbreviation>([\s\S]*?)<\/ISOAbbreviation>/.exec(a)?.[1] || '');
+    const data = dataXml(/<ArticleDate[^>]*>([\s\S]*?)<\/ArticleDate>/.exec(a)?.[1]) ||
+      dataXml(/<PubDate>([\s\S]*?)<\/PubDate>/.exec(a)?.[1]);
+    const tipi = Array.from(a.matchAll(/<PublicationType[^>]*>([^<]+)<\/PublicationType>/g)).map((m) => m[1].trim());
+    studi.push({ pmid, titolo, rivista, data, tipi, abstract });
+  }
+  return studi;
+}
+
+function tipoFonte(tipi: string[]): string {
+  if (tipi.some((t) => /meta-analysis|systematic review/i.test(t))) return 'meta-analysis';
+  if (tipi.some((t) => /guideline/i.test(t))) return 'guideline';
+  return 'study';
+}
+
+/**
+ * Seconda chiamata (senza ricerca, risposta JSON): fra gli studi di PubMed
+ * Gemini sceglie quelli utili ai pazienti e li riassume in italiano. Indica
+ * solo il PMID: indirizzo, rivista e data li prendiamo da PubMed.
+ */
+export function richiestaScelta(
+  temi: string,
+  quante: number,
+  studi: StudioPubmed[],
+  titoliGiaUsati: string[],
+): Record<string, unknown> {
   const esclusi = titoliGiaUsati.slice(0, 30);
   return {
     contents: [{
       role: 'user',
       parts: [{
         text:
-          `Oggi è il ${giorno}. Cerca con Google ${quante} scoperte scientifiche diverse e RECENTI (ultimi 30 giorni se possibile, ` +
-          `altrimenti le più recenti) utili alle persone comuni su: ${temi}.\n` +
-          `Cerca su questi siti: ${DOMINI_AUTOREVOLI.join(', ')}.\n` +
-          'Preferisci studi peer-review, meta-analisi, linee guida ufficiali, comunicati di università.\n' +
-          'Ogni scoperta deve smentire una credenza comune o dare qualcosa di pratico da fare.\n' +
-          (esclusi.length > 0 ? `Non ripetere queste, già usate:\n${esclusi.map((t) => `- ${t}`).join('\n')}\n` : '') +
-          'Per ogni scoperta scrivi un paragrafo con: titolo, cosa ha trovato (con i numeri veri), rivista o istituto, data. ' +
-          'Non inventare nulla: scrivi solo quello che trovi nelle pagine.',
+          `Sei il divulgatore scientifico di uno studio sanitario che si occupa di: ${temi}.\n` +
+          `Qui sotto ci sono studi recenti presi da PubMed. Scegline al massimo ${quante}, diversi fra loro, ` +
+          'utili ai pazienti di questo studio: che smentiscono una credenza comune o danno qualcosa di pratico da fare ' +
+          '(esercizio, movimento, postura, terapie manuali, abitudini, alimentazione). Scarta studi su farmaci, iniezioni, ' +
+          'chirurgia, macchinari da ospedale, studi su animali o con risultati poco chiari.\n' +
+          (esclusi.length > 0 ? `Non ripetere argomenti già usati:\n${esclusi.map((t) => `- ${t}`).join('\n')}\n` : '') +
+          'Usa solo i dati dell\'abstract, con i numeri veri; non aggiungere nulla.\n\nSTUDI\n' +
+          studi.map((s) =>
+            `[PMID ${s.pmid}] ${s.rivista} · ${s.data || 'data n.d.'} · ${s.tipi.join(', ')}\n${s.titolo}\n${s.abstract.slice(0, 1400)}`,
+          ).join('\n\n') +
+          '\n\nRispondi SOLO con JSON: {"items":[{"pmid":"numero","title":"titolo breve in italiano, comprensibile a tutti",' +
+          '"takeaways":["2-4 frasi brevi in italiano con i numeri veri"]}]}',
       }],
     }],
-    tools: [{ google_search: {} }],
-    generationConfig: { temperature: 0.2 },
-  };
-}
-
-/** Pagine consultate da Gemini, numerate da 1 (uri = rimando di Google da risolvere). */
-export function fontiConsultate(risposta: unknown): Array<{ n: number; uri: string; title: string }> {
-  const r = risposta as {
-    candidates?: Array<{ groundingMetadata?: { groundingChunks?: Array<{ web?: { uri?: string; title?: string } }> } }>;
-  } | null;
-  const chunks = r?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-  return chunks
-    .map((c, i) => ({ n: i + 1, uri: String(c?.web?.uri || ''), title: String(c?.web?.title || '') }))
-    .filter((c) => /^https?:\/\//i.test(c.uri));
-}
-
-/** Testo della risposta e, per ogni frase appoggiata a una pagina, i numeri delle fonti. */
-export function testoConFonti(risposta: unknown): { testo: string; frasi: Array<{ frase: string; fonti: number[] }> } {
-  const r = risposta as {
-    candidates?: Array<{
-      content?: { parts?: Array<{ text?: string }> };
-      groundingMetadata?: { groundingSupports?: Array<{ segment?: { text?: string }; groundingChunkIndices?: number[] }> };
-    }>;
-  } | null;
-  const c = r?.candidates?.[0];
-  const testo = (c?.content?.parts || []).map((p) => p?.text || '').join('');
-  const frasi = (c?.groundingMetadata?.groundingSupports || [])
-    .map((s) => ({
-      frase: String(s?.segment?.text || '').trim(),
-      fonti: (s?.groundingChunkIndices || []).filter((i) => Number.isInteger(i)).map((i) => i + 1),
-    }))
-    .filter((f) => f.frase && f.fonti.length > 0);
-  return { testo, frasi };
-}
-
-/**
- * Seconda chiamata (senza ricerca, risposta JSON): mette in ordine le
- * scoperte e per ognuna sceglie il numero della pagina che la sostiene.
- */
-export function richiestaEstrazione(
-  testo: string,
-  frasi: Array<{ frase: string; fonti: number[] }>,
-  fonti: Array<{ n: number; sito: string; url: string }>,
-): Record<string, unknown> {
-  return {
-    contents: [{
-      role: 'user',
-      parts: [{
-        text:
-          'Qui sotto ci sono delle scoperte scientifiche trovate con Google, le frasi con il numero della pagina che le sostiene, ' +
-          'e l\'elenco delle pagine.\n\nTESTO\n' + testo +
-          '\n\nFRASI E FONTI\n' + frasi.map((f) => `[${f.fonti.join(',')}] ${f.frase}`).join('\n') +
-          '\n\nPAGINE\n' + fonti.map((f) => `[${f.n}] ${f.sito} ${f.url}`).join('\n') +
-          '\n\nPer ogni scoperta scegli UNA pagina fra quelle elencate che la sostiene davvero (preferisci lo studio o il sito ' +
-          'scientifico alla notizia). Se nessuna pagina la sostiene, lasciala fuori. Usa solo i dati del testo, non aggiungere nulla.\n' +
-          'Rispondi SOLO con JSON: {"items":[{"fonte":numero,"title":"titolo breve in italiano",' +
-          '"takeaways":["2-4 frasi brevi in italiano con i numeri veri"],"source":"rivista o istituto","date":"AAAA-MM-GG o vuoto",' +
-          '"source_type":"study|meta-analysis|guideline|news"}]}',
-      }],
-    }],
-    generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
+    generationConfig: { temperature: 0.2, responseMimeType: 'application/json' },
   };
 }
 
@@ -269,34 +312,32 @@ export function chiaveUrl(url: string): string {
   }
 }
 
-/**
- * Legge il JSON della seconda chiamata. L'indirizzo di ogni scoperta è quello
- * vero della pagina scelta (mai scritto dal modello); si tengono solo siti
- * autorevoli e pagine non già usate.
- */
-export function leggiRicerca(
-  risposta: unknown,
-  fonti: Array<{ n: number; url: string }>,
-  urlGiaUsati: string[] = [],
-): { scoperte: Scoperta[]; scartate: string[] } {
+function testoRisposta(risposta: unknown): string {
   const r = risposta as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> } | null;
-  const contenuto = (r?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('');
-  const json = estraiJson(contenuto) as { items?: unknown[] } | null;
+  return (r?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || '').join('');
+}
+
+/**
+ * Legge la scelta di Gemini. Si tengono solo PMID fra gli studi dati e non
+ * già usati; indirizzo, rivista, data e tipo di studio vengono da PubMed.
+ */
+export function leggiScelta(
+  risposta: unknown,
+  studi: StudioPubmed[],
+  urlGiaUsati: string[] = [],
+): Scoperta[] {
+  const json = estraiJson(testoRisposta(risposta)) as { items?: unknown[] } | null;
   const voci = Array.isArray(json?.items) ? json!.items : [];
-  const urlDi = new Map(fonti.map((f) => [f.n, f.url]));
+  const perPmid = new Map(studi.map((s) => [s.pmid, s]));
   const usati = new Set(urlGiaUsati.map(chiaveUrl));
   const visti = new Set<string>();
-  const scartate: string[] = [];
 
   const scoperte: Scoperta[] = [];
   for (const v of voci) {
     const o = v as Record<string, unknown>;
-    const url = urlDi.get(Number(o.fonte)) || '';
-    if (!/^https?:\/\//i.test(url)) continue;
-    if (!dominioAutorevole(url)) {
-      try { scartate.push(new URL(url).hostname.replace(/^www\./, '')); } catch { /* indirizzo non valido */ }
-      continue;
-    }
+    const studio = perPmid.get(String(o.pmid ?? '').replace(/\D/g, ''));
+    if (!studio) continue;
+    const url = urlPubmed(studio.pmid);
     const k = chiaveUrl(url);
     if (usati.has(k) || visti.has(k)) continue;
     const titolo = String(o.title || '').trim();
@@ -305,18 +346,17 @@ export function leggiRicerca(
       .filter(Boolean)
       .slice(0, 4);
     if (!titolo || sintesi.length === 0) continue;
-    const dataGrezza = String(o.date || '').trim();
     visti.add(k);
     scoperte.push({
       titolo: titolo.slice(0, 200),
       sintesi,
-      fonte: String(o.source || '').trim().slice(0, 120) || new URL(url).hostname.replace(/^www\./, ''),
+      fonte: (studio.rivista || 'PubMed').slice(0, 120),
       url,
-      data: /^\d{4}-\d{2}-\d{2}/.test(dataGrezza) ? dataGrezza.slice(0, 10) : null,
-      tipo_fonte: String(o.source_type || '').trim().slice(0, 40) || 'study',
+      data: studio.data,
+      tipo_fonte: tipoFonte(studio.tipi),
     });
   }
-  return { scoperte, scartate };
+  return scoperte;
 }
 
 function vietate(brand: BrandPerScoperte): string[] {

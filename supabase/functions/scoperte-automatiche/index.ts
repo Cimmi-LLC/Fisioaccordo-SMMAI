@@ -38,18 +38,23 @@ import {
   type VariantRow,
 } from "../_shared/carouselProduction.ts";
 import {
+  chiaveUrl,
+  leggiArticoliPubmed,
   leggiCopy,
-  fontiConsultate,
-  leggiRicerca,
-  richiestaEstrazione,
-  testoConFonti,
+  leggiIdPubmed,
+  leggiScelta,
+  leggiTermini,
   normalizzaOrari,
   paroleVietateTrovate,
   promptCarosello,
   promptControlloItaliano,
   prossimiSlot,
-  richiestaRicerca,
+  richiestaScelta,
+  richiestaTermini,
   temiRicerca,
+  urlAbstractPubmed,
+  urlCercaPubmed,
+  urlPubmed,
   type BrandPerScoperte,
   type CopyScoperta,
   type Scoperta,
@@ -57,8 +62,7 @@ import {
 
 type Admin = ReturnType<typeof adminClient>;
 
-// Ricerca con Google Search dentro Gemini: gratis entro i limiti giornalieri
-// dell'API, e qui serve una chiamata per brand al giorno.
+// Termini di ricerca e scelta degli studi: due chiamate brevi per brand al giorno.
 const RESEARCH_MODEL = "gemini-2.5-flash";
 const COPY_MODEL = "gemini-2.5-flash";
 // Un post non va programmato a meno di 20 minuti da un altro dello stesso profilo.
@@ -294,12 +298,12 @@ async function giro(supabase: Admin, ctx: Contesto, slot: Date[]): Promise<void>
   }
 }
 
-type Diagnosi = { pagine: number; risolte: number; frasi: number; tenute: number; siti_scartati: string[] };
+type Diagnosi = { termini: string[]; trovati: number; letti: number; tenute: number };
 
 /**
- * Ricerca in due passi: Gemini cerca con Google e scrive in testo libero;
- * poi, senza ricerca, mette le scoperte in JSON scegliendo per ognuna il
- * numero di una pagina consultata. L'indirizzo si prende da quella pagina.
+ * Ricerca su PubMed: Gemini traduce gli argomenti in termini inglesi,
+ * PubMed dà gli studi dell'ultimo mese (o degli ultimi 4 se sono pochi) con
+ * abstract, Gemini sceglie quelli utili ai pazienti e li riassume.
  */
 async function cerca(
   temi: string,
@@ -307,41 +311,48 @@ async function cerca(
   usate: { url: string; titolo: string }[],
 ): Promise<{ scoperte: Scoperta[]; diagnosi: Diagnosi }> {
   const apiKey = Deno.env.get("GEMINI_API_KEY")!;
-  const res = await callGeminiWithRetry({
-    apiKey,
-    model: RESEARCH_MODEL,
-    body: richiestaRicerca(temi, quante, usate.map((u) => u.titolo), new Date()),
-  });
-  if (!res.ok) throw new Error(`Ricerca Gemini ${res.status}: ${(res.errorBody || "").slice(0, 300)}`);
+  const tr = await callGeminiWithRetry({ apiKey, model: RESEARCH_MODEL, body: richiestaTermini(temi) });
+  if (!tr.ok) throw new Error(`Termini Gemini ${tr.status}: ${(tr.errorBody || "").slice(0, 300)}`);
+  const termini = leggiTermini(tr.data);
 
-  const { testo, frasi } = testoConFonti(res.data);
-  // Le fonti arrivano come rimandi di Google: si seguono fino alla pagina vera.
-  const consultate = fontiConsultate(res.data);
-  const risolte = await Promise.all(consultate.map(async (f) => ({ n: f.n, sito: f.title, url: await paginaVera(f.uri) })));
-  const fonti = risolte.filter((f): f is { n: number; sito: string; url: string } => !!f.url);
-  const diagnosi: Diagnosi = { pagine: consultate.length, risolte: fonti.length, frasi: frasi.length, tenute: 0, siti_scartati: [] };
-  if (!testo.trim() || fonti.length === 0) {
-    console.log("Ricerca senza pagine consultate:", JSON.stringify(diagnosi), testo.slice(0, 300));
+  const usati = new Set(usate.map((u) => chiaveUrl(u.url)));
+  const ids: string[] = [];
+  for (const giorni of [30, 120]) {
+    for (const t of termini) {
+      const json = await chiediPubmed(urlCercaPubmed(t, giorni)).then((r) => JSON.parse(r)).catch(() => null);
+      for (const id of leggiIdPubmed(json)) {
+        if (!ids.includes(id) && !usati.has(chiaveUrl(urlPubmed(id)))) ids.push(id);
+      }
+    }
+    if (ids.length >= quante * 3) break;
+  }
+
+  const studi = ids.length > 0 ? leggiArticoliPubmed(await chiediPubmed(urlAbstractPubmed(ids.slice(0, 30)))) : [];
+  const diagnosi: Diagnosi = { termini, trovati: ids.length, letti: studi.length, tenute: 0 };
+  if (studi.length === 0) {
+    console.log("Ricerca senza studi:", JSON.stringify(diagnosi));
     return { scoperte: [], diagnosi };
   }
 
-  const estr = await callGeminiWithRetry({ apiKey, model: COPY_MODEL, body: richiestaEstrazione(testo, frasi, fonti) });
-  if (!estr.ok) throw new Error(`Estrazione Gemini ${estr.status}: ${(estr.errorBody || "").slice(0, 300)}`);
-  const { scoperte, scartate } = leggiRicerca(estr.data, fonti, usate.map((u) => u.url));
+  const scelta = await callGeminiWithRetry({
+    apiKey, model: RESEARCH_MODEL, body: richiestaScelta(temi, quante, studi, usate.map((u) => u.titolo)),
+  });
+  if (!scelta.ok) throw new Error(`Scelta Gemini ${scelta.status}: ${(scelta.errorBody || "").slice(0, 300)}`);
+  const scoperte = leggiScelta(scelta.data, studi, usate.map((u) => u.url));
   diagnosi.tenute = scoperte.length;
-  diagnosi.siti_scartati = Array.from(new Set(scartate));
   console.log("Ricerca:", JSON.stringify(diagnosi));
   return { scoperte, diagnosi };
 }
 
-async function paginaVera(uri: string): Promise<string | null> {
-  try {
-    const r = await fetch(uri, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(8000) });
-    await r.body?.cancel();
-    return r.headers.get("location") || (r.status < 400 ? uri : null);
-  } catch {
-    return null;
-  }
+// PubMed senza chiave accetta 3 richieste al secondo: le facciamo una alla volta, distanziate.
+let ultimaPubmed = 0;
+async function chiediPubmed(url: string): Promise<string> {
+  const attesa = ultimaPubmed + 400 - Date.now();
+  if (attesa > 0) await new Promise((r) => setTimeout(r, attesa));
+  ultimaPubmed = Date.now();
+  const r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+  if (!r.ok) throw new Error(`PubMed ${r.status}`);
+  return await r.text();
 }
 
 async function chiediGemini(prompt: string): Promise<string> {

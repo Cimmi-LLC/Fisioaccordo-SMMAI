@@ -62,7 +62,7 @@ export default function PilotaScoperteCard(props: Props) {
   const [anteprima, setAnteprima] = useState<{
     temi: string;
     scoperte: Array<{ titolo: string; sintesi: string[]; fonte: string; url: string; data: string | null }>;
-    diagnosi?: { pagine: number; risolte: number; tenute: number; siti_scartati: string[] };
+    diagnosi?: { termini: string[]; trovati: number; letti: number; tenute: number };
   } | null>(null);
   const [cercando, setCercando] = useState(false);
 
@@ -189,7 +189,7 @@ export default function PilotaScoperteCard(props: Props) {
             <FlaskConical className="h-5 w-5" /> Pubblicazione automatica: scoperte scientifiche
           </h2>
           <p className="text-[12px] mt-1" style={{ color: 'var(--ink3)' }}>
-            Ogni mattina cerca con Google studi e notizie recenti da fonti autorevoli (PubMed, Lancet, BMJ, OMS…), scrive il carosello in italiano
+            Ogni mattina cerca su PubMed gli studi dell'ultimo mese (studi clinici, meta-analisi, linee guida), sceglie quelli utili ai tuoi pazienti, scrive il carosello in italiano
             con la fonte, crea le slide col tuo template e lo programma su Instagram agli orari che scegli.
           </p>
         </div>
@@ -308,13 +308,11 @@ export default function PilotaScoperteCard(props: Props) {
           <div className="text-[12px]" style={{ color: 'var(--ink3)' }}>
             Anteprima, niente salvato. Cercato su: {anteprima.temi}
             {anteprima.diagnosi && (
-              <> · pagine lette {anteprima.diagnosi.pagine}, tenute {anteprima.diagnosi.tenute}
-                {anteprima.diagnosi.siti_scartati.length > 0 && <> · siti non autorevoli scartati: {anteprima.diagnosi.siti_scartati.join(', ')}</>}
-              </>
+              <> · su PubMed: {anteprima.diagnosi.termini.join(', ')} · studi trovati {anteprima.diagnosi.trovati}, letti {anteprima.diagnosi.letti}, scelti {anteprima.diagnosi.tenute}</>
             )}
           </div>
           {anteprima.scoperte.length === 0 && (
-            <div className="text-[13px]" style={{ color: 'var(--ink)' }}>Nessuna scoperta nuova da fonti autorevoli.</div>
+            <div className="text-[13px]" style={{ color: 'var(--ink)' }}>Nessuno studio nuovo adatto ai tuoi pazienti.</div>
           )}
           {anteprima.scoperte.map((s) => (
             <div key={s.url} className="text-[13px]">

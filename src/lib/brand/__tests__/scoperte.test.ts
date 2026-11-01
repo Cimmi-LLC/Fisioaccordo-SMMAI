@@ -3,15 +3,17 @@ import {
   normalizzaOrari,
   prossimiSlot,
   daOraRoma,
-  leggiRicerca,
   leggiCopy,
   chiaveUrl,
   temiRicerca,
-  richiestaRicerca,
-  fontiConsultate,
-  testoConFonti,
-  richiestaEstrazione,
-  dominioAutorevole,
+  leggiArticoliPubmed,
+  leggiScelta,
+  leggiTermini,
+  leggiIdPubmed,
+  urlCercaPubmed,
+  urlAbstractPubmed,
+  richiestaScelta,
+  richiestaTermini,
   paroleVietateTrovate,
   promptCarosello,
 } from '../scoperte';
@@ -46,74 +48,70 @@ describe('orari di pubblicazione', () => {
   });
 });
 
-describe('ricerca con Gemini + Google', () => {
-  const grounded = {
-    candidates: [{
-      content: { parts: [{ text: 'Uno studio su The Lancet ' }, { text: 'mostra che camminare riduce il mal di schiena del 40%.' }] },
-      groundingMetadata: {
-        groundingChunks: [
-          { web: { uri: 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/A', title: 'thelancet.com' } },
-          { web: { uri: 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/B', title: 'blog.it' } },
-          { web: {} },
-        ],
-        groundingSupports: [
-          { segment: { text: 'camminare riduce il mal di schiena del 40%' }, groundingChunkIndices: [0, 1] },
-          { segment: { text: 'senza fonte' }, groundingChunkIndices: [] },
-        ],
-      },
-    }],
-  };
-  const estrazione = (items: unknown[]) => ({ candidates: [{ content: { parts: [{ text: JSON.stringify({ items }) }] } }] });
-  const voce = (fonte: number, titolo = 'Camminare e mal di schiena') => ({
-    fonte, title: titolo, takeaways: ['Il 40% in meno di dolore', 'Bastano 30 minuti'], source: 'The Lancet', date: '2026-10-12', source_type: 'study',
+describe('ricerca su PubMed', () => {
+  const risposta = (json: unknown) => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(json) }] } }] });
+  const xml = `<?xml version="1.0"?><PubmedArticleSet>
+<PubmedArticle><MedlineCitation><PMID Version="1">111</PMID><Article><Journal><JournalIssue><PubDate><Year>2026</Year><Month>Nov</Month></PubDate></JournalIssue>
+<Title>The spine journal : official journal of the North American Spine Society</Title><ISOAbbreviation>Spine J</ISOAbbreviation></Journal>
+<ArticleTitle>Walking &amp; <i>exercise</i> for low back pain: a randomized trial.</ArticleTitle>
+<Abstract><AbstractText Label="METHODS">200 adults walked 30 minutes.</AbstractText><AbstractText Label="RESULTS">Pain fell by 40%.</AbstractText></Abstract>
+<ArticleDate DateType="Electronic"><Year>2026</Year><Month>10</Month><Day>7</Day></ArticleDate>
+<PublicationTypeList><PublicationType UI="D016428">Journal Article</PublicationType><PublicationType UI="D016449">Randomized Controlled Trial</PublicationType></PublicationTypeList>
+</Article></MedlineCitation></PubmedArticle>
+<PubmedArticle><MedlineCitation><PMID Version="1">222</PMID><Article><Journal><JournalIssue><PubDate><Year>2026</Year><Month>Sep</Month></PubDate></JournalIssue><Title>BMJ</Title></Journal>
+<ArticleTitle>Neck pain exercises: meta-analysis.</ArticleTitle><Abstract><AbstractText>Exercise helps.</AbstractText></Abstract>
+<PublicationTypeList><PublicationType UI="D017418">Meta-Analysis</PublicationType></PublicationTypeList></Article></MedlineCitation></PubmedArticle>
+<PubmedArticle><MedlineCitation><PMID Version="1">333</PMID><Article><ArticleTitle>Senza abstract</ArticleTitle></Article></MedlineCitation></PubmedArticle>
+</PubmedArticleSet>`;
+
+  it('legge dall’XML PMID, titolo, rivista, data, tipo e abstract', () => {
+    const studi = leggiArticoliPubmed(xml);
+    expect(studi.map((s) => s.pmid)).toEqual(['111', '222']);
+    expect(studi[0]).toMatchObject({
+      titolo: 'Walking & exercise for low back pain: a randomized trial.',
+      rivista: 'The spine journal',
+      data: '2026-10-07',
+      abstract: 'METHODS: 200 adults walked 30 minutes. RESULTS: Pain fell by 40%.',
+    });
+    expect(studi[1].data).toBe('2026-09-01');
+    expect(leggiArticoliPubmed('')).toEqual([]);
   });
 
-  it('numera le pagine consultate e lega le frasi alle fonti', () => {
-    expect(fontiConsultate(grounded).map((f) => [f.n, f.title])).toEqual([[1, 'thelancet.com'], [2, 'blog.it']]);
-    const { testo, frasi } = testoConFonti(grounded);
-    expect(testo).toContain('The Lancet mostra');
-    expect(frasi).toEqual([{ frase: 'camminare riduce il mal di schiena del 40%', fonti: [1, 2] }]);
-    expect(fontiConsultate(null)).toEqual([]);
-    expect(testoConFonti(null)).toEqual({ testo: '', frasi: [] });
+  it('prende indirizzo, rivista e data da PubMed, mai dal modello', () => {
+    const studi = leggiArticoliPubmed(xml);
+    const r = risposta({ items: [
+      { pmid: '111', title: 'Camminare toglie il mal di schiena', takeaways: ['Il 40% in meno di dolore'], url: 'https://inventato.com', source: 'Lancet' },
+      { pmid: '999', title: 'Studio inventato', takeaways: ['x'] },
+      { pmid: 'PMID 222', title: 'Collo ed esercizio', takeaways: ['Aiuta'] },
+      { pmid: '111', title: 'Doppione', takeaways: ['x'] },
+    ] });
+    const scoperte = leggiScelta(r, studi);
+    expect(scoperte.map((s) => s.url)).toEqual(['https://pubmed.ncbi.nlm.nih.gov/111/', 'https://pubmed.ncbi.nlm.nih.gov/222/']);
+    expect(scoperte[0]).toMatchObject({ fonte: 'The spine journal', data: '2026-10-07', tipo_fonte: 'study' });
+    expect(scoperte[1].tipo_fonte).toBe('meta-analysis');
+    expect(leggiScelta(r, studi, ['https://pubmed.ncbi.nlm.nih.gov/111']).map((s) => s.titolo)).toEqual(['Collo ed esercizio']);
+    expect(leggiScelta(null, studi)).toEqual([]);
   });
 
-  it('prende l’indirizzo dalla pagina scelta, mai dal modello, e scarta i siti non autorevoli', () => {
-    const fonti = [
-      { n: 1, url: 'https://www.thelancet.com/journals/x' },
-      { n: 2, url: 'https://blog-qualsiasi.it/post' },
-    ];
-    const r = estrazione([{ ...voce(1), url: 'https://inventato.com' }, voce(2), voce(9)]);
-    const { scoperte, scartate } = leggiRicerca(r, fonti);
-    expect(scoperte.map((s) => s.url)).toEqual(['https://www.thelancet.com/journals/x']);
-    expect(scoperte[0].data).toBe('2026-10-12');
-    expect(scartate).toEqual(['blog-qualsiasi.it']);
+  it('termini puliti, massimo 5, con un ripiego se mancano', () => {
+    expect(leggiTermini(risposta({ termini: ['Low back pain', 'low back pain', 'neck "pain" AND x', 'a'] }))).toEqual(['low back pain', 'neck pain and x']);
+    expect(leggiTermini(null)).toEqual(['musculoskeletal pain']);
+    expect(leggiIdPubmed({ esearchresult: { idlist: ['42105106', 'x1', 7] } })).toEqual(['42105106', '7']);
   });
 
-  it('scarta pagine già usate, doppioni e voci incomplete', () => {
-    const fonti = [{ n: 1, url: 'https://bmj.com/x?utm_source=a' }, { n: 2, url: 'https://bmj.com/y' }];
-    const r = estrazione([voce(1), voce(1, 'Doppione'), voce(2), { fonte: 1, title: '', takeaways: [] }]);
-    expect(leggiRicerca(r, fonti, ['https://www.bmj.com/y']).scoperte.map((s) => s.titolo)).toEqual(['Camminare e mal di schiena']);
-    expect(leggiRicerca(null, fonti).scoperte).toEqual([]);
-  });
-
-  it('prima chiamata con Google e senza indirizzi chiesti al modello; seconda in JSON senza ricerca', () => {
-    const ric = richiestaRicerca('mal di schiena', 4, ['Titolo già usato'], new Date('2026-11-01T06:00:00Z')) as Record<string, any>;
-    expect(ric.tools).toEqual([{ google_search: {} }]);
-    const t = ric.contents[0].parts[0].text as string;
-    expect(t).toContain('2026-11-01');
+  it('cerca solo studi clinici, meta-analisi e linee guida, con abstract', () => {
+    const u = decodeURIComponent(urlCercaPubmed('neck pain', 30));
+    expect(u).toContain('reldate=30');
+    expect(u).toContain('(neck pain) AND (randomized controlled trial[pt]');
+    expect(u).toContain('hasabstract');
+    expect(urlAbstractPubmed(['1', '2'])).toContain('id=1,2');
+    const scelta = richiestaScelta('mal di schiena', 3, leggiArticoliPubmed(xml), ['Titolo già usato']) as Record<string, any>;
+    expect(scelta.tools).toBeUndefined();
+    const t = scelta.contents[0].parts[0].text as string;
+    expect(t).toContain('[PMID 111] The spine journal');
     expect(t).toContain('Titolo già usato');
-    expect(t).toContain('pubmed.ncbi.nlm.nih.gov');
-    const estr = richiestaEstrazione('testo', [{ frase: 'f', fonti: [1] }], [{ n: 1, sito: 'bmj.com', url: 'https://bmj.com/a' }]) as Record<string, any>;
-    expect(estr.tools).toBeUndefined();
-    expect(estr.generationConfig.responseMimeType).toBe('application/json');
-    expect(estr.contents[0].parts[0].text).toContain('[1] bmj.com https://bmj.com/a');
-  });
-
-  it('riconosce i domini autorevoli anche come sottodomini', () => {
-    expect(dominioAutorevole('https://www.nature.com/articles/x')).toBe(true);
-    expect(dominioAutorevole('https://news.harvard.edu/x')).toBe(false);
-    expect(dominioAutorevole('https://pubmed.ncbi.nlm.nih.gov/123')).toBe(true);
-    expect(dominioAutorevole('https://fakenature.com/x')).toBe(false);
+    expect(t).toContain('iniezioni');
+    expect((richiestaTermini('cervicale') as Record<string, any>).generationConfig.responseMimeType).toBe('application/json');
   });
 
   it('normalizza gli URL per il confronto', () => {
