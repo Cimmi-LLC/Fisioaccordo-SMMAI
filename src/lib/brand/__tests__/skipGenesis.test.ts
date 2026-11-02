@@ -18,3 +18,14 @@ describe('coloriDaCompletare', () => {
     expect(Object.values(COLORI_PARTENZA)).not.toContain('#E6007E');
   });
 });
+
+describe('colori di partenza nel Template Genesis', () => {
+  it('non contano come scelti dal cliente: vince la palette estratta dal logo', async () => {
+    const { mergePaletteWithBrandKit } = await import('../extractor.ts');
+    const estratta = { accent: '#123456', bg_light: '#fafafa', bg_dark: '#111111', candidates: [] } as any;
+    const unita = mergePaletteWithBrandKit(estratta, {
+      primario: COLORI_PARTENZA.colore_primario, secondario: COLORI_PARTENZA.colore_secondario, terziario: null,
+    });
+    expect(unita.accent).toBe('#123456');
+  });
+});

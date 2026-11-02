@@ -196,8 +196,12 @@ export type BrandKitColors = {
   terziario?: string | null;
 };
 
-/** Default Fisioaccordo: presenti su ogni brand appena creato, non scelti. */
-const DEFAULT_BRAND_COLORS = new Set(['#554697', '#e6007e', '#1a1a2e']);
+/**
+ * Colori di default, non scelti dal cliente: quelli FisioAccordo dei brand
+ * creati prima del 02/11/2026 e quelli neutri di partenza (skipGenesis.ts;
+ * il bianco no: puo essere una scelta vera come sfondo).
+ */
+const DEFAULT_BRAND_COLORS = new Set(['#554697', '#e6007e', '#1a1a2e', '#1f2937', '#f59e0b']);
 
 function isChosenColor(hex: string | null | undefined): hex is string {
   if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return false;
