@@ -1,4 +1,5 @@
-// Step 1: caricamento logo (obbligatorio) e fino a 6 post esistenti.
+// Step 1: caricamento logo (serve per il template; chi non lo ha salta
+// dal wizard) e fino a 6 post esistenti.
 // Se il brand ha gia un logo nel kit, viene proposto precaricato: l'utente
 // puo tenerlo o sostituirlo.
 import React, { useRef, useState } from 'react';
@@ -42,7 +43,7 @@ const UploadStep: React.FC<UploadStepProps> = ({ busy, progress, existingLogoUrl
         <p className="text-[13px]" style={{ color: 'var(--ink3)' }}>
           {existingLogoUrl
             ? `Uso il logo gia salvato nel tuo brand. I post esistenti aiutano l'AI a capire il tuo stile (fino a ${MAX_POSTS}).`
-            : `Il logo e obbligatorio. I post esistenti aiutano l'AI a capire il tuo stile (fino a ${MAX_POSTS}).`}
+            : `Per progettare il template serve il logo. I post esistenti aiutano l'AI a capire il tuo stile (fino a ${MAX_POSTS}). Non hai il logo adesso? Salta e lo aggiungi dopo.`}
         </p>
       </div>
 
@@ -96,7 +97,7 @@ const UploadStep: React.FC<UploadStepProps> = ({ busy, progress, existingLogoUrl
           ) : (
             <div className="flex flex-col items-center gap-2">
               <Upload className="h-8 w-8" style={{ color: 'var(--viola)' }} />
-              <span className="text-sm font-bold" style={{ color: 'var(--viola)' }}>Logo del tuo studio *</span>
+              <span className="text-sm font-bold" style={{ color: 'var(--viola)' }}>Logo del tuo brand *</span>
               <span className="text-[11px]" style={{ color: 'var(--ink3)' }}>PNG o JPG, meglio se su sfondo trasparente</span>
             </div>
           )}
@@ -149,7 +150,7 @@ const UploadStep: React.FC<UploadStepProps> = ({ busy, progress, existingLogoUrl
           className="rounded-xl p-3 text-[11px]"
           style={{ backgroundColor: 'rgba(245,158,11,0.08)', color: 'var(--ink2)' }}
         >
-          Senza post l'AI progettera il template partendo da logo, colori e descrizione del tuo studio.
+          Senza post l'AI progettera il template partendo da logo, colori e descrizione del tuo brand.
           Funziona, ma con 2 o 3 post il risultato somiglia molto di piu al tuo stile reale.
         </div>
       )}

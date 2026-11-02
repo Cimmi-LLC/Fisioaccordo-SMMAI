@@ -290,7 +290,7 @@ const Onboarding = () => {
   const handleSave = async () => {
     if (!user) return;
     if (!brand.nome_business.trim()) {
-      toast({ title: 'Nome richiesto', description: 'Inserisci il nome del tuo studio.', variant: 'destructive' });
+      toast({ title: 'Nome richiesto', description: 'Inserisci il nome del tuo brand o studio.', variant: 'destructive' });
       return;
     }
 
@@ -347,8 +347,8 @@ const Onboarding = () => {
           : 'Il tuo brand è pronto. Iniziamo a creare contenuti!',
       });
       clearDraft();
-      // Dopo il salvataggio del brand si entra nel Template Genesis:
-      // senza template approvato la generazione caroselli e bloccata.
+      // Dopo il salvataggio del brand si entra nel Template Genesis,
+      // che si puo saltare («Salta e configura dopo»).
       navigate(inserted?.id ? `/onboarding/template?brand=${inserted.id}` : (isNewBrandMode ? '/brands' : '/posts'));
     } catch (err: any) {
       toast({ title: 'Errore nel salvataggio', description: err.message, variant: 'destructive' });
@@ -591,7 +591,7 @@ const Onboarding = () => {
               {/* Nome business */}
               <div>
                 <label className="block text-[10px] font-black uppercase mb-1.5" style={{ color: 'var(--ink2)', letterSpacing: '0.8px' }}>
-                  Nome dello studio *
+                  Nome del brand o dello studio *
                 </label>
                 <Input
                   value={brand.nome_business}
