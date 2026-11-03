@@ -6,7 +6,9 @@
 import React, { useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { ChevronLeft, ChevronRight, Loader2, RefreshCw, Download, CalendarClock, Copy } from 'lucide-react';
+import MinimalProgressBar from '@/components/carousel/MinimalProgressBar';
+import { captionConHashtag } from '@/lib/caption';
+import { ChevronLeft, ChevronRight, Loader2, RefreshCw, Download, CalendarClock, Copy, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActiveBrand } from '@/hooks/useActiveBrand';
 import { supabase } from '@/integrations/supabase/client';
@@ -39,10 +41,12 @@ const Nb2CarouselPreview: React.FC<Nb2CarouselPreviewProps> = ({
   const genome = (activeBrand as { genome?: TemplateGenome } | null)?.genome ?? null;
   const current = slides[active];
 
-  const caption = useMemo(() => {
-    const tags = (carousel.hashtag_suggeriti || []).map((h) => '#' + String(h).replace(/^#/, '')).join(' ');
-    return [carousel.caption_instagram, tags].filter(Boolean).join('\n\n');
-  }, [carousel]);
+  // Caption + hashtag senza doppioni: se la caption generata contiene già un
+  // blocco di hashtag, viene tolto prima di appendere hashtag_suggeriti.
+  const caption = useMemo(
+    () => captionConHashtag(carousel.caption_instagram, carousel.hashtag_suggeriti),
+    [carousel],
+  );
 
   const copyCaption = async () => {
     await navigator.clipboard.writeText(caption);
@@ -97,9 +101,32 @@ const Nb2CarouselPreview: React.FC<Nb2CarouselPreviewProps> = ({
 
   if (slides.length === 0 && !producing) return null;
 
+  // Avanzamento reale: slide arrivate (bene o male) su totale.
+  const pronte = slides.filter((s) => s.imageUrl).length;
+  const chiuse = slides.filter((s) => s.imageUrl || s.error).length;
+  const fallite = slides.filter((s) => !s.imageUrl && s.error).length;
+
   return (
     <Card className="panel-card">
       <CardContent style={{ padding: 24 }}>
+        {/* Avanzamento reale della produzione */}
+        {producing && (
+          <div className="mb-4 space-y-1.5">
+            <MinimalProgressBar current={chiuse} total={slides.length || 1} label="Genero le slide" />
+            <p className="text-[11px]" style={{ color: 'var(--ink3)' }}>
+              Circa 20-40 secondi a slide. Puoi restare qui: si aggiornano da sole, non ricaricare la pagina.
+            </p>
+          </div>
+        )}
+        {!producing && fallite > 0 && (
+          <div className="mb-4 flex items-start gap-2 rounded-xl p-3 text-[12px]" style={{ backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: 'var(--ink)' }}>
+            <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" style={{ color: '#ef4444' }} />
+            <span>
+              {fallite === 1 ? '1 slide non è stata generata' : `${fallite} slide non sono state generate`} ({pronte}/{slides.length} pronte).
+              Aprile dalle miniature qui sotto e premi «Riprova» su ognuna.
+            </span>
+          </div>
+        )}
         {/* Slide viewer */}
         <div style={{ position: 'relative' }}>
           <div
@@ -170,7 +197,9 @@ const Nb2CarouselPreview: React.FC<Nb2CarouselPreviewProps> = ({
             >
               {s.imageUrl
                 ? <img src={s.imageUrl} alt={`t${s.index}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                : <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" style={{ color: 'var(--ink3)' }} />}
+                : s.error
+                  ? <AlertTriangle className="h-3.5 w-3.5 mx-auto" style={{ color: '#ef4444' }} />
+                  : <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" style={{ color: 'var(--ink3)' }} />}
             </button>
           ))}
         </div>

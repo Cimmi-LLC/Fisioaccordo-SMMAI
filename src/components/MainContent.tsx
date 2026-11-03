@@ -222,7 +222,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
           className="text-[32px] leading-tight"
           style={{ fontWeight: 900, color: 'var(--ink)', letterSpacing: '-1.5px', lineHeight: '1.1' }}
         >
-          Crea contenuti <span style={{ color: 'var(--rosa)' }}>virali</span> in secondi
+          Crea i <span style={{ color: 'var(--rosa)' }}>contenuti</span> del tuo studio
         </h1>
       </div>
 

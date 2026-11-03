@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useActiveBrand } from '@/hooks/useActiveBrand';
 import { useToast } from '@/hooks/use-toast';
+import { captionConHashtag } from '@/lib/caption';
 import type { CarouselData, CarouselSlideData, SlideRenderConfig } from '@/types/carousel';
 
 export const useCarouselPreview = (initialData: CarouselData | null) => {
@@ -358,8 +359,7 @@ export const useCarouselPreview = (initialData: CarouselData | null) => {
 
   const copyCaption = useCallback(() => {
     if (!carousel) return;
-    const text = carousel.caption_instagram + '\n\n' + carousel.hashtag_suggeriti.map(h => '#' + h.replace('#', '')).join(' ');
-    navigator.clipboard.writeText(text);
+    navigator.clipboard.writeText(captionConHashtag(carousel.caption_instagram, carousel.hashtag_suggeriti));
     toast({ title: 'Caption copiata!' });
   }, [carousel, toast]);
 

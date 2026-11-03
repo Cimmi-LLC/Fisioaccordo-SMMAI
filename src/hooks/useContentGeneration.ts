@@ -100,7 +100,7 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
       const first = successful[0];
       const personalizedContent = first?.content || first?.caption_instagram || '';
 
-      loadingState.updateProgress(80, 'Ottimizzazione per viralità...');
+      loadingState.updateProgress(80, 'Ultimi ritocchi al copy...');
 
       setGeneratedContent(personalizedContent);
       setLastRawResponse(first);
