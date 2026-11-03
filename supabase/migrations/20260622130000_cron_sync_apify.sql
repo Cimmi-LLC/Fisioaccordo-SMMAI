@@ -17,7 +17,7 @@ SELECT cron.schedule(
   $$
     SELECT net.http_post(
       url := 'https://cktdoqvyyvjlkpahbjyi.supabase.co/functions/v1/sync-instagram-metrics-apify',
-      headers := '{"Content-Type": "application/json", "x-cron-secret": "b3ea42bcfe026c92dfa789d13402d2d6ab6c8aad9adcaacb4abe8ba6f9232d4b"}'::jsonb,
+      headers := '{"Content-Type": "application/json", "x-cron-secret": "TOLTO-dal-repo-vedi-20261103180000"}'::jsonb,
       body := '{}'::jsonb,
       timeout_milliseconds := 120000
     );
