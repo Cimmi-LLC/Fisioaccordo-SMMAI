@@ -116,6 +116,16 @@ const Onboarding = () => {
   const [url, setUrl] = useState('');
   // Chi non ha un sito (o non lo vuole dare) parte dal profilo Instagram.
   const [fonte, setFonte] = useState<'sito' | 'instagram'>('sito');
+  // Nel campo Instagram la @ e gia scritta: si tiene solo il nome. Se
+  // qualcuno incolla il link del profilo, lo trasformiamo subito nel nome.
+  const scriviNomeInstagram = (valore: string) => {
+    const t = valore.trim();
+    if (sembraInstagram(t) && !t.startsWith('@')) {
+      const nome = nomeUtenteInstagram(t);
+      if (nome) { setUrl(nome); return; }
+    }
+    setUrl(valore.replace(/^\s*@+/, '').replace(/\s+/g, ''));
+  };
   const [nuovaCategoria, setNuovaCategoria] = useState('');
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
   const [brand, setBrand] = useState<BrandProfile>({ ...EMPTY_BRAND });
@@ -247,7 +257,7 @@ const Onboarding = () => {
       });
       if (scrapeErr || !scrapeData?.success) {
         const errorMessages: Record<string, string> = {
-          not_found: `Non trovo il profilo @${handle}. Controlla il nome.`,
+          not_found: `Non trovo il profilo @${handle}. Controlla che sia scritto preciso, con punti e trattini bassi.`,
           private: `Il profilo @${handle} e privato: rendilo pubblico o compila a mano.`,
           rate_limited: 'Troppe letture in poco tempo. Riprova tra un\'ora o compila a mano.',
           invalid_handle: 'Il nome del profilo non e valido.',
@@ -488,7 +498,7 @@ const Onboarding = () => {
                 ]).map(({ id, label, Icon }) => (
                   <button
                     key={id}
-                    onClick={() => setFonte(id)}
+                    onClick={() => { if (id !== fonte) setUrl(''); setFonte(id); }}
                     className="inline-flex items-center gap-1.5 text-[12px] font-black uppercase px-4 py-2 rounded-xl"
                     style={{
                       letterSpacing: '0.5px', cursor: 'pointer',
@@ -512,19 +522,59 @@ const Onboarding = () => {
                 <p className="text-[13px]" style={{ color: 'var(--ink3)' }}>
                   {fonte === 'sito'
                     ? "Incolla il link del tuo sito. Ci pensiamo noi a scoprire tutto quello che c'è da sapere sul tuo brand."
-                    : 'Scrivi il nome del profilo. Da bio, post e foto ricaviamo chi sei, cosa offri, i colori e il logo. Il profilo deve essere pubblico.'}
+                    : 'Scrivi il nome del tuo profilo dopo la @. Da bio, post e foto ricaviamo chi sei, cosa offri, i colori e il logo. Il profilo deve essere pubblico.'}
                 </p>
               </div>
 
               <div className="space-y-4">
-                <Input
-                  value={url}
-                  onChange={e => setUrl(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleAnalyze(); }}
-                  placeholder={fonte === 'sito' ? 'https://www.tuostudio.it' : '@tuoprofilo'}
-                  className="text-center text-sm h-12"
-                  style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '12px', fontSize: '14px' }}
-                />
+                {fonte === 'sito' ? (
+                  <Input
+                    value={url}
+                    onChange={e => setUrl(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleAnalyze(); }}
+                    placeholder="https://www.tuostudio.it"
+                    className="text-center text-sm h-12"
+                    style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '12px', fontSize: '14px' }}
+                  />
+                ) : (
+                  <>
+                    <div className="relative">
+                      <span
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-[16px] font-black pointer-events-none"
+                        style={{ color: 'var(--viola)' }}
+                      >
+                        @
+                      </span>
+                      <Input
+                        value={url}
+                        onChange={e => scriviNomeInstagram(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleAnalyze(); }}
+                        placeholder="nomeprofilo"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        className="text-sm h-12 pl-9"
+                        style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '12px', fontSize: '16px' }}
+                      />
+                    </div>
+                    <p className="text-[12px] text-left" style={{ color: 'var(--ink2)' }}>
+                      Scrivilo preciso, lettera per lettera, con punti e trattini bassi (_) se ci sono. Senza spazi.
+                    </p>
+                    <details className="text-left rounded-xl px-4 py-3" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)' }}>
+                      <summary className="text-[12px] font-bold" style={{ color: 'var(--viola)', cursor: 'pointer' }}>
+                        Dove trovo il nome del mio profilo?
+                      </summary>
+                      <ol className="mt-2 space-y-1 text-[12px] list-decimal pl-5" style={{ color: 'var(--ink2)' }}>
+                        <li>Apri l'app Instagram sul telefono.</li>
+                        <li>Tocca la tua foto in basso a destra: si apre il tuo profilo.</li>
+                        <li>Il nome è scritto in alto, sopra la foto (per esempio <b>studio.rossi_fisio</b>). Scrivilo qui uguale.</li>
+                      </ol>
+                      <p className="mt-2 text-[12px]" style={{ color: 'var(--ink3)' }}>
+                        Più comodo: nel tuo profilo tocca «Condividi profilo», poi «Copia link», e incollalo qui. Il nome lo prendiamo noi dal link.
+                      </p>
+                    </details>
+                  </>
+                )}
                 <button
                   onClick={handleAnalyze}
                   disabled={!url.trim()}
@@ -602,7 +652,7 @@ const Onboarding = () => {
                 {LOADING_MESSAGES[loadingMsgIndex]}
               </p>
               <p className="text-[12px]" style={{ color: 'var(--ink3)' }}>
-                Stiamo analizzando il tuo sito web...
+                {fonte === 'instagram' ? 'Stiamo analizzando il tuo profilo Instagram...' : 'Stiamo analizzando il tuo sito web...'}
               </p>
             </div>
 
