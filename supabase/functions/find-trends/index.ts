@@ -88,22 +88,22 @@ serve(async (req) => {
 
     const prompt = `Sei un trend analyst esperto. Oggi è ${today}.
 
-Trova esattamente ${numTrends} trend ATTUALI per la nicchia "${niche}" sulla piattaforma ${platform || "Instagram"}.${excludeBlock}
+Trova esattamente ${numTrends} temi caldi per la nicchia "${niche}" sulla piattaforma ${platform || "Instagram"}.${excludeBlock}
 
-I trend devono essere:
-- REALI e attuali (non inventati)
-- Specifici per la nicchia indicata
-- Applicabili per creare contenuti social
-- Tutti DIVERSI tra loro
+Chi li usa è un professionista o uno studio LOCALE italiano che pubblica per i propri pazienti/clienti.
+I temi devono essere:
+- Argomenti di cui si parla DAVVERO adesso sui social di questa nicchia (stagionalità, abitudini, convinzioni diffuse, format che girano)
+- Rifattibili da uno studio locale col telefono: NIENTE temi da convegno di settore (tele-riabilitazione VR/AR, wearable, intelligenza artificiale, eSports) che un paziente non cerca
+- Specifici per la nicchia indicata, tutti DIVERSI tra loro
+- NIENTE punteggi o percentuali inventate: in "why_trending" scrivi il motivo concreto e verificabile per cui il tema tira adesso (periodo dell'anno, comportamento diffuso, domanda ricorrente dei pazienti)
 
 Rispondi SOLO con JSON valido:
 {
   "trends": [
     {
-      "topic": "nome del trend",
-      "trend_score": 85,
-      "why_trending": "perché è trend adesso (1 frase)",
-      "content_idea": "idea concreta per un post su questo trend",
+      "topic": "nome del tema",
+      "why_trending": "perché tira adesso: motivo concreto, 1 frase",
+      "content_idea": "idea concreta per un post su questo tema",
       "suggested_format": "carosello|reel|foto|video",
       "search_hashtags": ["hashtag1", "hashtag2"]
     }
@@ -138,6 +138,9 @@ Rispondi SOLO con JSON valido:
     }
 
     const trends = parsed.trends || [];
+    // Niente numeri senza fonte (revisione 03/11): il punteggio inventato dal
+    // modello non si mostra più. 0 tiene compatibile la colonna trend_score.
+    for (const t of trends) t.trend_score = 0;
 
     // Step 2: If Apify is available, search real reels for each trend
     if (APIFY_API_TOKEN && trends.length > 0) {

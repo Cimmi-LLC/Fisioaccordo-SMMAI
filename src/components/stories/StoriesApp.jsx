@@ -482,6 +482,48 @@ function clearContrastShadow(ctx){
   ctx.shadowOffsetY = 0;
 }
 
+// ── Sfondi di default (revisione 03/11) ─────────────────────────────────
+// Un terapista un template grafico non ce l'ha: senza upload si usano questi
+// sfondi pronti, disegnati coi colori del brand. Il logo NON è mai uno sfondo.
+export const DEFAULT_BGS=[
+  {id:"morbido",label:"Morbido"},
+  {id:"angoli",label:"Angoli"},
+  {id:"banda",label:"Banda"},
+];
+
+function drawDefaultBackground(ctx,W,H,colors,variant){
+  const p1=(colors&&colors[0])||"#554697";
+  const p2=(colors&&colors[1])||p1;
+  // Base sempre chiara e leggibile.
+  ctx.fillStyle="#f7f7fa"; ctx.fillRect(0,0,W,H);
+  ctx.save();
+  if(variant==="angoli"){
+    ctx.globalAlpha=0.12; ctx.fillStyle=p1;
+    ctx.beginPath(); ctx.arc(0,0,W*0.45,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=0.10; ctx.fillStyle=p2;
+    ctx.beginPath(); ctx.arc(W,H,W*0.55,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1; ctx.fillStyle=p1;
+    ctx.fillRect(0,0,W,14);
+  } else if(variant==="banda"){
+    ctx.globalAlpha=0.08; ctx.fillStyle=p1;
+    ctx.beginPath();
+    ctx.moveTo(0,H*0.30); ctx.lineTo(W,H*0.14); ctx.lineTo(W,H*0.40); ctx.lineTo(0,H*0.56); ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha=0.10; ctx.fillStyle=p2;
+    ctx.beginPath();
+    ctx.moveTo(0,H*0.78); ctx.lineTo(W,H*0.64); ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha=1; ctx.fillStyle=p1;
+    ctx.fillRect(0,H-14,W,14);
+  } else { // morbido
+    ctx.globalAlpha=0.10; ctx.fillStyle=p1;
+    ctx.beginPath(); ctx.ellipse(W*0.92,H*0.10,W*0.5,W*0.5,0,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=0.08; ctx.fillStyle=p2;
+    ctx.beginPath(); ctx.ellipse(W*0.06,H*0.92,W*0.55,W*0.55,0,0,Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
 async function renderJpeg(story, client, photoImg){
   const W=1080, H=1920;
   const cv=document.createElement("canvas"); cv.width=W; cv.height=H;
@@ -492,13 +534,14 @@ async function renderJpeg(story, client, photoImg){
   const isAnswer=story.cardType==="quiz_risposta";
   const bgLight=client.bgIsLight!==false;
 
-  // Background
+  // Background: template caricato, altrimenti sfondo di default coi colori
+  // del brand (mai il logo a tutta pagina).
   if(client.templateDataUrl){
     const bg=await loadImg(client.templateDataUrl);
     if(bg) ctx.drawImage(bg,0,0,W,H);
-    else { ctx.fillStyle=bgLight?"#f5f5f5":"#111"; ctx.fillRect(0,0,W,H); }
+    else drawDefaultBackground(ctx,W,H,colors,client.defaultBg);
   } else {
-    ctx.fillStyle=bgLight?"#f5f5f5":"#111"; ctx.fillRect(0,0,W,H);
+    drawDefaultBackground(ctx,W,H,colors,client.defaultBg);
   }
 
   // Safe zone: logo nel template occupa ~22% -> contenuto parte dal 25%
@@ -631,16 +674,13 @@ async function renderReviewJpeg(reviews_input, client, colorOverrides={}){
   const reviewTextColor = colorOverrides.textColor || (bgLight ? "#2a2a2a" : "#e8e8e8");
   const cardBg = bgLight ? "rgba(255,255,255,0.97)" : "rgba(14,24,14,0.95)";
 
-  // 1. Draw background
+  // 1. Draw background: template caricato o sfondo di default del brand.
   if(client.templateDataUrl){
     const bg = await loadImg(client.templateDataUrl);
     if(bg) ctx.drawImage(bg,0,0,W,H);
-    else { ctx.fillStyle=bgLight?"#f5f5f5":"#111"; ctx.fillRect(0,0,W,H); }
+    else drawDefaultBackground(ctx,W,H,colors,client.defaultBg);
   } else {
-    ctx.fillStyle=bgLight?"#f5f5f5":"#111"; ctx.fillRect(0,0,W,H);
-    const g=ctx.createLinearGradient(0,0,W,H);
-    g.addColorStop(0,p1+"18"); g.addColorStop(1,p2+"0a");
-    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    drawDefaultBackground(ctx,W,H,colors,client.defaultBg);
   }
 
   // 2. Safe zone - logo nel template occupa ~22% -> contenuto dal 25%
@@ -885,7 +925,9 @@ const Inp=({sx,...p})=><input style={{width:"100%",background:"var(--bg)",border
 const Sel=({children,sx,...p})=><select style={{width:"100%",background:"var(--bg)",border:"1px solid var(--line)",borderRadius:9,padding:"8px 12px",color:"var(--ink)",fontSize:12,fontWeight:500,outline:"none",boxSizing:"border-box",fontFamily:"Montserrat,sans-serif",transition:"border-color .15s",...sx}} {...p}>{children}</select>;
 const PBtn=({children,sx,...p})=><button style={{background:p.disabled?"rgba(85,70,151,0.08)":"var(--rosa)",border:"none",borderRadius:10,padding:"11px 22px",color:p.disabled?"rgba(85,70,151,0.30)":"#ffffff",fontSize:12,fontWeight:800,cursor:p.disabled?"not-allowed":"pointer",fontFamily:"Montserrat,sans-serif",textTransform:"uppercase",letterSpacing:"0.5px",transition:"background .2s",...sx}} {...p}>{children}</button>;
 const SBtn=({children,sx,...p})=><button style={{background:"transparent",border:"1px solid var(--line)",borderRadius:10,padding:"10px 16px",color:"var(--ink3)",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"Montserrat,sans-serif",transition:"background .2s,border-color .2s",...sx}} {...p}>{children}</button>;
-const Chip=({sel,children,onClick})=><button onClick={onClick} style={{padding:"6px 14px",borderRadius:20,fontSize:11,fontWeight:sel?700:500,cursor:"pointer",border:sel?"1px solid var(--viola)":"1px solid var(--line)",background:sel?"var(--viola-dim)":"var(--bg)",color:sel?"var(--viola)":"var(--ink3)",fontFamily:"Montserrat,sans-serif",transition:"all .15s"}}>{children}</button>;
+// Stato visivo esplicito (revisione 03/11: «clicchi per togliere o per
+// mettere?»): la chip attiva ha la spunta, quella spenta è vuota.
+const Chip=({sel,children,onClick})=><button onClick={onClick} title={sel?"Attiva: clicca per togliere":"Spenta: clicca per attivare"} style={{padding:"6px 14px",borderRadius:20,fontSize:11,fontWeight:sel?700:500,cursor:"pointer",border:sel?"1.5px solid var(--viola)":"1px dashed var(--line)",background:sel?"var(--viola-dim)":"var(--bg)",color:sel?"var(--viola)":"var(--ink3)",opacity:sel?1:0.75,fontFamily:"Montserrat,sans-serif",transition:"all .15s"}}>{sel?"✓ ":""}{children}</button>;
 
 function UpZone({label,accept,value,preview,onChange,hint}){
   const ref=useRef();
@@ -1138,10 +1180,13 @@ export default function StoriesApp({ client: clientProp }){
   // Single uploaded template applies to BOTH storie and recensioni
   const [storyTemplate,setStoryTemplate]=useState(genClient?.templateDataUrl||null);
   const [reviewTemplate,setReviewTemplate]=useState(null);
+  // Sfondo di default scelto (quando non c'è un template caricato).
+  const [defaultBg,setDefaultBgState]=useState(()=>{try{return localStorage.getItem("smm_default_bg_"+(genClient?.id||""))||"morbido";}catch{return "morbido";}});
+  const setDefaultBg=(v)=>{setDefaultBgState(v);try{localStorage.setItem("smm_default_bg_"+(genClient?.id||""),v);}catch{}};
 
   const sharedTemplate = storyTemplate || reviewTemplate || genClient?.templateDataUrl || null;
-  const storyClient = {...(genClient||{}), templateDataUrl: storyTemplate || sharedTemplate, bgIsLight: true};
-  const reviewClient = {...(genClient||{}), templateDataUrl: reviewTemplate || sharedTemplate, bgIsLight: true};
+  const storyClient = {...(genClient||{}), templateDataUrl: storyTemplate || sharedTemplate, bgIsLight: true, defaultBg};
+  const reviewClient = {...(genClient||{}), templateDataUrl: reviewTemplate || sharedTemplate, bgIsLight: true, defaultBg};
   const templateFileRef=useRef();
 
   const handleTemplateUpload=(_type,e)=>{
@@ -1368,7 +1413,7 @@ export default function StoriesApp({ client: clientProp }){
               <div style={{fontSize:10,color:"var(--ink3)",marginTop:5,fontFamily:"Montserrat,sans-serif"}}>I quiz generano 2 storie ciascuno</div>
             </div>
             <div>
-              <Lbl c="Tipologie"/>
+              <Lbl c={"Tipologie attive: "+((types||genClient.selectedTypes).length)+" di "+STORY_TYPES.length}/>
               <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                 {STORY_TYPES.map(t=>{
                   const ts=types||genClient.selectedTypes;
@@ -1376,6 +1421,7 @@ export default function StoriesApp({ client: clientProp }){
                   return <Chip key={t.id} sel={sel} onClick={()=>{const cur=types?[...types]:[...genClient.selectedTypes];setTypes(sel?cur.filter(x=>x!==t.id):[...cur,t.id]);}}>{t.emoji} {t.label}</Chip>;
                 })}
               </div>
+              <div style={{fontSize:10,color:"var(--ink3)",marginTop:5,fontFamily:"Montserrat,sans-serif"}}>Con la spunta ✓ = si genera. Clicca per attivare o togliere.</div>
             </div>
             <div style={{gridColumn:"1 / -1"}}>
               <Lbl c="Immagini di sfondo"/>
@@ -1387,6 +1433,10 @@ export default function StoriesApp({ client: clientProp }){
             </div>
           </div>
           {err&&<div style={{color:"#FF6B6B",fontSize:12,marginBottom:14,padding:"10px 14px",background:"#FF6B6B08",borderRadius:10}}>{err}</div>}
+          {loading&&<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,padding:"12px 14px",background:"var(--viola-dim)",border:"1px solid rgba(85,70,151,0.2)",borderRadius:10}}>
+            <div style={{width:18,height:18,border:"3px solid rgba(85,70,151,0.25)",borderTop:"3px solid var(--viola)",borderRadius:"50%",animation:"spin 1s linear infinite",flexShrink:0}}/>
+            <span style={{fontSize:12,fontWeight:600,color:"var(--ink)"}}>Scrivo {qty} storie per {genClient.name||"il brand"}… ci vogliono 20-60 secondi, resta su questa pagina.</span>
+          </div>}
           <div style={{display:"flex",gap:10,marginBottom:24,flexWrap:"wrap"}}>
             <PBtn sx={{flex:1,padding:"14px",fontSize:14,minWidth:200}} disabled={loading} onClick={generate}>{loading?"Generazione...":"Genera le Storie"}</PBtn>
             {stories.length>0&&<SBtn sx={{padding:"14px 20px"}} onClick={dlAll} disabled={!!genMsg||preparingSchedule}>{genMsg&&!preparingSchedule?"...":"Scarica Tutte"}</SBtn>}
@@ -1432,8 +1482,8 @@ export default function StoriesApp({ client: clientProp }){
           </div>
           <div style={{background:S,borderRadius:14,padding:"18px",border:GLASS_BD,marginBottom:14,display:"flex",flexDirection:"column",gap:12}}>
             <div>
-              <Lbl c="Importa da Google Maps"/>
-              <div style={{fontSize:11,color:M,marginBottom:8}}>Incolla il link Google Maps del centro — scarica automaticamente tutte le recensioni</div>
+              <Lbl c="Importa da Google Maps o MioDottore"/>
+              <div style={{fontSize:11,color:M,marginBottom:8}}>Incolla il link del centro: va bene anche quello corto di «Condividi» (maps.app.goo.gl) o la pagina MioDottore. Ci vogliono 1-3 minuti.</div>
               <div style={{display:"flex",gap:8}}>
                 <input value={gmapsUrl} onChange={e=>setGmapsUrl(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleGmapsScrape()} placeholder="https://www.google.com/maps/place/..." style={{flex:1,background:"rgba(85,70,151,0.04)",border:GLASS_BD,borderRadius:12,padding:"9px 14px",color:T,fontSize:12,outline:"none",fontFamily:"inherit"}}/>
                 <PBtn onClick={handleGmapsScrape} disabled={gmapsLoading||!gmapsUrl.trim()} sx={{fontSize:12,padding:"9px 14px",whiteSpace:"nowrap"}}>{gmapsLoading?"Scarico...":"Importa Recensioni"}</PBtn>
@@ -1473,10 +1523,34 @@ export default function StoriesApp({ client: clientProp }){
 
         {/* ── Tab: Template (unico per storie + recensioni) ── */}
         {mode==="templates"&&<div style={{animation:"fadeSlideUp .4s ease"}}>
-          <div style={{maxWidth:720,margin:"0 auto",background:"var(--surface)",borderRadius:16,padding:20,border:"1px solid var(--line)"}}>
-            <Lbl c="Template Sfondo"/>
+          <div style={{maxWidth:720,margin:"0 auto 16px",background:"var(--surface)",borderRadius:16,padding:20,border:"1px solid var(--line)"}}>
+            <Lbl c="Sfondi pronti (coi colori del tuo brand)"/>
             <p style={{fontSize:11,color:"var(--ink3)",marginBottom:14,fontFamily:"Montserrat,sans-serif"}}>
-              Sfondo 9:16 usato sia per storie sia per card recensioni.
+              Non serve caricare niente: scegli uno sfondo pronto, le storie escono già coi tuoi colori.
+              {storyTemplate?" (Ora è attivo il template caricato: rimuovilo qui sotto per usare gli sfondi pronti.)":""}
+            </p>
+            <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
+              {DEFAULT_BGS.map(bg=>{
+                const sel=!storyTemplate&&defaultBg===bg.id;
+                const c1=(genClient.brandColors&&genClient.brandColors[0])||"#554697";
+                const c2=(genClient.brandColors&&genClient.brandColors[1])||c1;
+                const anteprima=bg.id==="angoli"
+                  ?{background:`radial-gradient(circle at 0% 0%, ${c1}22 0 38%, transparent 39%), radial-gradient(circle at 100% 100%, ${c2}1e 0 44%, transparent 45%), #f7f7fa`,borderTop:`3px solid ${c1}`}
+                  :bg.id==="banda"
+                  ?{background:`linear-gradient(170deg, transparent 28%, ${c1}16 29% 45%, transparent 46% 62%, ${c2}1a 63%), #f7f7fa`,borderBottom:`3px solid ${c1}`}
+                  :{background:`radial-gradient(circle at 90% 8%, ${c1}1d 0 34%, transparent 35%), radial-gradient(circle at 6% 94%, ${c2}17 0 38%, transparent 39%), #f7f7fa`};
+                return <button key={bg.id} onClick={()=>{setStoryTemplate(null);setReviewTemplate(null);setDefaultBg(bg.id);}} style={{width:96,cursor:"pointer",background:"transparent",border:"none",padding:0}}>
+                  <div style={{aspectRatio:"9/16",borderRadius:10,border:sel?"3px solid var(--rosa)":"1px solid var(--line)",boxSizing:"border-box",...anteprima}}/>
+                  <div style={{fontSize:10,fontWeight:sel?800:500,color:sel?"var(--rosa)":"var(--ink3)",marginTop:5,fontFamily:"Montserrat,sans-serif"}}>{sel?"✓ ":""}{bg.label}</div>
+                </button>;
+              })}
+            </div>
+          </div>
+
+          <div style={{maxWidth:720,margin:"0 auto",background:"var(--surface)",borderRadius:16,padding:20,border:"1px solid var(--line)"}}>
+            <Lbl c="Oppure carica il tuo template"/>
+            <p style={{fontSize:11,color:"var(--ink3)",marginBottom:14,fontFamily:"Montserrat,sans-serif"}}>
+              Sfondo 9:16 usato sia per storie sia per card recensioni. Non caricare il logo: per quello c'è il Brand Kit.
             </p>
             {storyTemplate?(
               <div style={{position:"relative",marginBottom:14}}>
@@ -1492,11 +1566,6 @@ export default function StoriesApp({ client: clientProp }){
             <input ref={templateFileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>handleTemplateUpload("story",e)}/>
           </div>
 
-          <div style={{maxWidth:720,margin:"16px auto 0",padding:12,borderRadius:10,background:"var(--viola-dim)",border:"1px solid rgba(85,70,151,0.1)"}}>
-            <p style={{fontSize:11,color:"var(--ink2)",fontFamily:"Montserrat,sans-serif"}}>
-              Carica un'immagine 9:16 personalizzata da usare come sfondo per storie e card recensioni.
-            </p>
-          </div>
         </div>}
 
         {mode==="history"&&<div style={{animation:"fadeSlideUp .4s ease"}}>

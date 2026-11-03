@@ -141,7 +141,7 @@ COLORI BRAND: primario ${brand.colore_primario || "#554697"}, secondario ${brand
 === VIETATO RIPETERE IL SITO ===
 La descrizione e la mission qui sopra vengono dal sito del brand: servono per CAPIRE chi parla, MAI da riscrivere.
 ❌ Vietate le frasi da sito vetrina riformulate: "valutazione continua e mirata basata su evidenze scientifiche", "percorsi terapeutici personalizzati", "approccio su misura", "al centro del nostro lavoro".
-→ Si parla delle situazioni concrete ${delLuogo(P)} e della vita di ${ilCliente(P)}, con le sue parole.
+→ Si parla delle situazioni concrete ${delLuogo(brandProf.profile)} e della vita di ${ilCliente(brandProf.profile)}, con le sue parole.
 
 REGOLA FONDAMENTALE: il contenuto deve sembrare scritto DA "${brand.nome_business || `lo ${luogo}`}", non da un'agenzia generica. Se rileggendo il copy non si capisce CHE È IL BRAND a parlare (vs. qualsiasi altro ${luogo}), riscrivilo.`;
           }
