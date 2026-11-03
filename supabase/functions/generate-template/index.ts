@@ -209,6 +209,63 @@ serve(async (req) => {
       return jsonResponse(req, { bucket: BUCKET, path });
     }
 
+    // ─── RIPROVA_CANDIDATO ────────────────────────────────────
+    // Rigenera UNA variante fallita (revisione 03/11: «un modo per
+    // rigenerarla», non solo «Rigenera tutto» che rifà 9 immagini).
+    // Costa 1 immagine: rate limit suo, fuori dal 6/ora del genesis intero.
+    if (action === "riprova_candidato") {
+      const rlRetry = await requireWithinRateLimit(supabase, userId, "generate-template-riprova", 12, 3600);
+      if (!rlRetry.ok) return jsonResponse(req, { error: rlRetry.error }, rlRetry.status);
+      const GEMINI_RETRY_KEY = Deno.env.get("GEMINI_API_KEY");
+      if (!GEMINI_RETRY_KEY) return jsonResponse(req, { error: "GEMINI_API_KEY non configurata" }, 500);
+
+      const candidateId = String(body.candidateId || "");
+      if (!candidateId) return jsonResponse(req, { error: "candidateId obbligatorio" }, 400);
+      const { data: cand } = await supabase
+        .from("template_candidates")
+        .select("id, user_id, brand_id, genesis_prompt, genome, slide_role, variant_index, genome_version")
+        .eq("id", candidateId)
+        .maybeSingle();
+      const c = cand as {
+        id: string; user_id: string; brand_id: string; genesis_prompt: string;
+        genome: { format?: string } | null; slide_role: string; variant_index: number; genome_version: number;
+      } | null;
+      if (!c || c.user_id !== userId || c.brand_id !== brandId || !c.genesis_prompt) {
+        return jsonResponse(req, { error: "Variante non trovata" }, 404);
+      }
+
+      await supabase.from("template_candidates")
+        .update({ status: "generating", error: null, updated_at: new Date().toISOString() })
+        .eq("id", c.id);
+      const aspect = c.genome?.format === "4:5" ? "4:5" : "1:1";
+      const bytes = await generateOneImage(GEMINI_RETRY_KEY, c.genesis_prompt, aspect);
+      if (!bytes) {
+        await supabase.from("template_candidates")
+          .update({ status: "failed", error: "nessuna immagine dal modello", updated_at: new Date().toISOString() })
+          .eq("id", c.id);
+        return jsonResponse(req, { error: "La variante non è uscita neanche stavolta: riprova tra poco" }, 502);
+      }
+      const path = `${userId}/${brandId}/candidates/v${c.genome_version}/${c.slide_role}_${c.variant_index}.png`;
+      const { error: upErr } = await supabase.storage
+        .from(BUCKET)
+        .upload(path, bytes, { contentType: "image/png", upsert: true });
+      if (upErr) {
+        await supabase.from("template_candidates")
+          .update({ status: "failed", error: "upload fallito: " + upErr.message, updated_at: new Date().toISOString() })
+          .eq("id", c.id);
+        return jsonResponse(req, { error: "Upload fallito: " + upErr.message }, 500);
+      }
+      await supabase.from("template_candidates")
+        .update({ status: "done", storage_bucket: BUCKET, storage_path: path, error: null, updated_at: new Date().toISOString() })
+        .eq("id", c.id);
+      await logGeneration({
+        userId, brandId, type: "template_genesis", status: "success",
+        title: `Riprova variante ${c.slide_role} ${c.variant_index}`,
+        metadata: { phase: "riprova_candidato", candidateId: c.id, estimated_cost_usd: estimateGenesisCost(1, 2) },
+      });
+      return jsonResponse(req, { ok: true, candidateId: c.id, path });
+    }
+
     const rl = await requireWithinRateLimit(supabase, userId, "generate-template", 6, 3600);
     if (!rl.ok) return jsonResponse(req, { error: rl.error }, rl.status);
 

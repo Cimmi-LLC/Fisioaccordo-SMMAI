@@ -70,7 +70,7 @@ Analizza attentamente e ricava:
 - Suggerisci 5 temi chiave adatti per i post social, coerenti con la professione
 - Suggerisci 3 call to action adatte
 - La persona di scrittura suggerita ("io" per professionista singolo, "noi" per studio/team)
-- I colori principali del brand (analizza i colori CSS, i colori delle immagini, il logo se descritto). Restituisci 3 colori in formato hex: primario, secondario, terziario. Se non riesci a determinarli, suggerisci colori appropriati per il settore sanitario.
+- I colori principali del brand: scegli SOLO tra i COLORI CSS TROVATI NEL SITO (sono i colori che il visitatore vede davvero). Il primario è quello più usato per bottoni, titoli e marchio. Restituisci 3 colori hex presi da quella lista. Se la lista manca o non basta, lascia stringa vuota nei campi che non puoi riempire: NON inventare MAI un colore e NON suggerire colori «di settore».
 - Categorie: scegli tra [${allProfessionCategories().join(", ")}, altro], coerenti con la professione rilevata
 
 Rispondi SOLO con JSON valido.`;
@@ -94,9 +94,9 @@ Rispondi con questo JSON esatto:
   "temi_chiave": ["tema 1", "tema 2", "tema 3", "tema 4", "tema 5"],
   "cta_suggerite": ["cta 1", "cta 2", "cta 3"],
   "persona_scrittura": "io|noi",
-  "colore_primario": "#hex del colore principale del brand",
-  "colore_secondario": "#hex del colore secondario",
-  "colore_terziario": "#hex del colore terziario o di sfondo",
+  "colore_primario": "#hex preso dai COLORI CSS del sito, altrimenti stringa vuota",
+  "colore_secondario": "#hex preso dai COLORI CSS del sito, altrimenti stringa vuota",
+  "colore_terziario": "#hex preso dai COLORI CSS del sito, altrimenti stringa vuota",
   "logo_url": "URL del logo se trovato (passalo identico a quello fornito sopra), altrimenti stringa vuota"
 }`;
 
