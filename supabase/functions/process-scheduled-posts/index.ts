@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { publishToInstagram, publishStory } from "../_shared/instagramPublish.ts";
 import { adminClient, requireCronSecret } from "../_shared/auth.ts";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
+import { recordSocialPost, runSocialJob } from "../_shared/socialPublish.ts";
+import { loadConnection, tiktokPublishStatus } from "../_shared/socialApi.ts";
 
 const MAX_ATTEMPTS = 3;
 const BATCH_SIZE = 10;
@@ -34,8 +36,12 @@ serve(async (req) => {
       return jsonResponse(req, { error: "Errore lettura posts" }, 500);
     }
 
+    // TikTok pubblica in differita: i contenuti «in pubblicazione» si
+    // ricontrollano a ogni giro finché diventano pubblicati o falliti.
+    const settled = await settleProcessing(supabase);
+
     if (!posts || posts.length === 0) {
-      return jsonResponse(req, { processed: 0, message: "Nessun post pronto" });
+      return jsonResponse(req, { processed: 0, settled, message: "Nessun post pronto" });
     }
 
     const results = [];
@@ -44,7 +50,7 @@ serve(async (req) => {
       results.push(result);
     }
 
-    return jsonResponse(req, { processed: posts.length, results });
+    return jsonResponse(req, { processed: posts.length, settled, results });
   } catch (e) {
     console.error("process-scheduled-posts error:", e);
     return jsonResponse(req, { error: "Errore interno" }, 500);
@@ -62,6 +68,9 @@ async function processPost(
     .from("published_posts")
     .update({ attempts: newAttempts, updated_at: new Date().toISOString() })
     .eq("id", post.id);
+
+  // TikTok / YouTube
+  if (post.social_connection_id) return await processSocialPost(supabase, post, newAttempts);
 
   try {
     if (!post.connection_id) throw new Error("connection_id mancante");
@@ -155,4 +164,89 @@ async function processPost(
 
     return { id: post.id, success: false, error: errorMessage };
   }
+}
+
+async function processSocialPost(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  post: any,
+  attempts: number,
+): Promise<{ id: string; success: boolean; error?: string }> {
+  const opts = post.platform_options || {};
+  try {
+    const result = await runSocialJob(supabase, {
+      connectionId: post.social_connection_id,
+      userId: post.user_id,
+      kind: post.media_type === "video" ? "video" : "photos",
+      videoPath: post.video_path,
+      photoPaths: post.image_paths,
+      caption: post.hashtags ? `${post.content}\n\n${post.hashtags}` : post.content,
+      tiktok: opts.tiktok ?? null,
+      youtube: opts.youtube ?? null,
+    }, 8000);
+    await supabase.from("published_posts").update({
+      status: result.status,
+      published_at: new Date().toISOString(),
+      external_post_id: result.externalPostId,
+      platform_options: { ...opts, publish_id: result.publishId, url: result.url },
+      error_message: null,
+      updated_at: new Date().toISOString(),
+    }).eq("id", post.id);
+    await recordSocialPost(supabase, result.connection, result, post.id, opts.youtube?.title || String(post.content).split("\n")[0]);
+    return { id: post.id, success: true };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Errore sconosciuto";
+    await supabase.from("published_posts").update({
+      status: attempts >= MAX_ATTEMPTS ? "failed" : "scheduled",
+      error_message: errorMessage,
+      updated_at: new Date().toISOString(),
+    }).eq("id", post.id);
+    return { id: post.id, success: false, error: errorMessage };
+  }
+}
+
+// deno-lint-ignore no-explicit-any
+async function settleProcessing(supabase: any): Promise<number> {
+  const { data: rows } = await supabase
+    .from("published_posts")
+    .select("id, user_id, social_connection_id, platform_options, content, published_at, updated_at")
+    .eq("status", "processing")
+    .order("updated_at", { ascending: true })
+    .limit(10);
+  let done = 0;
+  for (const p of rows || []) {
+    const publishId = p.platform_options?.publish_id;
+    if (!p.social_connection_id || !publishId) continue;
+    if (p.published_at && Date.parse(p.published_at) < Date.now() - 24 * 3600 * 1000) {
+      await supabase.from("published_posts").update({
+        status: "failed", error_message: "TikTok non ha confermato la pubblicazione entro 24 ore", updated_at: new Date().toISOString(),
+      }).eq("id", p.id);
+      continue;
+    }
+    try {
+      const conn = await loadConnection(supabase, p.social_connection_id);
+      const s = await tiktokPublishStatus(conn.accessToken, publishId);
+      if (s.status === "PUBLISH_COMPLETE") {
+        await supabase.from("published_posts").update({
+          status: "published", external_post_id: s.postId, error_message: null, updated_at: new Date().toISOString(),
+        }).eq("id", p.id);
+        if (s.postId) {
+          await recordSocialPost(supabase, { id: conn.id, user_id: conn.user_id, brand_id: conn.brand_id, platform: conn.platform },
+            { status: "published", externalPostId: s.postId, publishId, url: null }, p.id, String(p.content).split("\n")[0]);
+        }
+        done++;
+      } else if (s.status === "FAILED") {
+        await supabase.from("published_posts").update({
+          status: "failed", error_message: `TikTok: ${s.failReason || "pubblicazione fallita"}`, updated_at: new Date().toISOString(),
+        }).eq("id", p.id);
+        done++;
+      } else {
+        // tocca updated_at così il prossimo giro guarda prima gli altri
+        await supabase.from("published_posts").update({ updated_at: new Date().toISOString() }).eq("id", p.id);
+      }
+    } catch (e) {
+      console.warn("stato TikTok non letto per", p.id, (e as Error).message);
+    }
+  }
+  return done;
 }

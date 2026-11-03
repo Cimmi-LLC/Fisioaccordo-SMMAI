@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Upload } from 'lucide-react';
+import PublishSocialDialog from '@/components/social/PublishSocialDialog';
 import ReelScriptPreview from '@/components/reel/ReelScriptPreview';
 import { useReelScript } from '@/hooks/useReelScript';
 
@@ -13,6 +14,11 @@ const ReelPage = () => {
   const [qty, setQty] = useState<number>(1);
   const [activeIndex, setActiveIndex] = useState(0);
   const { scripts, generating, progress, generateScripts, copyScript, copyCaption } = useReelScript();
+  const [publishOpen, setPublishOpen] = useState(false);
+  const activeScript = scripts[activeIndex];
+  const publishCaption = activeScript
+    ? [activeScript.caption_instagram, (activeScript.hashtag_suggeriti || []).map((h) => '#' + h.replace('#', '')).join(' ')].filter(Boolean).join('\n\n')
+    : '';
 
   const handleGenerate = () => {
     if (topic.trim()) generateScripts(topic.trim(), qty);
@@ -45,9 +51,26 @@ const ReelPage = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-xl font-black mb-6" style={{ color: 'var(--ink)', letterSpacing: '-0.5px' }}>
-        Script Reel
-      </h1>
+      <div className="flex items-start justify-between gap-3 mb-6">
+        <h1 className="text-xl font-black" style={{ color: 'var(--ink)', letterSpacing: '-0.5px' }}>
+          Script Reel
+        </h1>
+        {/* Il video registrato dal copione va su TikTok e YouTube Shorts da qui */}
+        <button
+          onClick={() => setPublishOpen(true)}
+          className="flex items-center gap-2 text-[11px] font-black uppercase px-4 py-2.5 rounded-xl"
+          style={{ border: '1px solid var(--rosa)', color: 'var(--rosa)', backgroundColor: 'transparent', letterSpacing: '0.5px' }}
+        >
+          <Upload className="h-4 w-4" /> Pubblica il video registrato
+        </button>
+      </div>
+      <PublishSocialDialog
+        open={publishOpen}
+        onClose={() => setPublishOpen(false)}
+        mode="video"
+        defaultCaption={publishCaption}
+        defaultTitle={activeScript?.titolo_reel || ''}
+      />
 
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Input */}
