@@ -130,7 +130,7 @@ const ReelPage = () => {
                 <div className="py-12 text-center">
                   <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" style={{ color: 'var(--viola)' }} />
                   <p className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
-                    Sto scrivendo {progress.total > 1 ? `${progress.total} script virali...` : 'il tuo script virale...'}
+                    Sto scrivendo {progress.total > 1 ? `${progress.total} script...` : 'il tuo script...'} (30-60 secondi)
                   </p>
                   {progress.total > 1 && (
                     <p className="text-[11px] mt-2" style={{ color: 'var(--ink3)' }}>

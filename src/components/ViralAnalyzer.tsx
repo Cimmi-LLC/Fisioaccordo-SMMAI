@@ -127,7 +127,7 @@ const ViralAnalyzer: React.FC = () => {
     <Card>
       <CardHeader className="pb-4">
         <CardTitle className="flex items-center gap-2 text-xl">
-          <Eye className="h-6 w-6" /> Analisi Post Virali
+          <Eye className="h-6 w-6" /> Analisi dei post
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -274,7 +274,7 @@ const ViralAnalyzer: React.FC = () => {
             {/* Header score */}
             <div className="flex items-center justify-between p-5 rounded-xl" style={{ backgroundColor: 'var(--viola-dim)' }}>
               <div className="space-y-1">
-                <div className="font-bold text-lg" style={{ color: 'var(--ink)' }}>Score Viralità</div>
+                <div className="font-bold text-lg" style={{ color: 'var(--ink)' }}>Punteggio del post</div>
                 <div className="text-sm" style={{ color: 'var(--ink3)' }}>Valutazione complessiva del reel</div>
               </div>
               <div className="text-center">

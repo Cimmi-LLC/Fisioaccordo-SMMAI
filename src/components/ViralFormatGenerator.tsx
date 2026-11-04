@@ -86,7 +86,7 @@ const ViralFormatGenerator: React.FC<ViralFormatGeneratorProps> = ({
       <CardHeader>
         <CardTitle className="text-foreground flex items-center">
           <TrendingUp className="h-6 w-6 mr-2 text-accent" />
-          🔥 Generatore Format Virali
+          🔥 Generatore di format
         </CardTitle>
         <p className="text-muted-foreground text-sm">
           Scegli un formato testato per massimizzare engagement e conversioni
@@ -96,7 +96,7 @@ const ViralFormatGenerator: React.FC<ViralFormatGeneratorProps> = ({
         {!topic.trim() && (
           <div className="text-center py-6 text-accent border border-accent/30 rounded-lg bg-accent/10 mb-4">
             <Sparkles className="h-8 w-8 mx-auto mb-2" />
-            <p>Inserisci prima un topic nel form principale per usare i format virali</p>
+            <p>Inserisci prima un topic nel form principale per usare i format</p>
           </div>
         )}
 

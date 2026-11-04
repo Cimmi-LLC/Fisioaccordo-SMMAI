@@ -10,7 +10,9 @@
 //     del canale) si nascondono: lo calcola la vista virali_video_vista;
 //   - copia esatta = cambia 1 mattoncino, copia vicina = ne cambia 2-3.
 // Per i soldi: un'inserzione che resta accesa per settimane sta vendendo,
-// nessuno paga per mesi un video che non rende.
+// nessuno paga per mesi un video che non rende. Le ricerche per parola chiave
+// portano anche prodotti e pagine fuori tema: Gemini le classifica e l'app
+// mostra di serie solo studi e professionisti.
 //
 // File specchio: identico in supabase/functions/_shared/brand/virali.ts
 // (lo controlla mirrorSync.test.ts). Niente import: serve a Vite e a Deno.
@@ -281,8 +283,8 @@ export function leggiInserzione(item: Grezzo, oggi: Date): InserzioneLetta | nul
     attiva,
     giorni,
     varianti: Math.max(1, numero(item.collationCount) ?? 1),
-    testo: testo(corpo.text) || testo((primaCarta as Grezzo).body),
-    titolo: testo(snap.title, 300) || testo((primaCarta as Grezzo).title, 300),
+    testo: senzaSegnaposto(testo(corpo.text)) || senzaSegnaposto(testo((primaCarta as Grezzo).body)),
+    titolo: senzaSegnaposto(testo(snap.title, 300)) || senzaSegnaposto(testo((primaCarta as Grezzo).title, 300)),
     link: (typeof snap.linkUrl === 'string' && snap.linkUrl) || (typeof (primaCarta as Grezzo).linkUrl === 'string' ? (primaCarta as Grezzo).linkUrl as string : null),
     cta: (typeof snap.ctaText === 'string' && snap.ctaText) || null,
     piattaforme: Array.isArray(item.publisherPlatform) ? (item.publisherPlatform as unknown[]).map(String) : [],
@@ -290,6 +292,65 @@ export function leggiInserzione(item: Grezzo, oggi: Date): InserzioneLetta | nul
     video_url: (video.videoSdUrl as string) || (video.videoHdUrl as string) || null,
     copertina_url: typeof video.videoPreviewImageUrl === 'string' ? video.videoPreviewImageUrl : null,
   };
+}
+
+/** Le inserzioni di catalogo hanno «{{product.brand}}» al posto del testo: si toglie. */
+export function senzaSegnaposto(s: string): string {
+  return s.replace(/\{\{[^}]*\}\}/g, '').replace(/[ \t]{2,}/g, ' ').trim();
+}
+
+// ── Inserzioni: studi, prodotti, fuori tema ─────────────────────────────
+
+export type CategoriaInserzione = 'studio' | 'prodotto' | 'fuori_tema';
+const CATEGORIE: CategoriaInserzione[] = ['studio', 'prodotto', 'fuori_tema'];
+
+export type InserzioneDaClassificare = {
+  pagina: string;
+  testo: string;
+  titolo: string;
+  link: string | null;
+  professione: string;
+};
+
+export const SISTEMA_CATEGORIE = `Classifichi inserzioni della Libreria inserzioni di Meta. Servono a fisioterapisti, osteopati e nutrizionisti per copiare le inserzioni che portano pazienti: tieni come "studio" solo quelle che un professionista sanitario potrebbe rifare per il suo studio. Rispondi solo con JSON valido.`;
+
+export function promptCategorie(lista: InserzioneDaClassificare[]): string {
+  const righe = lista.map((a, i) => {
+    let sito = '';
+    try {
+      const u = a.link ? new URL(a.link) : null;
+      if (u) sito = (u.hostname.replace(/^www\./, '') + (u.pathname === '/' ? '' : u.pathname)).slice(0, 80);
+    } catch { /* link non valido */ }
+    const corpo = [a.titolo, a.testo].filter(Boolean).join(' · ').replace(/\s+/g, ' ').slice(0, 500);
+    return `${i + 1}. Pagina: ${a.pagina} | Ricerca per: ${a.professione}${sito ? ` | Sito: ${sito}` : ''} | Testo: ${corpo || '(nessun testo)'}`;
+  });
+  return `Per ogni inserzione scegli una categoria.
+
+"studio": la pubblica uno studio, un centro, una clinica, un poliambulatorio, una palestra riabilitativa o un singolo professionista della salute o del movimento (fisioterapista, osteopata, chiropratico, nutrizionista, dietista, medico, posturologo, chinesiologo, personal trainer) per portare pazienti o clienti ai propri servizi: visite, sedute, percorsi, programmi, consulenze anche online, o per farsi seguire sui social.
+"prodotto": vende un oggetto o un prodotto per la salute, il dolore o il peso senza un professionista che offre il proprio servizio: creme, integratori, solette, tutori, cuscini, materassi, dispositivi, app, farmaci da banco, pasti.
+"fuori_tema": tutto il resto: non parla di salute, dolore, movimento o alimentazione (animali, religione, bevande, abbigliamento, corsi su altro), oppure si rivolge ai professionisti invece che ai pazienti (formazione, corsi ECM, software, attrezzature per studi).
+
+Una pagina col nome di una persona o di una community che racconta una storia e porta a un negozio o a una pagina di vendita (try…, shop, /products/, /lander, offer, vsl) è "prodotto": conta dove porta il link, non il nome.
+Nel dubbio fra "studio" e "prodotto" scegli "prodotto". Se il testo manca, decidi dal nome della pagina e dal sito.
+
+${righe.join('\n')}
+
+Rispondi con questo JSON, una voce per ogni inserzione, nello stesso ordine:
+{"risposte": [{"n": 1, "categoria": "studio"}]}`;
+}
+
+/** Una categoria per inserzione, nello stesso ordine; null dove la risposta manca o non è valida. */
+export function leggiCategorie(raw: string, quante: number): Array<CategoriaInserzione | null> {
+  const j = estraiJson(raw) as Grezzo;
+  const risposte = Array.isArray(j.risposte) ? (j.risposte as Grezzo[]) : [];
+  const esito: Array<CategoriaInserzione | null> = Array.from({ length: quante }, () => null);
+  for (const r of risposte) {
+    const n = numero(r?.n);
+    const c = typeof r?.categoria === 'string' ? (r.categoria.trim().toLowerCase().replace(/[\s-]+/g, '_') as CategoriaInserzione) : null;
+    if (n === null || !Number.isInteger(n) || n < 1 || n > quante || !c || !CATEGORIE.includes(c)) continue;
+    esito[n - 1] = c;
+  }
+  return esito;
 }
 
 // ── Punteggi ────────────────────────────────────────────────────────────
@@ -551,12 +612,18 @@ export function promptCopione(input: {
   brand: BrandPerCopione;
   bloccoProfessione: string;
   origine: { piattaforma: string; handle: string; paese: string; views: number | null };
+  /** Argomento scelto dall'utente: la struttura si applica a QUESTO tema. */
+  argomento?: string | null;
 }): string {
   const { analisi, tipo, brand, origine } = input;
-  const parlato = analisi.trascrizione.map((r) => (r.it ? `${r.testo} [${r.it}]` : r.testo)).join('\n');
+  const argomento = (input.argomento || '').trim();
+  const sulTema = argomento
+    ? `portandolo sull'argomento chiesto dall'utente: «${argomento}». Il nuovo video parla di QUESTO, non di un tema scelto da te`
+    : 'portandolo sulla professione e sui servizi del brand';
   const regolaCopia = tipo === 'esatta'
-    ? `COPIA ESATTA: cambi UN solo mattoncino, il topic, portandolo sulla professione e sui servizi del brand. Tieni uguali format, struttura frase per frase (a ogni frase dell'originale corrisponde una frase nuova con la stessa funzione: hook, contrasto, perché, passo 1, passo 2...), tipo di hook parlato, hook visivo, layout, lunghezza (più o meno 10%) e tipo di CTA. mattoncini_cambiati = ["topic"].`
-    : `COPIA VICINA: cambi 2 o 3 mattoncini (topic, contrarian take, e hook oppure CTA) e tieni format, struttura, layout e lunghezza. Scrivi in mattoncini_cambiati quali hai cambiato.`;
+    ? `COPIA ESATTA: cambi UN solo mattoncino, il topic, ${sulTema}. Tieni uguali format, struttura frase per frase (a ogni frase dell'originale corrisponde una frase nuova con la stessa funzione: hook, contrasto, perché, passo 1, passo 2...), tipo di hook parlato, hook visivo, layout, lunghezza (più o meno 10%) e tipo di CTA. mattoncini_cambiati = ["topic"].`
+    : `COPIA VICINA: cambi 2 o 3 mattoncini (topic ${sulTema}, contrarian take, e hook oppure CTA) e tieni format, struttura, layout e lunghezza. Scrivi in mattoncini_cambiati quali hai cambiato.`;
+  const parlato = analisi.trascrizione.map((r) => (r.it ? `${r.testo} [${r.it}]` : r.testo)).join('\n');
   const lista = (v?: string[] | null) => (v && v.length ? v.join(', ') : '(non indicato)');
   return `VIDEO ORIGINALE (${origine.piattaforma}, @${origine.handle}, ${origine.paese === 'US' ? 'americano' : origine.paese === 'IT' ? 'italiano' : 'estero'}${origine.views ? `, ${origine.views} visualizzazioni` : ''})
 Format: ${analisi.format}
@@ -593,6 +660,7 @@ REGOLE
 - Niente nomi, marchi o prodotti del video originale. Niente diagnosi, niente promesse di guarigione. Mai la parola «sbloccare»: si dice aiutare, risolvere in meno tempo, più risultati.
 - "frasi" contiene tutto il parlato, dall'hook alla CTA compresi, una frase per riga, nell'ordine in cui si dice.
 - "semplice" è true solo se si registra da soli col telefono parlando in camera, senza altre persone, oggetti particolari o b-roll da girare.
+- ONESTÀ SUI MEZZI: se l'originale si regge su mezzi che un professionista da solo di solito non ha (animazioni 3D, motion graphics spinte, attori, drone, studio di registrazione), dillo chiaro in "cosa_serve" (es. "animazione 3D del ginocchio, da far fare o sostituire") e scrivi in "come_girarlo" l'alternativa realistica col telefono. Mai far credere che basti registrarsi parlando se il video originale non funzionerebbe così.
 - "durata_stimata_s" è la durata dell'originale, più o meno 10%. "come_girarlo" dà solo indicazioni utili (inquadratura, luce, ritmo, cosa mostrare): niente dettagli dell'originale che non servono, come vestiti od oggetti a caso.
 
 JSON:

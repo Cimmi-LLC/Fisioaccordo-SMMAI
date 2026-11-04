@@ -11,6 +11,9 @@
 //                                 i competitor appena aggiunti
 //   admin/cron {azione:'conto'}  → di chi è il conto Apify, quanto ha speso nel
 //                                 mese e qual è il tetto (la chiave resta qui)
+//   admin/cron {azione:'classifica'} → Gemini mette le inserzioni senza
+//                                 categoria fra studi, prodotti e fuori tema
+//                                 (lo fa anche ogni 'raccogli')
 //
 // Su Apify i giri durano minuti: si avviano senza aspettarli e si leggono
 // al giro dopo. Il punteggio outlier si ricalcola su tutto lo storico del
@@ -19,15 +22,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { adminClient, requireAuth, requireCronSecret, requireWithinRateLimit } from "../_shared/auth.ts";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
+import { callGeminiWithRetry } from "../_shared/gemini.ts";
 import {
+  SISTEMA_CATEGORIE,
   engagement,
   handleInErrore,
+  leggiCategorie,
   leggiInserzione,
   leggiReelInstagram,
   leggiVideoTiktok,
   medieCanale,
   outlier,
+  promptCategorie,
   urlRicercaInserzioni,
+  type CategoriaInserzione,
+  type InserzioneDaClassificare,
   type InserzioneLetta,
   type Paese,
   type Piattaforma,
@@ -61,6 +70,10 @@ const COPERTINE_PER_CANALE = 8;
 const OUTLIER_COPERTINA = 3;
 const INSERZIONE_GIORNI_COPERTINA = 30;
 const BUCKET = "virali";
+// Classificazione delle inserzioni: testo soltanto, frazioni di centesimo.
+const MODELLO_CATEGORIE = "gemini-2.5-flash";
+const CATEGORIE_PER_CHIAMATA = 40;
+const CATEGORIE_PER_GIRO = 200;
 // La funzione ha 400 secondi: dopo 240 non si apre un altro giro.
 const TEMPO_MASSIMO_MS = 240_000;
 
@@ -104,6 +117,7 @@ serve(async (req) => {
       if (azione === "avvia") return jsonResponse(req, await avvia(admin, token));
       if (azione === "raccogli") return jsonResponse(req, await raccogli(admin, token, inizio));
       if (azione === "conto") return jsonResponse(req, await contoApify(token));
+      if (azione === "classifica") return jsonResponse(req, await classificaInserzioni(admin));
       return jsonResponse(req, { error: "azione sconosciuta" }, 400);
     }
 
@@ -122,6 +136,11 @@ serve(async (req) => {
     if (azione === "conto") {
       if (!eAdmin) return jsonResponse(req, { error: "Solo l'admin vede il conto Apify" }, 403);
       return jsonResponse(req, await contoApify(token));
+    }
+
+    if (azione === "classifica") {
+      if (!eAdmin) return jsonResponse(req, { error: "Solo l'admin classifica le inserzioni" }, 403);
+      return jsonResponse(req, await classificaInserzioni(admin));
     }
 
     if (azione === "account") {
@@ -352,7 +371,11 @@ async function raccogli(admin: Admin, token: string, inizio: number) {
     }
   }
   const avviati = await avviaCoda(admin, token);
-  return { ok: true, raccolti: esiti, avviati };
+  // Inserzioni appena salvate (o rimaste indietro): studi, prodotti, fuori tema.
+  const categorie = Date.now() - inizio < TEMPO_MASSIMO_MS
+    ? await classificaInserzioni(admin).catch((e) => ({ ok: false, error: e instanceof Error ? e.message : String(e) }))
+    : null;
+  return { ok: true, raccolti: esiti, avviati, categorie };
 }
 
 async function leggiDataset(token: string, datasetId: string): Promise<Grezzo[]> {
@@ -525,6 +548,64 @@ async function salvaInserzioni(admin: Admin, items: Grezzo[], parametri: Grezzo)
     .map((a) => ({ id: a.id, url: fresche.get(a.ad_id)!, percorso: `inserzioni/${a.ad_id}.jpg` }));
   await salvaCopertine(admin, "virali_inserzioni", daScaricare);
   return righe.length;
+}
+
+// ── Categorie delle inserzioni ──────────────────────────────────────────
+
+/** Gemini mette le inserzioni accese senza categoria fra studi, prodotti e fuori tema. */
+async function classificaInserzioni(admin: Admin) {
+  const gemini = Deno.env.get("GEMINI_API_KEY");
+  if (!gemini) return { ok: false, error: "GEMINI_API_KEY non configurata" };
+  const { data, error } = await admin
+    .from("virali_inserzioni")
+    .select("id, pagina, testo, titolo, link, professione")
+    .eq("attiva", true)
+    .is("categoria", null)
+    .order("giorni", { ascending: false, nullsFirst: false })
+    .limit(CATEGORIE_PER_GIRO);
+  if (error) throw new Error(error.message);
+  const lista = (data || []) as Array<InserzioneDaClassificare & { id: string }>;
+  const conteggio: Record<CategoriaInserzione, number> = { studio: 0, prodotto: 0, fuori_tema: 0 };
+  let senzaRisposta = 0;
+  for (let i = 0; i < lista.length; i += CATEGORIE_PER_CHIAMATA) {
+    const blocco = lista.slice(i, i + CATEGORIE_PER_CHIAMATA);
+    const res = await callGeminiWithRetry({
+      apiKey: gemini,
+      model: MODELLO_CATEGORIE,
+      body: {
+        system_instruction: { parts: [{ text: SISTEMA_CATEGORIE }] },
+        contents: [{ role: "user", parts: [{ text: promptCategorie(blocco) }] }],
+        generationConfig: { temperature: 0, responseMimeType: "application/json" },
+      },
+    });
+    if (!res.ok) {
+      console.error(`Categorie inserzioni: Gemini ${res.status}`);
+      senzaRisposta += blocco.length;
+      continue;
+    }
+    let categorie: Array<CategoriaInserzione | null>;
+    try {
+      categorie = leggiCategorie(testoGemini(res.data), blocco.length);
+    } catch (e) {
+      console.error("Categorie inserzioni: risposta illeggibile", e instanceof Error ? e.message : e);
+      senzaRisposta += blocco.length;
+      continue;
+    }
+    for (const categoria of ["studio", "prodotto", "fuori_tema"] as const) {
+      const ids = blocco.filter((_, k) => categorie[k] === categoria).map((a) => a.id);
+      if (ids.length === 0) continue;
+      const { error: upErr } = await admin.from("virali_inserzioni").update({ categoria }).in("id", ids);
+      if (upErr) throw new Error(`Categorie inserzioni: ${upErr.message}`);
+      conteggio[categoria] += ids.length;
+    }
+    senzaRisposta += categorie.filter((c) => c === null).length;
+  }
+  return { ok: true, lette: lista.length, ...conteggio, senza_risposta: senzaRisposta };
+}
+
+function testoGemini(data: unknown): string {
+  const parts = (data as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> })?.candidates?.[0]?.content?.parts || [];
+  return parts.map((p) => p.text || "").join("");
 }
 
 // ── Copertine ───────────────────────────────────────────────────────────

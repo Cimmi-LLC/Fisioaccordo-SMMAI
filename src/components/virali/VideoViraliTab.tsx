@@ -123,7 +123,7 @@ const VideoViraliTab: React.FC<{ soloHandle?: string[] | null }> = ({ soloHandle
           opzioni={[{ id: 'outlier', label: 'Più sopra la media (outlier)' }, { id: 'views', label: 'Più visualizzazioni' }, { id: 'salvati', label: 'Più salvati (TikTok)' }]} />
         <label className="flex items-center gap-2 text-xs font-semibold pb-2" style={{ color: 'var(--ink3)' }}
           title="Video con meno di un terzo delle interazioni tipiche del canale: di solito sono spinti con le inserzioni.">
-          <Switch checked={filtri.nascondiSponsorizzate} onCheckedChange={(c) => set('nascondiSponsorizzate', c)} />
+          <Switch className="data-[state=unchecked]:bg-black/20" checked={filtri.nascondiSponsorizzate} onCheckedChange={(c) => set('nascondiSponsorizzate', c)} />
           Nascondi le probabili sponsorizzate
         </label>
       </div>

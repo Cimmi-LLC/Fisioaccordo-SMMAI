@@ -69,6 +69,11 @@ function slideIllustration(s: CarouselSlideData): string {
 }
 
 const POLL_MS = 6000;
+// Watchdog: se la riga resta «producing» senza che NESSUNA slide avanzi per
+// questo tempo, la produzione è morta lato server (funzione uccisa, job perso).
+// Gli stati vanno chiusi comunque: le slide pendenti passano a errore con
+// «Riprova», mai rotelline infinite finché non ricarichi la pagina.
+const STALLO_MS = 3 * 60 * 1000;
 
 export function useNb2Carousel(brandId: string | null, genome: unknown) {
   const { toast } = useToast();
@@ -80,6 +85,10 @@ export function useNb2Carousel(brandId: string | null, genome: unknown) {
   const bucketRef = useRef('carousel-images');
   const urlCache = useRef(new Map<string, string>());
   const watchedRow = useRef<string | null>(null);
+  // Ultimo momento in cui una slide è avanzata (per il watchdog anti-stallo).
+  const lastProgress = useRef(Date.now());
+  const lastDoneCount = useRef(-1);
+  const [stallo, setStallo] = useState(false);
 
   const meta = genome as GenomeWithMeta | null;
   const colors = {
@@ -116,6 +125,14 @@ export function useNb2Carousel(brandId: string | null, genome: unknown) {
       error: s.error ?? null,
     })));
 
+    // Avanzamento reale: ogni slide chiusa (bene o male) azzera il watchdog.
+    const avanzate = rows.filter((s) => s.path || s.error).length;
+    if (avanzate !== lastDoneCount.current) {
+      lastDoneCount.current = avanzate;
+      lastProgress.current = Date.now();
+      setStallo(false);
+    }
+
     if (row.status !== 'producing') {
       setProducing(false);
       if (row.status === 'partial') {
@@ -135,6 +152,9 @@ export function useNb2Carousel(brandId: string | null, genome: unknown) {
     if (!carouselId) return;
     if (watchedRow.current === carouselId) return;
     watchedRow.current = carouselId;
+    lastProgress.current = Date.now();
+    lastDoneCount.current = -1;
+    setStallo(false);
 
     let cancelled = false;
 
@@ -165,6 +185,21 @@ export function useNb2Carousel(brandId: string | null, genome: unknown) {
       const status = await fetchRow();
       if (status && status !== 'producing') {
         clearInterval(interval);
+        return;
+      }
+      // Watchdog: produzione ferma da troppo → chiudo gli stati sul client.
+      if (status === 'producing' && Date.now() - lastProgress.current > STALLO_MS) {
+        clearInterval(interval);
+        setProducing(false);
+        setStallo(true);
+        setSlides((prev) => prev.map((s) => (
+          s.path || s.error ? s : { ...s, error: 'tempo scaduto: la generazione non è arrivata in fondo' }
+        )));
+        toast({
+          title: 'La generazione si è fermata',
+          description: 'Alcune slide non sono arrivate. Rigenerale una per una con «Riprova».',
+          variant: 'destructive',
+        });
       }
     }, POLL_MS);
 
@@ -285,7 +320,7 @@ export function useNb2Carousel(brandId: string | null, genome: unknown) {
   }, [brandId, carouselId, slides, toast, colors.bg_color, colors.title_color, colors.body_color]);
 
   return {
-    slides, producing, regenerating,
+    slides, producing, regenerating, stallo,
     carouselId, format,
     produce, regenerateSlide, reopen, setSlides,
   };

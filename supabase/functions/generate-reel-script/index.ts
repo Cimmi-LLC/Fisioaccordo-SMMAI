@@ -62,6 +62,8 @@ serve(async (req) => {
             prof = resolveProfession(brand, topic);
             const isPlural = brand.persona_scrittura === "noi";
             brandCta = (brand.cta_suggerite || [])[0] || "Prenota ora";
+            const frasiPazienti = (Array.isArray(brand.frasi_pazienti) ? brand.frasi_pazienti : []).filter(Boolean);
+            const convinzione = typeof brand.convinzione_da_ribaltare === "string" ? brand.convinzione_da_ribaltare.trim() : "";
             brandContext = `
 DATI DEL PROFESSIONISTA:
 Nome/Studio: ${brand.nome_business || "Studio"}
@@ -72,6 +74,8 @@ Target: ${brand.target_pazienti || "pubblico generale"}
 Tone of voice: ${brand.tono_voce || "professionale"}
 CTA preferita: ${brandCta}
 Persona: ${isPlural ? "PLURALE (noi, offriamo, aiutiamo)" : "SINGOLARE (io, offro, aiuto)"}
+${frasiPazienti.length > 0 ? `Frasi testuali dei pazienti (usa QUESTE parole, non le tue): ${frasiPazienti.map((f: string) => `«${f}»`).join(" · ")}` : ""}
+${convinzione ? `Convinzione del settore da ribaltare quando il tema lo permette: «${convinzione}»` : ""}
 
 REGOLA: Usa SEMPRE la persona ${isPlural ? "plurale" : "singolare"} in tutto lo script.`;
           }
@@ -79,30 +83,31 @@ REGOLA: Usa SEMPRE la persona ${isPlural ? "plurale" : "singolare"} in tutto lo 
       } catch (e) { console.error("Brand load error:", e); }
     }
 
-    const systemPrompt = `Ti comporti come il miglior sceneggiatore di video virali al mondo. Hai studiato i 1.000 video più virali degli ultimi 3 anni su Instagram Reels e TikTok. Hai una conoscenza approfondita delle opere di Russell Brunson, Alex Hormozi e dei principi di MrBeast per catturare l'attenzione.
+    const systemPrompt = `Scrivi script per video brevi (Reels/TikTok) col metodo Short Form Academy: ogni frase deve tenere lo spettatore fino alla successiva, e il copione deve poter essere DETTO AD ALTA VOCE da un professionista sanitario davanti al telefono.
 
-La tua unica ossessione è assicurarti che ogni frase tenga lo spettatore incollato allo schermo fino alla successiva.
-Sai che i primi 3 secondi sono tutto.
-Sai che lo scorrimento si interrompe per dolore, curiosità o sorpresa.
-E sai che le persone non condividono informazioni, ma la propria identità.
+PARLATO NATURALE (la regola più importante):
+- Scrivi come si PARLA, non come si titola. Frasi intorno alle 8 parole, ma legate tra loro: una conversazione con UNA persona («tu»), non slogan staccati.
+- VIETATO il ritmo a stacchi di 3-4 parole. Esempio SBAGLIATO: "Non la causa. Io cerco l'origine. Valuto il tuo corpo." Esempio GIUSTO: "Io non mi fermo al punto dove ti fa male: cerco da dove parte, e per farlo valuto come si muove tutto il corpo."
+- Prova del nove: leggi lo script ad alta voce nella tua testa. Se suona da spot o da trailer, riscrivilo.
+- Niente subordinate lunghe né incisi; livello prima media; ogni punto chiave detto due volte (nome + esempio o metafora).
+
+CONTENUTO:
+- Hook: nella PRIMA frase si capisce per chi è il video (la persona o il suo problema), poi il contrasto con quello che crede (contrarian take). Testo a schermo, parlato e immagine dicono la stessa cosa.
+- Per i temi clinici (cervicale, schiena, ginocchio...): spiega il MECCANISMO in parole semplici (cosa succede nel corpo e perché) e indica nell'inquadratura il supporto visivo che lo mostra (schema, mano sul punto, movimento da fare). È il meccanismo che convince, non il ritmo.
+- Valore vero entro i primi 5 secondi e almeno un consiglio applicabile subito, con numeri o tempi concreti (mai statistiche inventate).
+- UNA SOLA CTA, alla fine, naturale come estensione del video. Mai CTA in mezzo.
+- Zero gergo tecnico non spiegato, mai linguaggio aziendale, tono diretto e personale.
+- Totale parole script: 130-150 (60 secondi di parlato).
 ${brandContext}
 
 ${professionPromptBlock(prof)}
-
-REGOLE ASSOLUTE:
-- Frasi max 10 parole
-- Zero gergo tecnico, parla come una persona normale
-- Usa numeri concreti quando possibile
-- Tono amichevole, diretto, personale
-- Mai linguaggio aziendale
-- Totale parole script: 130-150 (60 secondi di parlato)
 
 Rispondi SOLO con JSON valido.`;
 
     const userPrompt = `TEMA DEL REEL: "${topic.trim()}"
 DURATA: 60 secondi (circa 130-150 parole totali)
 
-Scrivi una sceneggiatura virale con questa struttura:
+Scrivi la sceneggiatura con questa struttura:
 
 1. GANCIO (0-3 sec): Frase che blocca lo scorrimento. Affermazione provocatoria, domanda pungente o promessa impossibile da ignorare. [INQUADRATURA: primo piano viso, guarda dritto in camera]
 
@@ -151,7 +156,7 @@ Rispondi con questo JSON:
     }
   ],
   "script_completo": "tutto il testo parlato unito, senza inquadrature",
-  "caption_instagram": "Hook\\n\\nParagrafo 1\\n\\nParagrafo 2\\n\\n👉 CTA\\n\\n#hashtag1 #hashtag2",
+  "caption_instagram": "Hook\\n\\nParagrafo 1\\n\\nParagrafo 2\\n\\n👉 CTA (niente hashtag qui: vanno solo in hashtag_suggeriti)",
   "hashtag_suggeriti": ["hashtag1", "hashtag2", "hashtag3"]
 }`;
 

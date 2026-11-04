@@ -74,7 +74,7 @@ export const useViralAnalysis = () => {
         (data as any)._rowId = (saved as any).id;
       }
 
-      toast({ title: '🔍 Analisi completata!', description: `Score viralità: ${data.score}/100` });
+      toast({ title: '🔍 Analisi completata!', description: `Punteggio del post: ${data.score}/100` });
       return data;
     } catch (err: any) {
       toast({ title: '❌ Errore analisi', description: err.message, variant: 'destructive' });

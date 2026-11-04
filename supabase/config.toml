@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.virali-raccolta]
 verify_jwt = false
+
+[functions.scrape-instagram]
+verify_jwt = false

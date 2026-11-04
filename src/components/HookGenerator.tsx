@@ -114,7 +114,7 @@ const HookGenerator: React.FC<HookGeneratorProps> = ({
               <div className="flex items-center gap-2 mb-4">
                 <TrendingUp className="h-4 w-4 text-accent" />
                 <span className="text-sm text-muted-foreground">
-                  {generatedHooks.length} hooks generated • Sorted by virality score
+                  {generatedHooks.length} hook generati • ordinati per forza dell'aggancio
                 </span>
               </div>
               

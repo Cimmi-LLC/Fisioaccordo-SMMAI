@@ -33,13 +33,20 @@ const CopioneView: React.FC<{ copione: Copione }> = ({ copione }) => {
 
       <div
         className="rounded-xl p-3 flex items-start gap-2 text-sm"
-        style={{ backgroundColor: copione.semplice ? 'var(--viola-dim)' : 'rgba(0,0,0,0.04)', color: 'var(--ink)' }}
+        style={{
+          backgroundColor: copione.semplice ? 'var(--viola-dim)' : 'rgba(245,158,11,0.12)',
+          border: copione.semplice ? 'none' : '1px solid rgba(245,158,11,0.45)',
+          color: 'var(--ink)',
+        }}
       >
-        {copione.semplice ? <Smartphone className="h-4 w-4 mt-0.5 shrink-0" /> : <Clapperboard className="h-4 w-4 mt-0.5 shrink-0" />}
+        {copione.semplice ? <Smartphone className="h-4 w-4 mt-0.5 shrink-0" /> : <Clapperboard className="h-4 w-4 mt-0.5 shrink-0" style={{ color: '#b45309' }} />}
         <span>
           {copione.semplice
             ? 'Semplice: lo registri da solo col telefono, parlando in camera.'
-            : `Serve: ${copione.cosa_serve.join(', ') || 'qualcosa in più del telefono'}.`}
+            : <>
+                <span className="font-bold">Attenzione ai mezzi:</span> il video originale usa cose che potresti non avere
+                — {copione.cosa_serve.join(', ') || 'più del solo telefono'}. In «Come girarlo» trovi l'alternativa realistica.
+              </>}
         </span>
       </div>
 

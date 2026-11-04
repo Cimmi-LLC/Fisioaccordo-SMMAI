@@ -17,7 +17,7 @@ const NAV_ITEMS = [
   { to: '/virali', label: 'Video virali', icon: Flame },
   { to: '/trend', label: 'Trend', icon: TrendingUp },
   { to: '/competitor', label: 'Competitor', icon: Users },
-  { to: '/virale', label: 'Analisi Virale', icon: BarChart3 },
+  { to: '/virale', label: 'Analisi post', icon: BarChart3 },
 ];
 
 const ADMIN_NAV_ITEMS = [

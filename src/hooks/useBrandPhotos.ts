@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -8,7 +8,7 @@ export interface BrandPhoto {
   id: string;
   brand_id: string;
   user_id: string;
-  /** Signed URL minted on read. `url` column in DB is legacy and kept null. */
+  /** Signed URL minted on read. In DB la colonna `url` è legacy: '' per le righe nuove. */
   url: string;
   storage_path: string | null;
   caption: string | null;
@@ -60,6 +60,39 @@ export const useBrandPhotos = (brandId: string | null) => {
 
   useEffect(() => { load(); }, [load]);
 
+  // Pulizia dei file orfani lasciati dal vecchio bug dell'upload (file nello
+  // storage senza riga in brand_photos): una volta per sessione, si confronta
+  // la cartella dell'utente con TUTTE le sue righe (ogni brand) e si tolgono
+  // i file non referenziati più vecchi di un'ora (quelli recenti potrebbero
+  // essere upload in corso da un'altra scheda).
+  const sweepDone = useRef(false);
+  useEffect(() => {
+    if (!user || sweepDone.current) return;
+    sweepDone.current = true;
+    (async () => {
+      try {
+        const { data: files } = await supabase.storage.from(BUCKET).list(`${user.id}/${PREFIX}`, { limit: 1000 });
+        if (!files || files.length === 0) return;
+        const { data: rows } = await supabase
+          .from('brand_photos')
+          .select('storage_path')
+          .eq('user_id', user.id);
+        const referenced = new Set((rows || []).map((r: { storage_path: string | null }) => r.storage_path).filter(Boolean));
+        const unOraFa = Date.now() - 60 * 60 * 1000;
+        const orphans = files
+          .filter(f => f.name && !referenced.has(`${user.id}/${PREFIX}/${f.name}`))
+          .filter(f => !f.created_at || Date.parse(f.created_at) < unOraFa)
+          .map(f => `${user.id}/${PREFIX}/${f.name}`);
+        if (orphans.length > 0) {
+          await supabase.storage.from(BUCKET).remove(orphans);
+          console.log(`[useBrandPhotos] rimossi ${orphans.length} file orfani`);
+        }
+      } catch (e) {
+        console.warn('[useBrandPhotos] pulizia orfani saltata:', e);
+      }
+    })();
+  }, [user]);
+
   const addFromFile = useCallback(async (file: File, caption?: string, tags?: string[]) => {
     if (!user || !brandId) {
       console.warn('[useBrandPhotos] addFromFile: missing user or brandId', { user: !!user, brandId });
@@ -89,12 +122,16 @@ export const useBrandPhotos = (brandId: string | null) => {
       // Rule: don't persist full URLs in DB. Generate signed URL on read.
       const signed = await signedUrl(BUCKET, path);
 
+      // `url` in produzione è NOT NULL (migrazione 20260501100000): con null
+      // l'insert falliva SEMPRE con 23502 e il file restava orfano nello
+      // storage. Si scrive '' finché la migrazione che la rende nullable
+      // non viene applicata; la lettura usa comunque storage_path.
       const { data: row, error: insErr } = await supabase
         .from('brand_photos')
         .insert({
           brand_id: brandId,
           user_id: user.id,
-          url: null,
+          url: '',
           storage_path: path,
           caption: caption || null,
           tags: tags || [],
@@ -103,6 +140,9 @@ export const useBrandPhotos = (brandId: string | null) => {
         .single();
       if (insErr) {
         console.error('[useBrandPhotos] DB insert failed:', insErr);
+        // Niente riga nel DB = foto invisibile per sempre: il file appena
+        // caricato va tolto subito, altrimenti resta orfano nello storage.
+        await supabase.storage.from(BUCKET).remove([path]).catch(() => {});
         throw insErr;
       }
       console.log('[useBrandPhotos] DB insert OK', row);

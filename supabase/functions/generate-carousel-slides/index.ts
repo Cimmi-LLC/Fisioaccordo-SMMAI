@@ -16,6 +16,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { adminClient, requireAuth, assertBrandOwnership, requireWithinRateLimit } from "../_shared/auth.ts";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
+import { callGeminiWithRetry } from "../_shared/gemini.ts";
 import { logGeneration } from "../_shared/historyLogger.ts";
 import type { SlideRole } from "../_shared/brand/archetypes.ts";
 import { COST_NB2_IMAGE_1K } from "../_shared/brand/costs.ts";
@@ -34,6 +35,83 @@ import {
   type SlideRecord,
   type VariantRow,
 } from "../_shared/carouselProduction.ts";
+
+// ── Colori del brand kit ───────────────────────────────────────────────
+// Regola della revisione 03/11: se il colore primario è nel kit, le slide
+// usano quello. I default FisioAccordo (presenti su ogni brand appena creato)
+// non contano come scelta del cliente.
+const DEFAULT_KIT_COLORS = new Set(["#554697", "#e6007e", "#1a1a2e"]);
+
+function coloreSceltoDalKit(v: unknown): string | null {
+  const s = typeof v === "string" ? v.trim().toLowerCase() : "";
+  return /^#[0-9a-f]{6}$/.test(s) && !DEFAULT_KIT_COLORS.has(s) ? s : null;
+}
+
+// ── Controllo del testo renderizzato ───────────────────────────────────
+// Le slide sono PNG disegnate dal modello: a volte il titolo esce doppio,
+// sovrapposto o troncato («PERCHÉ LA SPALLA PERCHÉ LA…», «ANCHE IDA DA
+// FERMA»). Dopo la generazione si trascrive il testo dell'immagine e si
+// confronta col titolo atteso; in caso di problema si ritenta una volta.
+const VERIFY_MODEL = "gemini-2.5-flash";
+
+function normalizzaTesto(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** null = testo a posto; altrimenti il problema trovato (per log e retry). */
+async function problemaTestoRenderizzato(
+  apiKey: string,
+  bytes: Uint8Array,
+  titoloAtteso: string,
+): Promise<string | null> {
+  const atteso = normalizzaTesto(titoloAtteso);
+  if (!atteso || atteso.length < 4) return null;
+  try {
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    }
+    const res = await callGeminiWithRetry({
+      apiKey,
+      model: VERIFY_MODEL,
+      body: {
+        contents: [{
+          role: "user",
+          parts: [
+            { inline_data: { mime_type: "image/png", data: btoa(bin) } },
+            { text: "Trascrivi TUTTO il testo leggibile in questa immagine, nell'ordine in cui appare, compresi i pezzi ripetuti. Rispondi solo con JSON: {\"testo\": \"tutto il testo, separato da spazi\"}" },
+          ],
+        }],
+        generationConfig: { temperature: 0, responseMimeType: "application/json" },
+      },
+    });
+    const raw = res?.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const parsed = JSON.parse(raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
+    const visto = normalizzaTesto(String(parsed?.testo || ""));
+    if (!visto) return null; // trascrizione vuota: non giudico, meglio nessun falso positivo
+
+    // Titolo duplicato: la stringa intera compare più di una volta.
+    const occorrenze = visto.split(atteso).length - 1;
+    if (occorrenze > 1) return "il titolo è uscito doppio";
+
+    // Titolo mancante o troncato: meno di metà delle parole significative.
+    const parole = atteso.split(" ").filter((w) => w.length >= 3);
+    if (parole.length === 0) return null;
+    const presenti = parole.filter((w) => visto.includes(w)).length;
+    if (presenti / parole.length < 0.5) return "il titolo è mancante o troncato";
+    return null;
+  } catch (e) {
+    // Il controllo non deve mai bloccare la produzione: in dubbio, passa.
+    console.warn("verifica testo saltata:", (e as Error).message);
+    return null;
+  }
+}
 
 serve(async (req) => {
   const pre = handlePreflight(req);
@@ -99,7 +177,10 @@ serve(async (req) => {
     const modelKey = String((brandPrefs as { image_model?: string } | null)?.image_model || "nano-2");
     const models = MODEL_CASCADES[modelKey] || MODEL_CASCADES["nano-2"];
     const kicker = resolveProfession(brandPrefs as unknown as ProfessionBrandLike | null).kicker;
-    console.log("Produzione con cascata modelli:", modelKey, models.join(" -> "), "| kicker:", kicker);
+    // Il colore del kit comanda sul template: un centro blu non pubblica viola.
+    const brandPrimary = coloreSceltoDalKit((brandPrefs as Record<string, unknown> | null)?.colore_primario);
+    const brandSecondary = coloreSceltoDalKit((brandPrefs as Record<string, unknown> | null)?.colore_secondario);
+    console.log("Produzione con cascata modelli:", modelKey, models.join(" -> "), "| kicker:", kicker, "| colore kit:", brandPrimary || "(default)");
 
     // Scarica le 3 reference una volta sola.
     const refCache = new Map<SlideRole, string>();
@@ -115,10 +196,39 @@ serve(async (req) => {
       slide: SlideInput,
     ): Promise<SlideRecord> => {
       const variant = byRole.get(slide.role)!;
-      const prompt = resolveSkeleton(variant.prompt_skeleton, slide, colors, kicker);
-      const bytes = await generateSlide(GEMINI_API_KEY, refCache.get(slide.role)!, prompt, format, models);
+      let prompt = resolveSkeleton(variant.prompt_skeleton, slide, colors, kicker);
+      // Colori del brand sopra quelli cotti nel template master.
+      if (brandPrimary) {
+        prompt += "\nBRAND COLOR RULE: the brand primary color is " + brandPrimary +
+          (brandSecondary ? " and the secondary is " + brandSecondary : "") +
+          ". Every accent and decorative element (shapes, lines, highlighted words, index badge, buttons, underlines) " +
+          "must use the brand primary color, NOT the accent color of the reference image. " +
+          "Keep the background and text colors specified above.";
+      }
+      // Niente pallini di posizione finti: disegnati a caso confondono e basta.
+      prompt += "\nRender every piece of text exactly once: never duplicate, overlap or truncate the headline. " +
+        "If the reference image contains carousel position dots or page indicator dots, REMOVE them completely.";
+
+      let bytes: Uint8Array | null = null;
+      let problema: string | null = null;
+      for (let tentativo = 0; tentativo < 2; tentativo++) {
+        const promptTentativo = tentativo === 0 || !problema
+          ? prompt
+          : prompt + "\nPREVIOUS ATTEMPT FAILED: " + problema +
+            ". Render the headline exactly once, complete, with no overlapping text.";
+        bytes = await generateSlide(GEMINI_API_KEY, refCache.get(slide.role)!, promptTentativo, format, models);
+        if (!bytes) continue;
+        problema = await problemaTestoRenderizzato(GEMINI_API_KEY, bytes, slide.title || "");
+        if (!problema) break;
+        console.warn(`Slide ${slide.index}: ${problema} (tentativo ${tentativo + 1})`);
+      }
       if (!bytes) {
         return { ...slide, path: null, error: "nessuna immagine dal modello", status: "failed" };
+      }
+      if (problema) {
+        // Due tentativi col testo rotto: meglio un errore chiaro col Riprova
+        // che pubblicare un titolo doppio o troncato.
+        return { ...slide, path: null, error: problema + ": riprova o accorcia il titolo", status: "failed" };
       }
       const path = `${userId}/${rowId}/slide_${slide.index + 1}_${Date.now()}.png`;
       const { error: upErr } = await supabase.storage

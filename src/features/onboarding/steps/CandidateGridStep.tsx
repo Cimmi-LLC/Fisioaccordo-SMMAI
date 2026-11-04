@@ -1,7 +1,10 @@
 // Step 3: griglia 3x3 dei candidati. Selezione radio per ruolo,
-// aggiornamento progressivo (Realtime + polling), rigenerazione con feedback.
+// aggiornamento progressivo (Realtime + polling), rigenerazione con feedback
+// e «Riprova» sulla singola variante fallita (1 immagine, non 9).
 import React, { useState } from 'react';
 import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import type { TemplateCandidate } from '../hooks/useTemplateCandidates.ts';
 import type { SlideRole } from '@/lib/brand/archetypes.ts';
 
@@ -25,8 +28,30 @@ const ROLES: SlideRole[] = ['cover', 'content', 'cta'];
 const CandidateGridStep: React.FC<CandidateGridStepProps> = ({
   busy, candidates, selection, onSelect, onRegenerate, onContinue,
 }) => {
+  const { toast } = useToast();
   const [feedback, setFeedback] = useState('');
   const [showFeedback, setShowFeedback] = useState(false);
+  const [retrying, setRetrying] = useState<string | null>(null);
+
+  // Rigenera UNA variante: lo stato torna «generating» sul DB e la griglia
+  // si aggiorna da sola via Realtime/polling.
+  const retryOne = async (c: TemplateCandidate) => {
+    setRetrying(c.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-template', {
+        body: { action: 'riprova_candidato', brandId: c.brand_id, candidateId: c.id },
+      });
+      if (error || data?.error) throw new Error(data?.error || error?.message);
+    } catch (e) {
+      toast({
+        title: 'Variante non rigenerata',
+        description: e instanceof Error ? e.message : String(e),
+        variant: 'destructive',
+      });
+    } finally {
+      setRetrying(null);
+    }
+  };
 
   const byRole = (role: SlideRole) =>
     candidates.filter((c) => c.slide_role === role).sort((a, b) => a.variant_index - b.variant_index);
@@ -55,7 +80,12 @@ const CandidateGridStep: React.FC<CandidateGridStepProps> = ({
         {stalledCount > 0 && !generating && (
           <p className="text-[12px] mt-2 p-2 rounded-lg" style={{ color: '#b45309', backgroundColor: 'rgba(245,158,11,0.1)' }}>
             {stalledCount === 1 ? '1 variante non è stata completata' : `${stalledCount} varianti non sono state completate`}:
-            scegli tra quelle pronte oppure usa "Rigenera tutto".
+            premi «Riprova» sulla variante, scegli tra quelle pronte, oppure usa «Rigenera tutto».
+          </p>
+        )}
+        {generating && (
+          <p className="text-[11px] mt-1" style={{ color: 'var(--ink3)' }}>
+            Ci vogliono 1-2 minuti in tutto: puoi restare su questa pagina.
           </p>
         )}
       </div>
@@ -71,10 +101,14 @@ const CandidateGridStep: React.FC<CandidateGridStepProps> = ({
               const isLoading = (c.status === 'pending' || c.status === 'generating') && !isStalled(c);
               const isFailed = c.status === 'failed' || isStalled(c);
               return (
-                <button
+                // Non è un <button> disabilitato: dentro c'è il «Riprova»
+                // delle varianti fallite, che deve restare cliccabile.
+                <div
                   key={c.id}
+                  role="button"
+                  tabIndex={c.status === 'done' ? 0 : -1}
                   onClick={() => c.status === 'done' && onSelect(role, c.id)}
-                  disabled={c.status !== 'done'}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && c.status === 'done') onSelect(role, c.id); }}
                   className="relative rounded-xl overflow-hidden transition-all"
                   style={{
                     aspectRatio: '1',
@@ -95,10 +129,27 @@ const CandidateGridStep: React.FC<CandidateGridStepProps> = ({
                   )}
                   {isFailed && (
                     <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-2">
-                      <AlertCircle className="h-5 w-5" style={{ color: '#ef4444' }} />
-                      <span className="text-[9px] text-center" style={{ color: 'var(--ink3)' }}>
-                        Generazione fallita
-                      </span>
+                      {retrying === c.id ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin" style={{ color: 'var(--viola)' }} />
+                          <span className="text-[9px] text-center" style={{ color: 'var(--ink3)' }}>Riprovo…</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="h-5 w-5" style={{ color: '#ef4444' }} />
+                          <span className="text-[9px] text-center" style={{ color: 'var(--ink3)' }}>
+                            Generazione fallita
+                          </span>
+                          <span
+                            role="button"
+                            onClick={(e) => { e.stopPropagation(); void retryOne(c); }}
+                            className="text-[10px] font-bold px-3 py-1 rounded-lg text-white"
+                            style={{ backgroundColor: 'var(--viola)', cursor: 'pointer' }}
+                          >
+                            Riprova
+                          </span>
+                        </>
+                      )}
                     </div>
                   )}
                   {c.status === 'done' && c.image_url && (
@@ -114,7 +165,7 @@ const CandidateGridStep: React.FC<CandidateGridStepProps> = ({
                       style={{ backgroundColor: 'var(--rosa)' }}
                     >✓</div>
                   )}
-                </button>
+                </div>
               );
             })}
           </div>

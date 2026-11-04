@@ -2,7 +2,7 @@
 // Le tabelle virali_* non sono ancora nei tipi generati: si passa da `any`.
 
 import { supabase } from '@/integrations/supabase/client';
-import type { AnalisiVideo, Copione, Paese, Piattaforma, TipoCopia } from '@/lib/brand/virali';
+import type { AnalisiVideo, CategoriaInserzione, Copione, Paese, Piattaforma, TipoCopia } from '@/lib/brand/virali';
 
 const db = supabase as any;
 
@@ -48,6 +48,7 @@ export type InserzioneVirale = {
   video_url: string | null;
   copertina: string | null;
   analisi: AnalisiVideo | null;
+  categoria: CategoriaInserzione | null;
 };
 
 export type AccountSeguito = {
@@ -119,10 +120,13 @@ export type FiltriInserzioni = {
   professione: string | 'tutte';
   giorniMinimi: number;
   ordine: 'giorni' | 'varianti';
+  ancheProdotti: boolean;
 };
 
 export async function listaInserzioni(f: FiltriInserzioni, pagina: number): Promise<InserzioneVirale[]> {
-  let q = db.from('virali_inserzioni').select('*').eq('attiva', true);
+  // La vista tiene solo le accese e unisce i doppioni (stessa pagina, stesso testo).
+  let q = db.from('virali_inserzioni_vista').select('*');
+  q = f.ancheProdotti ? q.in('categoria', ['studio', 'prodotto']) : q.eq('categoria', 'studio');
   if (f.paese !== 'tutti') q = q.eq('paese', f.paese);
   if (f.professione !== 'tutte') q = q.eq('professione', f.professione);
   if (f.giorniMinimi > 0) q = q.gte('giorni', f.giorniMinimi);
@@ -242,9 +246,9 @@ export function analizzaVideo(sorgente: Sorgente) {
   return chiama<{ analisi: AnalisiVideo }>('duplica-video', { azione: 'analizza', ...sorgente });
 }
 
-export function scriviCopione(sorgente: Sorgente, brandId: string, tipo: TipoCopia) {
+export function scriviCopione(sorgente: Sorgente, brandId: string, tipo: TipoCopia, argomento?: string) {
   return chiama<{ analisi: AnalisiVideo; copione: Copione; copioneId: string | null }>('duplica-video', {
-    azione: 'copione', ...sorgente, brandId, tipo,
+    azione: 'copione', ...sorgente, brandId, tipo, argomento: argomento || '',
   });
 }
 
