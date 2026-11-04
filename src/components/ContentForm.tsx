@@ -128,6 +128,9 @@ const ContentForm: React.FC<ContentFormProps> = ({
               <>Genera {parseInt(formData.numVariations || '1') > 1 ? `${formData.numVariations} Post Diversi` : 'Contenuto'}</>
             )}
           </button>
+          <p className="text-[11px] -mt-2 text-center" style={{ color: 'var(--ink3)' }}>
+            Il copy arriva in 15-30 secondi; le slide grafiche richiedono 1-2 minuti in più. Non ricaricare la pagina.
+          </p>
 
           {/* Advanced options toggle */}
           <button

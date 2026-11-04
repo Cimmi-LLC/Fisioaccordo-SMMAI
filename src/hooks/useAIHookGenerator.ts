@@ -80,7 +80,7 @@ export const useAIHookGenerator = () => {
         setGeneratedHooks(data.hooks);
         toast({
           title: "Hook generati con successo! 🚀",
-          description: `${data.hooks.length} hook pronti all'uso, ordinati per virality score`,
+          description: `${data.hooks.length} hook pronti all'uso, ordinati per forza dell'aggancio`,
         });
       }
 

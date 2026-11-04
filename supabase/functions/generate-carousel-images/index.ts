@@ -184,19 +184,30 @@ serve(async (req) => {
 
     // ── BRAND POOL: pre-load brand-uploaded photos for this brand
     // If pool exists, we'll prefer those over Freepik for each slide.
+    // Le righe nuove hanno solo storage_path (url è legacy/vuoto): la signed
+    // URL si firma qui, altrimenti il pool sembrerebbe sempre vuoto.
     let brandPool: Array<{ url: string; tags: string[]; caption: string | null }> = [];
     if (brandId) {
       try {
         const { data, error } = await supabaseAdmin
           .from("brand_photos")
-          .select("url, tags, caption")
+          .select("url, storage_path, tags, caption")
           .eq("brand_id", brandId);
         if (!error && Array.isArray(data)) {
-          brandPool = data.map((r: any) => ({
-            url: r.url,
-            tags: Array.isArray(r.tags) ? r.tags : [],
-            caption: r.caption || null,
-          }));
+          brandPool = (await Promise.all(data.map(async (r: any) => {
+            let url: string = r.url || "";
+            if (!url && r.storage_path) {
+              const { data: signed } = await supabaseAdmin.storage
+                .from("user-photos")
+                .createSignedUrl(r.storage_path, 60 * 60);
+              url = signed?.signedUrl || "";
+            }
+            return {
+              url,
+              tags: Array.isArray(r.tags) ? r.tags : [],
+              caption: r.caption || null,
+            };
+          }))).filter((p) => p.url);
         }
       } catch (e) {
         console.warn("brand pool load failed:", e);
@@ -212,6 +223,9 @@ serve(async (req) => {
     const aiAspect = typeof (body as any).aspectRatio === "string" ? (body as any).aspectRatio : "4:5";
     let aiModels: string[] = AI_MODEL_SETS["nano-2"];
     let aiStyle = "foto";
+    // Opzione del brand kit: «usa prima le mie foto, sempre». Senza flag le
+    // foto caricate entrano solo quando combaciano con le keyword della slide.
+    let fotoMieSempre = false;
     // Professione del brand: scena delle immagini AI e filtri dello stock.
     // Il testo delle slide fa da topic quando il brand non la dichiara.
     const slidesTopic = (Array.isArray(slides) ? (slides as Array<Record<string, unknown>>) : [])
@@ -229,6 +243,7 @@ serve(async (req) => {
         const modelKey = String((prefs as any)?.image_model || "nano-2");
         if (AI_MODEL_SETS[modelKey]) aiModels = AI_MODEL_SETS[modelKey];
         aiStyle = String((prefs as any)?.slide_style || "foto");
+        fotoMieSempre = (prefs as any)?.foto_mie_sempre === true;
         if (prefs) prof = resolveProfession(prefs as unknown as ProfessionBrandLike, slidesTopic);
         console.log("Generatore immagini scelto: " + modelKey + " (stile " + aiStyle + ", professione " + prof.id + "/" + prof.source + ")");
       } catch (e) {
@@ -297,7 +312,7 @@ serve(async (req) => {
 
       // 1) Brand pool first
       if (brandPool.length > 0) {
-        const brandPhoto = pickFromBrandPool([...keywords, ...slideContext], brandPool, usedBrandUrls);
+        const brandPhoto = pickFromBrandPool([...keywords, ...slideContext], brandPool, usedBrandUrls, fotoMieSempre);
         if (brandPhoto) {
           usedBrandUrls.add(brandPhoto);
           results.push({
@@ -393,13 +408,17 @@ serve(async (req) => {
 
 /**
  * Pick a brand photo for the given slide keywords.
- * Prefers photos whose tags/caption overlap with keywords. Falls back to a
- * random pool photo. Skips photos already used in this batch (when possible).
+ * Prefers photos whose tags/caption overlap with keywords.
+ * - `sempre` = false (default): la foto entra SOLO se rilevante (almeno una
+ *   keyword in tag/didascalia), altrimenti si passa ad AI/stock.
+ * - `sempre` = true («usa prima le mie foto, sempre»): se nessuna è rilevante
+ *   se ne prende comunque una, riusando il pool quando è esaurito.
  */
 function pickFromBrandPool(
   keywords: string[],
   pool: Array<{ url: string; tags: string[]; caption: string | null }>,
   used: Set<string>,
+  sempre: boolean,
 ): string | null {
   if (pool.length === 0) return null;
   const available = pool.filter(p => !used.has(p.url));
@@ -413,10 +432,10 @@ function pickFromBrandPool(
     return { url: p.url, score };
   });
 
-  // Pick highest score; if all 0, pick random
   scored.sort((a, b) => b.score - a.score);
   const best = scored[0];
   if (best.score > 0) return best.url;
+  if (!sempre) return null;
   return candidates[Math.floor(Math.random() * candidates.length)].url;
 }
 

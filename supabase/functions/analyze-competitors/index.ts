@@ -69,7 +69,7 @@ serve(async (req) => {
 
     // 1. Scrape posts + profile in parallel
     const isInstagram = platform === "instagram" || !platform;
-    const [scrapedData, profile] = await Promise.all([
+    let [scrapedData, profile] = await Promise.all([
       username && APIFY_API_TOKEN && isInstagram
         ? scrapeInstagramPosts(username, APIFY_API_TOKEN)
         : Promise.resolve(null),
@@ -78,9 +78,73 @@ serve(async (req) => {
         : Promise.resolve(null),
     ]);
 
+    // 1b. Se lo scraping non ha portato post, i contenuti possono già essere
+    // nella libreria «Video virali» (stesse tabelle del team): si analizzano
+    // quelli, che hanno views, didascalie e trascrizioni vere.
+    let fonteDati: "instagram" | "virali" | null = scrapedData && scrapedData.posts.length > 0 ? "instagram" : null;
+    if (!fonteDati && username) {
+      try {
+        const handle = String(username).trim().toLowerCase().replace(/^@/, "").split(/[/?#\s]/)[0];
+        const { data: rows } = await adminClient()
+          .from("virali_video")
+          .select("didascalia, views, likes, commenti, condivisioni, trascrizione, piattaforma, pubblicato_il, url")
+          .eq("handle", handle)
+          .order("views", { ascending: false, nullsFirst: false })
+          .limit(12);
+        const virali = (rows || []) as Array<Record<string, unknown>>;
+        if (virali.length > 0) {
+          const posts = virali.map((v) => ({
+            caption: [
+              v.views ? `[${Number(v.views).toLocaleString("it-IT")} visualizzazioni] ` : "",
+              String(v.didascalia || ""),
+              v.trascrizione ? `\nTrascrizione: ${String(v.trascrizione).slice(0, 800)}` : "",
+            ].join(""),
+            likes: Number(v.likes || 0),
+            comments: Number(v.commenti || 0),
+            views: v.views === null || v.views === undefined ? null : Number(v.views),
+            type: String(v.piattaforma || "video"),
+            timestamp: String(v.pubblicato_il || ""),
+            hashtags: [] as string[],
+            url: String(v.url || ""),
+          }));
+          const totalLikes = posts.reduce((s, p) => s + p.likes, 0);
+          const totalComments = posts.reduce((s, p) => s + p.comments, 0);
+          scrapedData = {
+            username: handle,
+            postsCount: posts.length,
+            posts,
+            totalLikes,
+            totalComments,
+            avgLikes: Math.round(totalLikes / posts.length),
+            avgComments: Math.round(totalComments / posts.length),
+          };
+          fonteDati = "virali";
+          console.log(`analyze-competitors: uso ${posts.length} video dalla libreria virali per @${handle}`);
+        }
+      } catch (e) {
+        console.warn("lettura libreria virali fallita:", e);
+      }
+    }
+
+    // 1c. Niente dati, niente analisi: prima qui partiva comunque un'analisi
+    // «dalla conoscenza generale» con punteggi inventati e campi
+    // «non determinabile» (revisione 03/11). Meglio dirlo chiaro.
+    if (!fonteDati && !manualInfo) {
+      return new Response(JSON.stringify({
+        error: `Non sono riuscito a leggere i contenuti di @${username}: senza i post veri non do punteggi né analisi. ` +
+          `Riprova tra qualche minuto, controlla che il profilo sia pubblico e scritto giusto, ` +
+          `oppure aggiungilo agli «Account seguiti» in Video virali: al prossimo giro di raccolta l'analisi userà quei dati.`,
+      }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // 2. Compute extended metrics (deterministic, no LLM)
     let extendedMetrics = null;
     const warnings: string[] = [];
+    if (fonteDati === "virali") {
+      warnings.push("Analisi basata sui video già raccolti nella libreria Video virali (con visualizzazioni e trascrizioni), non su uno scraping fresco del profilo.");
+    }
     if (scrapedData) {
       try {
         extendedMetrics = computeMetrics(scrapedData, profile);
@@ -126,6 +190,7 @@ serve(async (req) => {
 
     // Additive new fields — UI v1 ignores them, UI v2 will use them
     parsed.schema_version = 1.5;
+    parsed.data_source = fonteDati || "manual";
     if (extendedMetrics) {
       parsed.scraped = extendedMetrics;
     }

@@ -37,7 +37,12 @@ const StoriesGenerator = () => {
       brandFont: activeBrand.font_intestazioni || fisioaccordoClient.brandFont,
       brandColors: colors,
       bgIsLight: isLightHex(colors[0]),
-      templateDataUrl: activeBrand.logo_url || null,
+      // MAI il logo come sfondo a tutta pagina (revisione 03/11: la prima
+      // storia generata era illeggibile, testo sopra il logo ingrandito).
+      // Senza template caricato si usano gli sfondi di default coi colori
+      // del brand; il logo resta il logo.
+      templateDataUrl: null,
+      logoUrl: activeBrand.logo_url || null,
       profession: {
         label: prof.label,
         settore: prof.profile.settore,

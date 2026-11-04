@@ -199,7 +199,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
           className="text-[32px] leading-tight"
           style={{ fontWeight: 900, color: 'var(--ink)', letterSpacing: '-1.5px', lineHeight: '1.1' }}
         >
-          Crea contenuti <span style={{ color: 'var(--rosa)' }}>virali</span> in secondi
+          Crea i <span style={{ color: 'var(--rosa)' }}>contenuti</span> del tuo studio
         </h1>
       </div>
 
@@ -263,9 +263,11 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
         </CollapsibleContent>
       </Collapsible>
 
-      {/* Main grid: Form + Preview */}
+      {/* Main grid: Form + Preview. min-w-0 sulle colonne: senza, un contenuto
+          largo (slide, barre) sfonda la griglia e la pagina scorre in
+          orizzontale da telefono (revisione 03/11). */}
       <div className="grid lg:grid-cols-2 gap-6">
-        <div className="space-y-4">
+        <div className="space-y-4 min-w-0">
           {loadingState.isLoading ? (
             <Card>
               <CardHeader><CardTitle>Configurazione Post</CardTitle></CardHeader>
@@ -283,7 +285,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
             />
           )}
         </div>
-        <div>
+        <div className="min-w-0">
           {carouselDataList.length > 1 && (
             <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1">
               {carouselDataList.map((_, i) => {

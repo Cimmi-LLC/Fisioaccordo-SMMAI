@@ -36,8 +36,19 @@ serve(async (req) => {
       });
     }
 
-    // Dispatch per dominio
+    // Dispatch per dominio. I link che Google Maps CONDIVIDE davvero sono
+    // short link (maps.app.goo.gl, goo.gl/maps): prima venivano rifiutati
+    // come «dominio non supportato» pur promettendo Google Maps (revisione
+    // 03/11). Si accettano e si passano ad Apify, che segue il redirect.
     const lower = url.toLowerCase();
+    const isGoogleMaps =
+      lower.includes("google.com/maps") ||
+      lower.includes("google.it/maps") ||
+      lower.includes("maps.google") ||
+      lower.includes("maps.app.goo.gl") ||
+      lower.includes("goo.gl/maps") ||
+      lower.includes("g.page") ||
+      lower.includes("share.google");
     let reviews: any[] = [];
     let totalSeen = 0;
     let filteredOut = 0;
@@ -48,7 +59,7 @@ serve(async (req) => {
       totalSeen = r.totalSeen;
       filteredOut = r.filteredOut;
       reviews = r.reviews;
-    } else if (lower.includes("google.com/maps") || lower.includes("maps.google") || lower.includes("g.page")) {
+    } else if (isGoogleMaps) {
       // Google Maps: serve Apify (no API pubblica gratuita)
       const APIFY_API_TOKEN = Deno.env.get("APIFY_API_TOKEN");
       if (!APIFY_API_TOKEN) throw new Error("APIFY_API_TOKEN not configured");
@@ -58,7 +69,7 @@ serve(async (req) => {
       reviews = r.reviews;
     } else {
       return new Response(JSON.stringify({
-        error: "Dominio non supportato. Sono supportati: Google Maps e MioDottore."
+        error: "Link non riconosciuto. Incolla il link del profilo Google Maps (va bene anche quello corto da «Condividi», maps.app.goo.gl) oppure la pagina MioDottore del centro."
       }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -82,13 +93,27 @@ serve(async (req) => {
 // Google Maps (existing flow, unchanged)
 // ─────────────────────────────────────────────────────────────────────
 async function scrapeGoogleMaps(url: string, apifyToken: string) {
+  // Gli short link di «Condividi» (maps.app.goo.gl, goo.gl/maps, g.page) si
+  // risolvono qui nel link lungo google.com/maps: più affidabile per Apify.
+  let target = url;
+  if (/maps\.app\.goo\.gl|goo\.gl\/maps|g\.page|share\.google/i.test(url)) {
+    try {
+      const res = await fetch(url, {
+        redirect: "follow",
+        headers: { "User-Agent": REALISTIC_UA },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (res.url && res.url.includes("google.")) target = res.url;
+    } catch { /* si prova comunque col link corto: Apify segue i redirect */ }
+  }
+
   const startResponse = await fetch(
     `https://api.apify.com/v2/acts/compass~crawler-google-places/runs?token=${apifyToken}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        startUrls: [{ url }],
+        startUrls: [{ url: target }],
         maxReviews: 250,
         language: "it",
         reviewsSort: "newest",

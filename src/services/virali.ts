@@ -246,9 +246,9 @@ export function analizzaVideo(sorgente: Sorgente) {
   return chiama<{ analisi: AnalisiVideo }>('duplica-video', { azione: 'analizza', ...sorgente });
 }
 
-export function scriviCopione(sorgente: Sorgente, brandId: string, tipo: TipoCopia) {
+export function scriviCopione(sorgente: Sorgente, brandId: string, tipo: TipoCopia, argomento?: string) {
   return chiama<{ analisi: AnalisiVideo; copione: Copione; copioneId: string | null }>('duplica-video', {
-    azione: 'copione', ...sorgente, brandId, tipo,
+    azione: 'copione', ...sorgente, brandId, tipo, argomento: argomento || '',
   });
 }
 

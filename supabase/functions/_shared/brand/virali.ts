@@ -612,12 +612,18 @@ export function promptCopione(input: {
   brand: BrandPerCopione;
   bloccoProfessione: string;
   origine: { piattaforma: string; handle: string; paese: string; views: number | null };
+  /** Argomento scelto dall'utente: la struttura si applica a QUESTO tema. */
+  argomento?: string | null;
 }): string {
   const { analisi, tipo, brand, origine } = input;
-  const parlato = analisi.trascrizione.map((r) => (r.it ? `${r.testo} [${r.it}]` : r.testo)).join('\n');
+  const argomento = (input.argomento || '').trim();
+  const sulTema = argomento
+    ? `portandolo sull'argomento chiesto dall'utente: «${argomento}». Il nuovo video parla di QUESTO, non di un tema scelto da te`
+    : 'portandolo sulla professione e sui servizi del brand';
   const regolaCopia = tipo === 'esatta'
-    ? `COPIA ESATTA: cambi UN solo mattoncino, il topic, portandolo sulla professione e sui servizi del brand. Tieni uguali format, struttura frase per frase (a ogni frase dell'originale corrisponde una frase nuova con la stessa funzione: hook, contrasto, perché, passo 1, passo 2...), tipo di hook parlato, hook visivo, layout, lunghezza (più o meno 10%) e tipo di CTA. mattoncini_cambiati = ["topic"].`
-    : `COPIA VICINA: cambi 2 o 3 mattoncini (topic, contrarian take, e hook oppure CTA) e tieni format, struttura, layout e lunghezza. Scrivi in mattoncini_cambiati quali hai cambiato.`;
+    ? `COPIA ESATTA: cambi UN solo mattoncino, il topic, ${sulTema}. Tieni uguali format, struttura frase per frase (a ogni frase dell'originale corrisponde una frase nuova con la stessa funzione: hook, contrasto, perché, passo 1, passo 2...), tipo di hook parlato, hook visivo, layout, lunghezza (più o meno 10%) e tipo di CTA. mattoncini_cambiati = ["topic"].`
+    : `COPIA VICINA: cambi 2 o 3 mattoncini (topic ${sulTema}, contrarian take, e hook oppure CTA) e tieni format, struttura, layout e lunghezza. Scrivi in mattoncini_cambiati quali hai cambiato.`;
+  const parlato = analisi.trascrizione.map((r) => (r.it ? `${r.testo} [${r.it}]` : r.testo)).join('\n');
   const lista = (v?: string[] | null) => (v && v.length ? v.join(', ') : '(non indicato)');
   return `VIDEO ORIGINALE (${origine.piattaforma}, @${origine.handle}, ${origine.paese === 'US' ? 'americano' : origine.paese === 'IT' ? 'italiano' : 'estero'}${origine.views ? `, ${origine.views} visualizzazioni` : ''})
 Format: ${analisi.format}
@@ -654,6 +660,7 @@ REGOLE
 - Niente nomi, marchi o prodotti del video originale. Niente diagnosi, niente promesse di guarigione. Mai la parola «sbloccare»: si dice aiutare, risolvere in meno tempo, più risultati.
 - "frasi" contiene tutto il parlato, dall'hook alla CTA compresi, una frase per riga, nell'ordine in cui si dice.
 - "semplice" è true solo se si registra da soli col telefono parlando in camera, senza altre persone, oggetti particolari o b-roll da girare.
+- ONESTÀ SUI MEZZI: se l'originale si regge su mezzi che un professionista da solo di solito non ha (animazioni 3D, motion graphics spinte, attori, drone, studio di registrazione), dillo chiaro in "cosa_serve" (es. "animazione 3D del ginocchio, da far fare o sostituire") e scrivi in "come_girarlo" l'alternativa realistica col telefono. Mai far credere che basti registrarsi parlando se il video originale non funzionerebbe così.
 - "durata_stimata_s" è la durata dell'originale, più o meno 10%. "come_girarlo" dà solo indicazioni utili (inquadratura, luce, ritmo, cosa mostrare): niente dettagli dell'originale che non servono, come vestiti od oggetti a caso.
 
 JSON:

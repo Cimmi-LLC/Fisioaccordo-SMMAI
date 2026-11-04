@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Loader2, CopyPlus, Wand2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActiveBrand } from '@/hooks/useActiveBrand';
@@ -13,7 +14,15 @@ const DuplicaPanel: React.FC<{ sorgente: Sorgente; analisiIniziale: AnalisiVideo
   const { activeBrand, activeBrandId } = useActiveBrand();
   const [analisi, setAnalisi] = useState<AnalisiVideo | null>(analisiIniziale);
   const [copione, setCopione] = useState<Copione | null>(null);
+  const [argomento, setArgomento] = useState('');
   const [fase, setFase] = useState<'ferma' | 'guardo' | 'scrivo'>('ferma');
+  const copioneRef = useRef<HTMLDivElement>(null);
+
+  // Il copione compare QUI sotto: appena arriva ci si scorre sopra, così non
+  // va cercato in «I miei copioni» (dove comunque resta salvato).
+  useEffect(() => {
+    if (copione) copioneRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [copione]);
 
   const duplica = async (tipo: TipoCopia) => {
     if (!activeBrandId) {
@@ -27,10 +36,10 @@ const DuplicaPanel: React.FC<{ sorgente: Sorgente; analisiIniziale: AnalisiVideo
         setAnalisi(r.analisi);
       }
       setFase('scrivo');
-      const r = await scriviCopione(sorgente, activeBrandId, tipo);
+      const r = await scriviCopione(sorgente, activeBrandId, tipo, argomento);
       setAnalisi(r.analisi);
       setCopione(r.copione);
-      toast({ title: 'Copione pronto', description: 'Lo trovi anche in «I miei copioni».' });
+      toast({ title: 'Copione pronto: eccolo qui sotto', description: 'Resta salvato anche in «I miei copioni».' });
     } catch (e) {
       toast({ title: 'Non sono riuscito a duplicarlo', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
     } finally {
@@ -46,8 +55,23 @@ const DuplicaPanel: React.FC<{ sorgente: Sorgente; analisiIniziale: AnalisiVideo
       <div className="rounded-2xl p-4 space-y-3" style={{ backgroundColor: 'var(--viola-dim)', border: '1px solid var(--viola)' }}>
         <div className="font-black" style={{ color: 'var(--ink)' }}>Duplica questo video</div>
         <p className="text-sm" style={{ color: 'var(--ink3)' }}>
-          Rifacciamo lo stesso video per {nomeBrand}: stessa struttura e stesso hook, con l'argomento del tuo studio.
+          Rifacciamo lo stesso video per {nomeBrand}: stessa struttura e stesso hook, applicati all'argomento che scegli tu.
         </p>
+        <div>
+          <label className="block text-xs font-bold mb-1" style={{ color: 'var(--ink)' }}>
+            Argomento del nuovo video
+          </label>
+          <Input
+            value={argomento}
+            onChange={(e) => setArgomento(e.target.value)}
+            placeholder="es. cefalea da cervicale, dolore al ginocchio quando corri…"
+            maxLength={200}
+            className="bg-white"
+          />
+          <p className="text-[11px] mt-1" style={{ color: 'var(--ink3)' }}>
+            Vuoto = lo scegliamo noi dai servizi del tuo brand.
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => duplica('esatta')} disabled={occupato}>
             <CopyPlus className="h-4 w-4 mr-1" /> Copia esatta
@@ -62,7 +86,7 @@ const DuplicaPanel: React.FC<{ sorgente: Sorgente; analisiIniziale: AnalisiVideo
         {occupato && (
           <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--ink)' }}>
             <Loader2 className="h-4 w-4 animate-spin" />
-            {fase === 'guardo' ? 'Guardo il video originale… (30-90 s)' : `Scrivo il copione per ${nomeBrand}…`}
+            {fase === 'guardo' ? 'Guardo il video originale… (30-90 s)' : `Scrivo il copione per ${nomeBrand}… (20-60 s)`}
           </div>
         )}
       </div>
@@ -76,7 +100,7 @@ const DuplicaPanel: React.FC<{ sorgente: Sorgente; analisiIniziale: AnalisiVideo
         </div>
       )}
 
-      {copione && <CopioneView copione={copione} />}
+      {copione && <div ref={copioneRef}><CopioneView copione={copione} /></div>}
     </div>
   );
 };

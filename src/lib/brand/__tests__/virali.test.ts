@@ -250,6 +250,22 @@ describe('analisi e copione', () => {
     expect(v).toContain('COPIA VICINA');
     expect(v).toContain('non riusare le sue frasi');
   });
+
+  it("con l'argomento dell'utente la copia esatta si applica a quel tema", () => {
+    const p = promptCopione({
+      analisi: ANALISI, tipo: 'esatta', brand: {},
+      bloccoProfessione: '', origine: { piattaforma: 'tiktok', handle: 'dr.x', paese: 'US', views: 1000 },
+      argomento: 'cefalea da cervicale',
+    });
+    expect(p).toContain('«cefalea da cervicale»');
+    expect(p).toContain('ONESTÀ SUI MEZZI');
+    // Senza argomento resta la regola storica sul brand.
+    const senza = promptCopione({
+      analisi: ANALISI, tipo: 'esatta', brand: {},
+      bloccoProfessione: '', origine: { piattaforma: 'tiktok', handle: 'dr.x', paese: 'US', views: 1000 },
+    });
+    expect(senza).toContain('professione e sui servizi del brand');
+  });
 });
 
 describe('categorie delle inserzioni', () => {

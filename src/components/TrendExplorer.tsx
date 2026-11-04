@@ -100,6 +100,11 @@ const TrendExplorer: React.FC<TrendExplorerProps> = ({ onUseTrend }) => {
             {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
           </Button>
         </div>
+        {searching && (
+          <p className="text-xs text-muted-foreground">
+            Cerco i temi e i reel di esempio: ci vogliono 30-60 secondi, resta su questa pagina.
+          </p>
+        )}
 
         {trends.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">Cerca trend per la tua nicchia!</p>
@@ -113,9 +118,7 @@ const TrendExplorer: React.FC<TrendExplorerProps> = ({ onUseTrend }) => {
                     {(trend as any).suggested_format && (
                       <Badge variant="outline" className="text-[10px]">{(trend as any).suggested_format}</Badge>
                     )}
-                    <Badge variant={trend.trend_score >= 70 ? 'default' : 'secondary'}>
-                      {trend.trend_score}/100
-                    </Badge>
+                    {/* Niente punteggi inventati: il «perché adesso» sta sotto il titolo. */}
                     <button
                       title="Togli questo trend"
                       onClick={() => removeTrend(trend)}
@@ -126,7 +129,7 @@ const TrendExplorer: React.FC<TrendExplorerProps> = ({ onUseTrend }) => {
                     </button>
                   </div>
                 </div>
-                {trend.source && <p className="text-xs text-muted-foreground">{trend.source}</p>}
+                {trend.source && <p className="text-xs text-muted-foreground">Perché adesso: {trend.source}</p>}
                 {trend.suggested_content && (
                   <p className="text-xs text-foreground/80">{trend.suggested_content}</p>
                 )}

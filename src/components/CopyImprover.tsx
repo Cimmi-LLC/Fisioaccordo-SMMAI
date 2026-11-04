@@ -85,7 +85,7 @@ const CopyImprover: React.FC<CopyImproverProps> = ({ onCopyImproved }) => {
 
         toast({
           title: "🔥 Copy super-ottimizzato!",
-          description: "Il tuo copy è stato trasformato in un format virale"
+          description: "Il tuo copy è stato trasformato in un format collaudato"
         });
       } else {
         console.warn('⚠️ No improvement generated');

@@ -22,6 +22,8 @@ import { POST_TEMPLATES, POST_TEMPLATE_NONE, POST_TEMPLATE_RANDOM } from '@/data
 import PostTemplateOverlay from '@/components/carousel/PostTemplateOverlay';
 import SinglePhotoUpload from '@/components/brand/SinglePhotoUpload';
 import BrandPhotoGallery from '@/components/brand/BrandPhotoGallery';
+import FotoPrimaSwitch from '@/components/brand/FotoPrimaSwitch';
+import MetodoContenutiCard from '@/components/brand/MetodoContenutiCard';
 
 /* ── Editable Field wrapper ── */
 const EditableField: React.FC<{ label: string; children: React.ReactNode; onEdit?: () => void }> = ({ label, children, onEdit }) => (
@@ -567,7 +569,8 @@ const BrandPage = () => {
       {activeTab === 'gallery' && (
         <div className="space-y-8">
           <p className="text-[13px]" style={{ color: 'var(--ink3)' }}>
-            Le tue immagini vengono usate per creare post social. I media vengono usati solo quando rilevanti per il contenuto.
+            Le tue immagini vengono usate per creare post social. Di base entrano solo quando c'entrano col contenuto;
+            con l'opzione «usa prima le mie foto, sempre» entrano in ogni slide.
           </p>
 
           {/* Stats */}
@@ -600,6 +603,7 @@ const BrandPage = () => {
               <h2 className="text-[14px] font-bold" style={{ color: 'var(--ink)' }}>Pool foto per post e storie</h2>
             </div>
             <BrandPhotoGallery brandId={brand.id || null} />
+            <FotoPrimaSwitch brandId={brand.id || null} />
           </div>
 
           {/* Avatar */}
@@ -609,7 +613,8 @@ const BrandPage = () => {
               <h2 className="text-[14px] font-bold" style={{ color: 'var(--ink)' }}>Avatar</h2>
             </div>
             <p className="text-[12px] mb-4" style={{ color: 'var(--ink3)' }}>
-              Carica una foto idealmente a mezzo busto dove è ben visibile il volto. Verrà utilizzata come reference per creare contenuti social più autentici e personalizzati.
+              Foto a mezzo busto col volto ben visibile. Serve SOLO all'analisi dello stile quando crei il template
+              (colori, atmosfera): non viene usata per generare immagini della tua persona.
             </p>
             <SinglePhotoUpload url={brand.avatar_url} onChange={v => update('avatar_url', v)} shape="circle" />
           </div>
@@ -621,7 +626,8 @@ const BrandPage = () => {
               <h2 className="text-[14px] font-bold" style={{ color: 'var(--ink)' }}>Location</h2>
             </div>
             <p className="text-[12px] mb-4" style={{ color: 'var(--ink3)' }}>
-              Carica foto degli interni della tua location. Preferibilmente solo gli ambienti, senza persone, per permetterci di riprodurre al meglio i tuoi spazi nei contenuti. (max 3)
+              Foto degli interni, preferibilmente senza persone (max 3). Servono SOLO all'analisi dello stile quando
+              crei il template: non vengono usate per generare immagini sintetiche dei tuoi spazi.
             </p>
             <PhotoGrid photos={brand.location_photos} onChange={v => update('location_photos', v)} max={3} />
           </div>
@@ -652,6 +658,9 @@ const BrandPage = () => {
               <TagInput tags={brand.parole_da_evitare} onChange={v => update('parole_da_evitare', v)} placeholder="Aggiungi parola" />
             </EditableField>
           </div>
+
+          {/* Campi del metodo contenuti (parole dei pazienti, contrarian take) */}
+          <MetodoContenutiCard brandId={brand.id || null} />
 
           {/* Tono di voce */}
           <div className="rounded-2xl p-6 space-y-4" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)' }}>

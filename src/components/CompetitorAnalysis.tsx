@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,12 +7,27 @@ import { Users, Loader2, TrendingUp, TrendingDown, Lightbulb, Sparkles, Hash, Ba
 import { Textarea } from '@/components/ui/textarea';
 import { useCompetitorAnalysis } from '@/hooks/useCompetitorAnalysis';
 import { useActiveBrand } from '@/hooks/useActiveBrand';
+import { listaAccount, type AccountSeguito } from '@/services/virali';
 
 const CompetitorAnalysis: React.FC = () => {
   const { analyses, analyzing, analyzeCompetitor, deleteAnalysis, updateAnalysis } = useCompetitorAnalysis();
   // L'analisi e "per" il brand attivo: nome e professione finiscono nel prompt.
-  const { activeBrandId } = useActiveBrand();
+  const { activeBrandId, activeBrand } = useActiveBrand();
   const [username, setUsername] = useState('');
+  // I profili della nicchia stanno già in «Video virali»: si propongono qui,
+  // invece di far scrivere il nome a mano in una casella vuota (revisione 03/11).
+  const [suggeriti, setSuggeriti] = useState<AccountSeguito[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const tutti = await listaAccount();
+        const professione = (activeBrand as { professione?: string | null } | null)?.professione || null;
+        const attivi = tutti.filter((a) => a.attivo);
+        const dellaNicchia = professione ? attivi.filter((a) => a.professione === professione) : attivi;
+        setSuggeriti((dellaNicchia.length > 0 ? dellaNicchia : attivi).slice(0, 12));
+      } catch { /* la sezione virali può non essere disponibile: pazienza */ }
+    })();
+  }, [activeBrand]);
   const [manualInfo, setManualInfo] = useState('');
   const [platform, setPlatform] = useState('instagram');
   const [result, setResult] = useState<any>(null);
@@ -101,6 +116,28 @@ const CompetitorAnalysis: React.FC = () => {
               Scarico e analizzo i post del competitor… può richiedere 30-60 secondi.
             </p>
           )}
+          {!analyzing && suggeriti.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-semibold" style={{ color: 'var(--ink3)' }}>
+                Dalla tua nicchia (Video virali):
+              </span>
+              {suggeriti.map((a) => (
+                <button
+                  key={a.id}
+                  onClick={() => setUsername(a.handle)}
+                  className="text-[11px] font-semibold px-2.5 py-1 rounded-full"
+                  style={{
+                    border: username === a.handle ? '1.5px solid var(--viola)' : '1px solid var(--line)',
+                    backgroundColor: username === a.handle ? 'var(--viola-dim)' : 'var(--bg)',
+                    color: username === a.handle ? 'var(--viola)' : 'var(--ink2)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  @{a.handle}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Results */}
@@ -148,6 +185,11 @@ const CompetitorAnalysis: React.FC = () => {
                     <X className="h-3.5 w-3.5" /> Annulla
                   </Button>
                 </div>
+              </div>
+            )}
+            {Array.isArray(result.warnings) && result.warnings.length > 0 && (
+              <div className="p-3 rounded-xl text-[12px]" style={{ backgroundColor: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)', color: 'var(--ink)' }}>
+                {result.warnings.map((w: string, i: number) => <div key={i}>{w}</div>)}
               </div>
             )}
             <div className="flex items-center justify-between p-5 rounded-xl" style={{ backgroundColor: 'var(--viola-dim)' }}>
