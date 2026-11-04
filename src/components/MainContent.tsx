@@ -185,33 +185,10 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
     setIdeaOpen(false);
   }, []);
 
-  // GATE Template Genesis: senza template approvato la produzione caroselli
-  // e bloccata (sostituzione totale della vecchia pipeline).
-  if (brandRecord && !genesisLocked) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-16">
-        <Card className="panel-card">
-          <CardContent style={{ padding: 40, textAlign: 'center' }}>
-            <Sparkles className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--rosa)' }} />
-            <h2 className="text-xl font-black mb-2" style={{ color: 'var(--ink)' }}>
-              Prima crea il tuo template
-            </h2>
-            <p className="text-[13px] mb-6" style={{ color: 'var(--ink3)' }}>
-              I tuoi caroselli vengono generati sul TUO sistema visivo.
-              Bastano 5 minuti: carichi logo e qualche post, l'AI progetta il template, tu approvi.
-            </p>
-            <button
-              onClick={() => navigate(`/onboarding/template?brand=${brandRecord.id}`)}
-              className="text-white text-[13px] font-black uppercase px-8 py-3.5 rounded-xl"
-              style={{ backgroundColor: 'var(--rosa)', border: 'none', cursor: 'pointer', letterSpacing: '0.5px' }}
-            >
-              Crea il template
-            </button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // Senza template approvato la pagina resta aperta: si scrivono i testi
+  // dei caroselli, le slide grafiche partono solo dopo il Template Genesis.
+  // Prima era un blocco a tutta pagina e chi saltava l'onboarding restava fuori.
+  const goToGenesis = () => brandRecord && navigate(`/onboarding/template?brand=${brandRecord.id}`);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8" style={{ paddingTop: '44px' }}>
@@ -225,6 +202,32 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
           Crea i <span style={{ color: 'var(--rosa)' }}>contenuti</span> del tuo studio
         </h1>
       </div>
+
+      {brandRecord && !genesisLocked && (
+        <Card className="panel-card mb-6">
+          <CardContent style={{ padding: 20 }}>
+            <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+              <Sparkles className="h-8 w-8 shrink-0" style={{ color: 'var(--rosa)' }} />
+              <div className="flex-1">
+                <p className="text-[14px] font-black" style={{ color: 'var(--ink)' }}>
+                  Il template di questo brand non c'e ancora
+                </p>
+                <p className="text-[12px]" style={{ color: 'var(--ink3)' }}>
+                  Puoi gia scrivere i testi dei caroselli. Per le slide grafiche crea il template:
+                  carichi il logo e qualche post, l'AI lo progetta, tu approvi. Bastano 5 minuti.
+                </p>
+              </div>
+              <button
+                onClick={goToGenesis}
+                className="text-white text-[12px] font-black uppercase px-6 py-3 rounded-xl shrink-0"
+                style={{ backgroundColor: 'var(--rosa)', border: 'none', cursor: 'pointer', letterSpacing: '0.5px' }}
+              >
+                Crea il template
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Loading progress */}
       {loadingState.isLoading && (
@@ -337,13 +340,24 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
                     >
                       Genera le slide
                     </button>
+                  ) : brandRecord && !brandLoading ? (
+                    <>
+                      <p className="text-[12px]" style={{ color: 'var(--ink3)' }}>
+                        Le slide grafiche si creano sul template del brand, che non c'e ancora.
+                      </p>
+                      <button
+                        onClick={goToGenesis}
+                        className="text-white text-[12px] font-black uppercase px-6 py-3 rounded-xl"
+                        style={{ backgroundColor: 'var(--rosa)', border: 'none', cursor: 'pointer', letterSpacing: '0.5px' }}
+                      >
+                        Crea il template
+                      </button>
+                    </>
                   ) : (
                     <p className="text-[12px]" style={{ color: '#b45309' }}>
                       {brandLoading
                         ? 'Sto caricando il brand attivo, un attimo…'
-                        : !brandRecord
-                          ? 'Nessun brand attivo trovato: ricarica la pagina o seleziona un brand.'
-                          : 'Il brand attivo non ha un template approvato: completa prima il Template Genesis.'}
+                        : 'Nessun brand attivo trovato: ricarica la pagina o seleziona un brand.'}
                     </p>
                   )}
                 </div>

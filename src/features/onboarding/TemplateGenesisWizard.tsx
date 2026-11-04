@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import AccountStrip from '@/components/AccountStrip';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/logo-full.png';
 import UploadStep from './steps/UploadStep.tsx';
@@ -14,6 +15,7 @@ import CandidateGridStep from './steps/CandidateGridStep.tsx';
 import SummaryStep from './steps/SummaryStep.tsx';
 import { useGenesis } from './hooks/useGenesis.ts';
 import { useTemplateCandidates } from './hooks/useTemplateCandidates.ts';
+import { coloriDaCompletare } from '@/lib/brand/skipGenesis.ts';
 import type { SlideRole } from '@/lib/brand/archetypes.ts';
 import type { VisualStyle, SlideFormat } from '@/lib/brand/genome.ts';
 
@@ -24,6 +26,7 @@ const STEP_LABELS = ['Materiali', 'Brand', 'Template', 'Conferma'];
 const TemplateGenesisWizard: React.FC = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const brandId = searchParams.get('brand');
 
@@ -32,6 +35,7 @@ const TemplateGenesisWizard: React.FC = () => {
   const [existingLogoUrl, setExistingLogoUrl] = useState<string | null>(null);
   const [visualStyle, setVisualStyle] = useState<VisualStyle>('flat_icon');
   const [format, setFormat] = useState<SlideFormat>('4:5');
+  const [skipping, setSkipping] = useState(false);
 
   const genesis = useGenesis(brandId);
   const { candidates, genesisStatus } = useTemplateCandidates(
@@ -82,6 +86,31 @@ const TemplateGenesisWizard: React.FC = () => {
   const handleRegenerate = async (feedback: string) => {
     const ok = await genesis.generate(feedback, visualStyle, format);
     if (ok) setSelection({});
+  };
+
+  // Salta tutto: il brand entra subito nell'app. Logo e template si fanno
+  // dopo (Brand Kit e pagina Post); qui si completano solo i colori mancanti.
+  const handleSkip = async () => {
+    if (!brandId || skipping) return;
+    setSkipping(true);
+    try {
+      const { data } = await (supabase as any)
+        .from('brands')
+        .select('colore_primario, colore_secondario, colore_terziario')
+        .eq('id', brandId)
+        .maybeSingle();
+      const patch = coloriDaCompletare(data);
+      if (Object.keys(patch).length > 0) {
+        await (supabase as any).from('brands').update(patch).eq('id', brandId);
+      }
+    } catch {
+      // I colori di partenza sono un di piu: se non si salvano si entra lo stesso.
+    }
+    toast({
+      title: 'Configurazione rimandata',
+      description: 'Il logo lo aggiungi dal Brand Kit, il template dalla pagina Post quando vuoi.',
+    });
+    navigate('/posts');
   };
 
   const handleApprove = async () => {
@@ -169,15 +198,28 @@ const TemplateGenesisWizard: React.FC = () => {
           )}
         </div>
 
-        {step > 0 && step < 3 && (
-          <div className="text-center mt-4">
+        {step < 3 && (
+          <div className="text-center mt-4 space-y-3">
             <button
-              onClick={() => setStep((s) => (s - 1) as WizardStep)}
-              className="text-[12px] font-semibold"
-              style={{ color: 'var(--ink3)', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+              onClick={handleSkip}
+              disabled={skipping}
+              className="text-[12px] font-black uppercase px-6 py-3 rounded-xl"
+              style={{ color: 'var(--viola)', background: 'transparent', border: '1.5px solid var(--viola)', cursor: skipping ? 'wait' : 'pointer', letterSpacing: '0.5px' }}
             >
-              Torna indietro
+              {skipping ? 'Un attimo…' : 'Salta e configura dopo'}
             </button>
+            <p className="text-[11px]" style={{ color: 'var(--ink3)' }}>
+              Entri subito nell'app. Logo e template li aggiungi quando vuoi.
+            </p>
+            {step > 0 && (
+              <button
+                onClick={() => setStep((s) => (s - 1) as WizardStep)}
+                className="text-[12px] font-semibold"
+                style={{ color: 'var(--ink3)', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                Torna indietro
+              </button>
+            )}
           </div>
         )}
       </div>

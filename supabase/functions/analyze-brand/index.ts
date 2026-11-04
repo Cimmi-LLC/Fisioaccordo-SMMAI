@@ -32,6 +32,8 @@ serve(async (req) => {
     }
 
     // Build context from scraped data
+    // Dal 02/11/2026 il profilo puo arrivare anche da Instagram (scrape-instagram).
+    const daInstagram = scrapedData.source === "instagram";
     let websiteContent = "";
     if (scrapedData.title) websiteContent += `TITOLO SITO: ${scrapedData.title}\n`;
     if (scrapedData.description) websiteContent += `META DESCRIPTION: ${scrapedData.description}\n`;
@@ -39,7 +41,9 @@ serve(async (req) => {
     if (scrapedData.phone) websiteContent += `TELEFONO: ${scrapedData.phone}\n`;
     if (scrapedData.email) websiteContent += `EMAIL: ${scrapedData.email}\n`;
     if (scrapedData.address) websiteContent += `INDIRIZZO: ${scrapedData.address}\n`;
-    websiteContent += `\nCONTENUTO TESTUALE DEL SITO:\n${scrapedData.bodyText}`;
+    websiteContent += daInstagram
+      ? `\nCONTENUTO DEL PROFILO INSTAGRAM:\n${scrapedData.bodyText}`
+      : `\nCONTENUTO TESTUALE DEL SITO:\n${scrapedData.bodyText}`;
 
     // Add JSON-LD if available
     if (scrapedData.jsonLd?.length > 0) {
@@ -48,7 +52,9 @@ serve(async (req) => {
 
     // Add CSS colors found on the site
     if (scrapedData.cssColors?.length > 0) {
-      websiteContent += `\n\nCOLORI CSS TROVATI NEL SITO: ${scrapedData.cssColors.join(", ")}\nUsa questi colori come riferimento per determinare i colori del brand.`;
+      websiteContent += daInstagram
+        ? `\n\nCOLORI RICORRENTI NELLE IMMAGINI DEL PROFILO: ${scrapedData.cssColors.join(", ")}\nUsa questi colori come riferimento per determinare i colori del brand.`
+        : `\n\nCOLORI CSS TROVATI NEL SITO: ${scrapedData.cssColors.join(", ")}\nUsa questi colori come riferimento per determinare i colori del brand.`;
     }
 
     // Add logo URL if scraped
@@ -56,7 +62,7 @@ serve(async (req) => {
       websiteContent += `\n\nLOGO TROVATO NEL SITO: ${scrapedData.logoUrl}\nUsa questo URL come logo del brand.`;
     }
 
-    const systemPrompt = `Sei un esperto di marketing per professionisti della salute (fisioterapisti, osteopati, poliambulatori, nutrizionisti, personal trainer, psicologi, dentisti e altre figure sanitarie). Hai estratto il contenuto testuale del sito web di uno studio o di un professionista. Il tuo compito è analizzare questo contenuto e costruire un profilo completo del brand.
+    const systemPrompt = `Sei un esperto di marketing per professionisti della salute (fisioterapisti, osteopati, poliambulatori, nutrizionisti, personal trainer, psicologi, dentisti e altre figure sanitarie) e anche per brand di altri settori, compresi i personal brand. Hai estratto il contenuto del sito web o del profilo Instagram (bio e didascalie dei post) di uno studio, di un professionista o di un brand. Il tuo compito è analizzare questo contenuto e costruire un profilo completo del brand.
 
 Analizza attentamente e ricava:
 - Il nome esatto dello studio/brand
@@ -70,12 +76,12 @@ Analizza attentamente e ricava:
 - Suggerisci 5 temi chiave adatti per i post social, coerenti con la professione
 - Suggerisci 3 call to action adatte
 - La persona di scrittura suggerita ("io" per professionista singolo, "noi" per studio/team)
-- I colori principali del brand: scegli SOLO tra i COLORI CSS TROVATI NEL SITO (sono i colori che il visitatore vede davvero). Il primario è quello più usato per bottoni, titoli e marchio. Restituisci 3 colori hex presi da quella lista. Se la lista manca o non basta, lascia stringa vuota nei campi che non puoi riempire: NON inventare MAI un colore e NON suggerire colori «di settore».
+- I colori principali del brand: scegli SOLO tra i colori della lista fornita sopra (COLORI CSS TROVATI NEL SITO, oppure COLORI RICORRENTI NELLE IMMAGINI DEL PROFILO se arriva da Instagram: sono i colori che il visitatore vede davvero). Il primario è quello più usato per bottoni, titoli e marchio. Restituisci 3 colori hex presi da quella lista. Se la lista manca o non basta, lascia stringa vuota nei campi che non puoi riempire: NON inventare MAI un colore e NON suggerire colori «di settore».
 - Categorie: scegli tra [${allProfessionCategories().join(", ")}, altro], coerenti con la professione rilevata
 
 Rispondi SOLO con JSON valido.`;
 
-    const userPrompt = `Contenuto estratto dal sito web:
+    const userPrompt = `Contenuto estratto dal sito web o dal profilo Instagram:
 
 ${websiteContent}
 
@@ -94,9 +100,9 @@ Rispondi con questo JSON esatto:
   "temi_chiave": ["tema 1", "tema 2", "tema 3", "tema 4", "tema 5"],
   "cta_suggerite": ["cta 1", "cta 2", "cta 3"],
   "persona_scrittura": "io|noi",
-  "colore_primario": "#hex preso dai COLORI CSS del sito, altrimenti stringa vuota",
-  "colore_secondario": "#hex preso dai COLORI CSS del sito, altrimenti stringa vuota",
-  "colore_terziario": "#hex preso dai COLORI CSS del sito, altrimenti stringa vuota",
+  "colore_primario": "#hex preso dalla lista dei colori (sito o profilo), altrimenti stringa vuota",
+  "colore_secondario": "#hex preso dalla lista dei colori (sito o profilo), altrimenti stringa vuota",
+  "colore_terziario": "#hex preso dalla lista dei colori (sito o profilo), altrimenti stringa vuota",
   "logo_url": "URL del logo se trovato (passalo identico a quello fornito sopra), altrimenti stringa vuota"
 }`;
 

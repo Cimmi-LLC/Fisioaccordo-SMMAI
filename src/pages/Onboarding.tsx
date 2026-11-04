@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { cleanWebsiteUrl } from '@/utils/url';
 import { siteGroundedColors } from '@/lib/siteColors';
+import { sembraInstagram, nomeUtenteInstagram } from '@/lib/brand/instagramProfile';
+import { COLORI_PARTENZA } from '@/lib/brand/skipGenesis';
 import { checkBrandGate, type BrandGate } from '@/lib/brandGate';
 import AccountStrip from '@/components/AccountStrip';
 import { useNavigate } from 'react-router-dom';
@@ -11,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Globe, X, Plus, CheckCircle2 } from 'lucide-react';
+import { Loader2, Globe, Instagram, X, Plus, CheckCircle2 } from 'lucide-react';
 import { BrandProfile, EMPTY_BRAND, TONO_OPTIONS, PERSONA_OPTIONS, categorieOptionsFor } from '@/types/brand';
 import { detectProfession, isProfessionId } from '@/lib/brand/profession';
 import logo from '@/assets/logo-fisioaccordo.png';
@@ -19,7 +21,7 @@ import SinglePhotoUpload from '@/components/brand/SinglePhotoUpload';
 import ProfessionSelect from '@/components/brand/ProfessionSelect';
 
 const LOADING_MESSAGES = [
-  "Sto visitando il tuo sito...",
+  "Sto visitando il tuo sito o il tuo profilo...",
   "Sto leggendo i tuoi servizi...",
   "Sto capendo che professione fai e a chi ti rivolgi...",
   "Sto raccogliendo l'identità del tuo brand...",
@@ -112,6 +114,18 @@ const Onboarding = () => {
   const { toast } = useToast();
   const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [url, setUrl] = useState('');
+  // Chi non ha un sito (o non lo vuole dare) parte dal profilo Instagram.
+  const [fonte, setFonte] = useState<'sito' | 'instagram'>('sito');
+  // Nel campo Instagram la @ e gia scritta: si tiene solo il nome. Se
+  // qualcuno incolla il link del profilo, lo trasformiamo subito nel nome.
+  const scriviNomeInstagram = (valore: string) => {
+    const t = valore.trim();
+    if (sembraInstagram(t) && !t.startsWith('@')) {
+      const nome = nomeUtenteInstagram(t);
+      if (nome) { setUrl(nome); return; }
+    }
+    setUrl(valore.replace(/^\s*@+/, '').replace(/\s+/g, ''));
+  };
   const [nuovaCategoria, setNuovaCategoria] = useState('');
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
   const [brand, setBrand] = useState<BrandProfile>({ ...EMPTY_BRAND });
@@ -182,6 +196,8 @@ const Onboarding = () => {
 
   // Step 1: Scrape + Analyze
   const handleAnalyze = async () => {
+    // Un link Instagram incollato nel campo del sito vale come Instagram.
+    if (fonte === 'instagram' || sembraInstagram(url)) return handleAnalyzeInstagram();
     // Link pulito: niente ?utm_source=ig&fbclid=... copiati dalla bio di Instagram.
     const trimmedUrl = cleanWebsiteUrl(url.trim());
     if (!trimmedUrl) return;
@@ -219,78 +235,127 @@ const Onboarding = () => {
         return;
       }
 
-      // Analyze
-      const { data: analyzeData, error: analyzeErr } = await supabase.functions.invoke('analyze-brand', {
-        body: { scrapedData: scrapeData }
-      });
-
-      if (analyzeErr || analyzeData?.error || !analyzeData?.brandProfile) {
-        toast({
-          title: 'Analisi parziale',
-          description: 'Abbiamo trovato poche informazioni. Completa i campi manualmente.',
-        });
-        setBrand({ ...EMPTY_BRAND, website_url: trimmedUrl.startsWith('http') ? trimmedUrl : 'https://' + trimmedUrl });
-        setStep(2);
-        return;
-      }
-
-      // Success — populate brand (preserve EMPTY_BRAND defaults for unset fields)
-      const profile = analyzeData.brandProfile;
-      // Process logo: if it has a white background, strip it and re-upload as PNG
-      let processedLogo = profile.logo_url || '';
-      if (processedLogo) {
-        try {
-          const { processLogoIfNeeded } = await import('@/utils/processLogo');
-          processedLogo = await processLogoIfNeeded(processedLogo, user?.id);
-        } catch (err) {
-          console.warn('Logo processing failed, using original:', err);
-        }
-      }
-      // Professione: lo slug dell'analisi se valido, altrimenti il
-      // rilevamento sui campi appena estratti; null = resta automatica.
-      const analyzedProfession = isProfessionId(profile.professione)
-        ? profile.professione
-        : (detectProfession({
-            nome_business: profile.nome_business,
-            descrizione: profile.descrizione,
-            categorie: profile.categorie,
-            servizi: profile.servizi,
-            temi_chiave: profile.temi_chiave,
-            website_url: trimmedUrl,
-          })?.id ?? null);
-      setBrand(prev => ({
-        ...prev,
-        nome_business: profile.nome_business || '',
-        professione: analyzedProfession,
-        professione_custom: analyzedProfession === 'altro' ? (profile.professione_label || '') : '',
-        descrizione: profile.descrizione || '',
-        categorie: profile.categorie || [],
-        servizi: profile.servizi || [],
-        target_pazienti: profile.target_pazienti || '',
-        tono_voce: normalizeTono(profile.tono_voce),
-        vantaggi_competitivi: profile.vantaggi_competitivi || [],
-        mission: profile.mission || '',
-        temi_chiave: profile.temi_chiave || [],
-        cta_suggerite: profile.cta_suggerite || [],
-        persona_scrittura: profile.persona_scrittura || 'noi',
-        // Solo colori realmente presenti sul sito (niente colori inventati o di WordPress).
-        ...siteGroundedColors(profile, (scrapeData.cssColors || []) as string[], { primario: '#554697', secondario: '#E6007E', terziario: '#1a1a2e' }),
-        logo_url: processedLogo,
-        website_url: trimmedUrl.startsWith('http') ? trimmedUrl : 'https://' + trimmedUrl,
-        raw_analysis: profile,
-      }));
-      setStep(2);
+      await analyzeAndFill(scrapeData, trimmedUrl.startsWith('http') ? trimmedUrl : 'https://' + trimmedUrl);
     } catch (err: any) {
       toast({ title: 'Errore', description: err.message || 'Errore imprevisto', variant: 'destructive' });
       setStep(0);
     }
   };
 
+  // Step 1 da Instagram: bio, didascalie, foto profilo e colori dei post.
+  const handleAnalyzeInstagram = async () => {
+    const handle = nomeUtenteInstagram(url);
+    if (!handle) {
+      toast({ title: 'Profilo non valido', description: 'Scrivi il nome del profilo (es. @tuoprofilo) o incolla il link del profilo, non di un post.', variant: 'destructive' });
+      return;
+    }
+    setStep(1);
+    setLoadingMsgIndex(0);
+    try {
+      const { data: scrapeData, error: scrapeErr } = await supabase.functions.invoke('scrape-instagram', {
+        body: { instagram: handle },
+      });
+      if (scrapeErr || !scrapeData?.success) {
+        const errorMessages: Record<string, string> = {
+          not_found: `Non trovo il profilo @${handle}. Controlla che sia scritto preciso, con punti e trattini bassi.`,
+          private: `Il profilo @${handle} e privato: rendilo pubblico o compila a mano.`,
+          rate_limited: 'Troppe letture in poco tempo. Riprova tra un\'ora o compila a mano.',
+          invalid_handle: 'Il nome del profilo non e valido.',
+        };
+        toast({
+          title: 'Problema con Instagram',
+          description: errorMessages[scrapeData?.error] || 'Non riesco a leggere il profilo adesso. Puoi compilare manualmente.',
+          variant: 'destructive',
+        });
+        setStep(0);
+        return;
+      }
+      await analyzeAndFill(scrapeData, cleanWebsiteUrl(scrapeData.externalUrl || ''));
+    } catch (err: any) {
+      toast({ title: 'Errore', description: err.message || 'Errore imprevisto', variant: 'destructive' });
+      setStep(0);
+    }
+  };
+
+  // Analisi AI e riempimento del profilo, uguale per sito e Instagram.
+  // websiteUrl: il sito analizzato, o il link in bio per Instagram ('' se manca).
+  const analyzeAndFill = async (scrapeData: any, websiteUrl: string) => {
+    const daInstagram = scrapeData?.source === 'instagram';
+    // Analyze (la foto profilo in base64 resta qui: all'AI non serve)
+    const { logoDataUrl, ...scrapedForAi } = scrapeData;
+    const { data: analyzeData, error: analyzeErr } = await supabase.functions.invoke('analyze-brand', {
+      body: { scrapedData: scrapedForAi }
+    });
+
+    if (analyzeErr || analyzeData?.error || !analyzeData?.brandProfile) {
+      toast({
+        title: 'Analisi parziale',
+        description: 'Abbiamo trovato poche informazioni. Completa i campi manualmente.',
+      });
+      setBrand({ ...EMPTY_BRAND, website_url: websiteUrl, logo_url: (daInstagram && logoDataUrl) || '' });
+      setStep(2);
+      return;
+    }
+
+    // Success — populate brand (preserve EMPTY_BRAND defaults for unset fields)
+    const profile = analyzeData.brandProfile;
+    // Process logo: if it has a white background, strip it and re-upload as PNG
+    // Da Instagram il logo e la foto profilo (data URL: i link del CDN scadono).
+    let processedLogo = daInstagram ? (logoDataUrl || '') : (profile.logo_url || '');
+    if (processedLogo && !daInstagram) {
+      try {
+        const { processLogoIfNeeded } = await import('@/utils/processLogo');
+        processedLogo = await processLogoIfNeeded(processedLogo, user?.id);
+      } catch (err) {
+        console.warn('Logo processing failed, using original:', err);
+      }
+    }
+    // Professione: lo slug dell'analisi se valido, altrimenti il
+    // rilevamento sui campi appena estratti; null = resta automatica.
+    const analyzedProfession = isProfessionId(profile.professione)
+      ? profile.professione
+      : (detectProfession({
+          nome_business: profile.nome_business,
+          descrizione: profile.descrizione,
+          categorie: profile.categorie,
+          servizi: profile.servizi,
+          temi_chiave: profile.temi_chiave,
+          website_url: websiteUrl,
+        })?.id ?? null);
+    setBrand(prev => ({
+      ...prev,
+      nome_business: profile.nome_business || '',
+      professione: analyzedProfession,
+      professione_custom: analyzedProfession === 'altro' ? (profile.professione_label || '') : '',
+      descrizione: profile.descrizione || '',
+      categorie: profile.categorie || [],
+      servizi: profile.servizi || [],
+      target_pazienti: profile.target_pazienti || '',
+      tono_voce: normalizeTono(profile.tono_voce),
+      vantaggi_competitivi: profile.vantaggi_competitivi || [],
+      mission: profile.mission || '',
+      temi_chiave: profile.temi_chiave || [],
+      cta_suggerite: profile.cta_suggerite || [],
+      persona_scrittura: profile.persona_scrittura || 'noi',
+      // Solo colori realmente presenti sul sito (niente colori inventati o di WordPress).
+      // Da Instagram: i colori ricorrenti nelle immagini del profilo.
+      ...siteGroundedColors(profile, (scrapeData.cssColors || []) as string[], {
+        primario: COLORI_PARTENZA.colore_primario,
+        secondario: COLORI_PARTENZA.colore_secondario,
+        terziario: COLORI_PARTENZA.colore_terziario,
+      }),
+      logo_url: processedLogo,
+      website_url: websiteUrl,
+      raw_analysis: profile,
+    }));
+    setStep(2);
+  };
+
   // Step 3: Save brand
   const handleSave = async () => {
     if (!user) return;
     if (!brand.nome_business.trim()) {
-      toast({ title: 'Nome richiesto', description: 'Inserisci il nome del tuo studio.', variant: 'destructive' });
+      toast({ title: 'Nome richiesto', description: 'Inserisci il nome del tuo brand o studio.', variant: 'destructive' });
       return;
     }
 
@@ -347,8 +412,8 @@ const Onboarding = () => {
           : 'Il tuo brand è pronto. Iniziamo a creare contenuti!',
       });
       clearDraft();
-      // Dopo il salvataggio del brand si entra nel Template Genesis:
-      // senza template approvato la generazione caroselli e bloccata.
+      // Dopo il salvataggio del brand si entra nel Template Genesis,
+      // che si puo saltare («Salta e configura dopo»).
       navigate(inserted?.id ? `/onboarding/template?brand=${inserted.id}` : (isNewBrandMode ? '/brands' : '/posts'));
     } catch (err: any) {
       toast({ title: 'Errore nel salvataggio', description: err.message, variant: 'destructive' });
@@ -425,32 +490,98 @@ const Onboarding = () => {
               className="rounded-2xl p-8"
               style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 2px 12px rgba(85,70,151,0.07)' }}
             >
+              {/* Sito o Instagram: chi non ha un sito parte dal profilo */}
+              <div className="flex justify-center gap-2 mb-6">
+                {([
+                  { id: 'sito' as const, label: 'Sito web', Icon: Globe },
+                  { id: 'instagram' as const, label: 'Instagram', Icon: Instagram },
+                ]).map(({ id, label, Icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => { if (id !== fonte) setUrl(''); setFonte(id); }}
+                    className="inline-flex items-center gap-1.5 text-[12px] font-black uppercase px-4 py-2 rounded-xl"
+                    style={{
+                      letterSpacing: '0.5px', cursor: 'pointer',
+                      color: fonte === id ? '#fff' : 'var(--viola)',
+                      backgroundColor: fonte === id ? 'var(--viola)' : 'transparent',
+                      border: '1.5px solid var(--viola)',
+                    }}
+                  >
+                    <Icon className="h-3.5 w-3.5" /> {label}
+                  </button>
+                ))}
+              </div>
+
               <div className="mb-6">
-                <Globe className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--viola)' }} />
+                {fonte === 'sito'
+                  ? <Globe className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--viola)' }} />
+                  : <Instagram className="h-12 w-12 mx-auto mb-4" style={{ color: 'var(--viola)' }} />}
                 <h1 className="text-xl font-black mb-2" style={{ color: 'var(--ink)', letterSpacing: '-0.5px' }}>
-                  Analizziamo il tuo sito web
+                  {fonte === 'sito' ? 'Analizziamo il tuo sito web' : 'Analizziamo il tuo profilo Instagram'}
                 </h1>
                 <p className="text-[13px]" style={{ color: 'var(--ink3)' }}>
-                  Incolla il link del tuo sito. Ci pensiamo noi a scoprire tutto quello che c'è da sapere sul tuo studio.
+                  {fonte === 'sito'
+                    ? "Incolla il link del tuo sito. Ci pensiamo noi a scoprire tutto quello che c'è da sapere sul tuo brand."
+                    : 'Scrivi il nome del tuo profilo dopo la @. Da bio, post e foto ricaviamo chi sei, cosa offri, i colori e il logo. Il profilo deve essere pubblico.'}
                 </p>
               </div>
 
               <div className="space-y-4">
-                <Input
-                  value={url}
-                  onChange={e => setUrl(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleAnalyze(); }}
-                  placeholder="https://www.tuostudio.it"
-                  className="text-center text-sm h-12"
-                  style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '12px', fontSize: '14px' }}
-                />
+                {fonte === 'sito' ? (
+                  <Input
+                    value={url}
+                    onChange={e => setUrl(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleAnalyze(); }}
+                    placeholder="https://www.tuostudio.it"
+                    className="text-center text-sm h-12"
+                    style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '12px', fontSize: '14px' }}
+                  />
+                ) : (
+                  <>
+                    <div className="relative">
+                      <span
+                        className="absolute left-4 top-1/2 -translate-y-1/2 text-[16px] font-black pointer-events-none"
+                        style={{ color: 'var(--viola)' }}
+                      >
+                        @
+                      </span>
+                      <Input
+                        value={url}
+                        onChange={e => scriviNomeInstagram(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleAnalyze(); }}
+                        placeholder="nomeprofilo"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        className="text-sm h-12 pl-9"
+                        style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '12px', fontSize: '16px' }}
+                      />
+                    </div>
+                    <p className="text-[12px] text-left" style={{ color: 'var(--ink2)' }}>
+                      Scrivilo preciso, lettera per lettera, con punti e trattini bassi (_) se ci sono. Senza spazi.
+                    </p>
+                    <details className="text-left rounded-xl px-4 py-3" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)' }}>
+                      <summary className="text-[12px] font-bold" style={{ color: 'var(--viola)', cursor: 'pointer' }}>
+                        Dove trovo il nome del mio profilo?
+                      </summary>
+                      <ol className="mt-2 space-y-1 text-[12px] list-decimal pl-5" style={{ color: 'var(--ink2)' }}>
+                        <li>Apri l'app Instagram sul telefono.</li>
+                        <li>Tocca la tua foto in basso a destra: si apre il tuo profilo.</li>
+                        <li>Il nome è scritto in alto, sopra la foto (per esempio <b>studio.rossi_fisio</b>). Scrivilo qui uguale.</li>
+                      </ol>
+                      <p className="mt-2 text-[12px]" style={{ color: 'var(--ink3)' }}>
+                        Più comodo: nel tuo profilo tocca «Condividi profilo», poi «Copia link», e incollalo qui. Il nome lo prendiamo noi dal link.
+                      </p>
+                    </details>
+                  </>
+                )}
                 <button
                   onClick={handleAnalyze}
                   disabled={!url.trim()}
                   className="w-full text-white text-[13px] font-black uppercase py-3.5 rounded-xl disabled:opacity-50 flex items-center justify-center gap-2"
                   style={{ backgroundColor: 'var(--viola)', border: 'none', cursor: url.trim() ? 'pointer' : 'not-allowed', letterSpacing: '0.5px' }}
                 >
-                  Analizza il mio sito
+                  {fonte === 'instagram' || sembraInstagram(url) ? 'Analizza il mio profilo' : 'Analizza il mio sito'}
                 </button>
               </div>
 
@@ -460,7 +591,7 @@ const Onboarding = () => {
                   className="text-[12px] font-semibold"
                   style={{ color: 'var(--ink3)', background: 'transparent', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
                 >
-                  Non hai un sito? Compila il profilo manualmente
+                  Preferisci scrivere tu? Compila il profilo manualmente
                 </button>
               </div>
             </div>
@@ -521,7 +652,7 @@ const Onboarding = () => {
                 {LOADING_MESSAGES[loadingMsgIndex]}
               </p>
               <p className="text-[12px]" style={{ color: 'var(--ink3)' }}>
-                Stiamo analizzando il tuo sito web...
+                {fonte === 'instagram' ? 'Stiamo analizzando il tuo profilo Instagram...' : 'Stiamo analizzando il tuo sito web...'}
               </p>
             </div>
 
@@ -591,7 +722,7 @@ const Onboarding = () => {
               {/* Nome business */}
               <div>
                 <label className="block text-[10px] font-black uppercase mb-1.5" style={{ color: 'var(--ink2)', letterSpacing: '0.8px' }}>
-                  Nome dello studio *
+                  Nome del brand o dello studio *
                 </label>
                 <Input
                   value={brand.nome_business}
