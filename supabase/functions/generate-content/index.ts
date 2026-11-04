@@ -83,6 +83,11 @@ serve(async (req) => {
             const paroleEvitare = (brand.parole_da_evitare || []).filter(Boolean);
             const temi = (brand.temi_chiave || []).filter(Boolean);
             const servizi = (brand.servizi || []).filter(Boolean);
+            // Campi del metodo (migrazione 20261103150000): se mancano in
+            // produzione restano array/stringhe vuote e i blocchi non escono.
+            const frasiPazienti = (Array.isArray(brand.frasi_pazienti) ? brand.frasi_pazienti : []).filter(Boolean);
+            const convinzione = typeof brand.convinzione_da_ribaltare === "string" ? brand.convinzione_da_ribaltare.trim() : "";
+            const profiloDetestato = typeof brand.profilo_detestato === "string" ? brand.profilo_detestato.trim() : "";
 
             brandContext = `
 
@@ -118,8 +123,25 @@ ${temi.length > 0 ? `=== TEMI CHIAVE del brand: ${temi.join(", ")}
 ${paroleEvitare.length > 0 ? `=== PAROLE/ESPRESSIONI BANDITE (output rifiutato se le usi) ===
 ${paroleEvitare.map((p: string) => `❌ ${p}`).join("\n")}
 ` : ""}
+${frasiPazienti.length > 0 ? `=== LE PAROLE DEI ${clienti.toUpperCase()} (frasi testuali, come le dicono loro) ===
+${frasiPazienti.map((f: string) => `«${f}»`).join("\n")}
+→ Hook, slide e caption usano QUESTE parole e questo registro, non il linguaggio da sito. Almeno un hook o una slide parte da una di queste frasi.
+` : ""}
+${convinzione ? `=== LA CONVINZIONE DA RIBALTARE (contrarian take) ===
+«${convinzione}»
+→ Quando il topic lo permette, il contenuto prende posizione CONTRO questa convinzione e spiega perché è sbagliata. Un punto di vista netto, non un elenco neutro.
+` : ""}
+${profiloDetestato ? `=== COME NON SUONARE MAI ===
+Il brand NON vuole somigliare a: ${profiloDetestato}.
+→ Se una frase potrebbe uscire da quel tipo di profilo, riscrivila.
+` : ""}
 ${brand.categorie?.length ? `Categorie: ${brand.categorie.join(", ")}` : ""}
 COLORI BRAND: primario ${brand.colore_primario || "#554697"}, secondario ${brand.colore_secondario || "#E6007E"}
+
+=== VIETATO RIPETERE IL SITO ===
+La descrizione e la mission qui sopra vengono dal sito del brand: servono per CAPIRE chi parla, MAI da riscrivere.
+❌ Vietate le frasi da sito vetrina riformulate: "valutazione continua e mirata basata su evidenze scientifiche", "percorsi terapeutici personalizzati", "approccio su misura", "al centro del nostro lavoro".
+→ Si parla delle situazioni concrete ${delLuogo(brandProf.profile)} e della vita di ${ilCliente(brandProf.profile)}, con le sue parole.
 
 REGOLA FONDAMENTALE: il contenuto deve sembrare scritto DA "${brand.nome_business || `lo ${luogo}`}", non da un'agenzia generica. Se rileggendo il copy non si capisce CHE È IL BRAND a parlare (vs. qualsiasi altro ${luogo}), riscrivilo.`;
           }
@@ -292,7 +314,7 @@ Rispondi con questo JSON esatto:
     }
   ],
   "cta_finale": "",
-  "caption_instagram": "Hook fortissimo\\n\\nParagrafo 1.\\n\\nParagrafo 2.\\n\\n👉 CTA\\n\\n#hashtag1 #hashtag2",
+  "caption_instagram": "Hook fortissimo\\n\\nParagrafo 1.\\n\\nParagrafo 2.\\n\\n👉 CTA",
   "hashtag_suggeriti": ["hashtag1", "hashtag2", "hashtag3"]
 }
 
@@ -344,7 +366,7 @@ Rispondi con questo JSON esatto:
     }
   ],
   "cta_finale": "Call to action finale",
-  "caption_instagram": "Hook fortissimo\\n\\nParagrafo 1 breve.\\nSeconda riga.\\n\\nParagrafo 2 breve.\\n\\n👉 CTA chiara e diretta\\n\\n#hashtag1 #hashtag2 #hashtag3",
+  "caption_instagram": "Hook fortissimo\\n\\nParagrafo 1 breve.\\nSeconda riga.\\n\\nParagrafo 2 breve.\\n\\n👉 CTA chiara e diretta",
   "hashtag_suggeriti": ["hashtag1", "hashtag2", "hashtag3"]
 }
 
@@ -380,8 +402,7 @@ La caption_instagram DEVE essere formattata così:
 - 2-3 paragrafi brevi separati da \\n\\n (max 2 frasi per paragrafo)
 - Riga vuota
 - CTA chiara e diretta con emoji 👉
-- Riga vuota
-- Hashtag su riga separata
+- NIENTE hashtag dentro caption_instagram: vanno SOLO in hashtag_suggeriti (l'app li aggiunge in coda una volta sola)
 - Usa \\n\\n per separare i paragrafi. MAI un blocco unico di testo.`;
 
     const fullUserPrompt = userPrompt + captionRules;

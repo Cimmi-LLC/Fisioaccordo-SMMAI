@@ -79,12 +79,15 @@ serve(async (req) => {
     if (azione === "copione") {
       const brandId = String(body?.brandId || "");
       const tipo: TipoCopia = body?.tipo === "vicina" ? "vicina" : "esatta";
+      // Argomento scelto dall'utente: la struttura dell'originale si applica
+      // a questo tema (prima lo sceglieva da solo il modello).
+      const argomento = typeof body?.argomento === "string" ? body.argomento.trim().slice(0, 200) : "";
       const own = await assertBrandOwnership(admin, auth.userId, brandId);
       if (!own.ok) return jsonResponse(req, { error: own.error }, own.status);
       const { data: brand } = await admin.from("brands").select("*").eq("id", brandId).maybeSingle();
       if (!brand) return jsonResponse(req, { error: "Brand non trovato" }, 404);
 
-      const copione = await scriviCopione(gemini, analisi, tipo, brand as BrandPerCopione & Grezzo, origine);
+      const copione = await scriviCopione(gemini, analisi, tipo, brand as BrandPerCopione & Grezzo, origine, argomento);
       const { data: salvato, error } = await admin.from("virali_copioni").insert({
         user_id: auth.userId,
         brand_id: brandId,
@@ -246,13 +249,14 @@ async function linkFresco(o: Origine): Promise<string | null> {
 
 // ── Copione ─────────────────────────────────────────────────────────────
 
-async function scriviCopione(gemini: string, analisi: AnalisiVideo, tipo: TipoCopia, brand: BrandPerCopione & Grezzo, o: Origine) {
+async function scriviCopione(gemini: string, analisi: AnalisiVideo, tipo: TipoCopia, brand: BrandPerCopione & Grezzo, o: Origine, argomento = "") {
   const prompt = promptCopione({
     analisi,
     tipo,
     brand,
     bloccoProfessione: professionPromptBlock(resolveProfession(brand as ProfessionBrandLike)),
     origine: { piattaforma: o.piattaforma === "inserzione" ? "inserzione Meta" : o.piattaforma, handle: o.handle, paese: o.paese, views: o.views },
+    argomento,
   });
   const chiedi = async (testo: string) => {
     const res = await callGeminiWithRetry({

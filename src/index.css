@@ -261,6 +261,17 @@ label[style*="var(--rosa)"]:not([style*="rosa-dim"]):active,
   .main-content {
     margin-left: 0;
     padding-top: 60px; /* room for the floating hamburger button */
+    /* Qualsiasi pezzo più largo dello schermo (slide, griglie) non deve
+       far scorrere la pagina in orizzontale: si taglia qui, e i contenuti
+       vanno resi flessibili (min-width: 0, max-width: 100%). */
+    overflow-x: clip;
+    max-width: 100vw;
+  }
+  .main-content img,
+  .main-content canvas,
+  .main-content video,
+  .main-content iframe {
+    max-width: 100%;
   }
 }
 
