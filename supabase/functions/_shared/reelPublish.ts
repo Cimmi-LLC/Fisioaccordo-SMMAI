@@ -1,5 +1,5 @@
 // Reel Instagram lato server: collega il flusso puro di _shared/brand/reel.ts
-// a Supabase (riga di published_posts, bucket reel-videos) e all'API di
+// a Supabase (riga di published_posts, bucket social-video) e all'API di
 // Instagram. Usato da meta-publish («Pubblica ora») e da
 // process-scheduled-posts (cron ogni 2 minuti).
 

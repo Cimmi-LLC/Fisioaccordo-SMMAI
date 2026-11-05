@@ -24,8 +24,9 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import PublishReelDialog from '@/components/reel/PublishReelDialog';
-import { eliminaFileReel } from '@/services/reelService';
+import PublishVideoDialog from '@/components/social/PublishVideoDialog';
+import { PLATFORM_ICON } from '@/components/BrandSocialConnect';
+import { eliminaFileSeLiberi } from '@/services/reelService';
 
 interface PostRow {
   id: string;
@@ -38,8 +39,9 @@ interface PostRow {
   error_message: string | null;
   attempts: number | null;
   platforms: string[];
-  media_type: 'post' | 'story' | 'reel' | null;
+  media_type: 'post' | 'story' | 'reel' | 'video' | null;
   video_path?: string | null;
+  platform_options?: { url?: string | null } | null;
   cover_path?: string | null;
   created_at: string;
 }
@@ -47,7 +49,7 @@ interface PostRow {
 const statusBadge = (s: PostRow['status']) => {
   const map = {
     scheduled: { label: 'Programmato', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', Icon: CalendarClock },
-    processing: { label: 'In elaborazione su Instagram', color: '#7c3aed', bg: 'rgba(124,58,237,0.12)', Icon: Loader2 },
+    processing: { label: 'In elaborazione', color: '#7c3aed', bg: 'rgba(124,58,237,0.12)', Icon: Loader2 },
     published: { label: 'Pubblicato', color: '#10b981', bg: 'rgba(16,185,129,0.12)', Icon: CheckCircle2 },
     failed: { label: 'Fallito', color: '#ef4444', bg: 'rgba(239,68,68,0.12)', Icon: XCircle },
   };
@@ -61,7 +63,7 @@ const CalendarPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'scheduled' | 'published' | 'failed'>('all');
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [reelAperto, setReelAperto] = useState(false);
+  const [videoAperto, setVideoAperto] = useState(false);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -89,7 +91,7 @@ const CalendarPage: React.FC = () => {
     load();
   }, [load]);
 
-  // Un Reel in elaborazione esce da solo nel giro di pochi minuti: si ricarica.
+  // Un video in elaborazione (Reel o TikTok) esce da solo nel giro di pochi minuti: si ricarica.
   const inElaborazione = posts.some((p) => p.status === 'processing');
   useEffect(() => {
     if (!inElaborazione) return;
@@ -103,7 +105,7 @@ const CalendarPage: React.FC = () => {
       const { data, error } = await supabase.from('published_posts').delete().eq('id', id).select('id');
       if (error) throw error;
       if (!data || data.length === 0) throw new Error('Il post è già in pubblicazione: non si può più togliere.');
-      if (post?.media_type === 'reel') await eliminaFileReel([post.video_path, post.cover_path]);
+      if (post?.video_path) await eliminaFileSeLiberi([post.video_path, post.cover_path]);
       setPosts((prev) => prev.filter((p) => p.id !== id));
       toast({ title: post?.status === 'failed' ? 'Tolto dal calendario' : 'Programmazione annullata' });
     } catch (err) {
@@ -117,7 +119,7 @@ const CalendarPage: React.FC = () => {
     }
   };
 
-  // «Programmati» comprende i Reel che Instagram sta ancora elaborando.
+  // «Programmati» comprende i video che la piattaforma sta ancora elaborando.
   const inAttesa = (p: PostRow) => p.status === 'scheduled' || p.status === 'processing';
   const visible = posts.filter((p) => filter === 'all' || p.status === filter || (filter === 'scheduled' && inAttesa(p)));
 
@@ -140,11 +142,11 @@ const CalendarPage: React.FC = () => {
           </p>
         </div>
         <Button
-          onClick={() => setReelAperto(true)}
+          onClick={() => setVideoAperto(true)}
           className="text-white font-bold"
           style={{ backgroundColor: 'var(--rosa)' }}
         >
-          <Film className="h-4 w-4 mr-2" /> Pubblica un Reel
+          <Film className="h-4 w-4 mr-2" /> Pubblica un video
         </Button>
       </div>
 
@@ -196,6 +198,8 @@ const CalendarPage: React.FC = () => {
             const badge = statusBadge(post.status) || statusBadge('scheduled');
             const Icon = badge.Icon;
             const isReel = post.media_type === 'reel';
+            const isVideo = isReel || post.media_type === 'video';
+            const link = post.status === 'published' ? post.platform_options?.url : null;
             const date = post.scheduled_for ? new Date(post.scheduled_for) : null;
             return (
               <Card key={post.id} className="panel-card">
@@ -203,7 +207,7 @@ const CalendarPage: React.FC = () => {
                   <div className="flex gap-4">
                     {/* Thumbnail */}
                     <div className="flex-shrink-0">
-                      {isReel ? (
+                      {isVideo ? (
                         <div
                           className="rounded-lg flex items-center justify-center"
                           style={{ width: 80, height: 80, backgroundColor: 'var(--viola-dim)', border: '1px solid var(--line)' }}
@@ -254,6 +258,18 @@ const CalendarPage: React.FC = () => {
                             <Instagram className="h-3 w-3" /> Instagram
                           </span>
                         )}
+                        {(['tiktok', 'youtube'] as const).filter((pl) => post.platforms?.includes(pl)).map((pl) => {
+                          const PlIcon = PLATFORM_ICON[pl];
+                          return (
+                            <span
+                              key={pl}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                              style={{ backgroundColor: 'var(--bg)', color: 'var(--ink)', border: '1px solid var(--line)' }}
+                            >
+                              <PlIcon className="h-3 w-3" /> {pl === 'tiktok' ? 'TikTok' : 'YouTube'}
+                            </span>
+                          );
+                        })}
                         <span
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
                           style={{
@@ -261,7 +277,7 @@ const CalendarPage: React.FC = () => {
                             color: post.media_type === 'story' ? '#ec4899' : 'var(--viola)',
                           }}
                         >
-                          {post.media_type === 'story' ? '📷 Story' : isReel ? '🎬 Reel' : '🖼 Post'}
+                          {post.media_type === 'story' ? '📷 Story' : isReel ? '🎬 Reel' : post.media_type === 'video' ? (post.platforms?.includes('youtube') ? '🎬 Short' : '🎬 Video') : '🖼 Post'}
                         </span>
                         {date && (
                           <span className="text-[11px] font-mono" style={{ color: 'var(--ink3)' }}>
@@ -275,6 +291,11 @@ const CalendarPage: React.FC = () => {
                       >
                         {post.content}
                       </p>
+                      {link && (
+                        <a href={link} target="_blank" rel="noreferrer" className="text-[11px] font-bold underline" style={{ color: 'var(--viola)' }}>
+                          Apri il video
+                        </a>
+                      )}
                       {post.error_message && (
                         <div
                           className="mt-2 text-[11px] p-2 rounded"
@@ -331,7 +352,7 @@ const CalendarPage: React.FC = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <PublishReelDialog open={reelAperto} onClose={() => setReelAperto(false)} onFatto={load} />
+      <PublishVideoDialog open={videoAperto} onClose={() => setVideoAperto(false)} onFatto={load} />
     </div>
   );
 };

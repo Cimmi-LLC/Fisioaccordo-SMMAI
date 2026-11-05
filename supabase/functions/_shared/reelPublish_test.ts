@@ -37,7 +37,7 @@ function supabaseFinto(riga: Riga, conn: Riga) {
     storage: {
       from: () => ({
         createSignedUrl: (p: string, s: number) =>
-          Promise.resolve({ data: { signedUrl: `https://cktdoq.supabase.co/sign/reel-videos/${p}?ttl=${s}` }, error: null }),
+          Promise.resolve({ data: { signedUrl: `https://cktdoq.supabase.co/sign/social-video/${p}?ttl=${s}` }, error: null }),
       }),
     },
   };
@@ -86,7 +86,7 @@ Deno.test("Reel programmato: container REELS, attesa, pubblicazione", async () =
     assertMatch(crea.url, /graph\.instagram\.com\/v22\.0\/17841400000000000\/media\?access_token=TOKEN-FINTO$/);
     assertEquals(crea.corpo, {
       media_type: "REELS",
-      video_url: `https://cktdoq.supabase.co/sign/reel-videos/${UTENTE}/abc.mp4?ttl=7200`,
+      video_url: `https://cktdoq.supabase.co/sign/social-video/${UTENTE}/abc.mp4?ttl=7200`,
       caption: "Mal di schiena da mesi?\n\n#fisioterapia #schiena",
       share_to_feed: true,
       thumb_offset: 3200,

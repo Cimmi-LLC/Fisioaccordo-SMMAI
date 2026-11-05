@@ -84,6 +84,24 @@ export async function eliminaFileReel(paths: (string | null | undefined)[]): Pro
   if (error) console.warn('File del reel non eliminati:', error.message);
 }
 
+/**
+ * Lo stesso video può servire a più righe (Reel, Short, TikTok, un nuovo
+ * tentativo): i file si tolgono solo quando nessuna riga li usa più.
+ */
+export async function eliminaFileSeLiberi(paths: (string | null | undefined)[]): Promise<void> {
+  const liberi: string[] = [];
+  for (const p of paths) {
+    if (!p) continue;
+    const { data, error } = await supabase
+      .from('published_posts')
+      .select('id')
+      .or(`video_path.eq."${p}",cover_path.eq."${p}"`)
+      .limit(1);
+    if (!error && (!data || data.length === 0)) liberi.push(p);
+  }
+  await eliminaFileReel(liberi);
+}
+
 /** Legge il messaggio d'errore anche quando la funzione risponde 4xx/5xx. */
 async function erroreDaRisposta(error: unknown, data: unknown): Promise<string> {
   const ctx = (error as { context?: Response })?.context;

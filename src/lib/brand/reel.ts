@@ -7,7 +7,8 @@
 // crea il container e torna subito; avanzaReel, chiamato dal cron ogni
 // 2 minuti, controlla lo stato e pubblica quando è FINISHED.
 
-export const REEL_BUCKET = 'reel-videos';
+/** Lo stesso bucket dei video per TikTok e YouTube: si carica una volta sola. */
+export const REEL_BUCKET = 'social-video';
 
 export const REEL_LIMITI = {
   maxByte: 100 * 1024 * 1024,

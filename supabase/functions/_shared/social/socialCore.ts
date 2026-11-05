@@ -232,6 +232,9 @@ export function explainSocialError(platform: SocialPlatform, error?: string | nu
   if (/unaudited_client_can_only_post_to_private_accounts/i.test(e)) {
     return "Finché TikTok non approva l'app si può pubblicare solo con visibilità «Solo io» su profili privati.";
   }
+  if (/access_token_invalid|invalid_token|token.*(revoked|invalid)|unauthorized/i.test(e)) {
+    return `Il collegamento con ${name} non vale più: ricollega l'account e riprova.`;
+  }
   if (/spam_risk|too_many|rate.?limit|quota/i.test(e)) return `${name} ha raggiunto il limite di pubblicazioni per oggi. Riprova domani.`;
   return e || 'Errore sconosciuto';
 }

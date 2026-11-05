@@ -6,18 +6,17 @@ import { useToast } from '@/hooks/use-toast';
 import { useActiveBrand } from '@/hooks/useActiveBrand';
 import { useSocialConnections } from '@/hooks/useSocialConnections';
 import BrandSocialConnect, { PLATFORM_ICON, connectionName } from '@/components/BrandSocialConnect';
+import TikTokOptionsPanel from '@/components/social/TikTokOptionsPanel';
+import { EMPTY_TIKTOK } from '@/lib/social/videoUnico';
 import { SocialService, PHOTO_BUCKET, MAX_VIDEO_MB, type CreatorInfo } from '@/services/socialService';
 import { supabase } from '@/integrations/supabase/client';
 import {
   PLATFORM_LABEL,
   SOCIAL_PLATFORMS,
-  TIKTOK_PRIVACY_LABEL,
   explainSocialError,
-  tiktokConsentText,
   validateTikTokOptions,
   youtubeTitle,
   type TikTokOptions,
-  type TikTokPrivacy,
   type YouTubeOptions,
 } from '@/lib/social/socialCore';
 
@@ -32,16 +31,6 @@ interface Props {
   prepareImages?: () => Promise<{ bucket: string; paths: string[] }>;
   onDone?: () => void;
 }
-
-const EMPTY_TIKTOK: TikTokOptions = {
-  privacy_level: '',
-  allow_comment: false,
-  allow_duet: false,
-  allow_stitch: false,
-  commercial: false,
-  brand_organic: false,
-  brand_content: false,
-};
 
 const fieldStyle: React.CSSProperties = {
   width: '100%', backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 8,
@@ -153,7 +142,6 @@ const PublishSocialDialog: React.FC<Props> = ({ open, onClose, mode, defaultCapt
     setVideoUrl(f ? URL.createObjectURL(f) : null);
   };
 
-  const privacyOptions = (creator?.privacy_level_options?.length ? creator.privacy_level_options : Object.keys(TIKTOK_PRIVACY_LABEL)) as TikTokPrivacy[];
   const tooLong = !!(tiktokAccount && creator?.max_video_post_duration_sec && videoSec && videoSec > creator.max_video_post_duration_sec);
 
   const problem = (() => {
@@ -223,14 +211,6 @@ const PublishSocialDialog: React.FC<Props> = ({ open, onClose, mode, defaultCapt
       setBusy(null);
     }
   };
-
-  const check = (key: 'allow_comment' | 'allow_duet' | 'allow_stitch', text: string, disabled: boolean) => (
-    <label className="flex items-center gap-2 text-[12px]" style={{ color: disabled ? 'var(--ink3)' : 'var(--ink)', opacity: disabled ? 0.6 : 1 }}>
-      <input type="checkbox" checked={tt[key] && !disabled} disabled={disabled}
-        onChange={(e) => setTt({ ...tt, [key]: e.target.checked })} />
-      {text}{disabled && ' (spento sul tuo profilo)'}
-    </label>
-  );
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && !busy && onClose()}>
@@ -339,49 +319,8 @@ const PublishSocialDialog: React.FC<Props> = ({ open, onClose, mode, defaultCapt
 
           {/* TikTok */}
           {tiktokAccount && (
-            <div className="p-3 rounded-lg space-y-2.5" style={{ border: '1px solid var(--line)' }}>
-              <div className="text-[12px] font-bold" style={{ color: 'var(--ink)' }}>
-                TikTok · pubblichi come {creator ? (creator.creator_nickname || creator.creator_username) : connectionName(tiktokAccount)}
-              </div>
-              {creatorError && <p className="text-[12px]" style={{ color: '#dc2626' }}>{creatorError}</p>}
-              <div>
-                <span className={labelCls} style={labelStyle}>Chi può vederlo</span>
-                <select value={tt.privacy_level} onChange={(e) => setTt({ ...tt, privacy_level: e.target.value as TikTokPrivacy })} style={fieldStyle}>
-                  <option value="" disabled>Scegli…</option>
-                  {privacyOptions.map((p) => (
-                    <option key={p} value={p} disabled={tt.brand_content && p === 'SELF_ONLY'}>{TIKTOK_PRIVACY_LABEL[p] || p}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                {check('allow_comment', 'Consenti i commenti', !!creator?.comment_disabled)}
-                {mode === 'video' && check('allow_duet', 'Consenti i duetti', !!creator?.duet_disabled)}
-                {mode === 'video' && check('allow_stitch', 'Consenti lo stitch', !!creator?.stitch_disabled)}
-              </div>
-              <div className="pt-1 space-y-1" style={{ borderTop: '1px solid var(--line)' }}>
-                <label className="flex items-center gap-2 text-[12px] pt-2" style={{ color: 'var(--ink)' }}>
-                  <input type="checkbox" checked={tt.commercial}
-                    onChange={(e) => setTt({ ...tt, commercial: e.target.checked, brand_organic: false, brand_content: false })} />
-                  Contenuto promozionale (pubblicizza un servizio o un prodotto)
-                </label>
-                {tt.commercial && (
-                  <div className="pl-6 space-y-1">
-                    <label className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--ink)' }}>
-                      <input type="checkbox" checked={tt.brand_organic} onChange={(e) => setTt({ ...tt, brand_organic: e.target.checked })} />
-                      Il tuo studio · comparirà «Contenuto promozionale»
-                    </label>
-                    <label className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--ink)' }}>
-                      <input type="checkbox" checked={tt.brand_content}
-                        onChange={(e) => setTt({ ...tt, brand_content: e.target.checked, privacy_level: e.target.checked && tt.privacy_level === 'SELF_ONLY' ? '' : tt.privacy_level })} />
-                      Un altro marchio che ti paga · comparirà «Partnership retribuita»
-                    </label>
-                  </div>
-                )}
-              </div>
-              <p className="text-[11px]" style={{ color: 'var(--ink3)' }}>
-                {tiktokConsentText(tt)} Dopo l'invio TikTok impiega qualche minuto a mostrarlo sul profilo.
-              </p>
-            </div>
+            <TikTokOptionsPanel value={tt} onChange={setTt} creator={creator} creatorError={creatorError}
+              accountName={connectionName(tiktokAccount)} mode={mode} />
           )}
 
           {/* Quando */}

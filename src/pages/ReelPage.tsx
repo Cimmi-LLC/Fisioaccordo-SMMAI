@@ -2,10 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { ChevronLeft, ChevronRight, Loader2, Upload } from 'lucide-react';
-import PublishSocialDialog from '@/components/social/PublishSocialDialog';
+import PublishVideoDialog from '@/components/social/PublishVideoDialog';
 import ReelScriptPreview from '@/components/reel/ReelScriptPreview';
 import { useReelScript } from '@/hooks/useReelScript';
-import PublishReelDialog from '@/components/reel/PublishReelDialog';
 import type { ReelScript } from '@/types/reel';
 
 const QTY_OPTIONS = [1, 2, 5, 10] as const;
@@ -22,13 +21,9 @@ const ReelPage = () => {
   const [topic, setTopic] = useState('');
   const [qty, setQty] = useState<number>(1);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [captionReel, setCaptionReel] = useState<string | null>(null);
   const { scripts, generating, progress, generateScripts, copyScript, copyCaption } = useReelScript();
   const [publishOpen, setPublishOpen] = useState(false);
   const activeScript = scripts[activeIndex];
-  const publishCaption = activeScript
-    ? [activeScript.caption_instagram, (activeScript.hashtag_suggeriti || []).map((h) => '#' + h.replace('#', '')).join(' ')].filter(Boolean).join('\n\n')
-    : '';
 
   const handleGenerate = () => {
     if (topic.trim()) generateScripts(topic.trim(), qty);
@@ -65,7 +60,7 @@ const ReelPage = () => {
         <h1 className="text-xl font-black" style={{ color: 'var(--ink)', letterSpacing: '-0.5px' }}>
           Script Reel
         </h1>
-        {/* Il video registrato dal copione va su TikTok e YouTube Shorts da qui */}
+        {/* Il video registrato dal copione va su Instagram, YouTube Shorts e TikTok da qui */}
         <button
           onClick={() => setPublishOpen(true)}
           className="flex items-center gap-2 text-[11px] font-black uppercase px-4 py-2.5 rounded-xl"
@@ -74,12 +69,11 @@ const ReelPage = () => {
           <Upload className="h-4 w-4" /> Pubblica il video registrato
         </button>
       </div>
-      <PublishSocialDialog
+      <PublishVideoDialog
         open={publishOpen}
         onClose={() => setPublishOpen(false)}
-        mode="video"
-        defaultCaption={publishCaption}
-        defaultTitle={activeScript?.titolo_reel || ''}
+        captionIniziale={activeScript ? captionDaScript(activeScript) : ''}
+        titoloIniziale={activeScript?.titolo_reel || ''}
       />
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -248,7 +242,7 @@ const ReelPage = () => {
                 onRegenerate={handleGenerate}
                 onCopyScript={() => copyScript(activeIndex)}
                 onCopyCaption={() => copyCaption(activeIndex)}
-                onPublish={() => scripts[activeIndex] && setCaptionReel(captionDaScript(scripts[activeIndex]))}
+                onPublish={() => setPublishOpen(true)}
               />
             </>
           ) : (
@@ -265,11 +259,6 @@ const ReelPage = () => {
           )}
         </div>
       </div>
-      <PublishReelDialog
-        open={captionReel !== null}
-        onClose={() => setCaptionReel(null)}
-        captionIniziale={captionReel || ''}
-      />
     </div>
   );
 };

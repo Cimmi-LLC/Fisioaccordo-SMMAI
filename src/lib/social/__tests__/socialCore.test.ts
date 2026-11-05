@@ -174,6 +174,9 @@ describe('errori in chiaro', () => {
   it('TikTok prima dell\'audit', () => {
     expect(explainSocialError('tiktok', 'unaudited_client_can_only_post_to_private_accounts')).toMatch(/Solo io/);
   });
+  it('collegamento non più valido', () => {
+    expect(explainSocialError('tiktok', 'access_token_invalid')).toMatch(/ricollega l'account/);
+  });
   it('account Google senza canale', () => {
     expect(explainSocialError('youtube', 'Nessun canale YouTube su questo account Google')).toMatch(/non ha un canale/);
   });

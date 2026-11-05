@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { publishSingleImage, publishCarousel, publishStory } from '../_shared/instagramPublish.ts'
 import { giroReel, leggiRigaReel, REEL_COLONNE, type RigaReelDb, type Client } from '../_shared/reelPublish.ts'
-import { validaDidascalia } from '../_shared/brand/reel.ts'
+import { REEL_BUCKET, validaDidascalia } from '../_shared/brand/reel.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
       // right before publishing (TTL > the entire Meta Graph download window).
       image_path, image_paths, image_bucket,
       // 'story' pubblica come storia 24h invece che come post nel feed;
-      // 'reel' pubblica un video caricato nel bucket reel-videos
+      // 'reel' pubblica un video caricato nel bucket social-video
       media_type,
       video_path, cover_path, thumb_offset_ms, share_to_feed, hashtags,
     } = body
@@ -255,6 +255,7 @@ async function pubblicaReelOra(
       attempts: 0,
       media_type: 'reel',
       video_path: r.videoPath,
+      video_bucket: REEL_BUCKET,
       cover_path: r.coverPath || null,
       thumb_offset_ms: Number.isFinite(r.thumbOffsetMs) && (r.thumbOffsetMs as number) > 0 ? Math.round(r.thumbOffsetMs as number) : null,
       share_to_feed: r.shareToFeed !== false,

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { validaDidascalia } from "../_shared/brand/reel.ts";
+import { REEL_BUCKET, validaDidascalia } from "../_shared/brand/reel.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -37,7 +37,7 @@ serve(async (req) => {
     const body = await req.json();
     const {
       content, hashtags, image_urls, image_paths, image_bucket, connection_id, scheduled_for, media_type,
-      // Reel: video (e copertina facoltativa) nel bucket reel-videos
+      // Reel: video (e copertina facoltativa) nel bucket social-video
       video_path, cover_path, thumb_offset_ms, share_to_feed,
     } = body;
     const mediaType = media_type === 'story' ? 'story' : media_type === 'reel' ? 'reel' : 'post';
@@ -151,6 +151,7 @@ serve(async (req) => {
         image_paths: usingPaths ? image_paths : null,
         image_bucket: usingPaths ? (image_bucket || "carousel-images") : null,
         video_path: isReel ? video_path : null,
+        video_bucket: isReel ? REEL_BUCKET : null,
         cover_path: isReel && typeof cover_path === "string" ? cover_path : null,
         thumb_offset_ms: isReel && Number.isFinite(thumb_offset_ms) && thumb_offset_ms > 0 ? Math.round(thumb_offset_ms) : null,
         share_to_feed: isReel ? share_to_feed !== false : true,

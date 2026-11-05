@@ -4,16 +4,18 @@
 -- Flusso (process-scheduled-posts, ogni 2 minuti):
 --   scheduled  → crea il container su Instagram (media_type=REELS)  → processing
 --   processing → stato del container FINISHED → media_publish         → published
--- Il video resta nel bucket privato reel-videos; Instagram lo scarica da un
--- URL firmato creato al momento.
+-- Il video sta nel bucket privato social-video (lo stesso di TikTok e
+-- YouTube); Instagram lo scarica da un URL firmato creato al momento.
+-- Va applicata DOPO 20261103120000_tiktok_youtube.
 -- ────────────────────────────────────────────────────────────────────
 
--- 1) published_posts: tipo «reel» e stato «processing»
+-- 1) published_posts: tipo «reel» (accanto a «video» di TikTok/YouTube) e
+-- stato «processing»
 ALTER TABLE public.published_posts
   DROP CONSTRAINT IF EXISTS published_posts_media_type_check;
 ALTER TABLE public.published_posts
   ADD CONSTRAINT published_posts_media_type_check
-  CHECK (media_type IN ('post', 'story', 'reel'));
+  CHECK (media_type IN ('post', 'story', 'reel', 'video'));
 
 ALTER TABLE public.published_posts
   DROP CONSTRAINT IF EXISTS published_posts_status_check;
@@ -23,6 +25,7 @@ ALTER TABLE public.published_posts
 
 ALTER TABLE public.published_posts
   ADD COLUMN IF NOT EXISTS video_path TEXT,
+  ADD COLUMN IF NOT EXISTS video_bucket TEXT,
   ADD COLUMN IF NOT EXISTS cover_path TEXT,
   ADD COLUMN IF NOT EXISTS thumb_offset_ms INTEGER,
   ADD COLUMN IF NOT EXISTS share_to_feed BOOLEAN NOT NULL DEFAULT true,
@@ -42,11 +45,6 @@ ALTER TABLE public.published_posts
   ADD CONSTRAINT published_posts_thumb_offset_check
   CHECK (thumb_offset_ms IS NULL OR thumb_offset_ms >= 0);
 
--- Il cron cerca i reel in elaborazione a ogni giro.
-CREATE INDEX IF NOT EXISTS idx_published_posts_processing
-  ON public.published_posts (updated_at)
-  WHERE status = 'processing';
-
 -- 2) Annullare un post programmato o togliere un tentativo fallito.
 -- Prima mancava la policy DELETE: il Calendario diceva «eliminato» ma la riga
 -- restava. Quelli pubblicati o in elaborazione non si toccano.
@@ -56,38 +54,13 @@ CREATE POLICY "Users can delete their own scheduled or failed posts"
   FOR DELETE
   USING (auth.uid() = user_id AND status IN ('scheduled', 'failed'));
 
--- 3) Bucket privato per i video dei reel (e le copertine), 100 MB a file.
+-- 3) Il video sta nel bucket social-video della migrazione TikTok/YouTube
+-- (20261103120000): un caricamento solo per Reel, Shorts e TikTok.
 -- Il limite globale del progetto (Storage → Settings) deve essere almeno 100 MB.
-INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-VALUES (
-  'reel-videos', 'reel-videos', false, 104857600,
-  ARRAY['video/mp4', 'video/quicktime', 'image/jpeg', 'image/png']
-)
-ON CONFLICT (id) DO UPDATE
-  SET public = false,
-      file_size_limit = EXCLUDED.file_size_limit,
-      allowed_mime_types = EXCLUDED.allowed_mime_types;
-
-DROP POLICY IF EXISTS "reel_videos_select_owner" ON storage.objects;
-DROP POLICY IF EXISTS "reel_videos_insert_owner" ON storage.objects;
-DROP POLICY IF EXISTS "reel_videos_delete_owner" ON storage.objects;
-
-CREATE POLICY "reel_videos_select_owner" ON storage.objects
-  FOR SELECT USING (
-    bucket_id = 'reel-videos'
-    AND (storage.foldername(name))[1] = auth.uid()::text
-  );
-
-CREATE POLICY "reel_videos_insert_owner" ON storage.objects
-  FOR INSERT WITH CHECK (
-    bucket_id = 'reel-videos'
-    AND (storage.foldername(name))[1] = auth.uid()::text
-  );
-
-CREATE POLICY "reel_videos_delete_owner" ON storage.objects
-  FOR DELETE USING (
-    bucket_id = 'reel-videos'
-    AND (storage.foldername(name))[1] = auth.uid()::text
-  );
+-- La copertina del Reel (facoltativa) va nella stessa cartella privata:
+-- il bucket accetta anche JPG e PNG.
+UPDATE storage.buckets
+  SET allowed_mime_types = ARRAY['video/mp4', 'video/quicktime', 'video/webm', 'image/jpeg', 'image/png']
+  WHERE id = 'social-video';
 
 NOTIFY pgrst, 'reload schema';
