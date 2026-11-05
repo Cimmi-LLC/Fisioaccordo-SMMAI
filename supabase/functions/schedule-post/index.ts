@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validaDidascalia } from "../_shared/brand/reel.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -34,8 +35,13 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { content, hashtags, image_urls, image_paths, image_bucket, connection_id, scheduled_for, media_type } = body;
-    const mediaType = media_type === 'story' ? 'story' : 'post';
+    const {
+      content, hashtags, image_urls, image_paths, image_bucket, connection_id, scheduled_for, media_type,
+      // Reel: video (e copertina facoltativa) nel bucket reel-videos
+      video_path, cover_path, thumb_offset_ms, share_to_feed,
+    } = body;
+    const mediaType = media_type === 'story' ? 'story' : media_type === 'reel' ? 'reel' : 'post';
+    const isReel = mediaType === 'reel';
 
     if (!content || typeof content !== "string") {
       return new Response(JSON.stringify({ error: "content obbligatorio" }), {
@@ -43,10 +49,32 @@ serve(async (req) => {
       });
     }
 
+    if (isReel) {
+      const userPrefix = user.id + "/";
+      if (typeof video_path !== "string" || !video_path) {
+        return new Response(JSON.stringify({ error: "Manca il video del Reel" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      for (const p of [video_path, cover_path]) {
+        if (p != null && (typeof p !== "string" || !p.startsWith(userPrefix))) {
+          return new Response(JSON.stringify({ error: "Path non autorizzato" }), {
+            status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+      const didascalia = validaDidascalia(hashtags ? `${content}\n\n${hashtags}` : content);
+      if (didascalia.errori.length > 0) {
+        return new Response(JSON.stringify({ error: didascalia.errori[0] }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // Prefer new shape (image_paths + image_bucket). Fall back to legacy
     // image_urls for backward compat during the rollout window.
     const usingPaths = Array.isArray(image_paths) && image_paths.length > 0;
-    if (!usingPaths && (!Array.isArray(image_urls) || image_urls.length === 0)) {
+    if (!isReel && !usingPaths && (!Array.isArray(image_urls) || image_urls.length === 0)) {
       return new Response(JSON.stringify({ error: "image_paths o image_urls obbligatorio (almeno 1)" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -119,9 +147,13 @@ serve(async (req) => {
         // Legacy column kept null for new rows; preferred fields are
         // image_paths + image_bucket. The cron resolves them to signed URLs
         // at publish time.
-        image_urls: usingPaths ? null : image_urls,
+        image_urls: usingPaths || isReel ? null : image_urls,
         image_paths: usingPaths ? image_paths : null,
         image_bucket: usingPaths ? (image_bucket || "carousel-images") : null,
+        video_path: isReel ? video_path : null,
+        cover_path: isReel && typeof cover_path === "string" ? cover_path : null,
+        thumb_offset_ms: isReel && Number.isFinite(thumb_offset_ms) && thumb_offset_ms > 0 ? Math.round(thumb_offset_ms) : null,
+        share_to_feed: isReel ? share_to_feed !== false : true,
         platforms: ["instagram"],
         connection_id,
         status: "scheduled",

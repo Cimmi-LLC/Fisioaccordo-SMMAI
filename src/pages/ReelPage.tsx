@@ -4,14 +4,24 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import ReelScriptPreview from '@/components/reel/ReelScriptPreview';
 import { useReelScript } from '@/hooks/useReelScript';
+import PublishReelDialog from '@/components/reel/PublishReelDialog';
+import type { ReelScript } from '@/types/reel';
 
 const QTY_OPTIONS = [1, 2, 5, 10] as const;
+
+/** Caption dello script + hashtag, con gli a capo veri (l'AI a volte scrive «\\n»). */
+function captionDaScript(s: ReelScript): string {
+  const testo = s.caption_instagram.split('\\n').join('\n').trim();
+  const hashtag = s.hashtag_suggeriti.map((h) => '#' + h.replace('#', '')).join(' ');
+  return hashtag ? `${testo}\n\n${hashtag}` : testo;
+}
 
 const ReelPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [topic, setTopic] = useState('');
   const [qty, setQty] = useState<number>(1);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [captionReel, setCaptionReel] = useState<string | null>(null);
   const { scripts, generating, progress, generateScripts, copyScript, copyCaption } = useReelScript();
 
   const handleGenerate = () => {
@@ -215,6 +225,7 @@ const ReelPage = () => {
                 onRegenerate={handleGenerate}
                 onCopyScript={() => copyScript(activeIndex)}
                 onCopyCaption={() => copyCaption(activeIndex)}
+                onPublish={() => scripts[activeIndex] && setCaptionReel(captionDaScript(scripts[activeIndex]))}
               />
             </>
           ) : (
@@ -231,6 +242,11 @@ const ReelPage = () => {
           )}
         </div>
       </div>
+      <PublishReelDialog
+        open={captionReel !== null}
+        onClose={() => setCaptionReel(null)}
+        captionIniziale={captionReel || ''}
+      />
     </div>
   );
 };

@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { publishToInstagram, publishStory } from "../_shared/instagramPublish.ts";
 import { adminClient, requireCronSecret } from "../_shared/auth.ts";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
+import { giroReel, REEL_COLONNE, type RigaReelDb, type Client } from "../_shared/reelPublish.ts";
 
 const MAX_ATTEMPTS = 3;
 const BATCH_SIZE = 10;
@@ -34,22 +35,51 @@ serve(async (req) => {
       return jsonResponse(req, { error: "Errore lettura posts" }, 500);
     }
 
-    if (!posts || posts.length === 0) {
+    // Reel in elaborazione su Instagram: a ogni giro si controlla il container.
+    const { data: reelInCorso, error: reelErr } = await supabase
+      .from("published_posts")
+      .select(REEL_COLONNE)
+      .eq("status", "processing")
+      .eq("media_type", "reel")
+      .order("updated_at", { ascending: true })
+      .limit(BATCH_SIZE);
+    if (reelErr) console.error("Select reel error:", reelErr);
+
+    const pronti = posts || [];
+    const inCorso = (reelInCorso || []) as unknown as RigaReelDb[];
+    if (pronti.length === 0 && inCorso.length === 0) {
       return jsonResponse(req, { processed: 0, message: "Nessun post pronto" });
     }
 
     const results = [];
-    for (const post of posts) {
-      const result = await processPost(supabase, post);
-      results.push(result);
+    for (const post of pronti) {
+      results.push(post.media_type === "reel" ? await processReel(supabase, post) : await processPost(supabase, post));
+    }
+    for (const reel of inCorso) {
+      results.push(await processReel(supabase, reel));
     }
 
-    return jsonResponse(req, { processed: posts.length, results });
+    return jsonResponse(req, { processed: results.length, results });
   } catch (e) {
     console.error("process-scheduled-posts error:", e);
     return jsonResponse(req, { error: "Errore interno" }, 500);
   }
 });
+
+async function processReel(
+  supabase: Client,
+  riga: RigaReelDb
+): Promise<{ id: string; success: boolean; esito?: string; error?: string }> {
+  try {
+    const esito = await giroReel(supabase, riga);
+    const errore = "errore" in esito ? esito.errore : undefined;
+    return { id: riga.id, success: esito.esito !== "fallito", esito: esito.esito, error: errore };
+  } catch (err) {
+    // Errore imprevisto: la riga resta com'è e si riprova al giro dopo.
+    console.error("processReel error:", riga.id, err);
+    return { id: riga.id, success: false, error: err instanceof Error ? err.message : "Errore sconosciuto" };
+  }
+}
 
 async function processPost(
   supabase: ReturnType<typeof createClient>,
