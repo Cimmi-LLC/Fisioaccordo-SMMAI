@@ -1,5 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { publishSingleImage, publishCarousel, publishStory } from '../_shared/instagramPublish.ts'
+import { giroReel, leggiRigaReel, REEL_COLONNE, type RigaReelDb, type Client } from '../_shared/reelPublish.ts'
+import { REEL_BUCKET, validaDidascalia } from '../_shared/brand/reel.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,8 +51,10 @@ Deno.serve(async (req) => {
       // New: caller passes storage paths; signed URLs are minted server-side
       // right before publishing (TTL > the entire Meta Graph download window).
       image_path, image_paths, image_bucket,
-      // 'story' pubblica come storia 24h invece che come post nel feed
+      // 'story' pubblica come storia 24h invece che come post nel feed;
+      // 'reel' pubblica un video caricato nel bucket social-video
       media_type,
+      video_path, cover_path, thumb_offset_ms, share_to_feed, hashtags,
     } = body
     console.log('meta-publish request:', JSON.stringify({
       connection_id, platform,
@@ -73,6 +77,14 @@ Deno.serve(async (req) => {
     if (typeof image_path === 'string') allInputPaths.push(image_path)
     if (Array.isArray(image_paths)) {
       for (const p of image_paths) if (typeof p === 'string') allInputPaths.push(p)
+    }
+    if (media_type === 'reel') {
+      if (typeof video_path !== 'string' || !video_path) return errorResponse('Manca il video del Reel', 400)
+      allInputPaths.push(video_path)
+      if (cover_path != null) {
+        if (typeof cover_path !== 'string') return errorResponse('Copertina non valida', 400)
+        allInputPaths.push(cover_path)
+      }
     }
     for (const p of allInputPaths) {
       if (!p.startsWith(userPrefix)) {
@@ -130,6 +142,13 @@ Deno.serve(async (req) => {
 
     if (!igId) {
       return errorResponse('Nessun account Instagram collegato', 400)
+    }
+
+    if (media_type === 'reel') {
+      return await pubblicaReelOra(supabase, {
+        userId: verified_user_id, connectionId: connection_id, content, hashtags,
+        videoPath: video_path, coverPath: cover_path, thumbOffsetMs: thumb_offset_ms, shareToFeed: share_to_feed,
+      })
     }
 
     // Resolve paths → signed URLs at publish time (TTL 10 min; Meta downloads
@@ -206,4 +225,74 @@ function errorResponse(message: string, status = 400) {
     JSON.stringify({ success: false, error: message }),
     { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
+}
+
+/**
+ * «Pubblica ora» per un Reel. Non si aspetta Instagram fino alla fine: si
+ * crea la riga e il container, si controlla per ~20 secondi (i video corti
+ * spesso sono già pronti) e poi, se serve, finisce il cron ogni 2 minuti.
+ */
+async function pubblicaReelOra(
+  supabase: Client,
+  r: {
+    userId: string; connectionId: string; content: string; hashtags?: string | null;
+    videoPath: string; coverPath?: string | null; thumbOffsetMs?: number | null; shareToFeed?: boolean;
+  },
+) {
+  const didascalia = validaDidascalia(r.hashtags ? `${r.content}\n\n${r.hashtags}` : r.content)
+  if (didascalia.errori.length > 0) return errorResponse(didascalia.errori[0], 400)
+
+  const { data: inserita, error: insErr } = await supabase
+    .from('published_posts')
+    .insert({
+      user_id: r.userId,
+      content: r.content,
+      hashtags: r.hashtags || null,
+      platforms: ['instagram'],
+      connection_id: r.connectionId,
+      status: 'scheduled',
+      scheduled_for: new Date().toISOString(),
+      attempts: 0,
+      media_type: 'reel',
+      video_path: r.videoPath,
+      video_bucket: REEL_BUCKET,
+      cover_path: r.coverPath || null,
+      thumb_offset_ms: Number.isFinite(r.thumbOffsetMs) && (r.thumbOffsetMs as number) > 0 ? Math.round(r.thumbOffsetMs as number) : null,
+      share_to_feed: r.shareToFeed !== false,
+    })
+    .select(REEL_COLONNE)
+    .single()
+  if (insErr || !inserita) return errorResponse('Non riesco a salvare il Reel: ' + (insErr?.message || 'errore'), 500)
+
+  const riga = inserita as unknown as RigaReelDb
+  let esito = await giroReel(supabase, riga)
+  for (let i = 0; i < 4 && (esito.esito === 'in_elaborazione' || esito.esito === 'saltato'); i++) {
+    await new Promise((res) => setTimeout(res, 5000))
+    const attuale = await leggiRigaReel(supabase, riga.id)
+    if (!attuale) break
+    if (attuale.status === 'published') { esito = { esito: 'pubblicato', mediaId: null }; break }
+    if (attuale.status !== 'processing' || !attuale.ig_container_id) break
+    esito = await giroReel(supabase, attuale)
+  }
+
+  const json = (corpo: Record<string, unknown>, status = 200) => new Response(
+    JSON.stringify(corpo),
+    { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+  )
+  switch (esito.esito) {
+    case 'pubblicato':
+      return json({ success: true, status: 'published', reel_id: riga.id, post_id: esito.mediaId })
+    case 'fallito':
+      return json({ success: false, status: 'failed', reel_id: riga.id, error: esito.errore }, 400)
+    case 'riprova':
+      return json({
+        success: true, status: 'scheduled', reel_id: riga.id,
+        message: `${esito.errore} Riprovo da solo tra pochi minuti.`,
+      })
+    default:
+      return json({
+        success: true, status: 'processing', reel_id: riga.id,
+        message: 'Instagram sta preparando il video: esce da solo appena è pronto, di solito in pochi minuti.',
+      })
+  }
 }

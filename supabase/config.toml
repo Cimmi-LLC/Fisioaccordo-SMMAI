@@ -54,6 +54,16 @@ verify_jwt = false
 [functions.meta-data-deletion]
 verify_jwt = false
 
+# TikTok / YouTube: controllano il JWT (o il cron secret) nel codice.
+[functions.social-auth]
+verify_jwt = false
+
+[functions.social-publish]
+verify_jwt = false
+
+[functions.sync-social-metrics]
+verify_jwt = false
+
 [functions.sync-instagram-metrics]
 verify_jwt = false
 

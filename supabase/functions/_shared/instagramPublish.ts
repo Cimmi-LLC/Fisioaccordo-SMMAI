@@ -2,7 +2,7 @@
 // Used by both `meta-publish` (interactive, JWT-authed) and
 // `process-scheduled-posts` (cron, service-role).
 
-const API_VERSION = 'v22.0';
+export const API_VERSION = 'v22.0';
 
 export interface PublishResult {
   success: boolean;
@@ -10,7 +10,7 @@ export interface PublishResult {
   error?: string;
 }
 
-async function igFetch(
+export async function igFetch(
   url: string,
   token: string,
   method: string = 'GET',
