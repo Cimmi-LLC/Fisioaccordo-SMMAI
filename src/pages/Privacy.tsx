@@ -36,6 +36,7 @@ const Privacy = () => {
               <li><strong>Contenuti generati:</strong> post, caroselli, storie e script video prodotti dall'AI in base ai tuoi input.</li>
               <li><strong>Token di accesso Meta:</strong> token OAuth necessari per pubblicare su Instagram, conservati cifrati at-rest tramite Supabase Vault.</li>
               <li><strong>Dati di pubblicazione:</strong> data, ora e stato dei contenuti pubblicati o programmati su Instagram.</li>
+              <li><strong>Account TikTok e YouTube (se li colleghi):</strong> identificativo dell'account o del canale, nome, foto profilo, numero di follower o iscritti, elenco dei tuoi video pubblici con visualizzazioni, mi piace, commenti, condivisioni e tempo di visione; token OAuth conservati cifrati at-rest. I video e le foto che scegli di pubblicare restano nel tuo spazio di archiviazione dell'app.</li>
               <li><strong>Recensioni importate:</strong> testo e metadati delle recensioni che decidi di importare da Google Maps o MioDottore.</li>
               <li><strong>Dati di utilizzo:</strong> log tecnici delle chiamate API (es. errori, prestazioni) anonimizzati o pseudonimizzati.</li>
             </ul>
@@ -47,6 +48,7 @@ const Privacy = () => {
             <ul className="list-disc pl-6 space-y-2 mt-2">
               <li>Erogare il Servizio e consentirti di generare contenuti tramite AI.</li>
               <li>Pubblicare contenuti su Instagram tramite l'integrazione Meta Graph API, su tua autorizzazione esplicita.</li>
+              <li>Pubblicare su TikTok (Content Posting API) e su YouTube (YouTube Data API) i video e le foto che scegli tu, con le impostazioni che scegli tu, e mostrarti le statistiche dei tuoi contenuti (TikTok Display API, YouTube Data e Analytics API). Non usiamo questi dati per pubblicità né li vendiamo.</li>
               <li>Memorizzare le tue preferenze e i contenuti creati.</li>
               <li>Migliorare il Servizio e prevenire abusi.</li>
               <li>Adempiere a obblighi di legge.</li>
@@ -58,7 +60,7 @@ const Privacy = () => {
             <p>Trattiamo i tuoi dati sulla base di:</p>
             <ul className="list-disc pl-6 space-y-2 mt-2">
               <li><strong>Esecuzione del contratto</strong> (art. 6.1.b GDPR): per fornirti il Servizio.</li>
-              <li><strong>Consenso</strong> (art. 6.1.a GDPR): per la connessione a Meta/Instagram e per cookie non essenziali.</li>
+              <li><strong>Consenso</strong> (art. 6.1.a GDPR): per la connessione a Meta/Instagram, TikTok e YouTube e per cookie non essenziali.</li>
               <li><strong>Interesse legittimo</strong> (art. 6.1.f GDPR): per sicurezza, prevenzione frodi e miglioramento del Servizio.</li>
               <li><strong>Obblighi di legge</strong> (art. 6.1.c GDPR): per adempimenti fiscali o richieste delle autorità.</li>
             </ul>
@@ -73,6 +75,8 @@ const Privacy = () => {
               <li><strong>Pixabay GmbH</strong> (Germania): ricerca di immagini stock. Inviamo solo le keyword di ricerca, mai dati personali. <a href="https://pixabay.com/it/service/privacy/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>Privacy Pixabay</a>.</li>
               <li><strong>Apify (Apify Technologies s.r.o.)</strong> (UE - Repubblica Ceca): scraping di recensioni pubbliche di Google Maps quando lo richiedi esplicitamente. <a href="https://apify.com/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>Privacy Apify</a>.</li>
               <li><strong>Meta Platforms Ireland Limited</strong>: pubblicazione su Instagram Business via Graph API. <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>Privacy Meta</a>.</li>
+              <li><strong>TikTok</strong>: pubblicazione e statistiche dei contenuti tramite le API ufficiali di TikTok for Developers. <a href="https://www.tiktok.com/legal/page/eea/privacy-policy/it" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>Privacy TikTok</a>.</li>
+              <li><strong>Google / YouTube</strong>: caricamento dei video e statistiche tramite YouTube API Services; usandoli accetti i <a href="https://www.youtube.com/t/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>Termini di servizio di YouTube</a> e si applica la <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>Privacy Policy di Google</a>. Puoi revocare l'accesso anche da <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>myaccount.google.com/permissions</a>.</li>
               <li><strong>Vercel Inc.</strong> (USA): hosting dell'applicazione frontend. <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>Privacy Vercel</a>.</li>
               <li><strong>Functional Software, Inc. dba Sentry</strong> (USA, server EU - Francoforte): monitoraggio errori run-time per migliorare stabilità. Raccoglie stack trace e contesto tecnico SENZA dati personali (PII disabilitati). <a href="https://sentry.io/privacy/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--rosa)' }}>Privacy Sentry</a>.</li>
             </ul>
@@ -89,6 +93,7 @@ const Privacy = () => {
               <li><strong>Dati dell'account:</strong> per tutta la durata del rapporto contrattuale + 12 mesi dopo la chiusura.</li>
               <li><strong>Contenuti generati e Brand Kit:</strong> finché non li elimini o chiudi l'account.</li>
               <li><strong>Token Meta:</strong> finché non revochi l'autorizzazione (su Instagram o dal pannello App).</li>
+              <li><strong>Token TikTok e YouTube:</strong> finché non scolleghi l'account (pulsante «Scollega», che revoca anche il permesso sulla piattaforma) o non revochi l'accesso da TikTok o Google; le statistiche già lette restano finché non chiedi la cancellazione dell'account.</li>
               <li><strong>Log tecnici:</strong> 90 giorni, poi cancellati o anonimizzati.</li>
               <li><strong>Recensioni importate:</strong> finché non le elimini.</li>
             </ul>
@@ -115,7 +120,7 @@ const Privacy = () => {
             <ul className="list-disc pl-6 space-y-2 mt-2">
               <li>Connessioni cifrate HTTPS/TLS.</li>
               <li>Password salvate in forma cifrata (bcrypt).</li>
-              <li>Token Meta cifrati at-rest tramite Supabase Vault (pgcrypto).</li>
+              <li>Token Meta, TikTok e YouTube cifrati at-rest tramite Supabase Vault (pgcrypto).</li>
               <li>Row Level Security (RLS) sul database per isolare i dati di ciascun utente.</li>
               <li>JWT per autenticazione, autorizzazione granulare sulle Edge Functions.</li>
               <li>Validazione e sanificazione input contro injection (SQL, XSS, SSRF).</li>

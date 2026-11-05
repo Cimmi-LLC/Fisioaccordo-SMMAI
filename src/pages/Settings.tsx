@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, Link2, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import MetaConnection from '@/components/MetaConnection';
+import SocialConnections from '@/components/SocialConnections';
 import AccountPreferences from '@/components/settings/AccountPreferences';
 
 const Settings: React.FC = () => {
@@ -67,6 +68,7 @@ const Settings: React.FC = () => {
           <TabsContent value="social">
             <div className="max-w-md">
               <MetaConnection />
+              <SocialConnections />
             </div>
           </TabsContent>
 

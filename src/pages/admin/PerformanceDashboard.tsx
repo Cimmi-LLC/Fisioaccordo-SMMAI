@@ -9,6 +9,7 @@ import SidebarClients, { ClientBrand } from '@/components/admin/SidebarClients';
 import { usePerformanceMetrics, Channel, MetricRow } from '@/hooks/usePerformanceMetrics';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { SocialService } from '@/services/socialService';
 
 type RangeId = 7 | 28 | 90 | 'custom';
 
@@ -20,8 +21,8 @@ const RANGES: { id: RangeId; label: string }[] = [
 
 const CHANNELS: { id: Channel; label: string; icon: LucideIcon; accent: string; enabled: boolean }[] = [
   { id: 'instagram', label: 'Instagram', icon: Instagram, accent: '#E1306C', enabled: true },
-  { id: 'tiktok',    label: 'TikTok',    icon: Music2,    accent: '#00BCD4', enabled: false },
-  { id: 'youtube',   label: 'YouTube',   icon: Youtube,   accent: '#FF0000', enabled: false },
+  { id: 'tiktok',    label: 'TikTok',    icon: Music2,    accent: '#00BCD4', enabled: true },
+  { id: 'youtube',   label: 'YouTube',   icon: Youtube,   accent: '#FF0000', enabled: true },
 ];
 
 function fmt(n: number | null | undefined) {
@@ -123,7 +124,8 @@ function buildKpis(
       { key: 'foll',  label: 'Follower',        value: fmt(foll),  delta: delta(foll, pfoll), sub: `+${fmt(sumAcc('new_followers'))} nuovi` },
       { key: 'eng',   label: 'Mi piace + commenti', value: fmt(likes), delta: delta(likes, plikes) },
       { key: 'er',    label: 'Tasso engagement', value: erTt.value, delta: erTt.d },
-      { key: 'comp',  label: 'Tasso completamento', value: (avg('video_completion_rate') * 100).toFixed(1) + '%', delta: delta(avg('video_completion_rate'), pavg('video_completion_rate')) },
+      // Il tasso di completamento non arriva dalle API di TikTok: al suo posto i commenti
+      { key: 'comm',  label: 'Commenti', value: fmt(sum('comments')), delta: delta(sum('comments'), psum('comments')) },
       { key: 'shares', label: 'Condivisioni', value: fmt(sum('shares')), delta: delta(sum('shares'), psum('shares')) },
     ];
   }
@@ -155,6 +157,18 @@ const PerformanceDashboard: React.FC = () => {
   const handleSyncNow = async () => {
     setSyncing(true);
     try {
+      if (channel !== 'instagram') {
+        // TikTok / YouTube: API ufficiali, solo il cliente selezionato
+        const r = await SocialService.syncNow(channel, client?.kind === 'brand' ? client.id : null);
+        toast({
+          title: 'Sincronizzazione completata',
+          description: r.processed === 0
+            ? `Nessun account ${channelMeta.label} collegato per questo cliente.`
+            : `${r.processed} account · ${r.totalPostsSynced} video aggiornati. Refresh tra 2-3 secondi.`,
+        });
+        if (r.processed > 0) setTimeout(() => window.location.reload(), 2500);
+        return;
+      }
       // We invoke the Apify ingestion fn. The fn accepts either x-cron-secret
       // or an admin JWT — supabase.functions.invoke automatically includes
       // the user JWT, and the fn checks user_roles for 'admin'.
@@ -429,8 +443,11 @@ const PerformanceDashboard: React.FC = () => {
                   Nessuna metrica nel periodo selezionato
                 </p>
                 <p className="text-xs mt-1" style={{ color: 'var(--ink3)' }}>
-                  La sincronizzazione automatica con {channelMeta.label} non è ancora attiva.
-                  Una volta deployato l'edge function di sync, i dati appariranno qui.
+                  {channel === 'instagram'
+                    ? <>La sincronizzazione automatica con {channelMeta.label} non è ancora attiva.
+                      Una volta deployato l'edge function di sync, i dati appariranno qui.</>
+                    : <>Collega {channelMeta.label} dalla card del brand (I miei Brand) o da Impostazioni:
+                      i numeri arrivano ogni mattina, oppure subito con «Sincronizza ora».</>}
                 </p>
               </CardContent>
             </Card>

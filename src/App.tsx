@@ -28,6 +28,7 @@ const AdminPage = lazy(() => import("./pages/AdminPage"));
 const PerformanceDashboard = lazy(() => import("./pages/admin/PerformanceDashboard"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const InstagramCallback = lazy(() => import("./pages/InstagramCallback"));
+const SocialCallback = lazy(() => import("./pages/SocialCallback"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
@@ -88,6 +89,7 @@ const App = () => (
                     {/* Public routes */}
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/auth/instagram/callback" element={<InstagramCallback />} />
+                    <Route path="/auth/social/:platform/callback" element={<SocialCallback />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/onboarding" element={<Onboarding />} />
                     <Route path="/onboarding/template" element={<TemplateGenesisWizard />} />
