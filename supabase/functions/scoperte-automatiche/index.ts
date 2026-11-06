@@ -10,6 +10,8 @@
 //       programmato al prossimo orario libero. Funziona anche a pilota spento.
 //   anteprima (utente loggato + brandId + soloRicerca) → solo la ricerca,
 //       senza salvare niente.
+//   disegna (x-cron-secret + carouselId + indice) → una slide editoriale,
+//       poi la successiva in un'altra chiamata (limite di CPU per chiamata).
 //
 // Ogni scoperta trovata finisce in public.scoperte con lo stato del suo
 // giro (nuova, in_produzione, programmata, errore), così l'app mostra da
@@ -124,6 +126,14 @@ serve(async (req) => {
     if (req.headers.get("x-cron-secret")) {
       const cron = requireCronSecret(req);
       if (!cron.ok) return jsonResponse(req, { error: cron.error }, cron.status);
+
+      // Una slide editoriale per chiamata (la lancia il carosello stesso).
+      const d = body.disegna as { carouselId?: unknown; indice?: unknown } | undefined;
+      if (d && typeof d.carouselId === "string" && typeof d.indice === "number") {
+        // @ts-ignore EdgeRuntime disponibile nell'ambiente Supabase
+        EdgeRuntime.waitUntil(disegnaSlide(supabase, d.carouselId, d.indice));
+        return jsonResponse(req, { carouselId: d.carouselId, indice: d.indice }, 202);
+      }
 
       if (!brandId) {
         const { data: brands, error } = await supabase
@@ -667,7 +677,6 @@ async function generaFoto(descrizione: string, formato: string, modelli: string[
 /** Carosello editoriale: testo col metodo, 2 foto, 8 slide disegnate dal server. */
 async function unCaroselloEditoriale(supabase: Admin, ctx: Contesto, s: Scoperta, scopertaId: string, quando: Date): Promise<void> {
   const { brand } = ctx;
-  const ed = ctx.editoriale!;
   await aggiornaScoperta(supabase, scopertaId, { stato: "in_produzione" });
   try {
     const { copy, voti } = await scriviCopyEditoriale(brand, s);
@@ -685,19 +694,20 @@ async function unCaroselloEditoriale(supabase: Admin, ctx: Contesto, s: Scoperta
       body: testoPiano(testoSlide(sl)),
     }));
 
+    const copyRiga = {
+      ...copy,
+      stile: "editoriale",
+      giudizio: voti,
+      foto: { copertina: !!fotoCopertina, passi: !!fotoPassi },
+      fonte: { titolo: s.titolo, fonte: s.fonte, url: s.url, data: s.data },
+    };
     const { data: riga, error: insErr } = await supabase
       .from("produced_carousels")
       .insert({
         user_id: brand.user_id,
         brand_id: brand.id,
         title: copy.titolo_carosello,
-        copy: {
-          ...copy,
-          stile: "editoriale",
-          giudizio: voti,
-          foto: { copertina: !!fotoCopertina, passi: !!fotoPassi },
-          fonte: { titolo: s.titolo, fonte: s.fonte, url: s.url, data: s.data },
-        },
+        copy: copyRiga,
         slides: slides.map((sl) => ({ ...sl, path: null, error: null, status: "pending" })),
         storage_bucket: OUTPUT_BUCKET,
         format: "4:5",
@@ -710,38 +720,126 @@ async function unCaroselloEditoriale(supabase: Admin, ctx: Contesto, s: Scoperta
     const carouselId = (riga as { id: string }).id;
     await aggiornaScoperta(supabase, scopertaId, { carousel_id: carouselId });
 
-    // Una slide alla volta: il disegno usa la CPU, in parallelo non si guadagna niente.
-    const risultati: SlideRecord[] = [];
-    for (const sl of slides) {
-      const dati = copy.slides[sl.index];
-      let r: SlideRecord;
-      try {
-        const png = await disegnaSlideEditoriale(dati, {
-          indice: sl.index,
-          totale: slides.length,
-          etichetta: etichettaEditoriale(sl.index, brand.nome_business || ""),
-          colori: ed.colori,
-          logo: ed.logo,
-          foto: dati.tipo === "copertina" ? fotoCopertina : dati.tipo === "passi" ? fotoPassi : null,
-          fonte,
-        });
-        const path = `${brand.user_id}/${carouselId}/slide_${sl.index + 1}_${Date.now()}.png`;
-        const { error } = await supabase.storage.from(OUTPUT_BUCKET).upload(path, png, { contentType: "image/png", upsert: true });
-        r = error ? { ...sl, path: null, error: error.message, status: "failed" } : { ...sl, path, error: null, status: "done" };
-      } catch (e) {
-        r = { ...sl, path: null, error: "disegno: " + ((e as Error).message || String(e)), status: "failed" };
-      }
-      risultati.push(r);
-      await patchSlide(supabase, carouselId, r);
+    // Le foto vanno in archivio: le slide si disegnano in chiamate separate.
+    const fotoPath: Disegno["fotoPath"] = { copertina: null, passi: null };
+    for (const [nome, dataUrl] of [["copertina", fotoCopertina], ["passi", fotoPassi]] as const) {
+      if (!dataUrl) continue;
+      const [testa, b64] = dataUrl.split(",");
+      const mime = testa.match(/^data:([^;]+)/)?.[1] || "image/png";
+      const path = `${brand.user_id}/${carouselId}/foto_${nome}.${mime === "image/jpeg" ? "jpg" : "png"}`;
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const { error } = await supabase.storage.from(OUTPUT_BUCKET).upload(path, bytes, { contentType: mime, upsert: true });
+      if (!error) fotoPath[nome] = path;
     }
-
-    const foto = [fotoCopertina, fotoPassi].filter(Boolean).length;
-    await chiudiCarosello(supabase, ctx, s, scopertaId, quando, carouselId, risultati, {
-      titolo: copy.titolo_carosello, caption: copy.caption, hashtags: copy.hashtags, costoUsd: foto * COST_NB2_IMAGE_1K,
-    });
+    const disegno: Disegno = {
+      scopertaId,
+      quando: quando.toISOString(),
+      fotoPath,
+      fonte,
+      costoUsd: [fotoCopertina, fotoPassi].filter(Boolean).length * COST_NB2_IMAGE_1K,
+    };
+    await supabase.from("produced_carousels").update({ copy: { ...copyRiga, disegno } }).eq("id", carouselId);
+    await lanciaDisegno(carouselId, 0);
   } catch (e) {
     console.error("Carosello editoriale non riuscito per", s.url, e);
     await aggiornaScoperta(supabase, scopertaId, { stato: "errore", errore: (e as Error).message.slice(0, 500) });
+  }
+}
+
+/** Quello che serve per disegnare le slide in chiamate separate, salvato nel copy del carosello. */
+type Disegno = {
+  scopertaId: string;
+  quando: string;
+  fotoPath: { copertina: string | null; passi: string | null };
+  fonte: string;
+  costoUsd: number;
+};
+
+/**
+ * Fa partire il disegno di una slide in una chiamata nuova. Supabase dà circa
+ * 2 s di CPU per chiamata: 8 slide insieme non ci stanno (prova del 06/11,
+ * «CPU Time exceeded» alla slide 6).
+ */
+async function lanciaDisegno(carouselId: string, indice: number): Promise<void> {
+  const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/scoperte-automatiche`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-cron-secret": Deno.env.get("CRON_SECRET") || "" },
+    body: JSON.stringify({ disegna: { carouselId, indice } }),
+  });
+  if (!r.ok) throw new Error(`Disegno della slide ${indice + 1} non partito: ${r.status}`);
+}
+
+/** Disegna una slide editoriale; poi lancia la successiva o, se era l'ultima, chiude il carosello. */
+async function disegnaSlide(supabase: Admin, carouselId: string, indice: number): Promise<void> {
+  const { data } = await supabase
+    .from("produced_carousels")
+    .select("brand_id, copy, slides, total")
+    .eq("id", carouselId)
+    .maybeSingle();
+  const riga = data as {
+    brand_id: string;
+    copy: CopyEditoriale & { disegno?: Disegno };
+    slides: SlideRecord[];
+    total: number;
+  } | null;
+  const dis = riga?.copy?.disegno;
+  if (!riga || !dis) {
+    console.error("Disegno: carosello senza dati", carouselId);
+    return;
+  }
+  try {
+    const prep = await prepara(supabase, riga.brand_id);
+    if (!prep.ok) throw new Error(prep.motivo);
+    const { ctx } = prep;
+    if (!ctx.editoriale) throw new Error("il brand non è più in stile editoriale");
+    const { brand } = ctx;
+    const dati = riga.copy.slides[indice];
+    const sl = riga.slides.find((x) => x.index === indice)!;
+    const fotoPath = dati.tipo === "copertina" ? dis.fotoPath.copertina : dati.tipo === "passi" ? dis.fotoPath.passi : null;
+    let foto: string | null = null;
+    if (fotoPath) {
+      const b64 = await downloadAsBase64(supabase, OUTPUT_BUCKET, fotoPath);
+      if (b64) foto = `data:${fotoPath.endsWith(".jpg") ? "image/jpeg" : "image/png"};base64,${b64}`;
+    }
+
+    let r: SlideRecord;
+    try {
+      const png = await disegnaSlideEditoriale(dati, {
+        indice,
+        totale: riga.total,
+        etichetta: etichettaEditoriale(indice, brand.nome_business || ""),
+        colori: ctx.editoriale.colori,
+        logo: ctx.editoriale.logo,
+        foto,
+        fonte: dis.fonte,
+      });
+      const path = `${brand.user_id}/${carouselId}/slide_${indice + 1}_${Date.now()}.png`;
+      const { error } = await supabase.storage.from(OUTPUT_BUCKET).upload(path, png, { contentType: "image/png", upsert: true });
+      r = error ? { ...sl, path: null, error: error.message, status: "failed" } : { ...sl, path, error: null, status: "done" };
+    } catch (e) {
+      r = { ...sl, path: null, error: "disegno: " + ((e as Error).message || String(e)), status: "failed" };
+    }
+    await patchSlide(supabase, carouselId, r);
+
+    if (indice < riga.total - 1) {
+      await lanciaDisegno(carouselId, indice + 1);
+      return;
+    }
+
+    const { data: finale } = await supabase.from("produced_carousels").select("slides").eq("id", carouselId).single();
+    const { data: sc } = await supabase
+      .from("scoperte")
+      .select("titolo, sintesi, fonte, url, data_pubblicazione, tipo_fonte")
+      .eq("id", dis.scopertaId)
+      .single();
+    const scoperta = sc as { titolo: string; sintesi: string[]; fonte: string; url: string; data_pubblicazione: string; tipo_fonte: string };
+    const s = { ...scoperta, data: scoperta.data_pubblicazione } as unknown as Scoperta;
+    await chiudiCarosello(supabase, ctx, s, dis.scopertaId, new Date(dis.quando), carouselId, (finale as { slides: SlideRecord[] }).slides, {
+      titolo: riga.copy.titolo_carosello, caption: riga.copy.caption, hashtags: riga.copy.hashtags, costoUsd: dis.costoUsd,
+    });
+  } catch (e) {
+    console.error("Disegno non riuscito per", carouselId, indice, e);
+    await aggiornaScoperta(supabase, dis.scopertaId, { stato: "errore", errore: (e as Error).message.slice(0, 500) });
   }
 }
 
