@@ -44,19 +44,23 @@ export class ContentService {
         return { data: null, error: { message: 'Utente non autenticato' } };
       }
 
-      // Usa la funzione RPC per inserire i dati
-      const { data, error } = await supabase.rpc('insert_generated_content', {
-        p_user_id: user.id,
-        p_title: params.title,
-        p_content_text: params.contentText,
-        p_topic: params.topic,
-        p_audience: params.audience || '',
-        p_platform: params.platform,
-        p_post_type: params.postType,
-        p_tone: params.tone,
-        p_length: params.length,
-        p_images: JSON.stringify(params.images)
-      });
+      // Tabella diretta: la RLS lascia scrivere solo le proprie righe.
+      const { data, error } = await supabase
+        .from('generated_contents')
+        .insert({
+          user_id: user.id,
+          title: params.title,
+          content_text: params.contentText,
+          topic: params.topic,
+          audience: params.audience || '',
+          platform: params.platform,
+          post_type: params.postType,
+          tone: params.tone,
+          length: params.length,
+          images: params.images,
+        })
+        .select()
+        .single();
 
       if (error) {
         console.error('❌ Errore salvataggio:', error);
@@ -79,9 +83,11 @@ export class ContentService {
         return { data: null, error: { message: 'Utente non autenticato' } };
       }
 
-      const { data, error } = await supabase.rpc('get_user_contents', {
-        p_user_id: user.id
-      });
+      const { data, error } = await supabase
+        .from('generated_contents')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
       return { data, error };
     } catch (error) {
@@ -98,10 +104,11 @@ export class ContentService {
         return { error: { message: 'Utente non autenticato' } };
       }
 
-      const { error } = await supabase.rpc('delete_user_content', {
-        p_content_id: id,
-        p_user_id: user.id
-      });
+      const { error } = await supabase
+        .from('generated_contents')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
 
       return { error };
     } catch (error) {
