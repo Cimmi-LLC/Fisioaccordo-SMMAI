@@ -10,8 +10,13 @@
 // segue via Realtime (+ polling di sicurezza).
 //
 // Actions:
-//   generate    → crea la riga, risponde 202, produce in background
-//   regenerate  → una singola slide di una riga esistente (sincrona)
+//   generate      → crea la riga, risponde 202, produce in background
+//   regenerate    → una singola slide di una riga esistente (sincrona)
+//   disegna_slide → interna: disegna UNA slide di un template a layout
+//
+// Template a layout (genome.layout, dal 06/11/2026): niente NB2, le slide le
+// disegna il server con Satori + Resvg (testo esatto), una per chiamata per
+// stare nel limite di CPU delle edge function.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { adminClient, requireAuth, assertBrandOwnership, requireWithinRateLimit } from "../_shared/auth.ts";
@@ -22,6 +27,10 @@ import { sanitize } from "../_shared/brand/genesisPrompt.ts";
 import type { SlideRole } from "../_shared/brand/archetypes.ts";
 import { COST_NB2_IMAGE_1K } from "../_shared/brand/costs.ts";
 import { resolveProfession, type ProfessionBrandLike } from "../_shared/brand/profession.ts";
+import { evidenziaAuto, isLayoutId, vuoleFoto, type LayoutId } from "../_shared/brand/layouts.ts";
+import {
+  caricaFoto, chiamaDisegno, coloriDelBrand, disegnaLayout, fotoDelBrand, leggiSpec, logoDelBrand,
+} from "../_shared/layoutRender.ts";
 
 const IMAGE_MODEL = "gemini-3.1-flash-image";
 const IMAGE_MODEL_FALLBACK = "nano-banana-pro-preview";
@@ -60,7 +69,7 @@ type VariantRow = {
   storage_bucket: string;
   storage_path: string;
   prompt_skeleton: string;
-  genome: { archetype?: string; format?: string } | null;
+  genome: { archetype?: string; format?: string; layout?: string; layout_etichetta?: string } | null;
 };
 
 type PaletteColors = { bg_color: string; title_color: string; body_color: string };
@@ -254,6 +263,75 @@ async function patchSlide(
     .eq("id", rowId);
 }
 
+/** Sceglie una foto dello studio diversa a ogni carosello (stessa per la stessa riga). */
+function scegli<T>(lista: T[], chiave: string): T | null {
+  if (lista.length === 0) return null;
+  let h = 0;
+  for (const ch of chiave) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return lista[h % lista.length];
+}
+
+/** Disegna e carica UNA slide di un template a layout, poi la scrive nella riga. */
+async function disegnaSlideLayout(
+  supabase: ReturnType<typeof adminClient>,
+  userId: string,
+  brandId: string,
+  rowId: string,
+  slide: SlideInput,
+  totale: number,
+): Promise<SlideRecord> {
+  const fallita = (error: string): SlideRecord => ({ ...slide, path: null, error, status: "failed" });
+  try {
+    const { data: variant } = await supabase
+      .from("template_variants")
+      .select("genome, prompt_skeleton")
+      .eq("brand_id", brandId)
+      .eq("slide_role", slide.role)
+      .maybeSingle();
+    const v = variant as Pick<VariantRow, "genome" | "prompt_skeleton"> | null;
+    const layout = v?.genome?.layout;
+    if (!v || !isLayoutId(layout)) return fallita("template senza layout");
+
+    const { data: brand } = await supabase.from("brands").select("*").eq("id", brandId).single();
+    const b = (brand || {}) as Record<string, unknown>;
+
+    // Foto: una vera dello studio (a rotazione fra i caroselli), altrimenti
+    // quella scelta per il template approvato.
+    let foto = null;
+    if (vuoleFoto(layout as LayoutId, slide.role) !== "no") {
+      const tutte = await fotoDelBrand(supabase, brandId, b);
+      const rif = scegli(tutte, rowId + slide.role) ?? leggiSpec(v.prompt_skeleton)?.foto ?? null;
+      foto = await caricaFoto(supabase, rif);
+    }
+    const logo = await logoDelBrand(b.logo_url);
+    const etichetta = v.genome?.layout_etichetta || resolveProfession(b as unknown as ProfessionBrandLike).kicker;
+
+    const bytes = await disegnaLayout({
+      layout: layout as LayoutId,
+      role: slide.role,
+      colori: coloriDelBrand(b, (b.genome as { palette?: { accent?: string } } | null)?.palette?.accent),
+      nome: String(b.nome_business || "Studio"),
+      logo,
+      foto: foto?.src ?? null,
+      etichetta,
+      titolo: evidenziaAuto(slide.title || ""),
+      testo: slide.body || "",
+      numero: slide.number,
+      indice: slide.index,
+      totale,
+    });
+    const path = `${userId}/${rowId}/slide_${slide.index + 1}_${Date.now()}.png`;
+    const { error: upErr } = await supabase.storage
+      .from(OUTPUT_BUCKET)
+      .upload(path, bytes, { contentType: "image/png", upsert: true });
+    if (upErr) return fallita(upErr.message);
+    return { ...slide, path, error: null, status: "done" };
+  } catch (e) {
+    console.error("disegno slide fallito:", e);
+    return fallita((e as Error).message || "disegno fallito");
+  }
+}
+
 serve(async (req) => {
   const pre = handlePreflight(req);
   if (pre) return pre;
@@ -273,6 +351,26 @@ serve(async (req) => {
     const colors = (body.colors ?? null) as PaletteColors | null;
 
     if (!brandId) return jsonResponse(req, { error: "brandId obbligatorio" }, 400);
+
+    // ─── DISEGNA_SLIDE: chiamata dal lavoro in background, una slide ───
+    // Niente AI: fuori dal rate limit.
+    if (action === "disegna_slide") {
+      const own = await assertBrandOwnership(supabase, userId, brandId);
+      if (!own.ok) return jsonResponse(req, { error: own.error }, own.status);
+      const rowId = String(body.carouselId || "");
+      const slide = body.slide as SlideInput | undefined;
+      const { data: row } = await supabase
+        .from("produced_carousels")
+        .select("id, user_id, total")
+        .eq("id", rowId)
+        .maybeSingle();
+      const r0 = row as { user_id: string; total: number } | null;
+      if (!r0 || r0.user_id !== userId || !slide) return jsonResponse(req, { error: "Carosello non trovato" }, 404);
+      const result = await disegnaSlideLayout(supabase, userId, brandId, rowId, slide, r0.total || 1);
+      await patchSlide(supabase, rowId, result);
+      return result.path ? jsonResponse(req, { path: result.path }) : jsonResponse(req, { error: result.error }, 500);
+    }
+
     if (slides.length === 0 || slides.length > 12) {
       return jsonResponse(req, { error: "slides: da 1 a 12" }, 400);
     }
@@ -304,8 +402,11 @@ serve(async (req) => {
       }, 409);
     }
 
+    // Template a layout: le slide le disegna il server (4:5, testo esatto).
+    const aLayout = isLayoutId(byRole.get("content")!.genome?.layout);
+
     // Formato dal genoma congelato del template (default 1:1 per i vecchi).
-    const format = byRole.get("content")!.genome?.format === "4:5" ? "4:5" : "1:1";
+    const format = aLayout || byRole.get("content")!.genome?.format === "4:5" ? "4:5" : "1:1";
 
     // Modello scelto dallo studio (brands.image_model, card impostazioni) e
     // professione del brand: il suo kicker (es. NUTRIZIONE) sostituisce
@@ -323,9 +424,9 @@ serve(async (req) => {
     const brandSecondary = coloreSceltoDalKit((brandPrefs as Record<string, unknown> | null)?.colore_secondario);
     console.log("Produzione con cascata modelli:", modelKey, models.join(" -> "), "| kicker:", kicker, "| colore kit:", brandPrimary || "(default)");
 
-    // Scarica le 3 reference una volta sola.
+    // Scarica le 3 reference una volta sola (solo per i template NB2).
     const refCache = new Map<SlideRole, string>();
-    for (const role of ["cover", "content", "cta"] as SlideRole[]) {
+    for (const role of (aLayout ? [] : ["cover", "content", "cta"]) as SlideRole[]) {
       const v = byRole.get(role)!;
       const b64 = await downloadAsBase64(supabase, v.storage_bucket, v.storage_path);
       if (!b64) return jsonResponse(req, { error: `Reference ${role} non scaricabile` }, 500);
@@ -385,20 +486,23 @@ serve(async (req) => {
       if (!rowId) return jsonResponse(req, { error: "carouselId obbligatorio" }, 400);
       const { data: row } = await supabase
         .from("produced_carousels")
-        .select("id, user_id")
+        .select("id, user_id, total")
         .eq("id", rowId)
         .maybeSingle();
       if (!row || (row as { user_id: string }).user_id !== userId) {
         return jsonResponse(req, { error: "Carosello non trovato" }, 404);
       }
+      const totaleRiga = (row as { total?: number }).total || slides[0].index + 1;
 
-      const result = await produceOne(rowId, slides[0]);
+      const result = aLayout
+        ? await disegnaSlideLayout(supabase, userId, brandId, rowId, slides[0], totaleRiga)
+        : await produceOne(rowId, slides[0]);
       await patchSlide(supabase, rowId, result);
       await logGeneration({
         userId, brandId, type: "carousel",
         status: result.path ? "success" : "failed",
         title: "Rigenerazione slide " + (slides[0].index + 1),
-        metadata: { phase: "regenerate-slide", carouselId: rowId, estimated_cost_usd: result.path ? COST_NB2_IMAGE_1K : 0 },
+        metadata: { phase: "regenerate-slide", carouselId: rowId, layout: aLayout, estimated_cost_usd: result.path && !aLayout ? COST_NB2_IMAGE_1K : 0 },
       });
       if (!result.path) return jsonResponse(req, { error: result.error || "generazione fallita" }, 502);
       return jsonResponse(req, { bucket: OUTPUT_BUCKET, path: result.path, index: result.index });
@@ -436,6 +540,16 @@ serve(async (req) => {
       try {
         const results = await runPool(
           slides.map((s) => async () => {
+            if (aLayout) {
+              // Una chiamata per slide: la slide la scrive nella riga lei stessa.
+              const r = await chiamaDisegno("generate-carousel-slides", auth.authHeader, {
+                action: "disegna_slide", brandId, carouselId: rowId, slide: s,
+              });
+              if (r.ok) return { ...s, path: "", error: null, status: "done" } as SlideRecord;
+              const fallita: SlideRecord = { ...s, path: null, error: r.errore || "disegno fallito", status: "failed" };
+              await patchSlide(supabase, rowId, fallita);
+              return fallita;
+            }
             const r = await produceOne(rowId, s);
             await patchSlide(supabase, rowId, r);
             return r;
@@ -453,7 +567,7 @@ serve(async (req) => {
           userId, brandId, type: "carousel",
           status: finalStatus === "ready" ? "success" : finalStatus === "partial" ? "partial" : "failed",
           title: "Produzione carosello (" + okCount + "/" + slides.length + " slide)",
-          metadata: { phase: "produce-slides", carouselId: rowId, format, estimated_cost_usd: okCount * COST_NB2_IMAGE_1K },
+          metadata: { phase: "produce-slides", carouselId: rowId, format, layout: aLayout, estimated_cost_usd: aLayout ? 0 : okCount * COST_NB2_IMAGE_1K },
         });
       } catch (e) {
         console.error("Produzione background fallita:", e);

@@ -1,25 +1,35 @@
 // Edge function di genesi del template.
 //
 // Actions:
-//   analyze    → lettura semantica dei post caricati (gemini-2.5-flash vision)
-//   generate   → art director sceglie il genoma + 9 immagini NB2 in background
-//   regenerate → come generate ma con feedback prioritario e genome_version+1
+//   analyze           → lettura semantica dei post caricati (gemini-2.5-flash vision)
+//   generate          → i 3 layout × 3 slide, testi di prova da Gemini, in background
+//   regenerate        → come generate ma con feedback prioritario e genome_version+1
+//   disegna_candidato → interna: disegna UNA slide a layout (limite di CPU)
+//   riprova_candidato → ridisegna una variante fallita
 //
-// La risposta a generate/regenerate e un 202 immediato: le 9 immagini si
-// generano in background (EdgeRuntime.waitUntil) con concorrenza 3, e il
+// La risposta a generate/regenerate e un 202 immediato: le 9 slide si
+// disegnano in background (EdgeRuntime.waitUntil), una per chiamata, e il
 // client segue il progresso via Realtime/polling su template_candidates.
+//
+// Fino al 06/11/2026 l'art director sceglieva un archetipo e NB2 disegnava
+// tutta la slide, testo compreso: clipart piatte e decorazioni senza senso,
+// «nessuno li pubblicherebbe» (Attilio). Il vecchio percorso resta solo per
+// riprovare i candidati generati prima.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { adminClient, requireAuth, assertBrandOwnership, requireWithinRateLimit } from "../_shared/auth.ts";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { callGeminiWithRetry } from "../_shared/gemini.ts";
 import { logGeneration } from "../_shared/historyLogger.ts";
-import { buildArtDirectorPrompt, parseArtDirectorResponse } from "../_shared/brand/artDirector.ts";
-import type { ArtDirectorBrandInfo, BrandSemantics } from "../_shared/brand/artDirector.ts";
-import { buildGenesisPrompt } from "../_shared/brand/genesisPrompt.ts";
-import type { GenesisBrandKit, GenesisPalette, GenesisVariant } from "../_shared/brand/genesisPrompt.ts";
-import type { TemplateGenome } from "../_shared/brand/genome.ts";
+import type { GenesisPalette } from "../_shared/brand/genesisPrompt.ts";
+import { genomaPerLayout } from "../_shared/brand/genome.ts";
 import type { SlideRole } from "../_shared/brand/archetypes.ts";
+import { LAYOUT_IDS, layoutConsigliato, vuoleFoto, type LayoutId } from "../_shared/brand/layouts.ts";
+import { leggiTestiProva, promptTestiProva, testiDaSegnaposto } from "../_shared/brand/layoutCopy.ts";
+import {
+  caricaFoto, chiamaDisegno, coloriDelBrand, disegnaLayout, fotoDelBrand, leggiSpec, logoDelBrand,
+  type RifFoto, type SpecLayout,
+} from "../_shared/layoutRender.ts";
 import { estimateGenesisCost, COST_GEMINI_FLASH_CALL } from "../_shared/brand/costs.ts";
 import { buildSemanticsPrompt, parseSemanticsResponse } from "./semantics.ts";
 import { resolveProfession, placeholderCopyFor } from "../_shared/brand/profession.ts";
@@ -29,7 +39,6 @@ const IMAGE_MODEL_FALLBACK = "nano-banana-pro-preview";
 const TEXT_MODEL = "gemini-2.5-flash";
 const BUCKET = "brand-assets";
 const ROLES: SlideRole[] = ["cover", "content", "cta"];
-const VARIANTS: GenesisVariant[] = [1, 2, 3];
 const CONCURRENCY = 3;
 
 type BrandRow = {
@@ -53,27 +62,6 @@ type BrandRow = {
   raw_analysis?: { professione?: unknown } | null;
   target_pazienti?: string | null;
 };
-
-/**
- * Piu materiale distintivo riceve l'art director, meno il risultato
- * converge sulla scelta generica valida per qualsiasi studio sanitario.
- */
-function brandInfo(b: BrandRow): ArtDirectorBrandInfo {
-  return {
-    nome_business: b.nome_business || "Studio",
-    professione: resolveProfession(b).label,
-    descrizione: b.descrizione || "",
-    categorie: b.categorie || [],
-    servizi: b.servizi || [],
-    tono_voce: b.tono_voce || "professionale",
-    mission: b.mission || undefined,
-    identita_core: b.identita_core || undefined,
-    vantaggi_competitivi: b.vantaggi_competitivi || undefined,
-    temi_chiave: b.temi_chiave || undefined,
-    font_intestazioni: b.font_intestazioni || undefined,
-    font_body: b.font_body || undefined,
-  };
-}
 
 async function downloadAsBase64(
   supabase: ReturnType<typeof adminClient>,
@@ -124,6 +112,89 @@ async function generateOneImage(
     }
   }
   return null;
+}
+
+/** Foto per il layout B quando lo studio non ne ha: posto vero, nessun testo. */
+function promptFotoLayout(b: BrandRow): string {
+  return [
+    `Editorial photograph for the Instagram carousel of ${b.nome_business || "a healthcare studio"} (${resolveProfession(b).label}).`,
+    b.descrizione ? `About the business: ${String(b.descrizione).slice(0, 300)}` : "",
+    "Show a real, bright, tidy place where this work happens, for example a treatment room or a studio reception, " +
+      "natural window light, shallow depth of field, calm and warm, shot on a full-frame camera. Vertical 4:5.",
+    "Absolutely no text, letters, numbers, logos or signs. No computer screens or documents with readable data. " +
+      "If people appear they are seen from behind or out of focus.",
+  ].filter(Boolean).join("\n");
+}
+
+/** Disegna un candidato a layout e lo carica: una slide, dentro il limite di CPU. */
+async function disegnaCandidato(
+  supabase: ReturnType<typeof adminClient>,
+  userId: string,
+  brandId: string,
+  candidateId: string,
+): Promise<{ ok: true; path: string } | { ok: false; errore: string }> {
+  const { data: cand } = await supabase
+    .from("template_candidates")
+    .select("id, user_id, brand_id, genesis_prompt, slide_role, variant_index, genome_version")
+    .eq("id", candidateId)
+    .maybeSingle();
+  const c = cand as {
+    id: string; user_id: string; brand_id: string; genesis_prompt: string;
+    slide_role: string; variant_index: number; genome_version: number;
+  } | null;
+  if (!c || c.user_id !== userId || c.brand_id !== brandId) return { ok: false, errore: "Variante non trovata" };
+  const spec = leggiSpec(c.genesis_prompt);
+  if (!spec) return { ok: false, errore: "Variante senza layout" };
+
+  const segna = (patch: Record<string, unknown>) => supabase.from("template_candidates")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", c.id);
+  await segna({ status: "generating", error: null });
+  try {
+    const { data: brand } = await supabase
+      .from("brands")
+      .select("nome_business, colore_primario, colore_secondario, logo_url, genome")
+      .eq("id", brandId)
+      .single();
+    const b = (brand || {}) as Record<string, unknown>;
+    const [logo, foto] = await Promise.all([
+      logoDelBrand(b.logo_url),
+      vuoleFoto(spec.layout, spec.role) === "no" ? null : caricaFoto(supabase, spec.foto),
+    ]);
+    // Il template mostra copertina, contenuto e chiusura di un carosello da 5.
+    const t = spec.testi;
+    const pezzo = spec.role === "cover"
+      ? { titolo: t.copertina.titolo, testo: t.copertina.sotto, indice: 0 }
+      : spec.role === "content"
+      ? { titolo: t.contenuto.titolo, testo: t.contenuto.testo, indice: 1 }
+      : { titolo: t.chiusura.titolo, testo: t.chiusura.testo, indice: 4 };
+    const bytes = await disegnaLayout({
+      layout: spec.layout,
+      role: spec.role,
+      colori: coloriDelBrand(b, (b.genome as { palette?: { accent?: string } } | null)?.palette?.accent),
+      nome: String(b.nome_business || "Studio"),
+      logo,
+      foto: foto?.src ?? null,
+      etichetta: t.etichetta,
+      ...pezzo,
+      totale: 5,
+    });
+    const path = `${userId}/${brandId}/candidates/v${c.genome_version}/${c.slide_role}_${c.variant_index}.png`;
+    const { error: upErr } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, bytes, { contentType: "image/png", upsert: true });
+    if (upErr) {
+      await segna({ status: "failed", error: "upload fallito: " + upErr.message });
+      return { ok: false, errore: "Upload fallito: " + upErr.message };
+    }
+    await segna({ status: "done", storage_bucket: BUCKET, storage_path: path, error: null });
+    return { ok: true, path };
+  } catch (e) {
+    const msg = (e as Error).message || "disegno fallito";
+    console.error("disegno candidato fallito:", msg);
+    await segna({ status: "failed", error: msg.slice(0, 300) });
+    return { ok: false, errore: msg };
+  }
 }
 
 /** Pool a concorrenza limitata. */
@@ -209,6 +280,14 @@ serve(async (req) => {
       return jsonResponse(req, { bucket: BUCKET, path });
     }
 
+    // ─── DISEGNA_CANDIDATO ────────────────────────────────────
+    // Chiamata dal lavoro in background di generate, una slide per volta:
+    // niente AI, quindi fuori dal rate limit.
+    if (action === "disegna_candidato") {
+      const r = await disegnaCandidato(supabase, userId, brandId, String(body.candidateId || ""));
+      return r.ok ? jsonResponse(req, { ok: true, path: r.path }) : jsonResponse(req, { error: r.errore }, 500);
+    }
+
     // ─── RIPROVA_CANDIDATO ────────────────────────────────────
     // Rigenera UNA variante fallita (revisione 03/11: «un modo per
     // rigenerarla», non solo «Rigenera tutto» che rifà 9 immagini).
@@ -232,6 +311,12 @@ serve(async (req) => {
       } | null;
       if (!c || c.user_id !== userId || c.brand_id !== brandId || !c.genesis_prompt) {
         return jsonResponse(req, { error: "Variante non trovata" }, 404);
+      }
+      // Variante a layout: si ridisegna, niente modello delle immagini.
+      if (leggiSpec(c.genesis_prompt)) {
+        const r = await disegnaCandidato(supabase, userId, brandId, c.id);
+        if (!r.ok) return jsonResponse(req, { error: "La variante non è uscita: " + r.errore }, 502);
+        return jsonResponse(req, { ok: true, candidateId: c.id, path: r.path });
       }
 
       await supabase.from("template_candidates")
@@ -369,79 +454,18 @@ serve(async (req) => {
     }
 
     // ─── GENERATE / REGENERATE ────────────────────────────────
+    // I 3 layout (A colore del brand, B foto editoriale, C carta clinica),
+    // ognuno con copertina, contenuto e chiusura: 9 slide disegnate dal
+    // server col testo esatto. Lo studio sceglie un layout intero.
     if (action === "generate" || action === "regenerate") {
       const palette = body.palette as GenesisPalette | undefined;
-      const semantics = (body.semantics ?? null) as BrandSemantics | null;
       const feedback = typeof body.feedback === "string" ? body.feedback : undefined;
       if (!palette || !palette.bg_a || !palette.bg_b || !palette.accent) {
         return jsonResponse(req, { error: "palette mancante o incompleta" }, 400);
       }
+      const b = brand as BrandRow & Record<string, unknown>;
 
-      // Archetipi gia usati dagli altri brand dell'account: l'art director
-      // li evita quando puo, per dare varieta visiva tra i brand.
-      const { data: otherBrands } = await supabase
-        .from("brands")
-        .select("genome")
-        .eq("user_id", userId)
-        .neq("id", brandId)
-        .not("genome", "is", null);
-      const otherGenomes = ((otherBrands || []) as Array<{
-        genome: { archetype?: string; decoration_motif?: string } | null;
-      }>).map((b) => b.genome).filter(Boolean);
-      const usedArchetypes = Array.from(new Set(
-        otherGenomes
-          .map((g) => g!.archetype)
-          .filter((a): a is string => typeof a === "string" && a.length > 0)
-      ));
-      const usedMotifs = Array.from(new Set(
-        otherGenomes
-          .map((g) => g!.decoration_motif)
-          .filter((m): m is string => typeof m === "string" && m.length > 0)
-      )).slice(0, 8);
-
-      // Art director: 1 tentativo + 1 retry con gli errori appesi.
-      let genome: TemplateGenome | null = null;
-      let adErrors: string[] = [];
-      for (let attempt = 0; attempt < 2 && !genome; attempt++) {
-        const prompt = buildArtDirectorPrompt(
-          brandInfo(brand as BrandRow),
-          semantics,
-          palette,
-          feedback,
-          attempt > 0 ? adErrors : undefined,
-          usedArchetypes,
-          usedMotifs,
-        );
-        const result = await callGeminiWithRetry({
-          apiKey: GEMINI_API_KEY,
-          model: TEXT_MODEL,
-          body: {
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            // Temperatura alta di proposito: con 0.7 il modello cadeva sempre
-            // sulla scelta "sicura" e i brand simili convergevano.
-            generationConfig: { temperature: 0.95, responseMimeType: "application/json" },
-          },
-        });
-        const raw = result?.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        const parsed = parseArtDirectorResponse(raw);
-        if (parsed.ok) genome = parsed.genome;
-        else adErrors = parsed.errors;
-      }
-      if (!genome) {
-        await supabase.from("brands").update({ genesis_status: "failed" }).eq("id", brandId);
-        return jsonResponse(req, { error: "Art director fallito: " + adErrors.join("; ") }, 502);
-      }
-
-      // Stile visual e formato: scelte dell'utente nel wizard, non dell'art
-      // director. Iniettate nel genoma cosi si propagano a candidati,
-      // brands.genome e allo skeleton congelato all'approvazione.
-      genome = {
-        ...genome,
-        visual_style: body.visualStyle === "realistic" ? "realistic" : "flat_icon",
-        format: body.format === "1:1" ? "1:1" : "4:5",
-      };
-
-      // Versione genoma: +1 su regenerate.
+      // Versione genoma: +1 a ogni giro.
       const { data: maxRow } = await supabase
         .from("template_candidates")
         .select("genome_version")
@@ -449,29 +473,24 @@ serve(async (req) => {
         .order("genome_version", { ascending: false })
         .limit(1)
         .maybeSingle();
-      const genomeVersion = action === "regenerate"
-        ? (((maxRow as { genome_version?: number } | null)?.genome_version) || 0) + 1
-        : (((maxRow as { genome_version?: number } | null)?.genome_version) || 0) + 1;
+      const genomeVersion = (((maxRow as { genome_version?: number } | null)?.genome_version) || 0) + 1;
 
-      // La palette entra nel jsonb accanto al genoma: serve alla pipeline di
-      // produzione per risolvere {{bg_color}}/{{title_color}}/{{body_color}}.
+      // Chi ha foto vere parte dalla foto editoriale, gli altri dal colore.
+      const fotoBrand = await fotoDelBrand(supabase, brandId, b);
+      const genome = genomaPerLayout(layoutConsigliato(fotoBrand.length > 0), "");
+
+      // La palette resta nel jsonb accanto al genoma, come prima.
       await supabase.from("brands")
         .update({ genome: { ...genome, palette }, genesis_status: "generating" })
         .eq("id", brandId);
 
-      const kit: GenesisBrandKit = {
-        nome_business: (brand as BrandRow).nome_business || "Studio",
-        palette,
-      };
-      // Copy segnaposto della professione: il kicker di copertina (es.
-      // NUTRIZIONE) e i titoli d'esempio finiscono dentro il template.
-      const placeholderCopy = placeholderCopyFor(resolveProfession(brand as BrandRow));
-
-      // Crea i 9 record pending.
-      const candidates: Array<{ id: string; role: SlideRole; variant: GenesisVariant; prompt: string }> = [];
-      for (const role of ROLES) {
-        for (const variant of VARIANTS) {
-          const prompt = buildGenesisPrompt(kit, genome, role, variant, placeholderCopy);
+      // Testi di riserva subito nei record: Gemini li sostituisce in background.
+      const riserva = testiDaSegnaposto(placeholderCopyFor(resolveProfession(b)));
+      const candidates: Array<{ id: string; layout: LayoutId; role: SlideRole; variant: number }> = [];
+      for (const layout of LAYOUT_IDS) {
+        const variant = LAYOUT_IDS.indexOf(layout) + 1;
+        for (const role of ROLES) {
+          const spec: SpecLayout = { tipo: "layout", layout, role, testi: riserva, foto: null };
           const { data: row, error: insErr } = await supabase
             .from("template_candidates")
             .insert({
@@ -480,8 +499,8 @@ serve(async (req) => {
               genome_version: genomeVersion,
               slide_role: role,
               variant_index: variant,
-              genome,
-              genesis_prompt: prompt,
+              genome: genomaPerLayout(layout, riserva.etichetta),
+              genesis_prompt: JSON.stringify(spec),
               status: "pending",
             })
             .select("id")
@@ -490,42 +509,96 @@ serve(async (req) => {
             console.error("insert candidate fallito:", insErr?.message);
             continue;
           }
-          candidates.push({ id: (row as { id: string }).id, role, variant, prompt });
+          candidates.push({ id: (row as { id: string }).id, layout, role, variant });
         }
       }
 
-      // Generazione in background: risposta immediata al client.
-      const generateAll = async () => {
-        let okCount = 0;
-        const jobs = candidates.map((c) => async () => {
-          await supabase.from("template_candidates")
-            .update({ status: "generating", updated_at: new Date().toISOString() })
-            .eq("id", c.id);
-          const bytes = await generateOneImage(GEMINI_API_KEY, c.prompt, genome!.format === "4:5" ? "4:5" : "1:1");
-          if (!bytes) {
-            await supabase.from("template_candidates")
-              .update({ status: "failed", error: "nessuna immagine dal modello", updated_at: new Date().toISOString() })
-              .eq("id", c.id);
-            return;
+      const lavoro = async () => {
+        let testiDaGemini = false;
+        let fotoGenerata = false;
+        try {
+          // 1. Testi di prova rivolti al pubblico vero del brand.
+          let testi = riserva;
+          try {
+            const r = await callGeminiWithRetry({
+              apiKey: GEMINI_API_KEY,
+              model: TEXT_MODEL,
+              body: {
+                contents: [{ role: "user", parts: [{ text: promptTestiProva({
+                  nome_business: b.nome_business,
+                  professione: resolveProfession(b).label,
+                  descrizione: b.descrizione,
+                  target_pazienti: b.target_pazienti,
+                  servizi: b.servizi,
+                  vantaggi_competitivi: b.vantaggi_competitivi,
+                  cta_suggerite: b.cta_suggerite as string[] | null,
+                  frasi_pazienti: b.frasi_pazienti as string[] | null,
+                  convinzione_da_ribaltare: b.convinzione_da_ribaltare as string | null,
+                }, feedback) }] }],
+                generationConfig: { temperature: 0.7, responseMimeType: "application/json" },
+              },
+            });
+            const letti = leggiTestiProva(r?.data?.candidates?.[0]?.content?.parts?.[0]?.text || "");
+            if (letti) {
+              testi = { ...letti, etichetta: letti.etichetta || riserva.etichetta };
+              testiDaGemini = true;
+            }
+          } catch (e) {
+            console.warn("testi di prova da Gemini saltati:", (e as Error).message);
           }
-          const path = `${userId}/${brandId}/candidates/v${genomeVersion}/${c.role}_${c.variant}.png`;
-          const { error: upErr } = await supabase.storage
-            .from(BUCKET)
-            .upload(path, bytes, { contentType: "image/png", upsert: true });
-          if (upErr) {
-            await supabase.from("template_candidates")
-              .update({ status: "failed", error: "upload fallito: " + upErr.message, updated_at: new Date().toISOString() })
-              .eq("id", c.id);
-            return;
+
+          // 2. Foto: quelle dello studio; il layout B senza foto ne riceve una generata.
+          let fotoCopertina: RifFoto | null = fotoBrand[0] ?? null;
+          let fotoChiusura: RifFoto | null = fotoBrand[1] ?? fotoBrand[0] ?? null;
+          if (!fotoCopertina) {
+            const bytes = await generateOneImage(GEMINI_API_KEY, promptFotoLayout(b), "4:5");
+            if (bytes) {
+              const path = `${userId}/${brandId}/candidates/v${genomeVersion}/foto_layout.png`;
+              const { error: upErr } = await supabase.storage
+                .from(BUCKET)
+                .upload(path, bytes, { contentType: "image/png", upsert: true });
+              if (!upErr) {
+                fotoCopertina = fotoChiusura = { bucket: BUCKET, path };
+                fotoGenerata = true;
+              }
+            }
           }
-          await supabase.from("template_candidates")
-            .update({ status: "done", storage_bucket: BUCKET, storage_path: path, updated_at: new Date().toISOString() })
-            .eq("id", c.id);
-          okCount++;
-        });
 
-        await runPool(jobs, CONCURRENCY);
+          // 3. Record definitivi.
+          for (const c of candidates) {
+            const vuole = vuoleFoto(c.layout, c.role);
+            const foto = vuole === "no" || (vuole === "se_c_e" && fotoBrand.length === 0)
+              ? null
+              : c.role === "cta" ? fotoChiusura : fotoCopertina;
+            const spec: SpecLayout = { tipo: "layout", layout: c.layout, role: c.role, testi, foto };
+            await supabase.from("template_candidates")
+              .update({ genesis_prompt: JSON.stringify(spec), genome: genomaPerLayout(c.layout, testi.etichetta) })
+              .eq("id", c.id);
+          }
 
+          // 4. Una slide per chiamata (limite di CPU), tre alla volta.
+          await runPool(candidates.map((c) => async () => {
+            const r = await chiamaDisegno("generate-template", auth.authHeader, {
+              action: "disegna_candidato", brandId, candidateId: c.id,
+            });
+            if (!r.ok) {
+              await supabase.from("template_candidates")
+                .update({ status: "failed", error: r.errore || "disegno fallito", updated_at: new Date().toISOString() })
+                .eq("id", c.id)
+                .neq("status", "done");
+            }
+          }), CONCURRENCY);
+        } catch (e) {
+          console.error("genesi layout fallita:", e);
+        }
+
+        const { count } = await supabase
+          .from("template_candidates")
+          .select("id", { count: "exact", head: true })
+          .eq("brand_id", brandId)
+          .eq("genome_version", genomeVersion)
+          .eq("status", "done");
+        const okCount = count || 0;
         await supabase.from("brands")
           .update({ genesis_status: okCount === 0 ? "failed" : "awaiting_approval" })
           .eq("id", brandId);
@@ -539,9 +612,12 @@ serve(async (req) => {
           metadata: {
             phase: action,
             genomeVersion,
+            layout: true,
+            testi_da_gemini: testiDaGemini,
+            foto_generata: fotoGenerata,
             ok: okCount,
             failed: candidates.length - okCount,
-            estimated_cost_usd: estimateGenesisCost(okCount, 2),
+            estimated_cost_usd: estimateGenesisCost(fotoGenerata ? 1 : 0, 1),
           },
         });
       };
@@ -550,8 +626,8 @@ serve(async (req) => {
       const runtime = (globalThis as Record<string, unknown>).EdgeRuntime as
         | { waitUntil?: (p: Promise<unknown>) => void }
         | undefined;
-      if (runtime?.waitUntil) runtime.waitUntil(generateAll());
-      else generateAll();
+      if (runtime?.waitUntil) runtime.waitUntil(lavoro());
+      else lavoro();
 
       return jsonResponse(req, {
         accepted: true,

@@ -17,7 +17,6 @@ import { useGenesis } from './hooks/useGenesis.ts';
 import { useTemplateCandidates } from './hooks/useTemplateCandidates.ts';
 import { coloriDaCompletare } from '@/lib/brand/skipGenesis.ts';
 import type { SlideRole } from '@/lib/brand/archetypes.ts';
-import type { VisualStyle, SlideFormat } from '@/lib/brand/genome.ts';
 
 type WizardStep = 0 | 1 | 2 | 3;
 
@@ -33,8 +32,6 @@ const TemplateGenesisWizard: React.FC = () => {
   const [step, setStep] = useState<WizardStep>(0);
   const [selection, setSelection] = useState<Partial<Record<SlideRole, string>>>({});
   const [existingLogoUrl, setExistingLogoUrl] = useState<string | null>(null);
-  const [visualStyle, setVisualStyle] = useState<VisualStyle>('flat_icon');
-  const [format, setFormat] = useState<SlideFormat>('4:5');
   const [skipping, setSkipping] = useState(false);
 
   const genesis = useGenesis(brandId);
@@ -79,12 +76,12 @@ const TemplateGenesisWizard: React.FC = () => {
   };
 
   const handleGenerate = async () => {
-    const ok = await genesis.generate(undefined, visualStyle, format);
+    const ok = await genesis.generate(undefined);
     if (ok) { setSelection({}); setStep(2); }
   };
 
   const handleRegenerate = async (feedback: string) => {
-    const ok = await genesis.generate(feedback, visualStyle, format);
+    const ok = await genesis.generate(feedback);
     if (ok) setSelection({});
   };
 
@@ -160,11 +157,7 @@ const TemplateGenesisWizard: React.FC = () => {
               busy={genesis.busy}
               palette={genesis.palette}
               semantics={genesis.semantics}
-              visualStyle={visualStyle}
-              format={format}
               onPaletteChange={genesis.setPalette}
-              onVisualStyleChange={setVisualStyle}
-              onFormatChange={setFormat}
               onConfirm={handleGenerate}
             />
           )}
@@ -177,6 +170,7 @@ const TemplateGenesisWizard: React.FC = () => {
               onSelect={(role, id) => setSelection((s) => ({ ...s, [role]: id }))}
               onRegenerate={handleRegenerate}
               onContinue={() => setStep(3)}
+              consigliato={genesis.genome?.layout ?? null}
             />
           )}
 
