@@ -122,6 +122,14 @@ describe('alberoSlide', () => {
     expect(tutto.join(' ')).not.toContain('SCORRI');
   });
 
+  it('niente gradienti CSS né overflow sulla radice: costavano CPU oltre il limite', () => {
+    for (const layout of LAYOUT_IDS) for (const role of ['cover', 'content', 'cta'] as const) {
+      const albero = alberoSlide({ ...BASE, layout, role, foto: 'data:image/jpeg;base64,AA' });
+      expect((albero.props.style as Record<string, unknown>).overflow).toBeUndefined();
+      expect(JSON.stringify(albero)).not.toContain('-gradient(');
+    }
+  });
+
   it('senza logo scrive il nome dello studio', () => {
     expect(testi(alberoSlide({ ...BASE, layout: 'carta_clinica', role: 'cover' }))).toContain('GestioMed');
   });

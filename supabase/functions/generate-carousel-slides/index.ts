@@ -29,7 +29,7 @@ import { COST_NB2_IMAGE_1K } from "../_shared/brand/costs.ts";
 import { resolveProfession, type ProfessionBrandLike } from "../_shared/brand/profession.ts";
 import { evidenziaAuto, isLayoutId, vuoleFoto, type LayoutId } from "../_shared/brand/layouts.ts";
 import {
-  caricaFoto, chiamaDisegno, coloriDelBrand, disegnaLayout, fotoDelBrand, leggiSpec, logoDelBrand,
+  DISEGNI_IN_PARALLELO, caricaFoto, chiamaDisegno, coloriDelBrand, disegnaLayout, fotoDelBrand, leggiSpec, logoDelBrand,
 } from "../_shared/layoutRender.ts";
 
 const IMAGE_MODEL = "gemini-3.1-flash-image";
@@ -303,7 +303,7 @@ async function disegnaSlideLayout(
       const rif = scegli(tutte, rowId + slide.role) ?? leggiSpec(v.prompt_skeleton)?.foto ?? null;
       foto = await caricaFoto(supabase, rif);
     }
-    const logo = await logoDelBrand(b.logo_url);
+    const logo = await logoDelBrand(supabase, brandId, b.logo_url);
     const etichetta = v.genome?.layout_etichetta || resolveProfession(b as unknown as ProfessionBrandLike).kicker;
 
     const bytes = await disegnaLayout({
@@ -554,7 +554,7 @@ serve(async (req) => {
             await patchSlide(supabase, rowId, r);
             return r;
           }),
-          CONCURRENCY,
+          aLayout ? DISEGNI_IN_PARALLELO : CONCURRENCY,
         );
         const okCount = results.filter((r) => r.status === "done").length;
         const finalStatus = okCount === slides.length ? "ready" : okCount > 0 ? "partial" : "failed";
