@@ -311,6 +311,12 @@ describe('carosello editoriale (template approvato il 01/11 sul laser)', () => {
     expect(numeriFuoriFonte(convertito, barbabietola)).toEqual([]);
     const inventatoGiorni = leggiCopyEditoriale(json({ caption: 'Dopo 9 giorni. Fonte: 2026' }))!;
     expect(numeriFuoriFonte(inventatoGiorni, barbabietola)).toEqual(['9']);
+    // Trigger point, 06/11: 86.85% si può dire 87%, non 90%
+    const trigger = { ...studio, abstract: `${studio.abstract || ''} Pain reduced by 86.85%.` };
+    const arrotondato = leggiCopyEditoriale(json({ caption: 'Il dolore cala dell\'87%. Fonte: 2026' }))!;
+    expect(numeriFuoriFonte(arrotondato, trigger)).toEqual([]);
+    const gonfiato = leggiCopyEditoriale(json({ caption: 'Il dolore cala del 90%. Fonte: 2026' }))!;
+    expect(numeriFuoriFonte(gonfiato, trigger)).toEqual(['90']);
     const sigla = leggiCopyEditoriale(json({ caption: 'SMD: 0.57' }))!;
     expect(problemiEditoriale(sigla, studio, {})).toContain('sigle statistiche nel testo');
     const vietata = leggiCopyEditoriale(json({ caption: 'Ti sblocchiamo la schiena' }))!;

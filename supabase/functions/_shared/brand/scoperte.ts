@@ -822,6 +822,13 @@ const NUMERI_IN_LETTERE: Record<string, number> = {
  */
 function numeriDellaFonte(testo: string): Set<string> {
   const fonte = new Set(numeriIn(testo));
+  // Arrotondamenti onesti: 86.85 → 87 o 86.9 (non 90).
+  for (const n of Array.from(fonte)) {
+    if (!n.includes('.')) continue;
+    const v = Number(n);
+    fonte.add(String(Math.round(v)));
+    fonte.add(String(Math.round(v * 10) / 10));
+  }
   for (const [parola, n] of Object.entries(NUMERI_IN_LETTERE)) {
     if (new RegExp(`\\b${parola}\\b`, 'i').test(testo)) fonte.add(String(n));
   }

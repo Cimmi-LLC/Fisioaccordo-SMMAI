@@ -398,9 +398,17 @@ async function giro(supabase: Admin, ctx: Contesto, slot: Date[]): Promise<void>
     if (error) throw new Error("Salvataggio scoperte: " + error.message);
     const idPerUrl = new Map(((righe || []) as Array<{ id: string; url: string }>).map((r) => [r.url, r.id]));
 
-    const daUsare = scoperte.filter((s) => idPerUrl.has(s.url)).slice(0, slot.length);
+    // Se un carosello viene scartato (numeri, giudice) si passa alla scoperta
+    // dopo, fino a 3 tentativi per orario: il 06/11 la prova si fermava al primo scarto.
+    const candidate = scoperte.filter((s) => idPerUrl.has(s.url));
+    let prossima = 0;
     await runPool(
-      daUsare.map((s, i) => () => unCarosello(supabase, ctx, s, idPerUrl.get(s.url)!, slot[i])),
+      slot.map((quando) => async () => {
+        for (let t = 0; t < 3 && prossima < candidate.length; t++) {
+          const s = candidate[prossima++];
+          if (await unCarosello(supabase, ctx, s, idPerUrl.get(s.url)!, quando)) return;
+        }
+      }),
       2,
     );
   } catch (e) {
@@ -497,7 +505,8 @@ async function aggiornaScoperta(supabase: Admin, id: string, campi: Record<strin
   await supabase.from("scoperte").update({ ...campi, updated_at: new Date().toISOString() }).eq("id", id);
 }
 
-async function unCarosello(supabase: Admin, ctx: Contesto, s: Scoperta, scopertaId: string, quando: Date): Promise<void> {
+/** true se il carosello è partito (o è pronto); false se scartato o fallito. */
+async function unCarosello(supabase: Admin, ctx: Contesto, s: Scoperta, scopertaId: string, quando: Date): Promise<boolean> {
   if (ctx.editoriale) return unCaroselloEditoriale(supabase, ctx, s, scopertaId, quando);
   const { brand } = ctx;
   await aggiornaScoperta(supabase, scopertaId, { stato: "in_produzione" });
@@ -547,9 +556,11 @@ async function unCarosello(supabase: Admin, ctx: Contesto, s: Scoperta, scoperta
     await chiudiCarosello(supabase, ctx, s, scopertaId, quando, carouselId, risultati, {
       titolo: copy.titolo_carosello, caption: copy.caption, hashtags: copy.hashtags, costoUsd: ok * COST_NB2_IMAGE_1K,
     });
+    return true;
   } catch (e) {
     console.error("Carosello non riuscito per", s.url, e);
     await aggiornaScoperta(supabase, scopertaId, { stato: "errore", errore: (e as Error).message.slice(0, 500) });
+    return false;
   }
 }
 
@@ -675,7 +686,7 @@ async function generaFoto(descrizione: string, formato: string, modelli: string[
 }
 
 /** Carosello editoriale: testo col metodo, 2 foto, 8 slide disegnate dal server. */
-async function unCaroselloEditoriale(supabase: Admin, ctx: Contesto, s: Scoperta, scopertaId: string, quando: Date): Promise<void> {
+async function unCaroselloEditoriale(supabase: Admin, ctx: Contesto, s: Scoperta, scopertaId: string, quando: Date): Promise<boolean> {
   const { brand } = ctx;
   await aggiornaScoperta(supabase, scopertaId, { stato: "in_produzione" });
   try {
@@ -740,9 +751,11 @@ async function unCaroselloEditoriale(supabase: Admin, ctx: Contesto, s: Scoperta
     };
     await supabase.from("produced_carousels").update({ copy: { ...copyRiga, disegno } }).eq("id", carouselId);
     await lanciaDisegno(carouselId, 0);
+    return true;
   } catch (e) {
     console.error("Carosello editoriale non riuscito per", s.url, e);
     await aggiornaScoperta(supabase, scopertaId, { stato: "errore", errore: (e as Error).message.slice(0, 500) });
+    return false;
   }
 }
 
