@@ -305,6 +305,12 @@ describe('carosello editoriale (template approvato il 01/11 sul laser)', () => {
     const inventato = leggiCopyEditoriale(json({ caption: 'Il 70% sta meglio. Fonte: 2026' }))!;
     expect(numeriFuoriFonte(inventato, studio)).toEqual(['70']);
     expect(problemiEditoriale(inventato, studio, {})).toContain('numeri che non sono nello studio: 70');
+    // Barbabietola, 06/11: «72 h» diventa «3 giorni», «Seventeen» diventa 17
+    const barbabietola = { ...studio, abstract: `${studio.abstract || ''} Seventeen players took juice at 24, 48, and 72 h post-EIMD.` };
+    const convertito = leggiCopyEditoriale(json({ caption: 'In 17 atlete, dopo 3 giorni. Fonte: 2026' }))!;
+    expect(numeriFuoriFonte(convertito, barbabietola)).toEqual([]);
+    const inventatoGiorni = leggiCopyEditoriale(json({ caption: 'Dopo 9 giorni. Fonte: 2026' }))!;
+    expect(numeriFuoriFonte(inventatoGiorni, barbabietola)).toEqual(['9']);
     const sigla = leggiCopyEditoriale(json({ caption: 'SMD: 0.57' }))!;
     expect(problemiEditoriale(sigla, studio, {})).toContain('sigle statistiche nel testo');
     const vietata = leggiCopyEditoriale(json({ caption: 'Ti sblocchiamo la schiena' }))!;

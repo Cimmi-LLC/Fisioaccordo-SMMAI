@@ -809,12 +809,40 @@ function numeriIn(testo: string): string[] {
   });
 }
 
+const NUMERI_IN_LETTERE: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+  eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
+  seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, thirty: 30, forty: 40,
+  fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90, hundred: 100,
+};
+
+/**
+ * Numeri dello studio, compresi quelli scritti in lettere («Seventeen») e le
+ * stesse durate in un'altra unità (72 h → 3 giorni, 6 settimane → 42 giorni).
+ */
+function numeriDellaFonte(testo: string): Set<string> {
+  const fonte = new Set(numeriIn(testo));
+  for (const [parola, n] of Object.entries(NUMERI_IN_LETTERE)) {
+    if (new RegExp(`\\b${parola}\\b`, 'i').test(testo)) fonte.add(String(n));
+  }
+  const durate = testo.matchAll(/(\d+)(?:\s|-)?(h|hours?|days?|weeks?|months?)\b/gi);
+  for (const [, valore, unita] of durate) {
+    const v = Number(valore);
+    const u = unita.toLowerCase();
+    if (u.startsWith('h') && v % 24 === 0) fonte.add(String(v / 24));
+    if (u.startsWith('d')) { fonte.add(String(v * 24)); if (v % 7 === 0) fonte.add(String(v / 7)); }
+    if (u.startsWith('w')) { fonte.add(String(v * 7)); if (v % 4 === 0) fonte.add(String(v / 4)); }
+    if (u.startsWith('m')) fonte.add(String(v * 4));
+  }
+  return fonte;
+}
+
 /**
  * Numeri del carosello che non stanno nello studio (abstract o sintesi).
  * Fanno eccezione la slide coi passi (secondi, volte) e gli anni.
  */
 export function numeriFuoriFonte(copy: CopyEditoriale, s: Scoperta): string[] {
-  const fonte = new Set(numeriIn(`${s.abstract || ''} ${s.sintesi.join(' ')}`));
+  const fonte = numeriDellaFonte(`${s.abstract || ''} ${s.sintesi.join(' ')}`);
   const passi = copy.slides.filter((x) => x.tipo === 'passi').map(testoSlide).join(' ');
   const daPassi = new Set(numeriIn(passi));
   const testo = [...copy.slides.filter((x) => x.tipo !== 'passi').map(testoSlide), copy.caption].join(' ');
