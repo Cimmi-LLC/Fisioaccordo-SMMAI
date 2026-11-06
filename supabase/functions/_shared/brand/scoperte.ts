@@ -607,6 +607,8 @@ export type CopyEditoriale = {
   /** Descrizione in inglese della foto della slide coi passi. */
   foto_passi: string;
   slides: SlideEditoriale[];
+  /** Campi oltre il massimo (mai tagliati): il carosello non passa finché ce ne sono. */
+  troppo_lunghi?: string[];
 };
 
 /** Tipi ammessi per ognuna delle 8 posizioni. */
@@ -719,6 +721,8 @@ LE 8 SLIDE (in quest'ordine)
 7. "domanda": "titolo" tipo "Se ti propongono …, chiedi:"; "domanda" = la frase da dire al terapista, tra «»; "nota" = una frase con un dato dello studio.
 8. "cta": "titolo" = UNA sola azione, meglio mandarlo a qualcuno (es. "[[Mandalo]] a chi sta pagando il laser"), max 6 parole; "testo" = una frase.
 
+LUNGHEZZE MASSIME (caratteri, spazi compresi): ogni "titolo" 70; "sopra" 60; ogni riga e "chiusa" 80; "testo" 200 (180 nella slide "numero", 120 nella "cta"); "citazione" 160; ogni passo 110; "sottotitolo" 90; "domanda" 90; "nota" 90 nel "confronto", 160 nella "domanda"; "numero" 6; etichette 32. Un testo più lungo fa scartare il carosello: scrivi frasi corte e complete.
+
 ALTRO
 - "caption": la prima riga è la copertina detta a parole; poi 5-8 righe brevi che ripercorrono il carosello, la cosa da fare, la stessa azione dell'ultima slide, e alla fine "Fonte: ${s.fonte}${anno ? `, ${anno}` : ''}" con tipo di studio e numero di persone. Niente link.
 - "hashtags": 5 hashtag italiani pertinenti.
@@ -741,40 +745,55 @@ const corto = (x: unknown, max: number) => String(x ?? '').replace(/\s+/g, ' ').
 const elenco = (x: unknown, max: number, n: number) =>
   (Array.isArray(x) ? x : []).map((v) => corto(v, max)).filter(Boolean).slice(0, n);
 
-function leggiSlideEditoriale(o: Record<string, unknown>): SlideEditoriale | null {
-  const titolo = corto(o.titolo, 70);
+/**
+ * Legge una slide senza mai tagliare i testi: un campo oltre il massimo resta
+ * intero e finisce in `lunghi`, così il riscrittore lo accorcia (07/11: la
+ * slide 3 era uscita troncata a metà frase).
+ */
+function leggiSlideEditoriale(o: Record<string, unknown>, n: number, lunghi: string[]): SlideEditoriale | null {
+  const c = (campo: string, x: unknown, max: number) => {
+    const t = String(x ?? '').replace(/\s+/g, ' ').trim();
+    if (t.length > max) {
+      lunghi.push(`slide ${n}, "${campo}" troppo lungo: ${t.length} caratteri, massimo ${max}. Riscrivi la frase più corta e completa, non tagliarla`);
+    }
+    return t;
+  };
+  const lista = (campo: string, x: unknown, max: number, quanti: number) =>
+    (Array.isArray(x) ? x : []).slice(0, quanti).map((v, i) => c(`${campo} ${i + 1}`, v, max)).filter(Boolean);
+  const titolo = c('titolo', o.titolo, 70);
   if (!titolo) return null;
   switch (o.tipo) {
-    case 'copertina': return { tipo: 'copertina', titolo, sopra: corto(o.sopra, 60) };
+    case 'copertina': return { tipo: 'copertina', titolo, sopra: c('sopra', o.sopra, 60) };
     case 'riconosci': {
-      const righe = elenco(o.righe, 80, 4);
-      return righe.length >= 2 ? { tipo: 'riconosci', titolo, righe, chiusa: corto(o.chiusa, 80) } : null;
+      const righe = lista('riga', o.righe, 80, 4);
+      return righe.length >= 2 ? { tipo: 'riconosci', titolo, righe, chiusa: c('chiusa', o.chiusa, 80) } : null;
     }
     case 'confronto': {
       const a = (o.a || {}) as Record<string, unknown>;
       const b = (o.b || {}) as Record<string, unknown>;
-      const lato = (x: Record<string, unknown>) => ({ numero: corto(x.numero, 6), etichetta: corto(x.etichetta, 32) });
-      const la = lato(a), lb = lato(b);
+      const lato = (x: Record<string, unknown>, g: string) =>
+        ({ numero: c(`numero ${g}`, x.numero, 6), etichetta: c(`etichetta ${g}`, x.etichetta, 32) });
+      const la = lato(a, 'a'), lb = lato(b, 'b');
       if (!la.numero || !lb.numero || !la.etichetta || !lb.etichetta) return null;
-      return { tipo: 'confronto', titolo, testo: corto(o.testo, 200), a: la, b: lb, nota: corto(o.nota, 90) };
+      return { tipo: 'confronto', titolo, testo: c('testo', o.testo, 200), a: la, b: lb, nota: c('nota', o.nota, 90) };
     }
     case 'numero': {
-      const numero = corto(o.numero, 6);
+      const numero = c('numero', o.numero, 6);
       if (!numero) return null;
       const sc = Number(o.scala);
       const scala = Number.isFinite(sc) && sc >= 2 && sc <= 100 ? sc : null;
-      return { tipo: 'numero', titolo, numero, unita: corto(o.unita, 16), scala, testo: corto(o.testo, 180) };
+      return { tipo: 'numero', titolo, numero, unita: c('unita', o.unita, 16), scala, testo: c('testo', o.testo, 180) };
     }
-    case 'punto': return { tipo: 'punto', titolo, testo: corto(o.testo, 200), citazione: corto(o.citazione, 160) };
+    case 'punto': return { tipo: 'punto', titolo, testo: c('testo', o.testo, 200), citazione: c('citazione', o.citazione, 160) };
     case 'passi': {
-      const passi = elenco(o.passi, 110, 4);
-      return passi.length >= 2 ? { tipo: 'passi', titolo, sottotitolo: corto(o.sottotitolo, 90), passi } : null;
+      const passi = lista('passo', o.passi, 110, 4);
+      return passi.length >= 2 ? { tipo: 'passi', titolo, sottotitolo: c('sottotitolo', o.sottotitolo, 90), passi } : null;
     }
     case 'domanda': {
-      const domanda = corto(o.domanda, 90);
-      return domanda ? { tipo: 'domanda', titolo, domanda, nota: corto(o.nota, 160) } : null;
+      const domanda = c('domanda', o.domanda, 90);
+      return domanda ? { tipo: 'domanda', titolo, domanda, nota: c('nota', o.nota, 160) } : null;
     }
-    case 'cta': return { tipo: 'cta', titolo, testo: corto(o.testo, 120) };
+    case 'cta': return { tipo: 'cta', titolo, testo: c('testo', o.testo, 120) };
     default: return null;
   }
 }
@@ -784,8 +803,9 @@ export function leggiCopyEditoriale(testo: string): CopyEditoriale | null {
   const j = estraiJson(testo) as Record<string, unknown> | null;
   if (!j || !Array.isArray(j.slides) || j.slides.length !== STRUTTURA_EDITORIALE.length) return null;
   const slides: SlideEditoriale[] = [];
+  const lunghi: string[] = [];
   for (let i = 0; i < STRUTTURA_EDITORIALE.length; i++) {
-    const sl = leggiSlideEditoriale((j.slides[i] || {}) as Record<string, unknown>);
+    const sl = leggiSlideEditoriale((j.slides[i] || {}) as Record<string, unknown>, i + 1, lunghi);
     if (!sl || !STRUTTURA_EDITORIALE[i].includes(sl.tipo)) return null;
     slides.push(sl);
   }
@@ -798,6 +818,7 @@ export function leggiCopyEditoriale(testo: string): CopyEditoriale | null {
     foto_copertina: corto(j.foto_copertina, 700),
     foto_passi: corto(j.foto_passi, 700),
     slides,
+    troppo_lunghi: lunghi,
   };
 }
 
@@ -861,7 +882,7 @@ export function numeriFuoriFonte(copy: CopyEditoriale, s: Scoperta): string[] {
 /** Problemi che bloccano il carosello editoriale prima di fare le immagini. */
 export function problemiEditoriale(copy: CopyEditoriale, s: Scoperta, brand: BrandPerScoperte): string[] {
   const tutto = [copy.caption, ...copy.slides.map(testoSlide)].join(' ');
-  const problemi: string[] = [];
+  const problemi: string[] = [...(copy.troppo_lunghi || [])];
   const v = vietateNelTesto(testoPiano(tutto), brand);
   if (v.length > 0) problemi.push(`parole vietate: ${v.join(', ')}`);
   if (SIGLE_STATISTICHE.test(tutto)) problemi.push('sigle statistiche nel testo');

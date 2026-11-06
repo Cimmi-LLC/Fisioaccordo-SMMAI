@@ -289,6 +289,17 @@ describe('carosello editoriale (template approvato il 01/11 sul laser)', () => {
     expect(leggiCopyEditoriale(json({ caption: '' }))).toBeNull();
   });
 
+  it('un testo troppo lungo non si taglia: diventa un problema da correggere', () => {
+    // 07/11: la slide 3 era uscita troncata a «chi riceveva la tDCS con un»
+    const lungo = 'Una meta-analisi di 14 studi randomizzati ha esaminato gli effetti della stimolazione transcranica diretta sul mal di schiena cronico. Questi studi hanno confrontato chi riceveva la tDCS con un trattamento finto, senza saperlo.';
+    const conLungo = slides.map((sl, i) => (i === 2 ? { ...sl, testo: lungo } : sl));
+    const c = leggiCopyEditoriale(json({ slides: conLungo }))!;
+    expect((c.slides[2] as { testo: string }).testo).toBe(lungo);
+    expect(c.troppo_lunghi).toEqual([expect.stringContaining('slide 3, "testo" troppo lungo')]);
+    expect(problemiEditoriale(c, studio, {})[0]).toContain('non tagliarla');
+    expect(leggiCopyEditoriale(json())!.troppo_lunghi).toEqual([]);
+  });
+
   it('fascia intera, accento e punteggiatura attaccata', () => {
     expect(segmenti('Provalo: il [[bird dog]].')).toEqual([
       { testo: 'Provalo:', stile: 'normale' }, { testo: 'il', stile: 'normale' },
