@@ -263,6 +263,17 @@ function tipoFonte(tipi: string[]): string {
  * Gemini sceglie quelli utili ai pazienti e li riassume in italiano. Indica
  * solo il PMID: indirizzo, rivista e data li prendiamo da PubMed.
  */
+/**
+ * I post li pubblicano terapisti e piattaforme che portano i pazienti dai
+ * terapisti: niente studi o caroselli che dicano di farne a meno (07/11,
+ * Attilio, dopo il carosello sulla teleriabilitazione con AI).
+ */
+export const REGOLA_TERAPISTA =
+  'Il messaggio non deve MAI dire o far capire al paziente che può fare a meno del terapista o di andare in studio ' +
+  '(app, intelligenza artificiale, teleriabilitazione, video o esercizi da solo «al posto di» o «quanto» la terapia ' +
+  'in studio; «la fisioterapia non serve»). Criticare una pratica o un macchinario va bene; il terapista resta ' +
+  'sempre la persona giusta a cui chiedere.';
+
 export function richiestaScelta(
   temi: string,
   quante: number,
@@ -282,6 +293,7 @@ export function richiestaScelta(
           'si paga o si fa per abitudine (macchinari, riposo, posture, integratori, miti). Scarta gli studi che dicono ' +
           'solo «è complicato», «servono altri studi», «è stato accettato bene», e quelli su farmaci, iniezioni, ' +
           'chirurgia, macchinari da ospedale, animali o con risultati poco chiari.\n' +
+          `Scarta anche gli studi il cui messaggio per il paziente sarebbe fare a meno del terapista. ${REGOLA_TERAPISTA}\n` +
           (esclusi.length > 0 ? `Non ripetere argomenti già usati:\n${esclusi.map((t) => `- ${t}`).join('\n')}\n` : '') +
           'Preferisci gli studi con numeri che un paziente capisce (quante persone, quanti studi, percentuali, minuti, ' +
           'settimane).\n' +
@@ -708,6 +720,7 @@ LE REGOLE DEL METODO
 - Valore pratico: almeno una cosa da fare subito, con i passi, le quantità e quando fermarsi.
 - Numeri: SOLO quelli dell'abstract o di "Cosa dice" (fa eccezione la slide 6 coi passi). Niente sigle statistiche (SMD, OR, IC, p): l'effetto si dice a parole o con il numero su una scala che tutti capiscono.
 - Mai inventare fatti; niente diagnosi né promesse di guarigione; niente "nel nostro studio"; non contare le sedute; non nominare marchi di macchinari.
+- ${REGOLA_TERAPISTA} La domanda della slide 7 va fatta AL terapista, mai contro di lui.
 - Parole vietate (mai, nemmeno coniugate): ${vietate(brand).join(', ')}.
 - Nei titoli metti tra [[doppie quadre]] UNA parola chiave da evidenziare in giallo; nei testi puoi mettere tra **doppi asterischi** al massimo 2 pezzi da colorare.
 
@@ -886,6 +899,8 @@ export function problemiEditoriale(copy: CopyEditoriale, s: Scoperta, brand: Bra
   const v = vietateNelTesto(testoPiano(tutto), brand);
   if (v.length > 0) problemi.push(`parole vietate: ${v.join(', ')}`);
   if (SIGLE_STATISTICHE.test(tutto)) problemi.push('sigle statistiche nel testo');
+  // 07/11: «telereabilitazione» 4 volte nel carosello della teleriabilitazione con AI.
+  if (/reabilit/i.test(tutto)) problemi.push('refuso: si scrive «riabilitazione» e «teleriabilitazione», non «reabilitazione»');
   const fuori = numeriFuoriFonte(copy, s);
   if (fuori.length > 0) problemi.push(`numeri che non sono nello studio: ${fuori.join(', ')}`);
   if (/nel nostro studio|i nostri pazienti/i.test(tutto) && !/studio/i.test(brand.descrizione || '')) {
@@ -910,9 +925,10 @@ Dai un voto da 1 a 5 a:
 - "pratico": la slide 6 dà una cosa da fare subito, chiara, con passi e quantità, sicura?
 - "non_ovvio": il lettore impara qualcosa che non aveva già sentito?
 - "fedele": ogni fatto e numero (esclusi i passi della slide 6) viene dallo studio, senza esagerare quello che lo studio dimostra?
-- "italiano": italiano naturale, corretto, frasi brevi?
+- "italiano": italiano naturale, corretto (anche le parole tecniche: «riabilitazione», «teleriabilitazione»), frasi brevi?
+- "terapista": il carosello lascia il terapista come la persona giusta a cui rivolgersi, senza mai dire o far capire che se ne può fare a meno (app, AI, teleriabilitazione o esercizi da solo al posto della terapia in studio)? 1 se lo fa.
 Scrivi in "problemi" cosa correggere, in modo concreto (slide e frase).
-Rispondi SOLO con JSON: {"voti":{"aggancio":0,"riconoscibile":0,"pratico":0,"non_ovvio":0,"fedele":0,"italiano":0},"problemi":[""]}`;
+Rispondi SOLO con JSON: {"voti":{"aggancio":0,"riconoscibile":0,"pratico":0,"non_ovvio":0,"fedele":0,"italiano":0,"terapista":0},"problemi":[""]}`;
 }
 
 export const VOTO_MINIMO = 4;
@@ -920,7 +936,7 @@ export const VOTO_MINIMO = 4;
 /** Legge il giudizio: passa solo se ogni voto è almeno VOTO_MINIMO. */
 export function leggiGiudizio(testo: string): { ok: boolean; voti: Record<string, number>; problemi: string[] } {
   const j = estraiJson(testo) as { voti?: Record<string, unknown>; problemi?: unknown[] } | null;
-  const chiavi = ['aggancio', 'riconoscibile', 'pratico', 'non_ovvio', 'fedele', 'italiano'];
+  const chiavi = ['aggancio', 'riconoscibile', 'pratico', 'non_ovvio', 'fedele', 'italiano', 'terapista'];
   const voti: Record<string, number> = {};
   for (const k of chiavi) voti[k] = Number(j?.voti?.[k]) || 0;
   const problemi = elenco(j?.problemi, 300, 8);

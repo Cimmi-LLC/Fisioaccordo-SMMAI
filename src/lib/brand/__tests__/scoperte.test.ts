@@ -29,6 +29,8 @@ import {
   problemiEditoriale,
   leggiGiudizio,
   promptCaroselloEditoriale,
+  promptGiudice,
+  REGOLA_TERAPISTA,
   etichettaEditoriale,
   type CopyScoperta,
 } from '../scoperte';
@@ -335,12 +337,24 @@ describe('carosello editoriale (template approvato il 01/11 sul laser)', () => {
   });
 
   it('il giudice passa solo con tutti i voti almeno a 4', () => {
-    const voti = { aggancio: 5, riconoscibile: 4, pratico: 4, non_ovvio: 4, fedele: 5, italiano: 5 };
+    const voti = { aggancio: 5, riconoscibile: 4, pratico: 4, non_ovvio: 4, fedele: 5, italiano: 5, terapista: 5 };
     expect(leggiGiudizio(JSON.stringify({ voti, problemi: [] })).ok).toBe(true);
     const basso = leggiGiudizio(JSON.stringify({ voti: { ...voti, pratico: 3 }, problemi: ['slide 6 vaga'] }));
     expect(basso.ok).toBe(false);
     expect(basso.problemi).toEqual(['slide 6 vaga']);
     expect(leggiGiudizio('non json').ok).toBe(false);
+  });
+
+  it('scarta i caroselli che dicono di fare a meno del terapista e il refuso «reabilitazione»', () => {
+    // 07/11: teleriabilitazione con AI «efficace quanto» la terapia in studio
+    const voti = { aggancio: 5, riconoscibile: 5, pratico: 5, non_ovvio: 5, fedele: 5, italiano: 5 };
+    expect(leggiGiudizio(JSON.stringify({ voti, problemi: [] })).ok).toBe(false);
+    expect(leggiGiudizio(JSON.stringify({ voti: { ...voti, terapista: 1 }, problemi: [] })).ok).toBe(false);
+    expect(leggiGiudizio(JSON.stringify({ voti: { ...voti, terapista: 5 }, problemi: [] })).ok).toBe(true);
+    const refuso = leggiCopyEditoriale(json({ caption: 'La telereabilitazione funziona. Fonte: 2026' }))!;
+    expect(problemiEditoriale(refuso, studio, {})).toContain('refuso: si scrive «riabilitazione» e «teleriabilitazione», non «reabilitazione»');
+    expect(promptGiudice(refuso, studio)).toContain('"terapista"');
+    expect(promptCaroselloEditoriale({}, studio)).toContain(REGOLA_TERAPISTA);
   });
 
   it('prompt col metodo e etichette fisse', () => {
