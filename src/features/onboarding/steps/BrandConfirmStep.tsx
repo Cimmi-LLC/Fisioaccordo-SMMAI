@@ -1,64 +1,21 @@
 // Step 2: conferma del brand estratto (palette + lettura semantica) e
-// scelta dello stile visual delle slide content (icone vs realistiche).
-// I campi a bassa confidenza sono evidenziati.
+// riepilogo dei 3 layout che verranno disegnati. I campi a bassa confidenza
+// sono evidenziati. Stile delle immagini e formato non si scelgono più: i
+// layout sono tutti 4:5 e usano foto vere (06/11/2026).
 import React from 'react';
-import { AlertCircle, PenTool, Camera, Square, RectangleVertical } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import type { PaletteResult } from '@/lib/brand/extractor.ts';
 import type { BrandSemantics } from '@/lib/brand/artDirector.ts';
-import type { VisualStyle, SlideFormat } from '@/lib/brand/genome.ts';
+import { LAYOUT_IDS, LAYOUT_INFO } from '@/lib/brand/layouts.ts';
 import CustomScalePanel from './CustomScalePanel';
 
 interface BrandConfirmStepProps {
   busy: boolean;
   palette: PaletteResult;
   semantics: BrandSemantics | null;
-  visualStyle: VisualStyle;
-  format: SlideFormat;
   onPaletteChange: (p: PaletteResult) => void;
-  onVisualStyleChange: (s: VisualStyle) => void;
-  onFormatChange: (f: SlideFormat) => void;
   onConfirm: () => void;
 }
-
-const FORMAT_OPTIONS: Array<{
-  value: SlideFormat;
-  label: string;
-  description: string;
-  Icon: typeof Square;
-}> = [
-  {
-    value: '4:5',
-    label: 'Verticale 4:5 (consigliato)',
-    description: '1080x1350: occupa piu schermo nel feed, il formato che performa meglio.',
-    Icon: RectangleVertical,
-  },
-  {
-    value: '1:1',
-    label: 'Quadrato 1:1',
-    description: '1080x1080: il formato classico dei caroselli.',
-    Icon: Square,
-  },
-];
-
-const VISUAL_STYLE_OPTIONS: Array<{
-  value: VisualStyle;
-  label: string;
-  description: string;
-  Icon: typeof PenTool;
-}> = [
-  {
-    value: 'flat_icon',
-    label: 'Icone e illustrazioni',
-    description: 'Grafica piatta e pulita nel colore del brand. Stile editoriale, sempre coerente.',
-    Icon: PenTool,
-  },
-  {
-    value: 'realistic',
-    label: 'Immagini realistiche',
-    description: 'Immagini in stile fotografico scontornate sullo sfondo. Piu concrete e dirette.',
-    Icon: Camera,
-  },
-];
 
 const SWATCH_KEYS: Array<{ key: keyof PaletteResult; label: string }> = [
   { key: 'bg_a', label: 'Sfondo chiaro' },
@@ -69,7 +26,7 @@ const SWATCH_KEYS: Array<{ key: keyof PaletteResult; label: string }> = [
 ];
 
 const BrandConfirmStep: React.FC<BrandConfirmStepProps> = ({
-  busy, palette, semantics, visualStyle, format, onPaletteChange, onVisualStyleChange, onFormatChange, onConfirm,
+  busy, palette, semantics, onPaletteChange, onConfirm,
 }) => {
   const lowConfidence = (semantics?.confidence ?? 0) < 0.5;
 
@@ -141,73 +98,22 @@ const BrandConfirmStep: React.FC<BrandConfirmStepProps> = ({
         </div>
       )}
 
-      {/* Stile visual delle slide content */}
+      {/* Cosa esce: i 3 layout (dal 06/11/2026 niente scelta di stile e formato) */}
       <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)' }}>
-        <div className="text-[11px] font-bold uppercase mb-1" style={{ color: 'var(--ink3)', letterSpacing: '0.6px' }}>
-          Immagini nelle slide
+        <div className="text-[11px] font-bold uppercase mb-2" style={{ color: 'var(--ink3)', letterSpacing: '0.6px' }}>
+          Cosa ricevi
         </div>
-        <p className="text-[11px] mb-3" style={{ color: 'var(--ink3)' }}>
-          Ogni slide di contenuto avra un visual che spiega l'argomento. Scegli lo stile.
+        <ul className="space-y-1.5 text-[12px]" style={{ color: 'var(--ink2)' }}>
+          {LAYOUT_IDS.map((l) => (
+            <li key={l}>
+              <strong style={{ color: 'var(--ink)' }}>{LAYOUT_INFO[l].lettera} · {LAYOUT_INFO[l].nome}</strong>: {LAYOUT_INFO[l].descrizione}
+            </li>
+          ))}
+        </ul>
+        <p className="text-[11px] mt-3" style={{ color: 'var(--ink3)' }}>
+          Ognuno con copertina, contenuto e chiusura, verticale 4:5. Logo, colore primario e secondario
+          vengono dal Brand Kit (la palette qui sopra serve solo se il kit non ha un colore). Poi scegli il layout che preferisci.
         </p>
-        <div className="grid sm:grid-cols-2 gap-3">
-          {VISUAL_STYLE_OPTIONS.map(({ value, label, description, Icon }) => {
-            const active = visualStyle === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                onClick={() => onVisualStyleChange(value)}
-                className="text-left rounded-xl p-4 transition-all"
-                style={{
-                  border: active ? '2px solid var(--viola)' : '1px solid var(--line)',
-                  backgroundColor: active ? 'var(--viola-dim)' : 'var(--bg)',
-                  cursor: 'pointer',
-                }}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Icon className="h-4 w-4" style={{ color: active ? 'var(--viola)' : 'var(--ink3)' }} />
-                  <span className="text-[13px] font-black" style={{ color: active ? 'var(--viola)' : 'var(--ink)' }}>
-                    {label}
-                  </span>
-                </div>
-                <p className="text-[11px]" style={{ color: 'var(--ink2)' }}>{description}</p>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Formato slide */}
-      <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)' }}>
-        <div className="text-[11px] font-bold uppercase mb-3" style={{ color: 'var(--ink3)', letterSpacing: '0.6px' }}>
-          Formato slide
-        </div>
-        <div className="grid sm:grid-cols-2 gap-3">
-          {FORMAT_OPTIONS.map(({ value, label, description, Icon }) => {
-            const active = format === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                onClick={() => onFormatChange(value)}
-                className="text-left rounded-xl p-4 transition-all"
-                style={{
-                  border: active ? '2px solid var(--viola)' : '1px solid var(--line)',
-                  backgroundColor: active ? 'var(--viola-dim)' : 'var(--bg)',
-                  cursor: 'pointer',
-                }}
-              >
-                <div className="flex items-center gap-2 mb-1.5">
-                  <Icon className="h-4 w-4" style={{ color: active ? 'var(--viola)' : 'var(--ink3)' }} />
-                  <span className="text-[13px] font-black" style={{ color: active ? 'var(--viola)' : 'var(--ink)' }}>
-                    {label}
-                  </span>
-                </div>
-                <p className="text-[11px]" style={{ color: 'var(--ink2)' }}>{description}</p>
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       <button
@@ -216,7 +122,7 @@ const BrandConfirmStep: React.FC<BrandConfirmStepProps> = ({
         className="w-full text-white text-[13px] font-black uppercase py-3.5 rounded-xl disabled:opacity-50"
         style={{ backgroundColor: 'var(--viola)', border: 'none', cursor: busy ? 'wait' : 'pointer', letterSpacing: '0.5px' }}
       >
-        {busy ? 'Genero i template… (30-90s)' : 'Genera i template'}
+        {busy ? 'Genero i template…' : 'Genera i 3 layout'}
       </button>
     </div>
   );

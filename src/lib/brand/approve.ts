@@ -16,6 +16,7 @@ type CandidateRow = {
   user_id: string;
   slide_role: SlideRole;
   genome: unknown;
+  genesis_prompt: string | null;
   storage_bucket: string | null;
   storage_path: string | null;
   status: string;
@@ -27,6 +28,9 @@ type CandidateRow = {
  * 2. upsert su template_variants con genoma congelato + prompt_skeleton
  * 3. candidato approved, fratelli dello stesso ruolo rejected
  * 4. se tutti e 3 i ruoli hanno un approvato: brands.genesis_status = 'locked'
+ *
+ * Template a layout: il prompt_skeleton è la ricetta della slide (layout,
+ * foto scelta) e brands.genome passa al layout approvato, palette compresa.
  */
 export async function approveTemplate(
   supabase: SupabaseClient,
@@ -34,7 +38,7 @@ export async function approveTemplate(
 ): Promise<void> {
   const { data: cand, error: candErr } = await supabase
     .from('template_candidates')
-    .select('id, brand_id, user_id, slide_role, genome, storage_bucket, storage_path, status')
+    .select('id, brand_id, user_id, slide_role, genome, genesis_prompt, storage_bucket, storage_path, status')
     .eq('id', candidateId)
     .single<CandidateRow>();
   if (candErr || !cand) throw new Error('Candidato non trovato: ' + (candErr?.message || candidateId));
@@ -68,7 +72,9 @@ export async function approveTemplate(
     genome,
     storage_bucket: cand.storage_bucket,
     storage_path: variantPath,
-    prompt_skeleton: skeletonFromGenome(genome, cand.slide_role),
+    prompt_skeleton: genome.layout && cand.genesis_prompt
+      ? cand.genesis_prompt
+      : skeletonFromGenome(genome, cand.slide_role),
     source_candidate_id: cand.id,
   });
   if (insErr) {
@@ -95,6 +101,20 @@ export async function approveTemplate(
     .eq('slide_role', cand.slide_role)
     .neq('id', cand.id)
     .in('status', ['done', 'pending', 'generating']);
+
+  // Il genoma del brand segue il layout approvato (era quello consigliato).
+  if (genome.layout) {
+    const { data: brand } = await supabase
+      .from('brands')
+      .select('genome')
+      .eq('id', cand.brand_id)
+      .maybeSingle();
+    const palette = (brand?.genome as { palette?: unknown } | null)?.palette;
+    await supabase
+      .from('brands')
+      .update({ genome: palette ? { ...genome, palette } : genome })
+      .eq('id', cand.brand_id);
+  }
 
   // 4. lock quando tutti e 3 i ruoli sono coperti
   const { data: variants } = await supabase

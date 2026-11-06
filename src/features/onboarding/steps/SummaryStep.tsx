@@ -5,6 +5,7 @@ import { getArchetype } from '@/lib/brand/archetypes.ts';
 import type { TemplateGenome } from '@/lib/brand/genome.ts';
 import type { TemplateCandidate } from '../hooks/useTemplateCandidates.ts';
 import type { SlideRole } from '@/lib/brand/archetypes.ts';
+import { LAYOUT_INFO, isLayoutId } from '@/lib/brand/layouts.ts';
 
 interface SummaryStepProps {
   busy: boolean;
@@ -32,6 +33,9 @@ const SummaryStep: React.FC<SummaryStepProps> = ({ busy, genome, candidates, sel
   const selected = (['cover', 'content', 'cta'] as SlideRole[])
     .map((role) => candidates.find((c) => c.id === selection[role]))
     .filter((c): c is TemplateCandidate => !!c);
+  // Template a layout: il layout lo dicono i candidati scelti, non il genoma
+  // della generazione (che porta solo quello consigliato).
+  const layout = selected.map((c) => c.genome?.layout).find(isLayoutId);
 
   return (
     <div className="space-y-6">
@@ -52,12 +56,28 @@ const SummaryStep: React.FC<SummaryStepProps> = ({ busy, genome, candidates, sel
             src={c.image_url}
             alt={c.slide_role}
             className="rounded-xl"
-            style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', border: '1px solid var(--line)' }}
+            style={{ width: '100%', aspectRatio: layout ? '4 / 5' : '1', objectFit: 'cover', border: '1px solid var(--line)' }}
           />
         ))}
       </div>
 
-      {/* Genoma leggibile */}
+      {layout && (
+        <div className="rounded-2xl p-5 space-y-2" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)' }}>
+          <div className="text-[11px] font-bold uppercase" style={{ color: 'var(--ink3)', letterSpacing: '0.6px' }}>
+            Layout scelto
+          </div>
+          <div className="text-[15px] font-bold" style={{ color: 'var(--ink)' }}>
+            {LAYOUT_INFO[layout].lettera} · {LAYOUT_INFO[layout].nome}
+          </div>
+          <p className="text-[12px]" style={{ color: 'var(--ink2)' }}>{LAYOUT_INFO[layout].descrizione}</p>
+          <p className="text-[12px] pt-2" style={{ color: 'var(--ink2)', borderTop: '1px solid var(--line)' }}>
+            Formato verticale 4:5 (1080x1350). Colori e logo dal tuo Brand Kit: se li cambi, i caroselli nuovi li seguono.
+          </p>
+        </div>
+      )}
+
+      {/* Genoma leggibile (template generati prima dei layout) */}
+      {!layout && (
       <div className="rounded-2xl p-5 space-y-3" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)' }}>
         <div>
           <div className="text-[11px] font-bold uppercase mb-1" style={{ color: 'var(--ink3)', letterSpacing: '0.6px' }}>
@@ -76,6 +96,7 @@ const SummaryStep: React.FC<SummaryStepProps> = ({ busy, genome, candidates, sel
           <div className="sm:col-span-2">Formato: <strong style={{ color: 'var(--ink)' }}>{genome.format === '4:5' ? 'verticale 4:5 (1080x1350)' : 'quadrato 1:1 (1080x1080)'}</strong></div>
         </div>
       </div>
+      )}
 
       <button
         onClick={onApprove}

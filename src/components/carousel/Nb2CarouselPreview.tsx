@@ -70,7 +70,8 @@ const Nb2CarouselPreview: React.FC<Nb2CarouselPreviewProps> = ({
     for (const s of slides) {
       if (!s.imageUrl) continue;
       let dataUrl: string;
-      if (logoUrl && genome) {
+      // Template a layout: il logo è già disegnato nella slide dal server.
+      if (logoUrl && genome && !genome.layout) {
         const slots = slotsForRole(genome, s.role);
         const blob = await compositeLogo(s.imageUrl, logoUrl, slots.logo, canvasForFormat(format));
         dataUrl = await new Promise<string>((resolve) => {

@@ -5,6 +5,7 @@
 // Niente zod: guardie scritte a mano per portabilita Deno senza dipendenze.
 
 import { isArchetypeId, type ArchetypeId } from './archetypes.ts';
+import { isLayoutId, LAYOUT_INFO, type LayoutId } from './layouts.ts';
 
 export type DecorationScale = 'subtle' | 'medium' | 'dominant';
 export type DecorationAnchor = 'corner' | 'edge' | 'behind_text' | 'full_bleed';
@@ -72,6 +73,14 @@ export type TemplateGenome = {
   bg_texture?: BgTexture;
   accent_element?: AccentElement;
   progress_indicator?: ProgressIndicator;
+
+  // ── Layout disegnati dal codice (dal 06/11/2026) ──
+  // Con `layout` presente le slide non le disegna il modello di immagini:
+  // le impagina src/lib/brand/layouts.ts. I campi sopra restano compilati
+  // solo per compatibilita con chi legge ancora l'archetipo.
+  layout?: LayoutId;
+  /** Etichetta di copertina scelta alla genesi (es. «Studi e centri sanitari»). */
+  layout_etichetta?: string;
 };
 
 const DECORATION_SCALES: readonly string[] = ['subtle', 'medium', 'dominant'];
@@ -189,6 +198,13 @@ export function validateGenome(g: unknown): { ok: boolean; errors: string[] } {
 
   // Vincolo incrociato: allineamento centrato incompatibile con archetipi
   // strutturalmente asimmetrici.
+  if (o.layout !== undefined && !isLayoutId(o.layout)) {
+    errors.push('layout non valido: ' + String(o.layout));
+  }
+  if (o.layout_etichetta !== undefined && typeof o.layout_etichetta !== 'string') {
+    errors.push('layout_etichetta non valida');
+  }
+
   if (
     o.alignment === 'center' &&
     isArchetypeId(o.archetype) &&
@@ -308,4 +324,31 @@ export function genomeToPromptFragment(g: TemplateGenome): string {
   }
 
   return lines.join('\n');
+}
+
+/**
+ * Genoma di un template a layout: i campi dell'archetipo restano compilati
+ * con valori neutri (validi per validateGenome e per chi legge ancora
+ * l'archetipo), ma la slide la disegna il layout.
+ */
+export function genomaPerLayout(layout: LayoutId, etichetta: string): TemplateGenome {
+  return {
+    archetype: 'text_heavy_left',
+    decoration_motif: 'nessuna decorazione: layout ' + layout,
+    decoration_scale: 'subtle',
+    decoration_anchor: 'corner',
+    decoration_opacity: 0.05,
+    type_pairing: layout === 'carta_clinica'
+      ? { title: 'Fraunces', body: 'Inter' }
+      : { title: 'Inter', body: 'Inter' },
+    type_contrast: 'high',
+    density: 'balanced',
+    alignment: 'left',
+    bg_strategy: layout === 'foto_editoriale' ? 'alternating_solid' : 'mono_with_accent_blocks',
+    rationale: LAYOUT_INFO[layout].nome + ': ' + LAYOUT_INFO[layout].descrizione,
+    visual_style: 'realistic',
+    format: '4:5',
+    layout,
+    layout_etichetta: etichetta,
+  };
 }
