@@ -633,20 +633,24 @@ async function chiudiCarosello(
 
 /**
  * Testo del carosello editoriale: stesura, controlli fissi (numeri, sigle,
- * parole vietate) e giudice col metodo. Una seconda stesura coi problemi
- * trovati; se non passa neanche quella, il carosello non si fa.
+ * parole vietate) e giudice col metodo. Fino a due correzioni della stessa
+ * stesura coi problemi trovati; se non passa, il carosello non si fa.
  */
 async function scriviCopyEditoriale(
   brand: BrandRow,
   s: Scoperta,
 ): Promise<{ copy: CopyEditoriale; voti: Record<string, number> }> {
   let problemi: string[] = [];
-  for (let tentativo = 0; tentativo < 2; tentativo++) {
+  // La stesura scartata torna al modello con i problemi: corregge quelli e
+  // lascia il resto (06/11: riscrivendo da capo ne nascevano di nuovi).
+  let precedente = "";
+  for (let tentativo = 0; tentativo < 3; tentativo++) {
     const correzioni = problemi.length > 0
-      ? `\n\nLA STESURA PRECEDENTE È STATA SCARTATA PER QUESTI PROBLEMI, CORREGGILI:\n${problemi.map((p) => `- ${p}`).join("\n")}`
+      ? `\n\nLA STESURA PRECEDENTE È STATA SCARTATA. Riparti da questa e correggi SOLO questi problemi, lasciando uguale tutto il resto:\n${problemi.map((p) => `- ${p}`).join("\n")}${precedente ? `\n\nSTESURA PRECEDENTE:\n${precedente}` : ""}`
       : "";
     const copy = leggiCopyEditoriale(await chiediGemini(promptCaroselloEditoriale(brand, s) + correzioni));
     if (!copy) { problemi = ["JSON non valido o slide fuori posto: rispetta le 8 slide e i loro tipi"]; continue; }
+    precedente = JSON.stringify(copy);
     problemi = problemiEditoriale(copy, s, brand);
     if (problemi.length > 0) continue;
     const giudizio = leggiGiudizio(await chiediGemini(promptGiudice(copy, s), 0.2));
