@@ -9,6 +9,9 @@ import IdeaGenerator from "./IdeaGenerator";
 import ContentForm from "./ContentForm";
 import Nb2CarouselPreview from "./carousel/Nb2CarouselPreview";
 import ProducedCarouselsList from "./carousel/ProducedCarouselsList";
+import CarouselCopyView from "./carousel/CarouselCopyView";
+import { caroselloDaRisposta } from "@/lib/carouselText";
+import { testiTemplate } from "@/lib/templateStato";
 import type { CarouselData } from "@/types/carousel";
 import SkeletonLoader from "./ui/skeleton-loader";
 import EnhancedProgress from "./ui/enhanced-progress";
@@ -24,11 +27,13 @@ interface MainContentProps {
   showCopyImprover: boolean;
   onCopyImproved: (improvedCopy: string) => void;
   onOpenSocialModal?: () => void;
+  /** Chiamata dopo che i testi generati sono stati salvati. */
+  onContentSaved?: () => void;
 }
 
 export type { MainContentProps };
 
-const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
+const MainContent: React.FC<MainContentProps> = React.memo(({ user, onContentSaved }) => {
   const loadingState = useGlobalLoading();
   const { toast } = useToast();
 
@@ -54,7 +59,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
   const [activeVariant, setActiveVariant] = useState(0);
 
   const noopFn = useCallback(() => {}, []);
-  const { generatedContent, setGeneratedContent, lastRawResponses, generateContent } = useContentGeneration(user, formData, noopFn);
+  const { generatedContent, setGeneratedContent, lastRawResponses, generateContent } = useContentGeneration(user, formData, noopFn, onContentSaved);
 
   // ── Template Genesis: gating + produzione NB2 ──
   const navigate = useNavigate();
@@ -131,24 +136,10 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
     }
     const list: CarouselData[] = lastRawResponses
       .filter((r) => r && r.slides)
-      .map((raw) => ({
-        titolo_carosello: raw.titolo_carosello || formData.description,
-        hook_principale: raw.hook_principale || '',
-        slides: (raw.slides || []).map((s: any, i: number) => ({
-          numero: s.numero || i + 1,
-          tipo: s.tipo || (i === 0 ? 'cover' : i === raw.slides.length - 1 ? 'cta' : 'content'),
-          hook: s.hook || '',
-          sottotitolo: s.sottotitolo || '',
-          titolo: s.titolo || s.title || '',
-          testo: s.testo || s.body || '',
-          testo_cta: s.testo_cta || '',
-          bottone_cta: s.bottone_cta || '',
-          keywords_stock: s.keywords_stock || [],
-        })),
-        cta_finale: raw.cta_finale || '',
-        caption_instagram: raw.caption_instagram || raw.content || generatedContent,
-        hashtag_suggeriti: raw.hashtag_suggeriti || [],
-      }));
+      .map((raw) => {
+        const c = caroselloDaRisposta(raw, formData.description);
+        return { ...c, caption_instagram: c.caption_instagram || generatedContent };
+      });
     setCarouselDataList(list);
     setActiveVariant(0);
   }, [lastRawResponses]);
@@ -189,6 +180,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
   // dei caroselli, le slide grafiche partono solo dopo il Template Genesis.
   // Prima era un blocco a tutta pagina e chi saltava l'onboarding restava fuori.
   const goToGenesis = () => brandRecord && navigate(`/onboarding/template?brand=${brandRecord.id}`);
+  const testiTpl = testiTemplate(brandRecord?.genesis_status);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8" style={{ paddingTop: '44px' }}>
@@ -210,11 +202,10 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
               <Sparkles className="h-8 w-8 shrink-0" style={{ color: 'var(--rosa)' }} />
               <div className="flex-1">
                 <p className="text-[14px] font-black" style={{ color: 'var(--ink)' }}>
-                  Il template di questo brand non c'e ancora
+                  {testiTpl.titolo}
                 </p>
                 <p className="text-[12px]" style={{ color: 'var(--ink3)' }}>
-                  Puoi gia scrivere i testi dei caroselli. Per le slide grafiche crea il template:
-                  carichi il logo e qualche post, l'AI lo progetta, tu approvi. Bastano 5 minuti.
+                  {testiTpl.testo}
                 </p>
               </div>
               <button
@@ -222,7 +213,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
                 className="text-white text-[12px] font-black uppercase px-6 py-3 rounded-xl shrink-0"
                 style={{ backgroundColor: 'var(--rosa)', border: 'none', cursor: 'pointer', letterSpacing: '0.5px' }}
               >
-                Crea il template
+                {testiTpl.bottone}
               </button>
             </div>
           </CardContent>
@@ -325,12 +316,15 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
           {carouselDataList[activeVariant] && nb2.slides.length === 0 && !nb2.producing && (
             <Card className="panel-card">
               <CardContent style={{ padding: 24 }}>
-                <div className="py-8 text-center space-y-3">
+                <div className="text-center space-y-3">
                   <p className="text-[14px] font-bold" style={{ color: 'var(--ink)' }}>
                     "{carouselDataList[activeVariant].titolo_carosello}"
                   </p>
-                  <p className="text-[12px]" style={{ color: 'var(--ink3)' }}>
-                    Il copy e pronto ma le slide non sono state ancora prodotte.
+                  {/* I testi si vedono sempre: prima senza template restava
+                      solo il titolo e il copy scritto dall'AI non compariva. */}
+                  <CarouselCopyView carousel={carouselDataList[activeVariant]} />
+                  <p className="text-[12px] pt-2" style={{ color: 'var(--ink3)' }}>
+                    I testi sono pronti e salvati nei tuoi contenuti; le slide grafiche non sono ancora state prodotte.
                   </p>
                   {brandRecord?.id && genesisLocked ? (
                     <button
@@ -343,14 +337,14 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user }) => {
                   ) : brandRecord && !brandLoading ? (
                     <>
                       <p className="text-[12px]" style={{ color: 'var(--ink3)' }}>
-                        Le slide grafiche si creano sul template del brand, che non c'e ancora.
+                        {testiTpl.sottoCarosello}
                       </p>
                       <button
                         onClick={goToGenesis}
                         className="text-white text-[12px] font-black uppercase px-6 py-3 rounded-xl"
                         style={{ backgroundColor: 'var(--rosa)', border: 'none', cursor: 'pointer', letterSpacing: '0.5px' }}
                       >
-                        Crea il template
+                        {testiTpl.bottone}
                       </button>
                     </>
                   ) : (

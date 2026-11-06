@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Copy, RefreshCw, Loader2, Hash, Clock } from 'lucide-react';
+import { Copy, RefreshCw, Loader2, Hash, Clock, Film } from 'lucide-react';
 import type { ReelScript } from '@/types/reel';
 import { SECTION_COLORS } from '@/types/reel';
 
@@ -10,6 +10,8 @@ interface ReelScriptPreviewProps {
   onRegenerate: () => void;
   onCopyScript: () => void;
   onCopyCaption: () => void;
+  /** Apre «Pubblica un Reel» con questa caption: il video lo carica l'utente. */
+  onPublish?: () => void;
 }
 
 const ReelScriptPreview: React.FC<ReelScriptPreviewProps> = ({
@@ -18,6 +20,7 @@ const ReelScriptPreview: React.FC<ReelScriptPreviewProps> = ({
   onRegenerate,
   onCopyScript,
   onCopyCaption,
+  onPublish,
 }) => {
   if (generating) {
     return (
@@ -152,6 +155,15 @@ const ReelScriptPreview: React.FC<ReelScriptPreviewProps> = ({
               <Copy className="h-4 w-4" /> Copia Caption
             </button>
           </div>
+          {onPublish && (
+            <button
+              onClick={onPublish}
+              className="w-full mt-2 flex items-center justify-center gap-2 py-3 text-[12px] font-black uppercase rounded-xl"
+              style={{ backgroundColor: 'var(--surface)', color: 'var(--ink)', border: '1px solid var(--line)', cursor: 'pointer', letterSpacing: '0.5px' }}
+            >
+              <Film className="h-4 w-4" /> Hai girato il video? Pubblicalo
+            </button>
+          )}
         </CardContent>
       </Card>
     </div>

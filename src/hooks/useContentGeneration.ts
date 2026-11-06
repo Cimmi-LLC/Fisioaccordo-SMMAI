@@ -6,6 +6,7 @@ import { useContentCache } from "@/contexts/ContentCacheContext";
 import { useActiveBrand } from "@/hooks/useActiveBrand";
 import { contentService } from "@/services/contentService";
 import { supabase } from "@/integrations/supabase/client";
+import { caroselloDaRisposta, testoCarosello } from "@/lib/carouselText";
 
 interface FormData {
   description: string;
@@ -19,7 +20,7 @@ interface FormData {
   numVariations?: string;
 }
 
-export const useContentGeneration = (user: any, formData: FormData, generateCarouselSlides: () => void) => {
+export const useContentGeneration = (user: any, formData: FormData, generateCarouselSlides: () => void, onSaved?: () => void) => {
   const { toast } = useToast();
   const loadingState = useGlobalLoading();
   const { cacheContent, getCachedContent } = useContentCache();
@@ -109,6 +110,27 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
 
       cacheContent(cacheKey, personalizedContent, [], formData);
 
+      // Ogni variante finisce nei contenuti salvati: senza template le slide
+      // non si producono e prima i testi si perdevano ricaricando la pagina.
+      const salvataggi = await Promise.all(successful.map((raw) => {
+        const carosello = caroselloDaRisposta(raw, formData.description);
+        return contentService.saveContent({
+          title: carosello.titolo_carosello,
+          contentText: testoCarosello(carosello),
+          topic: formData.description,
+          audience: formData.audience,
+          platform: formData.platform,
+          postType: formData.postType,
+          tone: formData.tone,
+          length: formData.length,
+          images: [],
+        });
+      }));
+      if (salvataggi.some((r) => r.error)) {
+        toast({ title: "Testi non salvati", description: "Li vedi qui sotto: copiali prima di ricaricare la pagina.", variant: "destructive" });
+      }
+      onSaved?.();
+
       loadingState.finishLoading(true, successful.length > 1
         ? `🎉 ${successful.length} varianti generate!`
         : '🎉 Copy personalizzato generato!'
@@ -135,7 +157,7 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
   // CRITICAL: activeBrandId MUST be in deps. Without it the callback caches
   // the brandId from the moment it was first created → switching brand in the
   // sidebar didn't update the generation context → leaked posts across brands.
-  }, [formData, activeBrandId, toast, loadingState, getCachedContent, cacheContent, generateCarouselSlides]);
+  }, [formData, activeBrandId, toast, loadingState, getCachedContent, cacheContent, generateCarouselSlides, onSaved]);
 
   const saveContent = async (carouselSlides: any[]) => {
     if (!generatedContent) return;

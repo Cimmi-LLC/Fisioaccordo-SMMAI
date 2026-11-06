@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { contentService } from "@/services/contentService";
@@ -19,12 +19,10 @@ const Index = () => {
   const [showCopyImprover, setShowCopyImprover] = useState(false);
   const [improvedCopyFromAI, setImprovedCopyFromAI] = useState('');
 
-  useEffect(() => {
-    if (user) loadSavedContents();
-  }, [user]);
-
-  const loadSavedContents = async () => {
-    setLoadingSavedContents(true);
+  // Il primo caricamento mostra lo scheletro; dopo una generazione la lista
+  // si aggiorna in silenzio, senza far sparire quella che c'è.
+  const loadSavedContents = useCallback(async (silenzioso = false) => {
+    if (!silenzioso) setLoadingSavedContents(true);
     try {
       const { data, error } = await contentService.getUserContents();
       if (data && !error) setSavedContents(data);
@@ -33,7 +31,22 @@ const Index = () => {
     } finally {
       setLoadingSavedContents(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    if (user) loadSavedContents();
+  }, [user, loadSavedContents]);
+
+  const reloadSavedContents = useCallback(() => loadSavedContents(true), [loadSavedContents]);
+
+  const handleDeleteContent = useCallback(async (id: string) => {
+    const { error } = await contentService.deleteContent(id);
+    if (error) {
+      toast({ title: "Non eliminato", description: "Riprova tra poco.", variant: "destructive" });
+      return;
+    }
+    setSavedContents((prev) => prev.filter((c) => c.id !== id));
+  }, [toast]);
 
   const handleImageEdit = (imageUrl: string, slideIndex: number) => {
     setSelectedImageForEdit(imageUrl);
@@ -70,12 +83,13 @@ const Index = () => {
           user={user}
           showCopyImprover={showCopyImprover}
           onCopyImproved={handleCopyImproved}
+          onContentSaved={reloadSavedContents}
         />
       </ErrorBoundary>
 
       <div className="max-w-7xl mx-auto px-4 pb-12">
         <ErrorBoundary>
-          <SavedContents savedContents={savedContents} isLoading={loadingSavedContents} />
+          <SavedContents savedContents={savedContents} isLoading={loadingSavedContents} onDelete={handleDeleteContent} />
         </ErrorBoundary>
       </div>
     </div>

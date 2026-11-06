@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
-import { Loader2, CalendarClock, Instagram } from 'lucide-react';
+import { Loader2, CalendarClock, Instagram, Music2 } from 'lucide-react';
+import PublishSocialDialog from '@/components/social/PublishSocialDialog';
 import { useSchedulePost } from '@/hooks/useSchedulePost';
 import { MetaService } from '@/services/metaService';
 import { markPublished } from '@/services/archiveService';
@@ -52,6 +53,7 @@ const SchedulePostDialog: React.FC<SchedulePostDialogProps> = ({
   const [publishing, setPublishing] = useState(false);
   const { toast } = useToast();
   const [connectingMeta, setConnectingMeta] = useState(false);
+  const [tiktokOpen, setTiktokOpen] = useState(false);
 
   useEffect(() => {
     if (open) loadConnections();
@@ -324,6 +326,16 @@ const SchedulePostDialog: React.FC<SchedulePostDialogProps> = ({
             )}
           </Button>
 
+          {/* Lo stesso carosello come post di foto su TikTok */}
+          <Button
+            variant="outline"
+            onClick={() => setTiktokOpen(true)}
+            disabled={publishing || scheduling || preparing}
+            className="w-full font-bold"
+          >
+            <Music2 className="h-4 w-4 mr-2" /> Pubblica anche su TikTok
+          </Button>
+
           {/* Buttons */}
           <div className="flex gap-2 pt-2">
             <Button variant="outline" onClick={onClose} disabled={scheduling || preparing || publishing} className="flex-1">
@@ -350,6 +362,13 @@ const SchedulePostDialog: React.FC<SchedulePostDialogProps> = ({
           </div>
         </div>
       </DialogContent>
+      <PublishSocialDialog
+        open={tiktokOpen}
+        onClose={() => setTiktokOpen(false)}
+        mode="photos"
+        defaultCaption={[content, hashtags].filter(Boolean).join('\n\n')}
+        prepareImages={prepareImages}
+      />
     </Dialog>
   );
 };

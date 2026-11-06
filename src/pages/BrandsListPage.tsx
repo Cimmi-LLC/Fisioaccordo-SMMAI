@@ -28,6 +28,11 @@ import { useIsAdmin } from '@/hooks/useIsAdmin';
 import BrandInstagramConnect from '@/components/BrandInstagramConnect';
 import InstagramConnectResult from '@/components/InstagramConnectResult';
 import { MetaService, type ConnectResult, type MetaConnectionData } from '@/services/metaService';
+import BrandSocialConnect from '@/components/BrandSocialConnect';
+import SocialConnectResult from '@/components/SocialConnectResult';
+import { SocialService, type SocialConnectResult as SocialResult } from '@/services/socialService';
+import { useSocialConnections } from '@/hooks/useSocialConnections';
+import { SOCIAL_PLATFORMS } from '@/lib/social/socialCore';
 
 const BrandsListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -43,6 +48,10 @@ const BrandsListPage: React.FC = () => {
     setIgConnections(await MetaService.getConnections());
   }, []);
   useEffect(() => { loadIgConnections(); }, [loadIgConnections]);
+  // TikTok e YouTube: un account per brand, come Instagram
+  const social = useSocialConnections();
+  const [socialResult, setSocialResult] = useState<SocialResult | null>(() => SocialService.peekConnectResult());
+  useEffect(() => { SocialService.clearConnectResult(); }, []);
 
   const goToCreateBrand = () => navigate('/onboarding?new=1');
 
@@ -90,6 +99,13 @@ const BrandsListPage: React.FC = () => {
           result={igResult}
           brandName={brands.find((b) => b.id === igResult.brandId)?.nome_business || null}
           onClose={() => setIgResult(null)}
+        />
+      )}
+      {socialResult && (
+        <SocialConnectResult
+          result={socialResult}
+          brandName={brands.find((b) => b.id === socialResult.brandId)?.nome_business || null}
+          onClose={() => setSocialResult(null)}
         />
       )}
 
@@ -209,6 +225,19 @@ const BrandsListPage: React.FC = () => {
                       onChanged={loadIgConnections}
                     />
                   )}
+
+                  {b.id && SOCIAL_PLATFORMS.map((p) => (
+                    <BrandSocialConnect
+                      key={p}
+                      platform={p}
+                      brandId={b.id!}
+                      brandName={b.nome_business || 'questo brand'}
+                      connection={social.forBrand(p, b.id!)}
+                      enabled={social.enabled[p]}
+                      justConnected={!!socialResult?.success && socialResult.platform === p && socialResult.brandId === b.id}
+                      onChanged={social.reload}
+                    />
+                  ))}
 
                   <div className="flex gap-2 pt-2" style={{ borderTop: '1px solid var(--line)' }}>
                     {!isActive ? (

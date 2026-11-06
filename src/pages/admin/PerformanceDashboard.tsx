@@ -9,8 +9,8 @@ import SidebarClients, { ClientBrand } from '@/components/admin/SidebarClients';
 import { usePerformanceMetrics, Channel, MetricRow } from '@/hooks/usePerformanceMetrics';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-type RangeId = 7 | 28 | 90 | 'custom';
+import { SocialService } from '@/services/socialService';
+import { dayLabel, localToday, resolveWindow, shiftDays, type RangeId } from '@/lib/performance/periodo';
 
 const RANGES: { id: RangeId; label: string }[] = [
   { id: 7, label: '7 giorni' },
@@ -20,8 +20,8 @@ const RANGES: { id: RangeId; label: string }[] = [
 
 const CHANNELS: { id: Channel; label: string; icon: LucideIcon; accent: string; enabled: boolean }[] = [
   { id: 'instagram', label: 'Instagram', icon: Instagram, accent: '#E1306C', enabled: true },
-  { id: 'tiktok',    label: 'TikTok',    icon: Music2,    accent: '#00BCD4', enabled: false },
-  { id: 'youtube',   label: 'YouTube',   icon: Youtube,   accent: '#FF0000', enabled: false },
+  { id: 'tiktok',    label: 'TikTok',    icon: Music2,    accent: '#00BCD4', enabled: true },
+  { id: 'youtube',   label: 'YouTube',   icon: Youtube,   accent: '#FF0000', enabled: true },
 ];
 
 function fmt(n: number | null | undefined) {
@@ -36,11 +36,6 @@ function fmtDur(sec: number | null | undefined) {
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
   return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-function todayStr() { return new Date().toISOString().slice(0, 10); }
-function shiftDays(d: string, n: number) {
-  return new Date(Date.parse(d) + n * 86_400_000).toISOString().slice(0, 10);
 }
 
 function sumKey(rows: MetricRow[], key: keyof MetricRow): number {
@@ -58,8 +53,8 @@ function avgKey(rows: MetricRow[], key: keyof MetricRow): number {
   if (vals.length === 0) return 0;
   return vals.reduce((a, b) => a + b, 0) / vals.length;
 }
-function delta(cur: number, prev: number): number {
-  if (!prev) return cur > 0 ? 100 : 0;
+function delta(cur: number, prev: number): number | null {
+  if (!prev) return cur > 0 ? null : 0;
   return ((cur - prev) / prev) * 100;
 }
 
@@ -67,11 +62,26 @@ interface Kpi {
   key: string;
   label: string;
   value: string;
-  delta: number;
+  /** null = niente da confrontare nel periodo precedente */
+  delta: number | null;
   sub?: string;
 }
 
 function buildKpis(
+  channel: Channel,
+  rows: MetricRow[],
+  accountRows: MetricRow[],
+  prevRows: MetricRow[],
+  prevAccountRows: MetricRow[],
+): Kpi[] {
+  const kpis = buildKpisRaw(channel, rows, accountRows, prevRows, prevAccountRows);
+  // Periodo precedente senza dati (es. prima del primo giro di sync):
+  // nessun confronto invece di un finto +100%.
+  if (prevRows.length === 0 && prevAccountRows.length === 0) return kpis.map((k) => ({ ...k, delta: null }));
+  return kpis;
+}
+
+function buildKpisRaw(
   channel: Channel,
   rows: MetricRow[],            // post-level rows only
   accountRows: MetricRow[],     // account-level rows only
@@ -123,7 +133,8 @@ function buildKpis(
       { key: 'foll',  label: 'Follower',        value: fmt(foll),  delta: delta(foll, pfoll), sub: `+${fmt(sumAcc('new_followers'))} nuovi` },
       { key: 'eng',   label: 'Mi piace + commenti', value: fmt(likes), delta: delta(likes, plikes) },
       { key: 'er',    label: 'Tasso engagement', value: erTt.value, delta: erTt.d },
-      { key: 'comp',  label: 'Tasso completamento', value: (avg('video_completion_rate') * 100).toFixed(1) + '%', delta: delta(avg('video_completion_rate'), pavg('video_completion_rate')) },
+      // Il tasso di completamento non arriva dalle API di TikTok: al suo posto i commenti
+      { key: 'comm',  label: 'Commenti', value: fmt(sum('comments')), delta: delta(sum('comments'), psum('comments')) },
       { key: 'shares', label: 'Condivisioni', value: fmt(sum('shares')), delta: delta(sum('shares'), psum('shares')) },
     ];
   }
@@ -148,13 +159,26 @@ const PerformanceDashboard: React.FC = () => {
   const [client, setClient] = useState<ClientBrand | null>(null);
   const [channel, setChannel] = useState<Channel>('instagram');
   const [range, setRange] = useState<RangeId>(28);
-  const [customFrom, setCustomFrom] = useState(shiftDays(todayStr(), -27));
-  const [customTo, setCustomTo] = useState(todayStr());
+  const today = localToday();
+  const [customFrom, setCustomFrom] = useState(shiftDays(today, -27));
+  const [customTo, setCustomTo] = useState(today);
   const [syncing, setSyncing] = useState(false);
 
   const handleSyncNow = async () => {
     setSyncing(true);
     try {
+      if (channel !== 'instagram') {
+        // TikTok / YouTube: API ufficiali, solo il cliente selezionato
+        const r = await SocialService.syncNow(channel, client?.kind === 'brand' ? client.id : null);
+        toast({
+          title: 'Sincronizzazione completata',
+          description: r.processed === 0
+            ? `Nessun account ${channelMeta.label} collegato per questo cliente.`
+            : `${r.processed} account · ${r.totalPostsSynced} video aggiornati. Refresh tra 2-3 secondi.`,
+        });
+        if (r.processed > 0) setTimeout(() => window.location.reload(), 2500);
+        return;
+      }
       // We invoke the Apify ingestion fn. The fn accepts either x-cron-secret
       // or an admin JWT — supabase.functions.invoke automatically includes
       // the user JWT, and the fn checks user_roles for 'admin'.
@@ -174,16 +198,16 @@ const PerformanceDashboard: React.FC = () => {
     }
   };
 
-  const { from, to } = useMemo(() => {
-    if (range === 'custom') return { from: customFrom, to: customTo };
-    return { from: shiftDays(todayStr(), -(range as number) + 1), to: todayStr() };
-  }, [range, customFrom, customTo]);
+  const periodWindow = useMemo(
+    () => resolveWindow(range, customFrom, customTo, today),
+    [range, customFrom, customTo, today]
+  );
 
   const { rows, prevRows, loading, error } = usePerformanceMetrics({
     brandId: client?.kind === 'brand' ? client.id : null,
     trackedHandleId: client?.kind === 'tracked' ? client.id : null,
     channel,
-    from, to,
+    window: periodWindow,
   });
 
   // Post-level vs account-level split. Post metrics (reach, engagement, …)
@@ -214,7 +238,7 @@ const PerformanceDashboard: React.FC = () => {
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, value]) => ({
         date,
-        label: new Date(date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }),
+        label: dayLabel(date),
         value,
       }));
   }, [postRows, trendKey]);
@@ -226,7 +250,7 @@ const PerformanceDashboard: React.FC = () => {
       .filter((r) => r.followers_total != null)
       .map((r) => ({
         date: r.snapshot_date,
-        label: new Date(r.snapshot_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }),
+        label: dayLabel(r.snapshot_date),
         followers: r.followers_total as number,
       }));
   }, [accountRows]);
@@ -242,7 +266,10 @@ const PerformanceDashboard: React.FC = () => {
       if (r.caption_excerpt && !prev.title.startsWith(r.caption_excerpt.slice(0, 10))) prev.title = r.caption_excerpt;
       byPost.set(id, prev);
     }
-    return Array.from(byPost.values()).sort((a, b) => b.engagement - a.engagement).slice(0, 5);
+    return Array.from(byPost.values())
+      .filter((p) => p.reach > 0 || p.engagement > 0)
+      .sort((a, b) => b.engagement - a.engagement || b.reach - a.reach)
+      .slice(0, 5);
   }, [postRows, trendKey]);
 
   if (!isAdmin) {
@@ -359,7 +386,7 @@ const PerformanceDashboard: React.FC = () => {
                   type="date"
                   value={customTo}
                   min={customFrom}
-                  max={todayStr()}
+                  max={today}
                   onChange={(e) => setCustomTo(e.target.value)}
                   style={{ padding: '6px 8px', border: '1px solid var(--line)', borderRadius: 6, fontSize: 12, background: 'transparent' }}
                 />
@@ -429,19 +456,22 @@ const PerformanceDashboard: React.FC = () => {
                   Nessuna metrica nel periodo selezionato
                 </p>
                 <p className="text-xs mt-1" style={{ color: 'var(--ink3)' }}>
-                  La sincronizzazione automatica con {channelMeta.label} non è ancora attiva.
-                  Una volta deployato l'edge function di sync, i dati appariranno qui.
+                  {channel === 'instagram'
+                    ? <>In questo periodo non c'è nessun giro di sincronizzazione.
+                      Prova un periodo più lungo oppure «Sincronizza ora».</>
+                    : <>Collega {channelMeta.label} dalla card del brand (I miei Brand) o da Impostazioni:
+                      i numeri arrivano ogni mattina, oppure subito con «Sincronizza ora».</>}
                 </p>
               </CardContent>
             </Card>
           )}
 
           {client && rows.length > 0 && (
-            <>
+            <div style={{ opacity: loading ? 0.45 : 1, transition: 'opacity 0.15s' }} aria-busy={loading}>
               {/* KPI grid */}
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
                 {kpis.map((k) => {
-                  const up = k.delta >= 0;
+                  const up = (k.delta ?? 0) >= 0;
                   return (
                     <Card key={k.key}>
                       <CardContent style={{ padding: 16 }}>
@@ -452,6 +482,11 @@ const PerformanceDashboard: React.FC = () => {
                           {k.value}
                         </div>
                         <div className="flex items-center gap-2 mt-2">
+                          {k.delta == null ? (
+                            <span className="text-[10px]" style={{ color: 'var(--ink3)' }}>
+                              {k.sub || 'nessun dato nel periodo prec.'}
+                            </span>
+                          ) : (<>
                           <span
                             className="inline-flex items-center gap-0.5 text-xs font-semibold rounded-md px-1.5 py-0.5"
                             style={{
@@ -465,6 +500,7 @@ const PerformanceDashboard: React.FC = () => {
                           <span className="text-[10px]" style={{ color: 'var(--ink3)' }}>
                             {k.sub || 'vs periodo prec.'}
                           </span>
+                          </>)}
                         </div>
                       </CardContent>
                     </Card>
@@ -477,7 +513,8 @@ const PerformanceDashboard: React.FC = () => {
                 <CardContent style={{ padding: 18 }}>
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                      {volLabel} · {trendData.length} giorni
+                      {volLabel} · {periodWindow.days} giorni
+                      {loading && <span className="text-[11px] font-normal ml-2" style={{ color: 'var(--ink3)' }}>aggiorno…</span>}
                     </h2>
                     <span className="text-xs" style={{ color: 'var(--ink3)' }}>
                       <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: accent, marginRight: 6 }} />
@@ -549,7 +586,7 @@ const PerformanceDashboard: React.FC = () => {
                   </CardContent>
                 </Card>
               </div>
-            </>
+            </div>
           )}
         </div>
       </main>
