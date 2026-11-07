@@ -20,6 +20,8 @@ export interface TemplateCandidate {
   storage_path: string | null;
   error: string | null;
   updated_at: string;
+  /** Genoma del candidato: `layout` c'è solo nei template a layout. */
+  genome?: { layout?: string; layout_etichetta?: string } | null;
   /** Signed URL per il rendering, mintata client-side. */
   image_url?: string;
 }

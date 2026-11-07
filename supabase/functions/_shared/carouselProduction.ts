@@ -46,7 +46,7 @@ export type VariantRow = {
   storage_bucket: string;
   storage_path: string;
   prompt_skeleton: string;
-  genome: { archetype?: string; format?: string } | null;
+  genome: { archetype?: string; format?: string; layout?: string; layout_etichetta?: string } | null;
 };
 
 export type PaletteColors = { bg_color: string; title_color: string; body_color: string };

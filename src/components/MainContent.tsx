@@ -144,20 +144,18 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, onContentSav
     setActiveVariant(0);
   }, [lastRawResponses]);
 
-  // Produzione NB2: quando arriva un carosello (o si cambia variante),
-  // genera le slide reali via reference template. Fingerprint per non
-  // riprodurre lo stesso contenuto a ogni re-render.
+  // Produzione delle slide: quando arriva un carosello (o si cambia
+  // variante), genera le slide reali. Parte anche senza template approvato:
+  // il server usa il layout di base nei colori del brand (prima si fermava
+  // qui e chi non aveva logo né template non vedeva mai un'immagine).
+  // Fingerprint per non riprodurre lo stesso contenuto a ogni re-render.
   useEffect(() => {
     const carousel = carouselDataList[activeVariant];
     if (!carousel) return;
-    if (!genesisLocked || !brandRecord?.id) {
+    if (!brandRecord?.id) {
       // Non deve mai fallire in silenzio: il fallback visibile in colonna
       // preview offre l'avvio manuale, qui lasciamo traccia per il debug.
-      console.warn('Produzione NB2 non avviata:', {
-        brandId: brandRecord?.id ?? null,
-        genesisLocked,
-        brandLoading,
-      });
+      console.warn('Produzione slide non avviata: nessun brand attivo', { brandLoading });
       return;
     }
     const fingerprint = activeVariant + '|' + carousel.titolo_carosello + '|' + carousel.slides.length;
@@ -165,7 +163,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, onContentSav
     producedFingerprint.current = fingerprint;
     nb2.produce(carousel);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [carouselDataList, activeVariant, genesisLocked, brandRecord?.id]);
+  }, [carouselDataList, activeVariant, brandRecord?.id]);
 
   const handleInputChange = useCallback((field: string, value: string | string[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -176,8 +174,8 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, onContentSav
     setIdeaOpen(false);
   }, []);
 
-  // Senza template approvato la pagina resta aperta: si scrivono i testi
-  // dei caroselli, le slide grafiche partono solo dopo il Template Genesis.
+  // Senza template approvato la pagina resta aperta e le slide escono nello
+  // stile di base: il riquadro propone il template su misura come un di più.
   // Prima era un blocco a tutta pagina e chi saltava l'onboarding restava fuori.
   const goToGenesis = () => brandRecord && navigate(`/onboarding/template?brand=${brandRecord.id}`);
   const testiTpl = testiTemplate(brandRecord?.genesis_status);
@@ -326,26 +324,21 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, onContentSav
                   <p className="text-[12px] pt-2" style={{ color: 'var(--ink3)' }}>
                     I testi sono pronti e salvati nei tuoi contenuti; le slide grafiche non sono ancora state prodotte.
                   </p>
-                  {brandRecord?.id && genesisLocked ? (
-                    <button
-                      onClick={produceNow}
-                      className="text-white text-[12px] font-black uppercase px-6 py-3 rounded-xl"
-                      style={{ backgroundColor: 'var(--rosa)', border: 'none', cursor: 'pointer', letterSpacing: '0.5px' }}
-                    >
-                      Genera le slide
-                    </button>
-                  ) : brandRecord && !brandLoading ? (
+                  {brandRecord?.id ? (
                     <>
-                      <p className="text-[12px]" style={{ color: 'var(--ink3)' }}>
-                        {testiTpl.sottoCarosello}
-                      </p>
+                      {/* Anche senza template: le slide escono nello stile di base. */}
                       <button
-                        onClick={goToGenesis}
+                        onClick={produceNow}
                         className="text-white text-[12px] font-black uppercase px-6 py-3 rounded-xl"
                         style={{ backgroundColor: 'var(--rosa)', border: 'none', cursor: 'pointer', letterSpacing: '0.5px' }}
                       >
-                        {testiTpl.bottone}
+                        Genera le slide
                       </button>
+                      {!genesisLocked && (
+                        <p className="text-[12px]" style={{ color: 'var(--ink3)' }}>
+                          {testiTpl.sottoCarosello}
+                        </p>
+                      )}
                     </>
                   ) : (
                     <p className="text-[12px]" style={{ color: '#b45309' }}>
