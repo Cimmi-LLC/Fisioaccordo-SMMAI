@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { resolveProfession, professionPromptBlock, type ResolvedProfession } from "../_shared/brand/profession.ts";
+import { callGeminiWithRetry } from "../_shared/gemini.ts";
+import { FORMATI, formatoPerId, pubblicoDelBrand, type Pubblico } from "../_shared/brand/metodoCopy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,6 +16,10 @@ interface TopicIdea {
   formato: string;
   focus: string;
 }
+
+// Le idee sono il punto in cui si decide se il post vale qualcosa (la
+// contrarian take): pro, con flash di riserva.
+const MODELLI = ["gemini-2.5-pro", "gemini-2.5-flash"];
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -32,11 +38,12 @@ serve(async (req) => {
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
-    // Optional brand context (lightweight, just for tone alignment).
+    // Contesto del brand: chi pubblica, a chi parla, con quali parole.
     // La professione decide il mestiere per cui si propongono le idee:
     // scelta nel brand kit, altrimenti rilevata dal brand e dal topic.
     let brandHint = "";
     let prof: ResolvedProfession = resolveProfession(null, topic);
+    let pubblico: Pubblico = "B2C";
     const authHeader = req.headers.get("authorization");
     if (authHeader) {
       try {
@@ -57,78 +64,89 @@ serve(async (req) => {
           const { data: brand } = await brandQuery.order("created_at", { ascending: true }).limit(1).maybeSingle();
           if (brand) {
             prof = resolveProfession(brand, topic);
-            brandHint = `\n\nCONTESTO BRAND:
+            pubblico = pubblicoDelBrand(brand);
+            const frasi = (Array.isArray(brand.frasi_pazienti) ? brand.frasi_pazienti : []).filter(Boolean).slice(0, 10);
+            const vantaggi = (brand.vantaggi_competitivi || []).filter(Boolean);
+            brandHint = `
+CONTESTO BRAND
 - Chi pubblica: ${brand.nome_business || prof.label} (${prof.label})
-- Target: ${brand.target_pazienti || "pubblico generale"}
-- Categorie: ${(brand.categorie || []).join(", ") || prof.profile.settore}
+- A chi parla: ${brand.target_pazienti || "pubblico generale"}
 - Servizi: ${(brand.servizi || []).join(", ") || "(non indicati)"}
-- Temi chiave: ${(brand.temi_chiave || []).join(", ")}`;
+- Temi chiave: ${(brand.temi_chiave || []).join(", ") || "(non indicati)"}
+${vantaggi.length ? `- Prove e vantaggi veri (le uniche prove ammesse): ${vantaggi.join("; ")}\n` : ""}${brand.convinzione_da_ribaltare ? `- Convinzione da ribaltare scelta dal brand: «${brand.convinzione_da_ribaltare}»\n` : ""}${frasi.length ? `- Parole vere dei clienti: ${frasi.map((f: string) => `«${f}»`).join(" ")}\n` : ""}`;
           }
         }
       } catch { /* non-blocking */ }
     }
 
-    const systemPrompt = `Sei un content strategist per ${prof.profile.labelPlural} su Instagram. Devi proporre idee di post AUTONOME e COMPLETAMENTE DIVERSE tra loro, mai variazioni dello stesso angolo. Ogni idea deve restare nel campo di ${prof.profile.settore}: niente angoli presi da un altro mestiere.
+    const lettore = pubblico === "B2B"
+      ? "il titolare o il professionista dello studio (problemi di agenda, tempo, soldi, collaboratori, pazienti persi)"
+      : `la persona con il problema (${prof.profile.cliente}), con i suoi sintomi e la sua giornata`;
+
+    const systemPrompt = `Sei il content strategist di ${prof.profile.labelPlural} su Instagram e usi il metodo della Short Form Academy di Kallaway. Proponi idee di carosello che costruiscono fiducia.
 
 ${professionPromptBlock(prof)}
+
+COME SI TROVA UN'IDEA (in quest'ordine)
+1. Format per primo: il modo in cui l'informazione è organizzata.
+2. Seed: l'idea in una riga.
+3. Convinzione comune (A): cosa crede o fa di solito il lettore, detto in concreto.
+4. Contrarian take (B): cosa sai tu che lui non sa, dimostrabile in meno di un minuto. Contrasto massimo fra A e B.
+5. Test: se chiunque nella nicchia potrebbe dirla, scartala. Vietate come idea centrale le ovvietà («muoviti di più», «ascolta il tuo corpo», «affidati a un professionista», «la prevenzione è importante», «organizzati meglio»).
+6. Solo alla fine l'hook della copertina: il lettore e la sua situazione nelle prime parole, il contrasto dichiarato o implicito, il tu, parole semplici, al massimo 9 parole.
+
+REGOLE
+- Il lettore è ${lettore}.
+- Mai prove, numeri, casi o studi inventati: solo quelli del contesto brand.${pubblico === "B2C" && prof.id !== "altro" ? "\n- Nessuna idea deve far capire che si può fare a meno del professionista o dello studio." : ""}
+- Mai «sbloccare». Niente «sapevi che», «la verità su», «non sottovalutare», «X cose che non sai».
+
+FORMAT DISPONIBILI (id: punto di partenza)
+${FORMATI.map((f) => `- ${f.id}: ${f.partenza}`).join("\n")}
 
 Rispondi SOLO con JSON valido.`;
 
     const userPrompt = `Topic generale: "${topic}"
+${brandHint}
+Proponi ESATTAMENTE ${n} idee di carosello sul topic, ognuna con un format DIVERSO e una contrarian take DIVERSA. Ognuna è un post a sé, non una serie.
 
-Genera ESATTAMENTE ${n} idee di post Instagram DIVERSE TRA LORO sul topic sopra. Ogni idea deve essere:
-- AUTONOMA (un post completo, non parte di una serie)
-- DIVERSA dalle altre per ANGOLO, FORMATO e FOCUS specifico
-- ESEGUIBILE come post a sé stante
+Per ogni idea:
+- "formato": uno degli id dei format disponibili;
+- "titolo": il seed, in una riga (cosa scomponi e perché è interessante);
+- "hook": la copertina, massimo 9 parole;
+- "focus": la contrarian take in una frase, nella forma «Si crede che A. In realtà B, perché…».
 
-Mix obbligatorio di formati: educativo (lista numerata), mito da sfatare, segnali d'allarme, consigli pratici da fare subito, errori comuni, caso reale/storia, prevenzione, quando rivolgersi al professionista, miti vs realtà. Scegli ${n} formati DIVERSI.
+Rispondi con {"ideas":[{"formato":"…","titolo":"…","hook":"…","focus":"…"}]}`;
 
-Esempio di STRUTTURA (l'argomento dell'esempio non conta, conta la varietà degli angoli):
-[
-  {"titolo": "3 segnali che il problema non è solo stanchezza", "hook": "Non tutti i casi sono uguali. Ecco quando devi preoccuparti.", "formato": "segnali_allarme", "focus": "segnali da non sottovalutare"},
-  {"titolo": "2 cose da fare oggi che cambiano il risultato in 5 minuti", "hook": "Provate su 200+ ${prof.profile.clientePlurale}. Si fanno a casa, senza attrezzi.", "formato": "consigli_pratici", "focus": "azioni immediate"},
-  {"titolo": "Smettila di credere a questo mito", "hook": "La credenza più diffusa è anche la più sbagliata. Ecco perché.", "formato": "mito_sfatato", "focus": "mito vs realtà"},
-  {"titolo": "I 4 errori che fai ogni giorno senza accorgertene", "hook": "Abitudini, tempi, scelte: il combo perfetto del disastro.", "formato": "errori_comuni", "focus": "errori quotidiani"}
-]
-
-Per il topic "${topic}", produci ${n} idee diverse seguendo questo schema esatto. ${brandHint}
-
-Restituisci SOLO un array JSON, niente altro.`;
-
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+    let ideas: TopicIdea[] = [];
+    let ultimoStatus = 0;
+    for (const model of MODELLI) {
+      const res = await callGeminiWithRetry({
+        apiKey: GEMINI_API_KEY,
+        model,
+        maxRetries: 2,
+        body: {
           system_instruction: { parts: [{ text: systemPrompt }] },
           contents: [{ role: "user", parts: [{ text: userPrompt }] }],
           generationConfig: {
             temperature: 0.95,
             responseMimeType: "application/json",
+            ...(model.includes("pro") ? { thinkingConfig: { thinkingBudget: 2048 } } : {}),
           },
-        }),
+        },
+      });
+      if (!res.ok) { ultimoStatus = res.status; continue; }
+      const raw = res.data?.candidates?.[0]?.content?.parts?.map((p: { text?: string; thought?: boolean }) => p.thought ? "" : (p.text || "")).join("") || "";
+      try {
+        const parsed = JSON.parse(raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
+        ideas = Array.isArray(parsed) ? parsed : (parsed.ideas || parsed.posts || []);
+      } catch (err) {
+        console.error("Parse error:", err, "raw:", raw.substring(0, 300));
+        ideas = [];
       }
-    );
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Gemini error:", response.status, errText);
-      throw new Error(`Gemini API error: ${response.status}`);
+      if (ideas.length > 0) break;
     }
 
-    const data = await response.json();
-    const raw = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-    let ideas: TopicIdea[] = [];
-    try {
-      const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      const parsed = JSON.parse(cleaned);
-      ideas = Array.isArray(parsed) ? parsed : (parsed.ideas || parsed.posts || []);
-    } catch (err) {
-      console.error("Parse error:", err, "raw:", raw.substring(0, 300));
-      throw new Error("Risposta Gemini non parsabile");
-    }
+    if (ideas.length === 0 && ultimoStatus) throw new Error(`Gemini API error: ${ultimoStatus}`);
 
     const valid = ideas
       .filter((i) => i && typeof i.titolo === "string" && i.titolo.trim().length > 3)
@@ -136,7 +154,8 @@ Restituisci SOLO un array JSON, niente altro.`;
       .map((i) => ({
         titolo: i.titolo.trim(),
         hook: (i.hook || "").trim(),
-        formato: (i.formato || "").trim(),
+        // Un id fuori lista non si passa avanti: generate-content sceglierà da sé.
+        formato: formatoPerId(i.formato)?.id ?? "",
         focus: (i.focus || "").trim(),
       }));
 

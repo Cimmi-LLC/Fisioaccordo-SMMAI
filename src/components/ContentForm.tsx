@@ -129,7 +129,7 @@ const ContentForm: React.FC<ContentFormProps> = ({
             )}
           </button>
           <p className="text-[11px] -mt-2 text-center" style={{ color: 'var(--ink3)' }}>
-            Il copy arriva in 15-30 secondi; le slide grafiche richiedono 1-2 minuti in più. Non ricaricare la pagina.
+            Il copy arriva in 30-90 secondi (lo scriviamo, lo controlliamo e se serve lo riscriviamo); le slide grafiche richiedono 1-2 minuti in più. Non ricaricare la pagina.
           </p>
 
           {/* Advanced options toggle */}
