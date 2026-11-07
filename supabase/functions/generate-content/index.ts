@@ -2,8 +2,12 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { logGeneration } from "../_shared/historyLogger.ts";
 import { requireWithinRateLimit } from "../_shared/auth.ts";
-import { callGeminiWithRetry } from "../_shared/gemini.ts";
-import { resolveProfession, professionPromptBlock, professionKeywordExamples, delLuogo, nelMioLuogo, ilCliente, alCliente } from "../_shared/brand/profession.ts";
+import { callGeminiWithRetry, type GeminiCallResult } from "../_shared/gemini.ts";
+import { resolveProfession, professionPromptBlock, professionKeywordExamples, delLuogo, nelMioLuogo, ilCliente } from "../_shared/brand/profession.ts";
+import {
+  pubblicoDelBrand, formatoPerId, bloccoFormato, elencoFormati, regoleMetodo, SCHEMA_BRIEF,
+  controlliMeccanici, promptGiudice, leggiGiudizio, type ContestoMetodo, type Giudizio,
+} from "../_shared/brand/metodoCopy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,17 +15,52 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// Il corso chiede un modello forte per scrivere: pro per la stesura, flash
+// se pro non risponde. Il giudice è flash, che basta per votare.
+// gemini-2.5-pro non c'è più per questa chiave (404 «no longer available to
+// new users», collaudo del 07/11/2026).
+const MODELLI_STESURA = ["gemini-3.1-pro-preview", "gemini-2.5-flash"];
+const MODELLO_GIUDICE = "gemini-2.5-flash";
+// Oltre questo tempo la riscrittura passa a flash, per stare nel limite
+// della funzione.
+const RISCRITTURA_PRO_ENTRO_MS = 55_000;
+
+function testoRisposta(r: GeminiCallResult): string {
+  return r.data?.candidates?.[0]?.content?.parts?.map((p: { text?: string; thought?: boolean }) => p.thought ? "" : (p.text || "")).join("") || "";
+}
+
+function leggiJson(raw: string): any | null {
+  try {
+    return JSON.parse(String(raw || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim());
+  } catch {
+    return null;
+  }
+}
+
+function corpoRichiesta(system: string, user: string, model: string, temperature: number) {
+  return {
+    system_instruction: { parts: [{ text: system }] },
+    contents: [{ role: "user", parts: [{ text: user }] }],
+    generationConfig: {
+      temperature,
+      responseMimeType: "application/json",
+      ...(model.startsWith("gemini-3") ? { thinkingConfig: { thinkingLevel: "low" } } : {}),
+    },
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const inizio = Date.now();
   try {
     const {
       topic, numSlides, postType, brandId,
       avatar: avatarInput = "B2C",
-      obiettivo = "nurture",
-      tipoContenuto = "valore",
+      formato: formatoRichiesto,
+      angolo,
     } = await req.json();
 
     if (!topic || typeof topic !== "string" || topic.trim().length < 2) {
@@ -36,7 +75,6 @@ serve(async (req) => {
     const slidesCount = Math.min(Math.max(parseInt(numSlides) || 5, 2), 10);
 
     // ── Load brand kit from Supabase ──
-    let brandContext = "";
     let brandData: any = null;
     let resolvedUserId: string | null = null;
     const authHeader = req.headers.get("authorization");
@@ -71,81 +109,7 @@ serve(async (req) => {
             console.warn("generate-content called WITHOUT brandId — falling back to first brand for backwards compat");
           }
           const { data: brand } = await brandQuery.limit(1).maybeSingle();
-
-          if (brand) {
-            brandData = brand;
-            const brandProf = resolveProfession(brand, topic);
-            const luogo = brandProf.profile.luogo;
-            const clienti = brandProf.profile.clientePlurale;
-            const persona = brand.persona_scrittura === "io" ? `prima persona singolare (io / il mio ${luogo})` : `prima persona plurale (noi / ${nelMioLuogo(brandProf.profile, true)})`;
-            const cta = (brand.cta_suggerite || []).filter(Boolean);
-            const vantaggi = (brand.vantaggi_competitivi || []).filter(Boolean);
-            const paroleEvitare = (brand.parole_da_evitare || []).filter(Boolean);
-            const temi = (brand.temi_chiave || []).filter(Boolean);
-            const servizi = (brand.servizi || []).filter(Boolean);
-            // Campi del metodo (migrazione 20261103150000): se mancano in
-            // produzione restano array/stringhe vuote e i blocchi non escono.
-            const frasiPazienti = (Array.isArray(brand.frasi_pazienti) ? brand.frasi_pazienti : []).filter(Boolean);
-            const convinzione = typeof brand.convinzione_da_ribaltare === "string" ? brand.convinzione_da_ribaltare.trim() : "";
-            const profiloDetestato = typeof brand.profilo_detestato === "string" ? brand.profilo_detestato.trim() : "";
-
-            brandContext = `
-
-=== BRAND: ${brand.nome_business || "Studio"} ===
-${brand.descrizione ? `Descrizione: ${brand.descrizione}` : ""}
-${brand.mission ? `Mission: ${brand.mission}` : ""}
-${brand.identita_core ? `Identità: ${brand.identita_core}` : ""}
-
-=== TARGET (a chi stai parlando in OGNI slide) ===
-${brand.target_pazienti || "pubblico generale"}
-→ Ogni hook, esempio, scenario DEVE risuonare con questo target. Mai parlare a "tutti".
-
-=== VOCE OBBLIGATORIA ===
-Tono: ${brand.tono_voce || "professionale"}
-Persona: ${persona}
-${persona.includes("singolare") ? `→ Usa 'io', 'il mio ${luogo}', 'nel mio lavoro vedo…'. MAI 'noi' o 'il nostro team'.` : `→ Usa 'noi', '${nelMioLuogo(brandProf.profile, true)}', 'i nostri ${clienti}'. MAI 'io' o 'il mio lavoro'.`}
-
-=== SERVIZI DEL BRAND (riferisciti SOLO a questi) ===
-${servizi.length > 0 ? servizi.join(" · ") : "(generici)"}
-→ La CTA finale e gli esempi di servizio devono riferirsi a UNO di questi, mai inventare servizi diversi.
-
-${vantaggi.length > 0 ? `=== VANTAGGI COMPETITIVI (cita almeno UNO in una slide content) ===
-${vantaggi.map((v: string, i: number) => `${i + 1}. ${v}`).join("\n")}
-→ Almeno una slide deve trasformare uno di questi vantaggi in un beneficio concreto per ${ilCliente(brandProf.profile)}.
-` : ""}
-${cta.length > 0 ? `=== CTA APPROVATE DAL BRAND (scegline UNA per cta_finale / bottone_cta) ===
-${cta.map((c: string) => `• ${c}`).join("\n")}
-→ Non inventare CTA fuori da questa lista. Adatta il fraseggio al topic ma resta nel set.
-` : ""}
-${temi.length > 0 ? `=== TEMI CHIAVE del brand: ${temi.join(", ")}
-→ Se il topic ne tocca uno, sfruttalo per creare connessione col brand.
-` : ""}
-${paroleEvitare.length > 0 ? `=== PAROLE/ESPRESSIONI BANDITE (output rifiutato se le usi) ===
-${paroleEvitare.map((p: string) => `❌ ${p}`).join("\n")}
-` : ""}
-${frasiPazienti.length > 0 ? `=== LE PAROLE DEI ${clienti.toUpperCase()} (frasi testuali, come le dicono loro) ===
-${frasiPazienti.map((f: string) => `«${f}»`).join("\n")}
-→ Hook, slide e caption usano QUESTE parole e questo registro, non il linguaggio da sito. Almeno un hook o una slide parte da una di queste frasi.
-` : ""}
-${convinzione ? `=== LA CONVINZIONE DA RIBALTARE (contrarian take) ===
-«${convinzione}»
-→ Quando il topic lo permette, il contenuto prende posizione CONTRO questa convinzione e spiega perché è sbagliata. Un punto di vista netto, non un elenco neutro.
-` : ""}
-${profiloDetestato ? `=== COME NON SUONARE MAI ===
-Il brand NON vuole somigliare a: ${profiloDetestato}.
-→ Se una frase potrebbe uscire da quel tipo di profilo, riscrivila.
-` : ""}
-${brand.categorie?.length ? `Categorie: ${brand.categorie.join(", ")}` : ""}
-COLORI BRAND: primario ${brand.colore_primario || "#554697"}, secondario ${brand.colore_secondario || "#E6007E"}
-
-=== VIETATO RIPETERE IL SITO ===
-La descrizione e la mission qui sopra vengono dal sito del brand: servono per CAPIRE chi parla, MAI da riscrivere.
-❌ Vietate le frasi da sito vetrina riformulate: "valutazione continua e mirata basata su evidenze scientifiche", "percorsi terapeutici personalizzati", "approccio su misura", "al centro del nostro lavoro".
-→ Si parla delle situazioni concrete ${delLuogo(brandProf.profile)} e della vita di ${ilCliente(brandProf.profile)}, con le sue parole.
-
-REGOLA FONDAMENTALE: il contenuto deve sembrare scritto DA "${brand.nome_business || `lo ${luogo}`}", non da un'agenzia generica. Se rileggendo il copy non si capisce CHE È IL BRAND a parlare (vs. qualsiasi altro ${luogo}), riscrivilo.`;
-          }
-
+          if (brand) brandData = brand;
         }
       } catch (err) {
         console.error("Error loading brand:", err);
@@ -153,310 +117,278 @@ REGOLA FONDAMENTALE: il contenuto deve sembrare scritto DA "${brand.nome_busines
     }
 
     const brandName = brandData?.nome_business || "Studio";
-    const brandColor = brandData?.colore_primario || "#554697";
 
     // Professione di chi pubblica: scelta nel brand kit, altrimenti rilevata
     // dal brand e dal topic. Decide lessico, esempi e immagini del prompt.
     const prof = resolveProfession(brandData, topic);
     const P = prof.profile;
 
-    // Tipo di copy: la scelta salvata sullo studio (card impostazioni) vince
-    // su quella passata nel body.
-    const avatar = (brandData?.avatar_type === "B2B" || brandData?.avatar_type === "B2C")
-      ? brandData.avatar_type
-      : (avatarInput === "B2B" ? "B2B" : "B2C");
+    // A chi si parla: B2B scelto nel kit, oppure un target fatto solo di
+    // professionisti (avatar_type resta B2C di default anche per GestioMed).
+    const pubblico = pubblicoDelBrand(brandData, avatarInput);
+    const target = String(brandData?.target_pazienti || "").trim();
+    const metodo: ContestoMetodo = {
+      pubblico,
+      lettori: pubblico === "B2B" ? (target || "i titolari degli studi") : P.clientePlurale,
+      sanitario: prof.id !== "altro",
+    };
+    const chiLegge = pubblico === "B2B" ? "il titolare che legge" : ilCliente(P);
+    // GestioMed o un'agenzia parlano agli studi ma uno studio non ce l'hanno:
+    // prima scrivevano «nel nostro studio abbiamo risolto…».
+    const fornitore = pubblico === "B2B" && prof.id === "altro";
 
-    const avatarBlock = `
-=== A CHI PARLI: E LA REGOLA PIU IMPORTANTE DI TUTTE ===
-Avatar impostato: ${avatar}.
-Se Avatar vale B2C devi parlare DIRETTAMENTE ALLA PERSONA CHE HA IL PROBLEMA, dandole del tu, parlando dei suoi sintomi o bisogni, della sua giornata e della sua vita: e VIETATO rivolgersi al professionista o al titolare ${delLuogo(P)}, e sono VIETATE le parole posizionamento, autorevolezza, competenza, acquisizione ${P.clientePlurale}, marketing, professionisti, colleghi, business, fatturato, percorso commerciale, differenziante.
-Se Avatar vale B2B allora parli al titolare ${delLuogo(P)} e quelle parole sono ammesse.
-Il BRAND KIT qui sopra serve SOLO a sapere chi pubblica, NON decide a chi ti rivolgi: anche se il brand si rivolge a professionisti, se Avatar vale B2C tu scrivi ${alCliente(P)}.
-Prima di scrivere ogni frase verifica che sia rivolta al destinatario giusto secondo Avatar: ${avatar}.
-Obiettivo: ${obiettivo} (reach/nurture/convert/retain). Tipo: ${tipoContenuto} (valore o offerta).
+    let brandContext = "";
+    const cta: string[] = [];
+    const paroleEvitare: string[] = [];
+    if (brandData) {
+      const brand = brandData;
+      const luogo = P.luogo;
+      const persona = brand.persona_scrittura === "io" ? `prima persona singolare (io / il mio ${luogo})` : `prima persona plurale (noi / ${nelMioLuogo(P, true)})`;
+      cta.push(...(brand.cta_suggerite || []).filter(Boolean));
+      paroleEvitare.push(...(brand.parole_da_evitare || []).filter(Boolean));
+      const vantaggi = (brand.vantaggi_competitivi || []).filter(Boolean);
+      const temi = (brand.temi_chiave || []).filter(Boolean);
+      const servizi = (brand.servizi || []).filter(Boolean);
+      // Campi del metodo (migrazione 20261103150000): se mancano in
+      // produzione restano array/stringhe vuote e i blocchi non escono.
+      const frasiPazienti = (Array.isArray(brand.frasi_pazienti) ? brand.frasi_pazienti : []).filter(Boolean);
+      const convinzione = typeof brand.convinzione_da_ribaltare === "string" ? brand.convinzione_da_ribaltare.trim() : "";
+      const profiloDetestato = typeof brand.profilo_detestato === "string" ? brand.profilo_detestato.trim() : "";
 
-=== FORMATO = OBIETTIVO x PIATTAFORMA ===
-reach: gancio larghissimo e breve. nurture: spiega ed educa passo-passo. convert: promessa + prova + CTA dura. retain: umano, dietro le quinte.
+      brandContext = `
+=== BRAND: ${brandName} ===
+${brand.descrizione ? `Descrizione: ${brand.descrizione}` : ""}
+${brand.mission ? `Mission: ${brand.mission}` : ""}
+${brand.identita_core ? `Identità: ${brand.identita_core}` : ""}
 
-=== STRUTTURA: HOOK -> VALORE -> CTA ===
-Una sola big idea. HOOK che chiama la situazione specifica del lettore (niente generico). VALORE: cosa ottiene, come funziona, cosa cambia; leve: sogno/risultato, probabilita con prova e numeri, tempo, sforzo. CTA: una sola azione chiara.
+=== TARGET (il lettore di OGNI slide) ===
+${target || "pubblico generale"}
 
-=== VALORE vs OFFERTA ===
-Se tipo=valore: educa e basta, nessuna vendita, CTA soft (salva/segui/commenta). Se tipo=offerta: promessa -> meccanismo credibile -> prova -> CTA dura (prenota/DM/link) piu rimozione del rischio; mai promesse mediche garantite, mai toni ingannevoli.
+=== VOCE OBBLIGATORIA ===
+Tono: ${brand.tono_voce || "professionale"}
+Persona: ${fornitore ? (brand.persona_scrittura === "io" ? "prima persona singolare" : "prima persona plurale") : persona}
+${fornitore
+  ? `→ Chi pubblica NON è uno studio: è ${brandName}, che lavora per gli studi. Usa '${persona.includes("singolare") ? "io" : "noi"}' come ${brandName}. MAI 'nel nostro studio', 'i nostri pazienti', 'abbiamo risolto in studio': lo studio e i pazienti sono di chi legge.`
+  : persona.includes("singolare") ? `→ Usa 'io', 'il mio ${luogo}'. MAI 'noi' o 'il nostro team'.` : `→ Usa 'noi', '${nelMioLuogo(P, true)}'. MAI 'io'.`}
 
-=== COPY B2C vs B2B ===
-B2C: emozione, desiderio, vita quotidiana, frasi corte, tanto tu, esempi di vita. B2B: rischio, soldi, tempo, status; il tuo team e la tua azienda; KPI e numeri; piu prove, casi, screenshot.`;
+=== SERVIZI DEL BRAND (riferisciti SOLO a questi; funzioni o risultati non scritti qui non esistono) ===
+${servizi.length > 0 ? servizi.join(" · ") : "(non indicati: non nominare servizi)"}
 
-    const systemPrompt = `Sei un copywriter d'élite specializzato in contenuti social per il settore ${P.settore} (${prof.label}). Formazione: $100M Playbook di Alex Hormozi.
+${vantaggi.length > 0 ? `=== VANTAGGI E PROVE DEL BRAND (le uniche prove che puoi citare) ===
+${vantaggi.map((v: string, i: number) => `${i + 1}. ${v}`).join("\n")}
+` : ""}
+${cta.length > 0 ? `=== AZIONI APPROVATE DAL BRAND ===
+${cta.map((c: string) => `• ${c}`).join("\n")}
+→ La CTA porta a una di queste azioni, nella forma nativa del metodo (es. «Commenta SPALLA e ti spieghiamo come funziona la valutazione»). Mai promettere guide o materiali che il brand non ha.
+` : ""}
+${temi.length > 0 ? `=== TEMI CHIAVE del brand: ${temi.join(", ")}
+` : ""}
+${paroleEvitare.length > 0 ? `=== PAROLE/ESPRESSIONI BANDITE (output rifiutato se le usi) ===
+${paroleEvitare.map((p: string) => `❌ ${p}`).join("\n")}
+` : ""}
+${frasiPazienti.length > 0 ? `=== LE PAROLE DEI CLIENTI (frasi testuali, come le dicono loro) ===
+${frasiPazienti.map((f: string) => `«${f}»`).join("\n")}
+→ Copertina, slide e caption usano QUESTE parole e questo registro, non il linguaggio da sito. La convinzione comune (A) si scrive come la direbbe uno di loro.
+` : ""}
+${convinzione ? `=== LA CONVINZIONE DA RIBALTARE, scelta dal brand ===
+«${convinzione}»
+→ Se il topic lo permette, è questa la convinzione comune (A) da ribaltare.
+` : ""}
+${profiloDetestato ? `=== COME NON SUONARE MAI ===
+Il brand NON vuole somigliare a: ${profiloDetestato}.
+` : ""}
+=== VIETATO RIPETERE IL SITO ===
+Descrizione e mission vengono dal sito: servono per CAPIRE chi parla, MAI da riscrivere.
+❌ Vietate le frasi da sito vetrina: "percorsi personalizzati", "approccio su misura", "strumenti avanzati", "al centro del nostro lavoro", "valutazione mirata basata su evidenze".
+→ Si parla di situazioni concrete ${delLuogo(P)} e della vita di ${chiLegge}, con le sue parole.`;
+    }
+
+    const isSinglePost = postType === "post-singolo" || postType === "reel";
+    const formato = formatoPerId(formatoRichiesto);
+    const nSlide = isSinglePost ? 1 : slidesCount;
+
+    const sceltaFormato = formato
+      ? bloccoFormato(formato, nSlide)
+      : `=== FORMAT: SCEGLILO TU PER PRIMO ===
+Scegli il format che porta il topic al contrasto più forte, e segui le sue parti in ordine (slide 1 = copertina, ultima = CTA):
+${elencoFormati()}`;
+
+    const systemPrompt = `Sei il copywriter di "${brandName}" (${prof.label}). Scrivi caroselli Instagram che si salvano e portano contatti, con il metodo della Short Form Academy di Kallaway.
 ${brandContext}
 
 ${professionPromptBlock(prof)}
-${avatarBlock}
 
-=== FRAMEWORK HOOK ===
-Usa i 7 tipi di hook di Hormozi:
-1) LABELS - Chiama direttamente il target
-2) DOMANDE SÌ - "Vorresti [risultato] in [tempo]?"
-3) DOMANDE APERTE - "Quale preferiresti?"
-4) CONDIZIONALI - "Se [situazione], stai facendo [errore]"
-5) COMANDI - "Smetti di fare X. Leggi questo."
-6) AFFERMAZIONI AUDACI - Statement con numeri concreti
-7) STORIE - "Un giorno ${nelMioLuogo(P)} arriva..."
+${regoleMetodo(metodo)}
 
-=== LIMITI ASSOLUTI PER OGNI SLIDE ===
-- Titolo: massimo 6 parole. Mai di più.
-- Testo body: massimo 2 frasi. Stop. Non spiegare, non approfondire, non aggiungere contesto.
-- Se hai più cose da dire, mettile in slide separate.
-- Ogni slide comunica UN solo concetto in modo fulmineo.
+${sceltaFormato}
 
-ESEMPIO CORRETTO (formato, non argomento):
-Titolo: "Non è stanchezza. È un segnale."
-Testo: "Ignorarlo lo peggiora. Il problema non passa da solo."
-
-ESEMPIO SBAGLIATO:
-Titolo: "Il Tuo Corpo Ti Sta Parlando?"
-Testo: "Ogni giorno, questo problema limita milioni di persone, impedendo una vita di qualità e un sonno ristoratore. Spesso si cercano soluzioni temporanee..."
-
-=== REGOLE DI SCRITTURA ===
-- Ogni contenuto DEVE essere 100% specifico per il topic
-- Hook potente nei primi 3 secondi
-- Numeri concreti, fatti reali (NO statistiche inventate o non verificabili)
-- Parla direttamente al lettore con "tu"
-- CTA scelta dalla lista approvata del brand (mai inventata)
-- NO emoji nel titolo e testo delle slide (solo nella caption Instagram)
-- NO frasi fatte generiche
-- Usa CONTRASTO drammatico (prima/dopo)
-- Stile conversazionale e diretto
-- Cliffhanger tra una slide e l'altra
-
-=== HOOK / FRASI BANDITE (output rifiutato se le usi) ===
-Sono tutte sentite mille volte, indeboliscono il messaggio:
-❌ "Il tuo corpo ti sta parlando"
-❌ "Sapevi che…?"
-❌ "X cose che non sai su…"
-❌ "Non sottovalutare…"
-❌ "La verità su…"
-❌ "Attenzione!"
-❌ "Devi assolutamente…"
-❌ "X consigli/segreti per…"
-❌ "Il modo migliore per…"
-❌ "Ecco perché…"
-❌ "Continua a leggere per scoprire…"
-❌ Domande retoriche generiche tipo "Mai capitato che…?"
-USA INVECE: scenari concreti ("Ieri in ${P.luogo}…"), numeri specifici ("3 settimane dopo…"),
-contrasti netti ("Pensavi fosse X. Era Y."), label sul target ("A te che …:"). Gli esempi sono di FORMA: l'argomento resta sempre quello di ${P.settore}.
-
-=== ANTI-GENERICO (banned) ===
-❌ "milioni di persone soffrono di…"
-❌ "ognuno di noi ha vissuto…"
-❌ "in un mondo in cui…"
-❌ "la salute è importante"
-❌ "prendersi cura di sé"
-❌ "il benessere è la chiave"
-Sono frasi vuote. Sostituisci con casi concreti, persone reali del target.
-
-=== STRUTTURA CAROSELLO ===
-- Slide 1 (tipo "cover"): HOOK ad alta tensione che identifica il target o lo scenario specifico.
-  Campi: hook (max 5 parole, niente domande generiche), sottotitolo (≤10 parole), keywords_stock.
-- Slide 2 (tipo "content"): PROBLEMA in scena concreta — un caso/scenario riconoscibile dal target.
-  Niente "molte persone soffrono di X". Sì una scena precisa della giornata del target (dove, quando, cosa succede).
-- Slide 3 (tipo "content"): CAUSA NON OVVIA — l'insight che cambia prospettiva.
-  Schema: "Non è [la causa ovvia]. È [la causa reale]." Differenzia dal banale, restando nel campo di ${P.settore}.
-- Slide 4..N-1 (tipo "content"): SOLUZIONE con step misurabili / proof concreta.
-  Cita un servizio del brand quando ha senso. Includi tempo/numero ("in 3 incontri…", "il 70% dei ${P.clientePlurale}…")
-  SOLO se il brand l'ha fornito nei vantaggi competitivi; altrimenti usa quantitativi generici verificabili.
-- Ultima Slide (tipo "cta"): CTA dalla lista BRAND. Aggancia il valore al servizio specifico.
-  Es. "Prenota la valutazione gratuita" → riferisce a un servizio reale del brand.
-
-=== REGOLE keywords_stock (FONDAMENTALE) ===
-Per ogni slide ragiona in QUESTO ORDINE prima di scrivere "keywords_stock":
-
-1. MESSAGGIO EMOTIVO della slide: qual è il sentimento o intento?
-   (es. "prevenzione" → ${ilCliente(P)} che si prende cura di sé PRIMA che arrivi il problema)
-2. SCENA VISIVA più rappresentativa di quel messaggio, ambientata dove lavora chi pubblica:
-   ${P.imageScene}
-3. Traduci quella scena in 3 keywords inglesi CONCRETE e FOTOGRAFABILI per Pixabay.
-
-REGOLE keywords:
-- Devono descrivere una SCENA FOTOGRAFABILE, non un concetto astratto
-- Sempre in INGLESE (Pixabay risponde meglio)
-- Specifiche per ${P.settore}: ${P.imageSubject} deve essere riconoscibile
-- EVITA parole troppo generiche: "health", "wellness", "people", "man", "woman", "person", "lifestyle"
-- Preferisci soggetti specifici CON il contesto di ${prof.label}
-
-ESEMPI CORRETTI (stesso settore di chi pubblica):
+=== REGOLE keywords_stock ===
+Per ogni slide: qual è il messaggio emotivo → quale scena fotografabile lo mostra, ambientata dove lavora chi pubblica (${P.imageScene}) → 3 keywords inglesi CONCRETE per Pixabay.
+- Una scena, non un concetto. Sempre in inglese. ${P.imageSubject} deve essere riconoscibile.
+- Vietate le parole generiche: "health", "wellness", "people", "man", "woman", "person", "lifestyle". Vietate le keywords di un altro mestiere.
+Esempi corretti:
 ${professionKeywordExamples(prof)}
-
-ESEMPI SBAGLIATI da evitare:
-- "prevenzione" → NO: ["prevention", "healthy man", "happy person"] (concetti, non scene)
-- "problema" → NO: ["pain", "sad person", "stress"] (troppo astratto)
-- "benessere" → NO: ["wellness", "happy people", "nature"] (off-topic)
-- Keywords di un ALTRO mestiere (es. "physiotherapy" per un nutrizionista): off-topic
 
 Rispondi SOLO con JSON valido.`;
 
-    const isSinglePost = postType === 'post-singolo' || postType === 'reel';
+    const angoloRichiesto = typeof angolo === "string" && angolo.trim() ? `\nAngolo già scelto (la contrarian take da sviluppare): «${angolo.trim()}»` : "";
 
     const userPrompt = isSinglePost
-      ? `Genera un post singolo Instagram su: "${topic.trim()}"
+      ? `Scrivi un post singolo Instagram su: "${topic.trim()}"${angoloRichiesto}
+
+Prima compila il brief, poi scrivi. Il post è UNA slide: il titolo è l'hook, il testo dà la contrarian take con la prova e il payoff; la caption porta il resto del corpo e la CTA.
 
 Rispondi con questo JSON esatto:
 {
+  ${SCHEMA_BRIEF},
   "titolo_carosello": "Titolo del post",
-  "hook_principale": "La frase hook che cattura",
+  "hook_principale": "L'hook, uguale al titolo della slide",
   "slides": [
     {
       "numero": 1,
       "tipo": "content",
-      "titolo": "TITOLO (max 6 parole, impattante)",
-      "testo": "Massimo 2 frasi brevi. Stop.",
+      "titolo": "L'hook, massimo 9 parole",
+      "testo": "Massimo 4 frasi brevi, una per riga con \\n, massimo 40 parole",
       "keywords_stock": ["keyword1 in inglese", "keyword2", "keyword3"]
     }
   ],
-  "cta_finale": "",
-  "caption_instagram": "Hook fortissimo\\n\\nParagrafo 1.\\n\\nParagrafo 2.\\n\\n👉 CTA",
-  "hashtag_suggeriti": ["hashtag1", "hashtag2", "hashtag3"]
-}
-
-REGOLE:
-1. UNA sola slide di tipo "content" con titolo, testo e keywords_stock
-2. Il contenuto deve essere SPECIFICO sul topic "${topic.trim()}"
-3. Scrivi dal punto di vista di "${brandName}", rispettando la VOCE OBBLIGATORIA (io/noi)
-4. Testo: MASSIMO 2 frasi brevi
-5. keywords_stock: 3-4 parole inglesi concrete per foto stock
-6. Niente frasi BANDITE (vedi system prompt), niente PAROLE BANDITE del brand
-7. La caption_instagram deve riferirsi al TARGET del brand e chiudere con UNA CTA APPROVATA
-
-=== SELF-CHECK PRIMA DI RISPONDERE ===
-[ ] Il TARGET si riconosce dal post?
-[ ] Il copy parla il linguaggio di ${prof.label} (non di un altro mestiere)?
-[ ] Voce io/noi rispettata?
-[ ] Nessuna frase/parola bandita?
-[ ] CTA dalla lista approvata?
-Se anche solo UNA è NO, riscrivi.`
-
-      : `Genera un carosello Instagram su: "${topic.trim()}"
+  "cta_finale": "La CTA",
+  "caption_instagram": "Hook\\n\\nParagrafo 1.\\n\\nParagrafo 2.\\n\\nCTA",
+  "hashtag_suggeriti": ["5 hashtag pertinenti"]
+}`
+      : `Scrivi un carosello Instagram su: "${topic.trim()}"${angoloRichiesto}
 Numero slide: ${slidesCount}
+
+Prima compila il brief (format, convinzione comune, contrarian take, fatti, esempio, domanda dell'hook, 3 copertine alternative), poi scegli la copertina migliore e scrivi le slide seguendo le parti del format.
 
 Rispondi con questo JSON esatto:
 {
-  "titolo_carosello": "Titolo principale del carosello",
-  "hook_principale": "La frase hook che cattura nei primi 3 secondi",
+  ${SCHEMA_BRIEF},
+  "titolo_carosello": "Titolo del carosello",
+  "hook_principale": "L'hook della copertina",
   "slides": [
     {
       "numero": 1,
       "tipo": "cover",
-      "hook": "Titolo d'impatto max 5 parole",
-      "sottotitolo": "Frase breve di supporto, max 10 parole",
+      "hook": "Copertina: massimo 9 parole, dice il lettore o la sua situazione e apre la domanda",
+      "sottotitolo": "Massimo 12 parole: promette cosa trova scorrendo",
       "keywords_stock": ["keyword coerente col tema", "keyword2", "keyword3"]
     },
     {
       "numero": 2,
       "tipo": "content",
-      "titolo": "TITOLO SLIDE (max 6 parole)",
-      "testo": "Massimo 2 frasi brevi. Stop.",
+      "titolo": "Massimo 8 parole: la verità non ovvia di questa slide",
+      "testo": "Da 2 a 4 frasi brevi, una per riga con \\n, massimo 40 parole",
       "keywords_stock": ["keyword1 in inglese", "keyword2", "keyword3"]
     },
     {
       "numero": ${slidesCount},
       "tipo": "cta",
-      "titolo": "TITOLO CTA",
-      "testo_cta": "Frase che spinge all'azione",
-      "bottone_cta": "Testo del bottone CTA"
+      "titolo": "Massimo 6 parole",
+      "testo_cta": "Una frase che lega la CTA al valore appena dato",
+      "bottone_cta": "L'azione, massimo 40 caratteri (es. «Commenta SPALLA»)"
     }
   ],
-  "cta_finale": "Call to action finale",
-  "caption_instagram": "Hook fortissimo\\n\\nParagrafo 1 breve.\\nSeconda riga.\\n\\nParagrafo 2 breve.\\n\\n👉 CTA chiara e diretta",
-  "hashtag_suggeriti": ["hashtag1", "hashtag2", "hashtag3"]
+  "cta_finale": "La CTA",
+  "caption_instagram": "Hook\\n\\nParagrafo 1 breve.\\n\\nParagrafo 2 breve.\\n\\nCTA",
+  "hashtag_suggeriti": ["5 hashtag pertinenti"]
 }
 
-REGOLE CRITICHE:
-1. La slide 1 DEVE essere tipo "cover" con "hook" (max 5 parole), "sottotitolo" (max 10 parole), e "keywords_stock"
-2. L'ultima slide DEVE essere tipo "cta"
-3. Tutte le slide intermedie DEVONO essere tipo "content" con "keywords_stock"
-4. Ogni keywords_stock deve essere DIVERSO e specifico per quella slide
-5. keywords_stock: array di 3-4 parole inglesi concrete e visive
-6. Il testo di ogni slide content: MASSIMO 2 frasi brevi
-7. Il contenuto deve essere SPECIFICO sul topic "${topic.trim()}"
-8. Scrivi dal punto di vista di "${brandName}"
-9. Usa cliffhanger tra una slide e l'altra
-10. L'ultima slide deve usare UNA delle CTA APPROVATE dal brand (vedi sezione CTA APPROVATE sopra). Niente CTA inventate.
+Regole di forma: la slide 1 è "cover", l'ultima è "cta", quelle in mezzo sono "content" con keywords_stock diverse per ogni slide. Niente hashtag dentro caption_instagram (l'app li aggiunge in coda). Paragrafi della caption separati da \\n\\n.`;
 
-=== SELF-CHECK PRIMA DI RISPONDERE ===
-Rileggi mentalmente l'output e verifica:
-[ ] Nessuna frase nella lista BANDITE è presente?
-[ ] Il TARGET si riconosce dal copy (non sembra scritto "per tutti")?
-[ ] Il copy parla il linguaggio di ${prof.label} (non di un altro mestiere)?
-[ ] La VOCE OBBLIGATORIA è rispettata (io vs noi)?
-[ ] Almeno una slide usa un VANTAGGIO COMPETITIVO del brand?
-[ ] La CTA finale è una di quelle approvate?
-[ ] Nessuna PAROLA BANDITA è presente?
-Se anche solo UNA risposta è NO, riscrivi prima di rispondere.`;
+    // ── 1. Stesura ──
+    let parsed: any = null;
+    let modelloUsato = "";
+    let ultimoErrore: GeminiCallResult | null = null;
+    for (const model of MODELLI_STESURA) {
+      const res = await callGeminiWithRetry({ apiKey: GEMINI_API_KEY, model, body: corpoRichiesta(systemPrompt, userPrompt, model, 0.8) });
+      if (!res.ok) { ultimoErrore = res; continue; }
+      const j = leggiJson(testoRisposta(res));
+      if (j && Array.isArray(j.slides) && j.slides.length > 0) { parsed = j; modelloUsato = model; break; }
+    }
 
-    const captionRules = `
-
-FORMATTAZIONE CAPTION INSTAGRAM:
-La caption_instagram DEVE essere formattata così:
-- Prima riga: hook fortissimo
-- Riga vuota (usa \\n\\n)
-- 2-3 paragrafi brevi separati da \\n\\n (max 2 frasi per paragrafo)
-- Riga vuota
-- CTA chiara e diretta con emoji 👉
-- NIENTE hashtag dentro caption_instagram: vanno SOLO in hashtag_suggeriti (l'app li aggiunge in coda una volta sola)
-- Usa \\n\\n per separare i paragrafi. MAI un blocco unico di testo.`;
-
-    const fullUserPrompt = userPrompt + captionRules;
-
-    const geminiResult = await callGeminiWithRetry({
-      apiKey: GEMINI_API_KEY,
-      body: {
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: "user", parts: [{ text: fullUserPrompt }] }],
-        generationConfig: {
-          temperature: 0.85,
-          responseMimeType: "application/json",
-        },
-      },
-    });
-
-    if (!geminiResult.ok) {
-      const userMsg = geminiResult.status === 503
+    if (!parsed) {
+      const status = ultimoErrore?.status;
+      const userMsg = status === 503
         ? "Gemini è temporaneamente sovraccarico. Riprova tra 30 secondi."
-        : geminiResult.status === 429
+        : status === 429
         ? "Quota Gemini superata. Riprova tra qualche minuto."
-        : `Gemini API error: ${geminiResult.status}`;
+        : status
+        ? `Gemini API error: ${status}`
+        : "Il copy non è uscito in un formato leggibile. Riprova.";
       return new Response(JSON.stringify({ error: userMsg }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const data = geminiResult.data;
-    const rawContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    // ── 2. Controlli: meccanici e giudice ──
+    // I numeri ammessi sono quelli scritti dal brand o dall'utente, non gli
+    // id o i colori del record.
+    const b = brandData || {};
+    const fonti = [topic, angolo, b.descrizione, b.mission, b.identita_core, b.target_pazienti, b.convinzione_da_ribaltare,
+      ...[b.vantaggi_competitivi, b.servizi, b.cta_suggerite, b.frasi_pazienti, b.temi_chiave].flatMap((v) => Array.isArray(v) ? v : [])]
+      .filter((x) => typeof x === "string").join("\n");
+    const datiBrand = brandData ? [
+      ["Servizi", b.servizi], ["Vantaggi e prove", b.vantaggi_competitivi], ["Azioni approvate", b.cta_suggerite],
+    ].map(([k, v]) => `${k}: ${(Array.isArray(v) ? v : []).filter(Boolean).join("; ") || "(nessuno)"}`).join("\n") : "";
+    const daVotare = (c: any) => ({ brief: c.brief, slides: c.slides, caption_instagram: c.caption_instagram });
+    let meccanici = controlliMeccanici(parsed, fonti, paroleEvitare);
+    let giudizio: Giudizio | null = null;
+    const giudica = async (c: any) => {
+      const r = await callGeminiWithRetry({
+        apiKey: GEMINI_API_KEY,
+        model: MODELLO_GIUDICE,
+        maxRetries: 2,
+        body: { contents: [{ role: "user", parts: [{ text: promptGiudice(daVotare(c), metodo, topic, datiBrand) }] }], generationConfig: { temperature: 0.2, responseMimeType: "application/json" } },
+      });
+      return r.ok ? leggiGiudizio(testoRisposta(r)) : null;
+    };
+    giudizio = await giudica(parsed);
 
-    if (!rawContent) throw new Error("No content returned from AI");
+    // ── 3. Una riscrittura se qualcosa non va ──
+    let riscritto = false;
+    const problemi = [...meccanici, ...(giudizio && !giudizio.promosso ? giudizio.problemi : [])];
+    if (problemi.length > 0) {
+      const modelli = Date.now() - inizio < RISCRITTURA_PRO_ENTRO_MS ? MODELLI_STESURA : MODELLI_STESURA.slice(1);
+      const richiesta = `${userPrompt}
 
-    let parsed;
-    try {
-      const jsonStr = rawContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      parsed = JSON.parse(jsonStr);
-    } catch {
-      // Fallback: try to build from raw text
-      parsed = {
-        titolo_carosello: topic,
-        hook_principale: rawContent.substring(0, 100),
-        slides: Array.from({ length: slidesCount }, (_, i) => ({
-          numero: i + 1,
-          tipo: i === 0 ? "cover" : i === slidesCount - 1 ? "cta" : "content",
-          ...(i === 0 ? { hook: topic, sottotitolo: "Scopri di più", keywords_stock: P.stockFallbackQuery.split(" ").slice(0, 3) } : {}),
-          ...(i > 0 ? { titolo: `PUNTO ${i}`, testo: rawContent.substring(i * 200, (i + 1) * 200) } : {}),
-          ...(i > 0 && i < slidesCount - 1 ? { keywords_stock: P.stockFallbackQuery.split(" ").slice(0, 3) } : {}),
-          ...(i === slidesCount - 1 ? { testo_cta: "Contattaci", bottone_cta: "Prenota ora" } : {}),
-        })),
-        cta_finale: "Contattaci ora",
-        caption_instagram: rawContent.substring(0, 500),
-        hashtag_suggeriti: [],
-      };
+=== LA TUA PRIMA VERSIONE ===
+${JSON.stringify(parsed)}
+
+=== COSA NON VA (correggi tutto, tieni quello che funziona) ===
+${problemi.map((p) => `- ${p}`).join("\n")}
+
+Riscrivi il JSON completo, stessa struttura.`;
+      for (const model of modelli) {
+        const res = await callGeminiWithRetry({ apiKey: GEMINI_API_KEY, model, maxRetries: 2, body: corpoRichiesta(systemPrompt, richiesta, model, 0.7) });
+        const j = res.ok ? leggiJson(testoRisposta(res)) : null;
+        if (j && Array.isArray(j.slides) && j.slides.length > 0) {
+          parsed = j;
+          riscritto = true;
+          meccanici = controlliMeccanici(parsed, fonti, paroleEvitare);
+          break;
+        }
+      }
     }
+
+    // Forma delle slide: copertina, contenuti, chiusura, numeri in fila.
+    if (!isSinglePost && Array.isArray(parsed.slides)) {
+      const tot = parsed.slides.length;
+      parsed.slides = parsed.slides.map((s: any, i: number) => ({
+        ...s,
+        numero: i + 1,
+        tipo: i === 0 ? "cover" : i === tot - 1 ? "cta" : "content",
+      }));
+    }
+
+    const qualita = {
+      modello: modelloUsato,
+      riscritto,
+      voti: giudizio?.voti ?? null,
+      problemi_prima_versione: problemi,
+      problemi_rimasti: meccanici,
+      secondi: Math.round((Date.now() - inizio) / 1000),
+    };
 
     if (resolvedUserId) {
       const firstSlide = parsed.slides?.[0] || {};
@@ -468,8 +400,8 @@ La caption_instagram DEVE essere formattata così:
         topic,
         title: parsed.titolo_carosello || firstSlide.titolo || topic.substring(0, 80),
         preview: {
-          first_title: firstSlide.titolo || firstSlide.title || "",
-          first_text: (firstSlide.testo || firstSlide.body || "").substring(0, 160),
+          first_title: firstSlide.hook || firstSlide.titolo || firstSlide.title || "",
+          first_text: (firstSlide.sottotitolo || firstSlide.testo || firstSlide.body || "").substring(0, 160),
           caption_preview: (parsed.caption_instagram || "").substring(0, 200),
           hashtags: parsed.hashtag_suggeriti || [],
           slides_count: parsed.slides?.length || 0,
@@ -479,6 +411,10 @@ La caption_instagram DEVE essere formattata così:
           numSlides: slidesCount,
           professione: prof.id,
           professione_source: prof.source,
+          pubblico,
+          formato: parsed.brief?.formato || formato?.id || null,
+          brief: parsed.brief || null,
+          qualita,
         },
         status: "success",
       });
@@ -486,6 +422,7 @@ La caption_instagram DEVE essere formattata così:
 
     return new Response(JSON.stringify({
       ...parsed,
+      qualita,
       content: parsed.caption_instagram || "",
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

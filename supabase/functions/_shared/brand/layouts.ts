@@ -134,6 +134,26 @@ export type ColoriLayout = {
   linea: string;
 };
 
+/** Colori di riserva per l'evidenza quando né il secondario né il giallo vanno. */
+const EVIDENZE_DI_RISERVA = ['#5eead4', '#93c5fd', '#f9a8d4'];
+
+/**
+ * Colore delle parole chiave sul fondo A: il secondario del kit (anche
+ * schiarito), poi il giallo, poi una riserva. Deve leggersi sia sul fondo
+ * scuro sia sul punto più chiaro e non somigliare al primario: con un brand
+ * giallo l'evidenza gialla spariva nello sfondo.
+ */
+function sceltaEvidenza(p: string, s: string | null, luce: string, fondo: string): string {
+  const va = (c: string) => contrasto(c, fondo) >= 4.5 && contrasto(c, luce) >= 2.2 && distanza(c, p) > 90;
+  if (s && saturazione(s) > 0.35) {
+    if (va(s)) return s;
+    const chiaro = leggibileSu(s, fondo, 4.5);
+    if (saturazione(chiaro) > 0.35 && va(chiaro)) return chiaro;
+  }
+  if (va(GIALLO_EVIDENZA)) return GIALLO_EVIDENZA;
+  return EVIDENZE_DI_RISERVA.find(va) ?? GIALLO_EVIDENZA;
+}
+
 /**
  * Colori dei layout da due colori del Brand Kit. Il primario comanda; il
  * secondario diventa il colore di evidenza solo se si legge sul fondo scuro
@@ -142,16 +162,18 @@ export type ColoriLayout = {
 export function coloriLayout(primario: string, secondario?: string | null): ColoriLayout {
   const p = hexToRgb(primario) ? primario.toLowerCase() : '#6d3cf0';
   const a_fondo = mescola(p, '#05030f', 0.8);
+  // Il punto più chiaro dello sfondo A è il colore del brand: se è chiaro
+  // (rosa, giallo, azzurro) lo si scurisce finché il bianco ci si legge
+  // sopra. Prima i titoli bianchi sparivano (prova del 07/11/2026).
+  const a_luce = leggibileSu(p, '#ffffff', 3.2);
   const s = secondario && hexToRgb(secondario) ? secondario.toLowerCase() : null;
-  const evidenza = s && contrasto(s, a_fondo) >= 4.5 && distanza(s, p) > 90 && saturazione(s) > 0.35
-    ? s
-    : GIALLO_EVIDENZA;
+  const evidenza = sceltaEvidenza(p, s, a_luce, a_fondo);
   const inchiostro = mescola(p, '#0d1326', 0.86);
   return {
     primario: p,
     evidenza,
-    a_luce: p,
-    a_medio: mescola(p, '#05030f', 0.45),
+    a_luce,
+    a_medio: mescola(a_luce, '#05030f', 0.45),
     a_fondo,
     a_tenue: mescola(p, '#ffffff', 0.78),
     carta: CARTA,
@@ -359,12 +381,28 @@ export type InputSlide = {
   totale: number;
 };
 
+/**
+ * Nome dello studio al posto del logo: parole intere, mai tagliate a metà
+ * («Dott.ssa Laura Verdi Nutrizi» usciva così).
+ */
+export function nomeCorto(nome: string, max = 34): string {
+  const t = testoPiano(nome);
+  if (t.length <= max) return t;
+  let out = '';
+  for (const parola of t.split(' ')) {
+    const prova = out ? `${out} ${parola}` : parola;
+    if (prova.length > max) break;
+    out = prova;
+  }
+  return out || t.slice(0, max);
+}
+
 /** Logo dentro una pillola bianca (o il nome se il logo non c'è). */
 function marchio(i: InputSlide, sfondo: string | null, altezza = 64): Nodo {
   const h = sfondo ? altezza - 24 : altezza;
   const dentro = i.logo
     ? img(i.logo.src, Math.min(360, Math.round(i.logo.w * h / Math.max(1, i.logo.h))), h, { objectFit: 'contain' })
-    : el('span', { fontFamily: 'Inter', fontSize: Math.round(altezza * 0.42), fontWeight: 800, color: i.colori.inchiostro, letterSpacing: -0.5 }, testoPiano(i.nome).slice(0, 28));
+    : el('span', { fontFamily: 'Inter', fontSize: Math.round(altezza * (nomeCorto(i.nome).length <= 24 ? 0.42 : 0.36)), fontWeight: 800, color: i.colori.inchiostro, letterSpacing: -0.5 }, nomeCorto(i.nome));
   if (!sfondo) return el('div', { alignItems: 'center', height: altezza }, dentro);
   return el('div', { backgroundColor: sfondo, borderRadius: 18, padding: '12px 20px', alignItems: 'center' }, dentro);
 }

@@ -25,7 +25,7 @@ import type { GenesisPalette } from "../_shared/brand/genesisPrompt.ts";
 import { genomaPerLayout } from "../_shared/brand/genome.ts";
 import type { SlideRole } from "../_shared/brand/archetypes.ts";
 import { LAYOUT_IDS, layoutConsigliato, vuoleFoto, type LayoutId } from "../_shared/brand/layouts.ts";
-import { leggiTestiProva, promptTestiProva, testiDaSegnaposto } from "../_shared/brand/layoutCopy.ts";
+import { leggiTestiProva, promptTestiProva, testiDiRiserva } from "../_shared/brand/layoutCopy.ts";
 import {
   DISEGNI_IN_PARALLELO, caricaFoto, chiamaDisegno, coloriDelBrand, disegnaLayout, fotoDelBrand, leggiSpec, logoDelBrand,
   type RifFoto, type SpecLayout,
@@ -484,7 +484,7 @@ serve(async (req) => {
         .eq("id", brandId);
 
       // Testi di riserva subito nei record: Gemini li sostituisce in background.
-      const riserva = testiDaSegnaposto(placeholderCopyFor(resolveProfession(b)));
+      const riserva = testiDiRiserva(b as Parameters<typeof testiDiRiserva>[0], placeholderCopyFor(resolveProfession(b)));
       const candidates: Array<{ id: string; layout: LayoutId; role: SlideRole; variant: number }> = [];
       for (const layout of LAYOUT_IDS) {
         const variant = LAYOUT_IDS.indexOf(layout) + 1;

@@ -51,6 +51,7 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
       // Step 1: if multi-variation, expand the macro-topic into N distinct ideas.
       // Otherwise use the user input as-is.
       let topicsForGeneration: string[] = [formData.description];
+      let ideas: Array<{ formato?: string; focus?: string }> = [];
       if (numVariations > 1) {
         loadingState.updateProgress(15, '💡 Trovo angoli diversi sul topic...');
         const { data: expand, error: expandErr } = await supabase.functions.invoke('expand-topic', {
@@ -59,23 +60,27 @@ export const useContentGeneration = (user: any, formData: FormData, generateCaro
         if (expandErr || expand?.error || !expand?.ideas?.length) {
           throw new Error(expand?.error || expandErr?.message || 'Errore espansione topic');
         }
+        ideas = expand.ideas;
         topicsForGeneration = expand.ideas.map((i: any) => {
           const parts = [i.titolo];
           if (i.hook) parts.push(`Hook: ${i.hook}`);
-          if (i.focus) parts.push(`Focus: ${i.focus}`);
           return parts.join('. ');
         });
       }
 
       loadingState.updateProgress(40, '🧠 AI sta scrivendo i post...');
 
-      const promises = topicsForGeneration.map((specificTopic) =>
+      // Ogni variante ha il suo format e la sua contrarian take, scelti da
+      // expand-topic: generate-content li segue invece di sceglierli lui.
+      const promises = topicsForGeneration.map((specificTopic, i) =>
         supabase.functions.invoke('generate-content', {
           body: {
             topic: specificTopic,
             postType: formData.postType,
             numSlides: formData.numSlides,
             brandId: activeBrandId,
+            formato: ideas[i]?.formato,
+            angolo: ideas[i]?.focus,
           }
         })
       );

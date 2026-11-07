@@ -9,6 +9,7 @@
 // File PURO, specchiato in supabase/functions/_shared/brand/layoutCopy.ts.
 
 import type { PlaceholderCopy } from './genesisPrompt.ts';
+import { pubblicoDelBrand } from './metodoCopy.ts';
 
 export type TestiProva = {
   etichetta: string;
@@ -110,4 +111,21 @@ export function testiDaSegnaposto(copy: PlaceholderCopy): TestiProva {
     contenuto: { titolo: frase(copy.content.title), testo: copy.content.body },
     chiusura: { titolo: frase(copy.cta.title), testo: copy.cta.body },
   };
+}
+
+/**
+ * Riserva per chi parla ai titolari (un gestionale, un'agenzia): il
+ * segnaposto della professione è scritto per i pazienti e GestioMed si
+ * ritrovava «Perché rimandi sempre quel controllo».
+ */
+export const TESTI_PROVA_B2B: TestiProva = {
+  etichetta: 'Per studi e centri',
+  copertina: { titolo: 'Il *buco* in agenda non nasce dalla disdetta', sotto: 'Nasce da quello che succede dopo' },
+  contenuto: { titolo: 'Conta chi richiama, e quando', testo: 'Una disdetta lascia un posto libero.\n*Diventa un buco se nessuno richiama.*' },
+  chiusura: { titolo: 'Parliamone', testo: 'Scrivici in direct per parlarne' },
+};
+
+/** Testi di riserva giusti per il pubblico del brand. */
+export function testiDiRiserva(b: BrandPerTesti & { avatar_type?: string | null }, copy: PlaceholderCopy): TestiProva {
+  return pubblicoDelBrand(b) === 'B2B' ? TESTI_PROVA_B2B : testiDaSegnaposto(copy);
 }
