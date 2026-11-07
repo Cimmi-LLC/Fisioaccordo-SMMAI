@@ -328,6 +328,9 @@ Regole di forma: la slide 1 è "cover", l'ultima è "cta", quelle in mezzo sono 
     const fonti = [topic, angolo, b.descrizione, b.mission, b.identita_core, b.target_pazienti, b.convinzione_da_ribaltare,
       ...[b.vantaggi_competitivi, b.servizi, b.cta_suggerite, b.frasi_pazienti, b.temi_chiave].flatMap((v) => Array.isArray(v) ? v : [])]
       .filter((x) => typeof x === "string").join("\n");
+    const datiBrand = brandData ? [
+      ["Servizi", b.servizi], ["Vantaggi e prove", b.vantaggi_competitivi], ["Azioni approvate", b.cta_suggerite],
+    ].map(([k, v]) => `${k}: ${(Array.isArray(v) ? v : []).filter(Boolean).join("; ") || "(nessuno)"}`).join("\n") : "";
     const daVotare = (c: any) => ({ brief: c.brief, slides: c.slides, caption_instagram: c.caption_instagram });
     let meccanici = controlliMeccanici(parsed, fonti, paroleEvitare);
     let giudizio: Giudizio | null = null;
@@ -336,7 +339,7 @@ Regole di forma: la slide 1 è "cover", l'ultima è "cta", quelle in mezzo sono 
         apiKey: GEMINI_API_KEY,
         model: MODELLO_GIUDICE,
         maxRetries: 2,
-        body: { contents: [{ role: "user", parts: [{ text: promptGiudice(daVotare(c), metodo, topic) }] }], generationConfig: { temperature: 0.2, responseMimeType: "application/json" } },
+        body: { contents: [{ role: "user", parts: [{ text: promptGiudice(daVotare(c), metodo, topic, datiBrand) }] }], generationConfig: { temperature: 0.2, responseMimeType: "application/json" } },
       });
       return r.ok ? leggiGiudizio(testoRisposta(r)) : null;
     };

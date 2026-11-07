@@ -206,7 +206,7 @@ Nella prima frase della copertina il lettore deve capire che parla di lui: il ta
 - L'avvocato: la copertina è la tesi, ogni slide porta una prova (fatto, esempio, meccanismo). 2-3 blocchi di prova bastano.
 - Distanza minima: ogni frase dice la cosa più vicina a quella prima. Niente salti.
 - Lean in / snap back: descrivi in concreto cosa fa di solito il lettore, poi «Ma è proprio questo che…», poi «Invece…».
-- Dai un nome al meccanismo («Si chiama…») e di' perché funziona in una frase a sé.
+- Se il meccanismo ha un nome vero del mestiere, dallo («Si chiama…»); mai inventare nomi o sindromi. Di' perché funziona in una frase a sé.
 - Repeater: il punto chiave si dice due volte, con il termine e con una metafora semplice.
 - Re-hook a metà con «ma in realtà», «il punto è che».
 - Payoff prima della CTA: «Quindi: non X. Fai Y.»
@@ -293,6 +293,7 @@ const FRASI_VIETATE: [RegExp, string][] = [
   [/commenta (la tua|cosa ne pensi)/i, 'CTA «commenta la tua opinione» vietata'],
   [/milioni di persone|in un mondo in cui|la salute è importante|prendersi cura di sé/i, 'frase generica vietata'],
   [/[—–]/, 'lineetta lunga'],
+  [/\b(no-?show|slot|follow-?up|booking|recall)\b/i, 'parola inglese: si dice disdetta, posto libero, richiamo'],
 ];
 
 const GUIDA_PROMESSA = /\b(guida|e-?book|pdf|checklist)\b[^.\n]{0,40}\b(gratis|gratuit|ti (la )?mand|ricever)|\b(ti (la )?mand|ricever[ea]?i?|scaric)[^.\n]{0,30}\b(guida|e-?book|pdf|checklist)\b/i;
@@ -352,12 +353,16 @@ export const CRITERI_GIUDICE: [string, string][] = [
   ['fedele', 'niente numeri, casi, servizi o promesse inventati; CTA una sola e mantenibile'],
 ];
 
-export function promptGiudice(copy: unknown, c: ContestoMetodo, topic: string): string {
+export function promptGiudice(copy: unknown, c: ContestoMetodo, topic: string, datiBrand = ''): string {
   return `Sei un editor severo che applica il metodo Short Form Academy di Kallaway. Valuta questo carosello Instagram.
 Pubblico: ${c.pubblico === 'B2B' ? `titolari e professionisti (${c.lettori})` : `le persone con il problema (${c.lettori})`}.
 Topic: «${topic}».
-
-Dai un voto da 1 a 5 a ogni criterio (5 = da pubblicare così, 3 = mediocre, 1 = da buttare):
+${datiBrand ? `
+DATI VERI DEL BRAND (l'unica fonte per servizi, funzioni, risultati e numeri)
+${datiBrand}
+Una funzione, un servizio, un risultato garantito («nessuna ora persa», «agenda sempre piena») o un numero che non sta qui sopra è inventato: «fedele» vale al massimo 2.
+` : ''}
+Sii severo: 5 vuol dire che non cambieresti una parola. Dai un voto da 1 a 5 a ogni criterio (3 = mediocre, 1 = da buttare):
 ${CRITERI_GIUDICE.map(([k, d]) => `- ${k}: ${d}`).join('\n')}
 ${c.sanitario && c.pubblico === 'B2C' ? '- Se il testo fa capire che si può fare a meno del professionista o dello studio, «fedele» vale 1.\n' : ''}
 Per ogni voto sotto 4 scrivi in «problemi» cosa cambiare, in concreto (quale slide, quale frase, come).

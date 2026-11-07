@@ -157,3 +157,15 @@ describe('collaudo del 07/11', () => {
     expect(controlliMeccanici(senza, '')).toEqual([]);
   });
 });
+
+describe('giudice con i dati del brand', () => {
+  it('il prompt porta i dati veri e la regola sulle funzioni inventate', () => {
+    const p = promptGiudice({ slides: [] }, { pubblico: 'B2B', lettori: 'studi', sanitario: false }, 'disdette', 'Servizi: Automazione WhatsApp');
+    expect(p).toContain('Automazione WhatsApp');
+    expect(p).toMatch(/inventato/);
+  });
+  it('«no-show» e «slot» sono parole inglesi da cambiare', () => {
+    const c = { slides: [{ tipo: 'content', testo: 'Basta no-show e slot vuoti.' }] };
+    expect(controlliMeccanici(c, '').some((p) => p.includes('inglese'))).toBe(true);
+  });
+});
