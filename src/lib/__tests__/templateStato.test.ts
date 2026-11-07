@@ -17,4 +17,13 @@ describe('testiTemplate', () => {
       expect(testiTemplate(s).bottone).toBe('Crea il template');
     }
   });
+
+  it('in ogni stato dice che le slide escono comunque, nello stile di base', () => {
+    for (const s of ['awaiting_approval', 'generating', 'draft', null]) {
+      const t = testiTemplate(s);
+      expect(t.testo).toMatch(/escono comunque/);
+      expect(t.sottoCarosello).toMatch(/stile di base/);
+      expect(t.sottoCarosello).not.toMatch(/partono appena|non c'è ancora/);
+    }
+  });
 });
