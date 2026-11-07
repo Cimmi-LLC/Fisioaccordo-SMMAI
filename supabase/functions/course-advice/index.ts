@@ -13,7 +13,9 @@ import { adminClient, requireAuth, assertBrandOwnership, requireWithinRateLimit 
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { callGeminiWithRetry } from "../_shared/gemini.ts";
 
-const MODELS = ["gemini-2.5-pro", "gemini-2.5-flash"];
+// gemini-2.5-pro non c'è più per questa chiave (404 «no longer available to
+// new users»): pro 3.1 con pensiero «low», flash di riserva.
+const MODELS = ["gemini-3.1-pro-preview", "gemini-2.5-flash"];
 const LESSON_MAX_CHARS = 14000;
 const DAYS = 120;
 
@@ -181,10 +183,15 @@ Rispondi SOLO con questo JSON:
         model,
         body: {
           contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: "application/json", temperature: 0.6 },
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.6,
+            ...(model.startsWith("gemini-3") ? { thinkingConfig: { thinkingLevel: "low" } } : {}),
+          },
         },
       });
-      const txt = res.data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text || "").join("") || "";
+      // Con i modelli 3 le parti di pensiero non fanno parte della risposta.
+      const txt = res.data?.candidates?.[0]?.content?.parts?.map((p: { text?: string; thought?: boolean }) => p.thought ? "" : (p.text || "")).join("") || "";
       try {
         const j = JSON.parse(txt);
         if (Array.isArray(j?.consigli) && j.consigli.length) { parsed = j; break; }
