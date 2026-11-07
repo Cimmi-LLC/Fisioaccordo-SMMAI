@@ -1,7 +1,7 @@
 // Test dei 3 layout disegnati dal server e dei testi di prova.
 import { describe, it, expect } from 'vitest';
 import {
-  LAYOUT_IDS, alberoSlide, coloriLayout, contrasto, corpoAdatto, estraiDato, evidenziaAuto,
+  LAYOUT_IDS, alberoSlide, coloriLayout, contrasto, corpoAdatto, estraiDato, evidenziaAuto, nomeCorto,
   GIALLO_EVIDENZA, layoutConsigliato, layoutDiBase, vuoleFoto, type InputSlide, type Nodo,
 } from '../layouts.ts';
 import { genomaPerLayout, validateGenome } from '../genome.ts';
@@ -50,6 +50,19 @@ describe('coloriLayout', () => {
 
   it('colore non valido: ripiega sul viola', () => {
     expect(coloriLayout('rosso').primario).toBe('#6d3cf0');
+  });
+
+  it('con un primario chiaro il bianco si legge anche nel punto più chiaro dello sfondo A', () => {
+    for (const chiaro of ['#f4a6b8', '#ffd43b', '#8ecae6', '#ffffff']) {
+      const c = coloriLayout(chiaro);
+      expect(contrasto('#ffffff', c.a_luce)).toBeGreaterThanOrEqual(3.2);
+    }
+  });
+
+  it('un brand giallo non ha le parole evidenziate gialle', () => {
+    const c = coloriLayout('#ffd43b', '#1d3557');
+    expect(c.evidenza).not.toBe(GIALLO_EVIDENZA);
+    expect(contrasto(c.evidenza, c.a_fondo)).toBeGreaterThanOrEqual(4.5);
   });
 
   it("l'accento su carta si legge sempre (anche con un primario chiaro)", () => {
@@ -223,5 +236,15 @@ describe('layoutDiBase (brand senza template scelto)', () => {
       expect(stiliPuliti(n)).toBe(true);
       expect(testi(n).join(' ')).toContain('GestioMed');
     }
+  });
+});
+
+describe('nomeCorto', () => {
+  it('lascia i nomi corti come sono', () => {
+    expect(nomeCorto('Fisio Sole')).toBe('Fisio Sole');
+  });
+
+  it('accorcia i nomi lunghi a parole intere', () => {
+    expect(nomeCorto('Centro Riabilitativo Mare Blu Associati')).toBe('Centro Riabilitativo Mare Blu');
   });
 });
