@@ -169,3 +169,45 @@ describe('giudice con i dati del brand', () => {
     expect(controlliMeccanici(c, '').some((p) => p.includes('inglese'))).toBe(true);
   });
 });
+
+describe('collaudo dopo l\'unione (07/11)', () => {
+  const cta = (testo_cta: string, bottone_cta: string, testo = 'Il punto.') => ({
+    slides: [{ tipo: 'cover', hook: 'Schiena in ufficio' }, { tipo: 'content', titolo: 'Il punto', testo }, { tipo: 'cta', titolo: 'Fallo oggi', testo_cta, bottone_cta }],
+  });
+  const promette = (p: string[]) => p.some((x) => x.startsWith('promette un materiale'));
+
+  it('«Ho preparato 3 esercizi… commenta per riceverli» è una promessa', () => {
+    expect(promette(controlliMeccanici(cta('Ho preparato 3 esercizi da fare alla scrivania', 'Commenta SCHIENA per riceverli'), 'Studio di fisioterapia'))).toBe(true);
+  });
+  it('la promessa divisa fra testo e bottone della CTA', () => {
+    expect(promette(controlliMeccanici(cta('Vuoi i 3 esercizi da fare alla scrivania?', 'Commenta SCHIENA per riceverli'), ''))).toBe(true);
+    expect(promette(controlliMeccanici(cta('Vuoi una schiena più libera?', 'Commenta SCHIENA e ti mando il video degli esercizi'), ''))).toBe(true);
+  });
+  it('esercizi fatti in studio e risposta sul caso non sono promesse', () => {
+    const p = controlliMeccanici(cta('Vuoi capire se fa per te?', 'Commenta COLLO e ti rispondiamo sul tuo caso', 'In studio lavoriamo con esercizi isometrici.'), '');
+    expect(p).toEqual([]);
+  });
+  it('il materiale regalato dal brand si può promettere', () => {
+    const c = cta('Ho preparato la scheda esercizi', 'Commenta SCHIENA per riceverla');
+    expect(promette(controlliMeccanici(c, 'Commenta ESERCIZI per ricevere la scheda esercizi'))).toBe(false);
+  });
+  it('i nomi inventati del collaudo vengono trovati', () => {
+    const nomi = (testo: string, fonti = '') => controlliMeccanici(cta('Vuoi saperne di più?', 'Commenta AGENDA e ti rispondiamo', testo), fonti)
+      .filter((x) => x.startsWith('nome dato'));
+    expect(nomi("Si chiama 'collo di bottiglia amministrativo'.")[0]).toContain('«collo di bottiglia amministrativo»');
+    expect(nomi('Si chiama debolezza posturale.')[0]).toContain('«debolezza posturale»');
+    expect(nomi("Si chiama gestione attiva dell'agenda.")[0]).toContain("«gestione attiva dell'agenda»");
+    expect(nomi('È il cosiddetto «effetto domino».')[0]).toContain('«effetto domino»');
+  });
+  it('un nome già usato dal brand o dal topic passa, «si chiama così» non è un nome', () => {
+    const p = (testo: string, fonti = '') => controlliMeccanici(cta('Vuoi saperne di più?', 'Commenta COLLO e ti rispondiamo', testo), fonti);
+    expect(p('Si chiama trattamento miofasciale.', 'Trattamento miofasciale per schiena e collo')).toEqual([]);
+    expect(p('Si chiama così perché il muscolo si difende.')).toEqual([]);
+  });
+  it('il giudice controlla anche i nomi inventati', () => {
+    expect(CRITERI_GIUDICE.find(([k]) => k === 'fedele')?.[1]).toMatch(/nomi di meccanismi/);
+  });
+  it('il format «errore» non chiede più un nome a tutti i costi', () => {
+    expect(formatoPerId('errore')!.parti.join(' ')).toMatch(/solo se ne ha uno vero/);
+  });
+});

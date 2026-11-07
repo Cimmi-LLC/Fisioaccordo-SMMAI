@@ -59,7 +59,7 @@ export const FORMATI: Formato[] = [
     id: 'errore',
     nome: 'Errore comune',
     partenza: 'un errore che il lettore fa senza saperlo',
-    parti: ["l'errore, detto in concreto come lo fa lui", 'perché è un errore (il meccanismo, con il suo nome)', "l'alternativa, con un primo passo da fare oggi"],
+    parti: ["l'errore, detto in concreto come lo fa lui", 'perché è un errore (il meccanismo; con il suo nome solo se ne ha uno vero del mestiere)', "l'alternativa, con un primo passo da fare oggi"],
     segreto: "abbastanza specifico da importare, abbastanza nuovo da non essere già sentito; dire sempre PERCHÉ è un errore",
     copertine: ['La cosa peggiore che puoi fare per [X] è [abitudine comune]', 'Stai facendo [X] nel modo sbagliato', 'Smetti di [abitudine comune] se [situazione]'],
     cta: 'salva, oppure commenta una parola per una risposta sul tuo caso',
@@ -70,7 +70,7 @@ export const FORMATI: Formato[] = [
     partenza: 'un problema che il lettore sente ogni giorno',
     parti: ['il problema, fatto sentire con una scena precisa della sua giornata', 'perché le soluzioni solite non bastano', 'la soluzione, con il motivo per cui funziona', 'cosa cambia quando lo risolve'],
     segreto: 'far sentire il dolore, un lettore molto preciso, una soluzione diversa da quelle già sentite',
-    copertine: ['Se [problema preciso], fai solo questo', 'Il motivo per cui [sintomo] è [causa con un nome]', 'Il modo più veloce per [risultato]'],
+    copertine: ['Se [problema preciso], fai solo questo', 'Il motivo per cui [sintomo] è [causa precisa]', 'Il modo più veloce per [risultato]'],
     cta: 'commenta una parola per avere informazioni',
   },
   {
@@ -206,7 +206,7 @@ Nella prima frase della copertina il lettore deve capire che parla di lui: il ta
 - L'avvocato: la copertina è la tesi, ogni slide porta una prova (fatto, esempio, meccanismo). 2-3 blocchi di prova bastano.
 - Distanza minima: ogni frase dice la cosa più vicina a quella prima. Niente salti.
 - Lean in / snap back: descrivi in concreto cosa fa di solito il lettore, poi «Ma è proprio questo che…», poi «Invece…».
-- Se il meccanismo ha un nome vero del mestiere, dallo («Si chiama…»); mai inventare nomi o sindromi. Di' perché funziona in una frase a sé.
+- Se il meccanismo ha un nome vero del mestiere, quello che un collega troverebbe sui libri, dallo («Si chiama…»); mai inventare nomi, sindromi o etichette da marketing («collo di bottiglia amministrativo», «gestione attiva dell'agenda»). Nel dubbio non dare nessun nome: spiega il meccanismo a parole. Di' perché funziona in una frase a sé.
 - Repeater: il punto chiave si dice due volte, con il termine e con una metafora semplice.
 - Re-hook a metà con «ma in realtà», «il punto è che».
 - Payoff prima della CTA: «Quindi: non X. Fai Y.»
@@ -296,7 +296,19 @@ const FRASI_VIETATE: [RegExp, string][] = [
   [/\b(no-?show|slot|follow-?up|booking|recall)\b/i, 'parola inglese: si dice disdetta, posto libero, richiamo'],
 ];
 
-const GUIDA_PROMESSA = /\b(guida|e-?book|pdf|checklist)\b[^.\n]{0,40}\b(gratis|gratuit|ti (la )?mand|ricever)|\b(ti (la )?mand|ricever[ea]?i?|scaric)[^.\n]{0,30}\b(guida|e-?book|pdf|checklist)\b/i;
+// Materiali che il brand dovrebbe avere già pronti per poterli mandare.
+const MATERIALE = String.raw`guid[ae]|e-?book|pdf|checklist|eserciz[io]|video|sched[ae]|programm[ai]|routine|protocoll[oi]|tabell[ae]|mini-?corso`;
+const PROMESSA = String.raw`gratis|gratuit\w*|ti (?:l[aeio] )?(?:mand|invi|gir)\w*|ricever\w*|scaric\w*|(?:ho|abbiamo) preparato|in (?:dm|direct|privato)`;
+// Nella stessa frase: «ti mando i 3 esercizi», «guida gratuita».
+const GUIDA_PROMESSA = new RegExp(String.raw`\b(?:${MATERIALE})\b[^.\n]{0,40}?\b(?:${PROMESSA})|\b(?:${PROMESSA})\b[^.\n]{0,40}?\b(?:${MATERIALE})\b`, 'i');
+// Fra testo e bottone della CTA: «Vuoi i 3 esercizi?» + «Commenta SCHIENA per riceverli».
+const PROMESSA_CON_PRONOME = /\b(?:riceverl[aeio]|scaricarl[aeio]|(?:te|ve) l[aeio] (?:mand|invi)\w*|(?:ho|abbiamo) preparato)\b/i;
+const MATERIALE_SOLO = new RegExp(String.raw`\b(?:${MATERIALE})\b`, 'i');
+// Il brand ha davvero un materiale da regalare se lo scrive lui.
+const MATERIALE_NEL_BRAND = new RegExp(String.raw`\b(?:${MATERIALE})\b[^.\n]{0,60}\b(?:regal\w*|omaggio|${PROMESSA})|\b(?:regal\w*|omaggio|${PROMESSA})\b[^.\n]{0,60}\b(?:${MATERIALE})\b`, 'i');
+
+// «Si chiama X», «il cosiddetto X»: un nome dato a un meccanismo.
+const NOME_DATO = /\b(?:si chiama(?:no)?|viene chiamat[oaie]|(?:noi )?l[oa] chiamiamo|il cosiddetto|la cosiddetta|in gergo|nome tecnico[^.\n]{0,10}?(?:è|:))\s+(?!così|cosi\b|in questo modo)[«"'“‘]?([^.,;:!?\n«»"“”‘’]{3,60}?)[»"'”’]?(?=[.,;:!?\n]|$)/gi;
 
 // Numeri che fanno da prova: percentuali, soldi, quanti pazienti o studi.
 const NUMERO_PROVA = /\d+(?:[.,]\d+)?\s?(?:%|€|euro\b|pazienti\b|clienti\b|studi\b|centri\b|persone\b|casi\b)/gi;
@@ -318,8 +330,9 @@ function testiDi(c: TestoCarosello): string[] {
 }
 
 /**
- * Problemi trovabili senza AI: frasi vietate e numeri-prova che non stanno
- * né nel brand kit né nel topic (cioè inventati).
+ * Problemi trovabili senza AI: frasi vietate, e numeri-prova, materiali
+ * promessi e nomi di meccanismi che non stanno né nel brand kit né nel
+ * topic (cioè inventati).
  */
 export function controlliMeccanici(c: TestoCarosello, fonti: string, vietateDelBrand: string[] = []): string[] {
   const problemi: string[] = [];
@@ -334,9 +347,21 @@ export function controlliMeccanici(c: TestoCarosello, fonti: string, vietateDelB
     const num = m[0].match(/\d+(?:[.,]\d+)?/)![0];
     if (!fontiNorm.includes(num)) problemi.push(`numero non presente nei dati del brand: «${m[0].trim()}»`);
   }
-  // Un lead magnet promesso deve esistere: la guida la nomina il brand.
-  if (GUIDA_PROMESSA.test(tutto) && !/guid|e-?book|pdf|checklist/i.test(fonti)) {
-    problemi.push('promette una guida che il brand non ha: usa «commenta PAROLA e ti rispondiamo sul tuo caso» o un\'azione approvata');
+  // Un lead magnet promesso deve esistere: lo nomina il brand, come regalo.
+  const cta = testiDi({ slides: (c.slides || []).filter((s, i, tutte) => s.tipo === 'cta' || i === tutte.length - 1) }).join('\n');
+  const promessa = tutto.match(GUIDA_PROMESSA)?.[0]
+    ?? (PROMESSA_CON_PRONOME.test(cta) && MATERIALE_SOLO.test(cta) ? cta : null);
+  if (promessa && !MATERIALE_NEL_BRAND.test(fonti)) {
+    problemi.push(`promette un materiale che il brand non ha («${promessa.replace(/\s+/g, ' ').trim()}»): usa «commenta PAROLA e ti rispondiamo sul tuo caso» o un'azione approvata`);
+  }
+  // Un nome dato a un meccanismo passa solo se lo usa già il brand o il topic:
+  // il modello inventa etichette che sembrano termini del mestiere.
+  const fontiMinuscole = fonti.toLocaleLowerCase('it');
+  for (const m of tutto.matchAll(NOME_DATO)) {
+    const nome = m[1].trim();
+    if (!fontiMinuscole.includes(nome.toLocaleLowerCase('it'))) {
+      problemi.push(`nome dato a un meccanismo: «${nome}». Tienilo solo se è il termine che un collega troverebbe sui libri del mestiere; se no togli il nome e spiega il meccanismo a parole`);
+    }
   }
   return [...new Set(problemi)];
 }
@@ -350,7 +375,7 @@ export const CRITERI_GIUDICE: [string, string][] = [
   ['valore', 'chi legge si porta via una cosa concreta da fare o da capire subito'],
   ['filo', 'ogni slide segue la precedente, nell\'ordine del format, senza riempitivo né ripetizioni'],
   ['stile', 'frasi corte, voce attiva, parole semplici, italiano naturale e corretto, niente frasi da sito vetrina'],
-  ['fedele', 'niente numeri, casi, servizi o promesse inventati; CTA una sola e mantenibile'],
+  ['fedele', 'niente numeri, casi, servizi, promesse o nomi di meccanismi e sindromi inventati; CTA una sola e mantenibile'],
 ];
 
 export function promptGiudice(copy: unknown, c: ContestoMetodo, topic: string, datiBrand = ''): string {
