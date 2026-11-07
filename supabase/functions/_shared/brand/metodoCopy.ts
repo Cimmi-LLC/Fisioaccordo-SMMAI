@@ -62,7 +62,7 @@ export const FORMATI: Formato[] = [
     parti: ["l'errore, detto in concreto come lo fa lui", 'perché è un errore (il meccanismo, con il suo nome)', "l'alternativa, con un primo passo da fare oggi"],
     segreto: "abbastanza specifico da importare, abbastanza nuovo da non essere già sentito; dire sempre PERCHÉ è un errore",
     copertine: ['La cosa peggiore che puoi fare per [X] è [abitudine comune]', 'Stai facendo [X] nel modo sbagliato', 'Smetti di [abitudine comune] se [situazione]'],
-    cta: 'salva oppure commenta una parola per ricevere la guida',
+    cta: 'salva, oppure commenta una parola per una risposta sul tuo caso',
   },
   {
     id: 'problema',
@@ -71,7 +71,7 @@ export const FORMATI: Formato[] = [
     parti: ['il problema, fatto sentire con una scena precisa della sua giornata', 'perché le soluzioni solite non bastano', 'la soluzione, con il motivo per cui funziona', 'cosa cambia quando lo risolve'],
     segreto: 'far sentire il dolore, un lettore molto preciso, una soluzione diversa da quelle già sentite',
     copertine: ['Se [problema preciso], fai solo questo', 'Il motivo per cui [sintomo] è [causa con un nome]', 'Il modo più veloce per [risultato]'],
-    cta: 'commenta una parola per avere informazioni o la guida',
+    cta: 'commenta una parola per avere informazioni',
   },
   {
     id: 'spiegazione',
@@ -80,7 +80,7 @@ export const FORMATI: Formato[] = [
     parti: ['il fatto più interessante, subito', 'il meccanismo in parole semplici, con una metafora', 'cosa significa per lui', 'cosa farne'],
     segreto: "o sei il primo o sei unico: un'idea mai sentita o una presa di posizione contro il pensiero comune",
     copertine: ['[Fatto sorprendente]. Ecco cosa significa per te', '[Sintomo] non viene da dove pensi', 'Non è [causa ovvia]. È [causa vera]'],
-    cta: 'commenta una parola per ricevere la spiegazione completa, oppure segui',
+    cta: 'commenta una parola per una risposta sul tuo caso, oppure segui',
   },
   {
     id: 'tutorial',
@@ -89,7 +89,7 @@ export const FORMATI: Formato[] = [
     parti: ['il risultato e quanto ci vuole', 'passo 1', 'passo 2', 'passo 3', "l'errore che rovina tutto"],
     segreto: 'un tutorial breve serve a farsi salvare: passaggi densi, numerati, eseguibili',
     copertine: ['Come [risultato] in [tempo breve]', '[Risultato] in [numero] passaggi'],
-    cta: 'salva il carosello oppure commenta una parola per la guida scritta',
+    cta: 'salva il carosello per rifarlo con calma',
   },
   {
     id: 'lista',
@@ -140,7 +140,8 @@ export const FORMATI: Formato[] = [
 
 export function formatoPerId(id: unknown): Formato | null {
   const k = String(id || '').trim().toLowerCase();
-  return FORMATI.find((f) => f.id === k) ?? null;
+  // Il modello a volte scrive il nome («Errore comune») invece dell'id.
+  return FORMATI.find((f) => f.id === k || f.nome.toLowerCase() === k) ?? null;
 }
 
 /** Come si distribuiscono le parti del format su N slide (copertina e CTA comprese). */
@@ -217,7 +218,7 @@ Nella prima frase della copertina il lettore deve capire che parla di lui: il ta
 - Mai la stessa parola in due frasi di fila.
 - Scrivi a una persona sola, come a un amico che ha lo stesso problema. Prima il terreno comune, poi la novità.
 - Ogni frase deve valere 100 euro: se la togli e non cambia niente, toglila.
-- Italiano corretto e naturale. Niente lineette lunghe, niente emoji nelle slide, niente parole inglesi se c'è quella italiana.
+- Italiano corretto e naturale. Niente lineette lunghe, niente emoji nelle slide, niente parole inglesi se c'è quella italiana (posto libero, non slot; disdetta, non no-show; richiamo, non follow-up).
 
 === PROVE E NUMERI ===
 - Numeri, percentuali, casi, studi, prezzi, durate: SOLO se sono nel brand kit o nel topic. Mai inventarli, nemmeno «tondi».
@@ -294,6 +295,8 @@ const FRASI_VIETATE: [RegExp, string][] = [
   [/[—–]/, 'lineetta lunga'],
 ];
 
+const GUIDA_PROMESSA = /\b(guida|e-?book|pdf|checklist)\b[^.\n]{0,40}\b(gratis|gratuit|ti (la )?mand|ricever)|\b(ti (la )?mand|ricever[ea]?i?|scaric)[^.\n]{0,30}\b(guida|e-?book|pdf|checklist)\b/i;
+
 // Numeri che fanno da prova: percentuali, soldi, quanti pazienti o studi.
 const NUMERO_PROVA = /\d+(?:[.,]\d+)?\s?(?:%|€|euro\b|pazienti\b|clienti\b|studi\b|centri\b|persone\b|casi\b)/gi;
 
@@ -329,6 +332,10 @@ export function controlliMeccanici(c: TestoCarosello, fonti: string, vietateDelB
   for (const m of tutto.matchAll(NUMERO_PROVA)) {
     const num = m[0].match(/\d+(?:[.,]\d+)?/)![0];
     if (!fontiNorm.includes(num)) problemi.push(`numero non presente nei dati del brand: «${m[0].trim()}»`);
+  }
+  // Un lead magnet promesso deve esistere: la guida la nomina il brand.
+  if (GUIDA_PROMESSA.test(tutto) && !/guid|e-?book|pdf|checklist/i.test(fonti)) {
+    problemi.push('promette una guida che il brand non ha: usa «commenta PAROLA e ti rispondiamo sul tuo caso» o un\'azione approvata');
   }
   return [...new Set(problemi)];
 }
@@ -373,8 +380,9 @@ export function leggiGiudizio(raw: string): Giudizio | null {
       if (!Number.isFinite(v) || v < 1 || v > 5) return null;
       voti[k] = v;
     }
+    // Il giudice a volte scrive {slide, problema, correzione} invece di una frase.
     const problemi = (Array.isArray(o?.problemi) ? o.problemi : [])
-      .map((p: unknown) => String(p ?? '').trim())
+      .map((p: unknown) => (p && typeof p === 'object' ? Object.values(p as Record<string, unknown>).join(': ') : String(p ?? '')).trim())
       .filter(Boolean)
       .slice(0, 10);
     const minimo = Math.min(...Object.values(voti));

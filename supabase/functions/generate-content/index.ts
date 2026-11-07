@@ -17,7 +17,9 @@ const corsHeaders = {
 
 // Il corso chiede un modello forte per scrivere: pro per la stesura, flash
 // se pro non risponde. Il giudice è flash, che basta per votare.
-const MODELLI_STESURA = ["gemini-2.5-pro", "gemini-2.5-flash"];
+// gemini-2.5-pro non c'è più per questa chiave (404 «no longer available to
+// new users», collaudo del 07/11/2026).
+const MODELLI_STESURA = ["gemini-3.1-pro-preview", "gemini-2.5-flash"];
 const MODELLO_GIUDICE = "gemini-2.5-flash";
 // Oltre questo tempo la riscrittura passa a flash, per stare nel limite
 // della funzione.
@@ -42,7 +44,7 @@ function corpoRichiesta(system: string, user: string, model: string, temperature
     generationConfig: {
       temperature,
       responseMimeType: "application/json",
-      ...(model.includes("pro") ? { thinkingConfig: { thinkingBudget: 4096 } } : {}),
+      ...(model.startsWith("gemini-3") ? { thinkingConfig: { thinkingLevel: "low" } } : {}),
     },
   };
 }
@@ -131,6 +133,9 @@ serve(async (req) => {
       sanitario: prof.id !== "altro",
     };
     const chiLegge = pubblico === "B2B" ? "il titolare che legge" : ilCliente(P);
+    // GestioMed o un'agenzia parlano agli studi ma uno studio non ce l'hanno:
+    // prima scrivevano «nel nostro studio abbiamo risolto…».
+    const fornitore = pubblico === "B2B" && prof.id === "altro";
 
     let brandContext = "";
     const cta: string[] = [];
@@ -161,10 +166,12 @@ ${target || "pubblico generale"}
 
 === VOCE OBBLIGATORIA ===
 Tono: ${brand.tono_voce || "professionale"}
-Persona: ${persona}
-${persona.includes("singolare") ? `→ Usa 'io', 'il mio ${luogo}'. MAI 'noi' o 'il nostro team'.` : `→ Usa 'noi', '${nelMioLuogo(P, true)}'. MAI 'io'.`}
+Persona: ${fornitore ? (brand.persona_scrittura === "io" ? "prima persona singolare" : "prima persona plurale") : persona}
+${fornitore
+  ? `→ Chi pubblica NON è uno studio: è ${brandName}, che lavora per gli studi. Usa '${persona.includes("singolare") ? "io" : "noi"}' come ${brandName}. MAI 'nel nostro studio', 'i nostri pazienti', 'abbiamo risolto in studio': lo studio e i pazienti sono di chi legge.`
+  : persona.includes("singolare") ? `→ Usa 'io', 'il mio ${luogo}'. MAI 'noi' o 'il nostro team'.` : `→ Usa 'noi', '${nelMioLuogo(P, true)}'. MAI 'io'.`}
 
-=== SERVIZI DEL BRAND (riferisciti SOLO a questi) ===
+=== SERVIZI DEL BRAND (riferisciti SOLO a questi; funzioni o risultati non scritti qui non esistono) ===
 ${servizi.length > 0 ? servizi.join(" · ") : "(non indicati: non nominare servizi)"}
 
 ${vantaggi.length > 0 ? `=== VANTAGGI E PROVE DEL BRAND (le uniche prove che puoi citare) ===
@@ -339,7 +346,7 @@ Regole di forma: la slide 1 è "cover", l'ultima è "cta", quelle in mezzo sono 
     let riscritto = false;
     const problemi = [...meccanici, ...(giudizio && !giudizio.promosso ? giudizio.problemi : [])];
     if (problemi.length > 0) {
-      const model = Date.now() - inizio < RISCRITTURA_PRO_ENTRO_MS ? MODELLI_STESURA[0] : MODELLI_STESURA[1];
+      const modelli = Date.now() - inizio < RISCRITTURA_PRO_ENTRO_MS ? MODELLI_STESURA : MODELLI_STESURA.slice(1);
       const richiesta = `${userPrompt}
 
 === LA TUA PRIMA VERSIONE ===
@@ -349,12 +356,15 @@ ${JSON.stringify(parsed)}
 ${problemi.map((p) => `- ${p}`).join("\n")}
 
 Riscrivi il JSON completo, stessa struttura.`;
-      const res = await callGeminiWithRetry({ apiKey: GEMINI_API_KEY, model, maxRetries: 2, body: corpoRichiesta(systemPrompt, richiesta, model, 0.7) });
-      const j = res.ok ? leggiJson(testoRisposta(res)) : null;
-      if (j && Array.isArray(j.slides) && j.slides.length > 0) {
-        parsed = j;
-        riscritto = true;
-        meccanici = controlliMeccanici(parsed, fonti, paroleEvitare);
+      for (const model of modelli) {
+        const res = await callGeminiWithRetry({ apiKey: GEMINI_API_KEY, model, maxRetries: 2, body: corpoRichiesta(systemPrompt, richiesta, model, 0.7) });
+        const j = res.ok ? leggiJson(testoRisposta(res)) : null;
+        if (j && Array.isArray(j.slides) && j.slides.length > 0) {
+          parsed = j;
+          riscritto = true;
+          meccanici = controlliMeccanici(parsed, fonti, paroleEvitare);
+          break;
+        }
       }
     }
 

@@ -137,3 +137,23 @@ describe('testi di riserva del template', () => {
     expect(testiDiRiserva({ target_pazienti: 'Pazienti con mal di schiena' }, copy as never).copertina.titolo).toBe('Perché rimandi sempre quel controllo');
   });
 });
+
+describe('collaudo del 07/11', () => {
+  it('appunti del giudice scritti come oggetti diventano frasi', () => {
+    const g = leggiGiudizio(JSON.stringify({
+      voti: Object.fromEntries(CRITERI_GIUDICE.map(([k]) => [k, k === 'fedele' ? 1 : 5])),
+      problemi: [{ slide: 3, problema: 'termine inventato', correzione: 'toglilo' }],
+    }));
+    expect(g?.problemi).toEqual(['3: termine inventato: toglilo']);
+  });
+  it('formatoPerId accetta anche il nome del format', () => {
+    expect(formatoPerId('Errore comune')?.id).toBe('errore');
+  });
+  it('una guida promessa senza guida nel brand è un problema', () => {
+    const c = { slides: [{ tipo: 'cta', testo_cta: 'Commenta COLLO per una guida gratuita sui primi passi' }] };
+    expect(controlliMeccanici(c, 'Studio di fisioterapia').some((p) => p.includes('guida'))).toBe(true);
+    expect(controlliMeccanici(c, 'Regaliamo la guida agli esercizi del collo').some((p) => p.includes('guida'))).toBe(false);
+    const senza = { slides: [{ tipo: 'cta', testo_cta: 'Commenta COLLO e ti rispondiamo sul tuo caso' }] };
+    expect(controlliMeccanici(senza, '')).toEqual([]);
+  });
+});

@@ -19,7 +19,7 @@ interface TopicIdea {
 
 // Le idee sono il punto in cui si decide se il post vale qualcosa (la
 // contrarian take): pro, con flash di riserva.
-const MODELLI = ["gemini-2.5-pro", "gemini-2.5-flash"];
+const MODELLI = ["gemini-3.1-pro-preview", "gemini-2.5-flash"];
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -130,7 +130,7 @@ Rispondi con {"ideas":[{"formato":"…","titolo":"…","hook":"…","focus":"…
           generationConfig: {
             temperature: 0.95,
             responseMimeType: "application/json",
-            ...(model.includes("pro") ? { thinkingConfig: { thinkingBudget: 2048 } } : {}),
+            ...(model.startsWith("gemini-3") ? { thinkingConfig: { thinkingLevel: "low" } } : {}),
           },
         },
       });
