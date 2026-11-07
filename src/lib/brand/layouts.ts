@@ -254,6 +254,46 @@ function img(src: string, w: number, h: number, style: Record<string, unknown> =
   return { type: 'img', props: { src, width: w, height: h, style: { width: w, height: h, objectFit: 'cover', ...style } } };
 }
 
+/** Colore CSS (#rgb, #rrggbb, #rrggbbaa, rgba()) → stop SVG con opacità a parte. */
+function stop(colore: string, offset: number): string {
+  let col = colore.trim();
+  let alfa = 1;
+  const rgba = col.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)$/i);
+  if (rgba) {
+    col = `rgb(${rgba[1]},${rgba[2]},${rgba[3]})`;
+    alfa = rgba[4] === undefined ? 1 : Number(rgba[4]);
+  } else if (/^#[0-9a-f]{8}$/i.test(col)) {
+    alfa = parseInt(col.slice(7), 16) / 255;
+    col = col.slice(0, 7);
+  }
+  return `<stop offset="${offset}" stop-color="${col}" stop-opacity="${Math.round(alfa * 1000) / 1000}"/>`;
+}
+
+/**
+ * Sfumatura a tutta slide come SVG nativo. Satori trasforma i gradienti CSS
+ * in pattern che Resvg dipinge due volte: ~300 ms di CPU a slide in locale,
+ * che sulle edge function sforavano i 2 s (07/11/2026, layout B mai usciti).
+ */
+function sfumatura(gradiente: string): Nodo {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${LARGHEZZA}" height="${ALTEZZA}"><defs>${gradiente}</defs>` +
+    `<rect width="${LARGHEZZA}" height="${ALTEZZA}" fill="url(#g)"/></svg>`;
+  return img(`data:image/svg+xml;base64,${btoa(svg)}`, LARGHEZZA, ALTEZZA, { position: 'absolute', left: 0, top: 0 });
+}
+
+/** Come `radial-gradient(circle at x% y%, …)`: raggio fino all'angolo più lontano. */
+function radiale(x: number, y: number, stops: Array<[string, number]>): Nodo {
+  const cx = (LARGHEZZA * x) / 100;
+  const cy = (ALTEZZA * y) / 100;
+  const r = Math.max(...[[0, 0], [LARGHEZZA, 0], [0, ALTEZZA], [LARGHEZZA, ALTEZZA]].map(([a, b]) => Math.hypot(a - cx, b - cy)));
+  return sfumatura(`<radialGradient id="g" gradientUnits="userSpaceOnUse" cx="${cx}" cy="${cy}" r="${Math.round(r)}">` +
+    stops.map(([c, o]) => stop(c, o)).join('') + '</radialGradient>');
+}
+
+/** Come `linear-gradient(180deg, …)`: dall'alto in basso. */
+function verticale(stops: Array<[string, number]>): Nodo {
+  return sfumatura('<linearGradient id="g" x1="0" y1="0" x2="0" y2="1">' + stops.map(([c, o]) => stop(c, o)).join('') + '</linearGradient>');
+}
+
 type Evidenza = { color?: string; bg?: string };
 
 /** Testo con *parole evidenziate* e a capo forzati; ogni parola va a capo da sola. */
@@ -363,10 +403,7 @@ function divideChiusura(testo?: string): { sotto: string; azione: string } {
 
 function layoutA(i: InputSlide): Figlio[] {
   const c = i.colori;
-  const sfondo = (x: number, y: number) => el('div', {
-    position: 'absolute', left: 0, top: 0, width: LARGHEZZA, height: ALTEZZA,
-    backgroundImage: `radial-gradient(circle at ${x}% ${y}%, ${c.a_luce} 0%, ${c.a_medio} 38%, ${c.a_fondo} 78%)`,
-  });
+  const sfondo = (x: number, y: number) => radiale(x, y, [[c.a_luce, 0], [c.a_medio, 0.38], [c.a_fondo, 0.78]]);
   const testa = el('div', { position: 'absolute', left: M, top: 70, width: CONTENUTO, justifyContent: 'space-between', alignItems: 'center' },
     marchio(i, '#ffffff'), contatore(i, 'rgba(255,255,255,0.7)'));
   // Ombra a strati senza sfocatura: il boxShadow sfocato costava 3 s di CPU
@@ -446,12 +483,9 @@ function layoutB(i: InputSlide): Figlio[] {
     return [
       el('div', { position: 'absolute', left: 0, top: 0, width: LARGHEZZA, height: ALTEZZA, backgroundColor: c.notte }),
       i.foto ? img(i.foto, LARGHEZZA, 900, { position: 'absolute', left: 0, top: 0 }) : null,
-      el('div', {
-        position: 'absolute', left: 0, top: 0, width: LARGHEZZA, height: ALTEZZA,
-        backgroundImage: i.foto
-          ? `linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0) 22%, ${c.notte}8c 50%, ${c.notte} 68%)`
-          : `radial-gradient(circle at 85% 10%, ${mescola(c.primario, c.notte, 0.55)} 0%, ${c.notte} 60%)`,
-      }),
+      i.foto
+        ? verticale([['rgba(0,0,0,0.18)', 0], ['rgba(0,0,0,0)', 0.22], [`${c.notte}8c`, 0.5], [c.notte, 0.68]])
+        : radiale(85, 10, [[mescola(c.primario, c.notte, 0.55), 0], [c.notte, 0.6]]),
       el('div', { position: 'absolute', left: M, top: 70, width: CONTENUTO, justifyContent: 'space-between', alignItems: 'center' },
         marchio(i, '#ffffff'), contatore(i, '#ffffff')),
       el('div', { position: 'absolute', left: M, bottom: 150, width: CONTENUTO, flexDirection: 'column', gap: 28 },
@@ -563,7 +597,9 @@ function layoutC(i: InputSlide): Figlio[] {
 /** L'albero completo della slide, pronto per Satori (1080×1350). */
 export function alberoSlide(i: InputSlide): Nodo {
   const figli = i.layout === 'brand_pieno' ? layoutA(i) : i.layout === 'foto_editoriale' ? layoutB(i) : layoutC(i);
-  return el('div', { position: 'relative', width: LARGHEZZA, height: ALTEZZA, overflow: 'hidden', fontFamily: 'Inter' }, ...figli);
+  // Niente overflow hidden: Satori metterebbe una maschera annidata su ogni
+  // elemento (20 maschere a slide, il grosso della CPU di Resvg). Taglia già l'SVG.
+  return el('div', { position: 'relative', width: LARGHEZZA, height: ALTEZZA, fontFamily: 'Inter' }, ...figli);
 }
 
 /** Quali slide del layout vogliono una foto (le altre la ignorano). */

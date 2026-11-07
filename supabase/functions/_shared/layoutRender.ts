@@ -145,11 +145,28 @@ export async function fotoDelBrand(supabase: Admin, brandId: string, brand: Reco
   return out;
 }
 
-/** Logo del Brand Kit (brands.logo_url); SVG e WebP non si disegnano → null. */
-export async function logoDelBrand(logoUrl: unknown): Promise<Immagine | null> {
-  if (typeof logoUrl !== "string" || !logoUrl) return null;
-  const b = await scaricaUrl(logoUrl);
-  return b ? immagineDaByte(b) : null;
+/**
+ * Logo del Brand Kit (brands.logo_url), altrimenti quello caricato nel
+ * wizard del template (brand_sources, kind logo): GestioMed il 07/11/2026
+ * aveva solo il secondo e le slide scrivevano il nome al posto del logo.
+ * SVG e WebP non si disegnano → null.
+ */
+export async function logoDelBrand(supabase: Admin, brandId: string, logoUrl: unknown): Promise<Immagine | null> {
+  if (typeof logoUrl === "string" && logoUrl) {
+    const b = await scaricaUrl(logoUrl);
+    const img = b ? immagineDaByte(b) : null;
+    if (img) return img;
+  }
+  const { data } = await supabase.from("brand_sources")
+    .select("storage_bucket, storage_path")
+    .eq("brand_id", brandId).eq("kind", "logo")
+    .limit(1).maybeSingle();
+  const r = data as { storage_bucket: string | null; storage_path: string | null } | null;
+  if (!r?.storage_bucket || !r.storage_path) return null;
+  const { data: file, error } = await supabase.storage.from(r.storage_bucket).download(r.storage_path);
+  if (error || !file) return null;
+  const b = new Uint8Array(await file.arrayBuffer());
+  return b.length <= MAX_BYTE ? immagineDaByte(b) : null;
 }
 
 /**
@@ -189,6 +206,14 @@ export function coloriDelBrand(brand: Record<string, unknown>, paletteAccent?: u
 }
 
 // ── Una slide per chiamata ──
+
+/**
+ * Disegni in corso insieme dal lavoro in background: uno. Le chiamate
+ * finiscono spesso nella stessa istanza, che somma la CPU: tre insieme
+ * sforavano i 2 s e l'istanza moriva col lavoro dentro (07/11/2026,
+ * GestioMed: 9 slide ferme su «Genero…»).
+ */
+export const DISEGNI_IN_PARALLELO = 1;
 
 /** Chiama la funzione stessa per disegnare una slide, col token dell'utente. */
 export async function chiamaDisegno(funzione: string, authHeader: string, body: Record<string, unknown>): Promise<{ ok: boolean; errore?: string }> {

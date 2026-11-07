@@ -27,7 +27,7 @@ import type { SlideRole } from "../_shared/brand/archetypes.ts";
 import { LAYOUT_IDS, layoutConsigliato, vuoleFoto, type LayoutId } from "../_shared/brand/layouts.ts";
 import { leggiTestiProva, promptTestiProva, testiDaSegnaposto } from "../_shared/brand/layoutCopy.ts";
 import {
-  caricaFoto, chiamaDisegno, coloriDelBrand, disegnaLayout, fotoDelBrand, leggiSpec, logoDelBrand,
+  DISEGNI_IN_PARALLELO, caricaFoto, chiamaDisegno, coloriDelBrand, disegnaLayout, fotoDelBrand, leggiSpec, logoDelBrand,
   type RifFoto, type SpecLayout,
 } from "../_shared/layoutRender.ts";
 import { estimateGenesisCost, COST_GEMINI_FLASH_CALL } from "../_shared/brand/costs.ts";
@@ -39,7 +39,6 @@ const IMAGE_MODEL_FALLBACK = "nano-banana-pro-preview";
 const TEXT_MODEL = "gemini-2.5-flash";
 const BUCKET = "brand-assets";
 const ROLES: SlideRole[] = ["cover", "content", "cta"];
-const CONCURRENCY = 3;
 
 type BrandRow = {
   id: string;
@@ -158,7 +157,7 @@ async function disegnaCandidato(
       .single();
     const b = (brand || {}) as Record<string, unknown>;
     const [logo, foto] = await Promise.all([
-      logoDelBrand(b.logo_url),
+      logoDelBrand(supabase, brandId, b.logo_url),
       vuoleFoto(spec.layout, spec.role) === "no" ? null : caricaFoto(supabase, spec.foto),
     ]);
     // Il template mostra copertina, contenuto e chiusura di un carosello da 5.
@@ -576,7 +575,7 @@ serve(async (req) => {
               .eq("id", c.id);
           }
 
-          // 4. Una slide per chiamata (limite di CPU), tre alla volta.
+          // 4. Una slide per chiamata (limite di CPU), una alla volta.
           await runPool(candidates.map((c) => async () => {
             const r = await chiamaDisegno("generate-template", auth.authHeader, {
               action: "disegna_candidato", brandId, candidateId: c.id,
@@ -587,7 +586,7 @@ serve(async (req) => {
                 .eq("id", c.id)
                 .neq("status", "done");
             }
-          }), CONCURRENCY);
+          }), DISEGNI_IN_PARALLELO);
         } catch (e) {
           console.error("genesi layout fallita:", e);
         }
