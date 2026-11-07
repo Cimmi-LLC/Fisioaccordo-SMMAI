@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   LAYOUT_IDS, alberoSlide, coloriLayout, contrasto, corpoAdatto, estraiDato, evidenziaAuto,
-  GIALLO_EVIDENZA, layoutConsigliato, vuoleFoto, type InputSlide, type Nodo,
+  GIALLO_EVIDENZA, layoutConsigliato, layoutDiBase, vuoleFoto, type InputSlide, type Nodo,
 } from '../layouts.ts';
 import { genomaPerLayout, validateGenome } from '../genome.ts';
 import { leggiTestiProva, promptTestiProva, testiDaSegnaposto } from '../layoutCopy.ts';
@@ -201,5 +201,27 @@ describe('testi di prova', () => {
     const t = testiDaSegnaposto(PLACEHOLDER);
     expect(t.copertina.titolo).not.toBe(t.copertina.titolo.toUpperCase());
     expect(t.chiusura.testo).toBe(PLACEHOLDER.cta.body);
+  });
+});
+
+describe('layoutDiBase (brand senza template scelto)', () => {
+  it('senza genoma parte da A, nei colori del brand', () => {
+    expect(layoutDiBase(undefined, false)).toBe('brand_pieno');
+    expect(layoutDiBase(null, true)).toBe('brand_pieno');
+    expect(layoutDiBase('nb2_vecchio', false)).toBe('brand_pieno');
+  });
+
+  it('rispetta il layout del genoma, ma B solo con foto vere', () => {
+    expect(layoutDiBase('carta_clinica', false)).toBe('carta_clinica');
+    expect(layoutDiBase('foto_editoriale', true)).toBe('foto_editoriale');
+    expect(layoutDiBase('foto_editoriale', false)).toBe('brand_pieno');
+  });
+
+  it('una slide di base si disegna anche senza logo e senza foto', () => {
+    for (const role of ['cover', 'content', 'cta'] as const) {
+      const n = alberoSlide({ ...BASE, layout: layoutDiBase(undefined, false), role, logo: null, foto: null });
+      expect(stiliPuliti(n)).toBe(true);
+      expect(testi(n).join(' ')).toContain('GestioMed');
+    }
   });
 });

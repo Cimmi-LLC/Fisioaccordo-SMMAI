@@ -614,6 +614,18 @@ export function layoutConsigliato(haFoto: boolean): LayoutId {
   return haFoto ? 'foto_editoriale' : 'brand_pieno';
 }
 
+/**
+ * Layout di base per un brand senza template scelto: le slide escono lo
+ * stesso (Attilio, 07/11/2026: «se qualcuno non mette il brand, devi
+ * comunque generare delle immagini fighe»). Vale il layout del genoma se
+ * c'è, altrimenti A nei colori del brand; B solo con foto vere, perché
+ * copertina e chiusura senza foto restano vuote.
+ */
+export function layoutDiBase(genomeLayout: unknown, haFoto: boolean): LayoutId {
+  if (isLayoutId(genomeLayout) && (genomeLayout !== 'foto_editoriale' || haFoto)) return genomeLayout;
+  return 'brand_pieno';
+}
+
 const PAROLE_VUOTE = new Set([
   'perché', 'perche', 'quanti', 'quante', 'quanto', 'quando', 'quale', 'quali', 'come', 'cosa', 'dove',
   'sempre', 'anche', 'ancora', 'molto', 'tutti', 'tutte', 'tutto', 'questo', 'questa', 'questi', 'prima',

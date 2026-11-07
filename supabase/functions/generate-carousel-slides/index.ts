@@ -27,7 +27,7 @@ import { sanitize } from "../_shared/brand/genesisPrompt.ts";
 import type { SlideRole } from "../_shared/brand/archetypes.ts";
 import { COST_NB2_IMAGE_1K } from "../_shared/brand/costs.ts";
 import { resolveProfession, type ProfessionBrandLike } from "../_shared/brand/profession.ts";
-import { evidenziaAuto, isLayoutId, vuoleFoto, type LayoutId } from "../_shared/brand/layouts.ts";
+import { evidenziaAuto, isLayoutId, layoutDiBase, vuoleFoto, type LayoutId } from "../_shared/brand/layouts.ts";
 import {
   DISEGNI_IN_PARALLELO, caricaFoto, chiamaDisegno, coloriDelBrand, disegnaLayout, fotoDelBrand, leggiSpec, logoDelBrand,
 } from "../_shared/layoutRender.ts";
@@ -289,25 +289,29 @@ async function disegnaSlideLayout(
       .eq("slide_role", slide.role)
       .maybeSingle();
     const v = variant as Pick<VariantRow, "genome" | "prompt_skeleton"> | null;
-    const layout = v?.genome?.layout;
-    if (!v || !isLayoutId(layout)) return fallita("template senza layout");
 
     const { data: brand } = await supabase.from("brands").select("*").eq("id", brandId).single();
     const b = (brand || {}) as Record<string, unknown>;
+    const tutte = await fotoDelBrand(supabase, brandId, b);
+
+    // Template scelto: il suo layout. Senza template (brand nuovo, wizard
+    // saltato, proposte mai scelte): il layout di base, nei colori del kit.
+    const layout: LayoutId = v && isLayoutId(v.genome?.layout)
+      ? v.genome!.layout as LayoutId
+      : layoutDiBase((b.genome as { layout?: unknown } | null)?.layout, tutte.length > 0);
 
     // Foto: una vera dello studio (a rotazione fra i caroselli), altrimenti
     // quella scelta per il template approvato.
     let foto = null;
-    if (vuoleFoto(layout as LayoutId, slide.role) !== "no") {
-      const tutte = await fotoDelBrand(supabase, brandId, b);
-      const rif = scegli(tutte, rowId + slide.role) ?? leggiSpec(v.prompt_skeleton)?.foto ?? null;
+    if (vuoleFoto(layout, slide.role) !== "no") {
+      const rif = scegli(tutte, rowId + slide.role) ?? (v ? leggiSpec(v.prompt_skeleton)?.foto : null) ?? null;
       foto = await caricaFoto(supabase, rif);
     }
     const logo = await logoDelBrand(supabase, brandId, b.logo_url);
-    const etichetta = v.genome?.layout_etichetta || resolveProfession(b as unknown as ProfessionBrandLike).kicker;
+    const etichetta = v?.genome?.layout_etichetta || resolveProfession(b as unknown as ProfessionBrandLike).kicker;
 
     const bytes = await disegnaLayout({
-      layout: layout as LayoutId,
+      layout,
       role: slide.role,
       colori: coloriDelBrand(b, (b.genome as { palette?: { accent?: string } } | null)?.palette?.accent),
       nome: String(b.nome_business || "Studio"),
@@ -387,7 +391,10 @@ serve(async (req) => {
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) return jsonResponse(req, { error: "GEMINI_API_KEY non configurata" }, 500);
 
-    // Template approvati del brand (gate: senza template niente produzione).
+    // Template approvati del brand. Fino al 07/11/2026 senza i 3 ruoli la
+    // produzione si fermava qui (409 template_not_locked) e chi non aveva
+    // logo né template non vedeva mai una slide: ora si disegna col layout
+    // di base (vedi disegnaSlideLayout), il template resta un di più.
     const { data: variants, error: varErr } = await supabase
       .from("template_variants")
       .select("slide_role, storage_bucket, storage_path, prompt_skeleton, genome")
@@ -395,17 +402,12 @@ serve(async (req) => {
     if (varErr) return jsonResponse(req, { error: varErr.message }, 500);
     const byRole = new Map<SlideRole, VariantRow>();
     for (const v of (variants || []) as VariantRow[]) byRole.set(v.slide_role, v);
-    if (!byRole.has("cover") || !byRole.has("content") || !byRole.has("cta")) {
-      return jsonResponse(req, {
-        error: "template_not_locked",
-        message: "Il brand non ha un template approvato. Completa prima il Template Genesis.",
-      }, 409);
-    }
+    const templateCompleto = byRole.has("cover") && byRole.has("content") && byRole.has("cta");
 
-    // Template a layout: le slide le disegna il server (4:5, testo esatto).
-    const aLayout = isLayoutId(byRole.get("content")!.genome?.layout);
+    // Template a layout (o nessun template): le slide le disegna il server (4:5, testo esatto).
+    const aLayout = !templateCompleto || isLayoutId(byRole.get("content")!.genome?.layout);
 
-    // Formato dal genoma congelato del template (default 1:1 per i vecchi).
+    // Formato dal genoma congelato del template (default 1:1 per i vecchi NB2).
     const format = aLayout || byRole.get("content")!.genome?.format === "4:5" ? "4:5" : "1:1";
 
     // Modello scelto dallo studio (brands.image_model, card impostazioni) e
@@ -422,7 +424,7 @@ serve(async (req) => {
     // Il colore del kit comanda sul template: un centro blu non pubblica viola.
     const brandPrimary = coloreSceltoDalKit((brandPrefs as Record<string, unknown> | null)?.colore_primario);
     const brandSecondary = coloreSceltoDalKit((brandPrefs as Record<string, unknown> | null)?.colore_secondario);
-    console.log("Produzione con cascata modelli:", modelKey, models.join(" -> "), "| kicker:", kicker, "| colore kit:", brandPrimary || "(default)");
+    console.log("Produzione:", templateCompleto ? (aLayout ? "template a layout" : "template NB2 " + models.join(" -> ")) : "layout di base (nessun template)", "| kicker:", kicker, "| colore kit:", brandPrimary || "(default)");
 
     // Scarica le 3 reference una volta sola (solo per i template NB2).
     const refCache = new Map<SlideRole, string>();
@@ -502,7 +504,7 @@ serve(async (req) => {
         userId, brandId, type: "carousel",
         status: result.path ? "success" : "failed",
         title: "Rigenerazione slide " + (slides[0].index + 1),
-        metadata: { phase: "regenerate-slide", carouselId: rowId, layout: aLayout, estimated_cost_usd: result.path && !aLayout ? COST_NB2_IMAGE_1K : 0 },
+        metadata: { phase: "regenerate-slide", carouselId: rowId, layout: aLayout, template: templateCompleto ? "scelto" : "base", estimated_cost_usd: result.path && !aLayout ? COST_NB2_IMAGE_1K : 0 },
       });
       if (!result.path) return jsonResponse(req, { error: result.error || "generazione fallita" }, 502);
       return jsonResponse(req, { bucket: OUTPUT_BUCKET, path: result.path, index: result.index });
@@ -567,7 +569,7 @@ serve(async (req) => {
           userId, brandId, type: "carousel",
           status: finalStatus === "ready" ? "success" : finalStatus === "partial" ? "partial" : "failed",
           title: "Produzione carosello (" + okCount + "/" + slides.length + " slide)",
-          metadata: { phase: "produce-slides", carouselId: rowId, format, layout: aLayout, estimated_cost_usd: aLayout ? 0 : okCount * COST_NB2_IMAGE_1K },
+          metadata: { phase: "produce-slides", carouselId: rowId, format, layout: aLayout, template: templateCompleto ? "scelto" : "base", estimated_cost_usd: aLayout ? 0 : okCount * COST_NB2_IMAGE_1K },
         });
       } catch (e) {
         console.error("Produzione background fallita:", e);
