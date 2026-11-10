@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { TrendingUp, Loader2, Sparkles, Search, ArrowRight, Film, Layers, MessageSquare, X } from 'lucide-react';
 import { useTrends } from '@/hooks/useTrends';
 import { useActiveBrand } from '@/hooks/useActiveBrand';
+import { useToast } from '@/hooks/use-toast';
 import { resolveProfession } from '@/lib/brand/profession';
 
 interface TrendExplorerProps {
@@ -41,6 +42,7 @@ const TrendExplorer: React.FC<TrendExplorerProps> = ({ onUseTrend }) => {
   const navigate = useNavigate();
   const { trends, searching, findTrends, removeTrend } = useTrends();
   const { activeBrand } = useActiveBrand();
+  const { toast } = useToast();
   const [niche, setNiche] = useState('');
   // Nicchia proposta dal brand attivo (es. "nutrizione e alimentazione"):
   // compilata solo se l'utente non ha ancora scritto nulla.
@@ -61,9 +63,20 @@ const TrendExplorer: React.FC<TrendExplorerProps> = ({ onUseTrend }) => {
     findTrends(niche.trim(), platform, false);
   };
 
+  // I trend in pagina possono arrivare dal database (ricerche dei giorni
+  // prima): in quel caso `lastNiche` è vuota e fino al 09/11/2026 il tasto
+  // non faceva nulla, senza dirlo. Si riparte dalla nicchia dei trend
+  // mostrati, poi da quella scritta nel campo.
   const handleLoadMore = () => {
-    if (!lastNiche) return;
-    findTrends(lastNiche, lastPlatform, true);
+    const nicchia = lastNiche || trends.find((t) => t.category)?.category || niche.trim();
+    if (!nicchia) {
+      toast({ title: 'Scrivi la tua nicchia', description: 'Serve per cercare altri temi: scrivila nel campo in alto.' });
+      return;
+    }
+    const piattaforma = lastPlatform || platform;
+    setLastNiche(nicchia);
+    setLastPlatform(piattaforma);
+    findTrends(nicchia, piattaforma, true);
   };
 
   const developIdea = (topic: string, target: DevTarget) => {
@@ -195,8 +208,13 @@ const TrendExplorer: React.FC<TrendExplorerProps> = ({ onUseTrend }) => {
               style={{ border: '1px solid var(--line)', color: 'var(--viola)', background: 'transparent', cursor: searching ? 'not-allowed' : 'pointer' }}
             >
               {searching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              Generane altri
+              {searching ? 'Cerco altri temi…' : 'Generane altri'}
             </button>
+            {searching && (
+              <p className="text-xs text-muted-foreground text-center">
+                Ci vogliono 30-60 secondi, resta su questa pagina.
+              </p>
+            )}
           </div>
         )}
       </CardContent>

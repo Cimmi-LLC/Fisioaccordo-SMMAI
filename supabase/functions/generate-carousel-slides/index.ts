@@ -28,6 +28,7 @@ import type { SlideRole } from "../_shared/brand/archetypes.ts";
 import { COST_NB2_IMAGE_1K } from "../_shared/brand/costs.ts";
 import { resolveProfession, type ProfessionBrandLike } from "../_shared/brand/profession.ts";
 import { evidenziaAuto, isLayoutId, layoutDiBase, vuoleFoto, type LayoutId } from "../_shared/brand/layouts.ts";
+import { applicaSlide, chiudiProduzione, contaFatte, scriviSlides, statoFinale, type IoRiga, type RigaSlides } from "../_shared/brand/carouselSlides.ts";
 import {
   DISEGNI_IN_PARALLELO, caricaFoto, chiamaDisegno, coloriDelBrand, disegnaLayout, fotoDelBrand, leggiSpec, logoDelBrand,
 } from "../_shared/layoutRender.ts";
@@ -243,24 +244,45 @@ async function runPool<T>(jobs: Array<() => Promise<T>>, limit: number): Promise
   return results;
 }
 
-/** Aggiorna una slide nel jsonb della riga (riletto per non perdere update concorrenti). */
+/**
+ * Accesso alla riga per `scriviSlides`: la scrittura passa solo se la riga ha
+ * ancora la versione letta (confronto su updated_at). Fino al 09/11/2026 si
+ * leggeva e riscriveva senza confronto: con 6 slide insieme l'ultima
+ * cancellava le altre (riga «ready 5/5» con 4 pending).
+ */
+function ioRiga(supabase: ReturnType<typeof adminClient>, rowId: string): IoRiga<SlideRecord> {
+  return {
+    leggi: async () => {
+      const { data } = await supabase
+        .from("produced_carousels")
+        .select("slides, updated_at, status")
+        .eq("id", rowId)
+        .maybeSingle();
+      return data as RigaSlides<SlideRecord> | null;
+    },
+    scrivi: async (campi, seVersione) => {
+      let q = supabase.from("produced_carousels").update(campi).eq("id", rowId);
+      if (seVersione) q = q.eq("updated_at", seVersione);
+      const { data, error } = await q.select("id");
+      if (error) console.warn("scrittura slide non riuscita:", error.message);
+      return !error && Array.isArray(data) && data.length > 0;
+    },
+    adesso: () => Date.now(),
+    pausa: (ms) => new Promise((r) => setTimeout(r, ms)),
+  };
+}
+
+/** Aggiorna una slide nella riga. A produzione già chiusa ricalcola anche lo stato (dopo un «Riprova»). */
 async function patchSlide(
   supabase: ReturnType<typeof adminClient>,
   rowId: string,
   slide: SlideRecord,
 ): Promise<void> {
-  const { data } = await supabase
-    .from("produced_carousels")
-    .select("slides")
-    .eq("id", rowId)
-    .single();
-  const slides = ((data as { slides?: SlideRecord[] } | null)?.slides || []) as SlideRecord[];
-  const next = slides.map((s) => (s.index === slide.index ? slide : s));
-  const okCount = next.filter((s) => s.status === "done").length;
-  await supabase
-    .from("produced_carousels")
-    .update({ slides: next, ok_count: okCount, updated_at: new Date().toISOString() })
-    .eq("id", rowId);
+  await scriviSlides(ioRiga(supabase, rowId), (riga) => {
+    const slides = applicaSlide(riga.slides || [], slide);
+    const chiusa = riga.status && riga.status !== "producing";
+    return { slides, ok_count: contaFatte(slides), ...(chiusa ? { status: statoFinale(slides) } : {}) };
+  });
 }
 
 /** Sceglie una foto dello studio diversa a ogni carosello (stessa per la stessa riga). */
@@ -558,12 +580,15 @@ serve(async (req) => {
           }),
           aLayout ? DISEGNI_IN_PARALLELO : CONCURRENCY,
         );
-        const okCount = results.filter((r) => r.status === "done").length;
-        const finalStatus = okCount === slides.length ? "ready" : okCount > 0 ? "partial" : "failed";
-        await supabase
-          .from("produced_carousels")
-          .update({ status: finalStatus, ok_count: okCount, updated_at: new Date().toISOString() })
-          .eq("id", rowId);
+        // Chiusura sulla riga vera: si rimettono le slide che chi ha prodotto
+        // ha in mano e nella riga mancano, e nessuna resta «pending».
+        const chiuse = await scriviSlides(ioRiga(supabase, rowId), (riga) => {
+          const fine = chiudiProduzione(riga.slides || initialSlides, results);
+          return { slides: fine.slides, ok_count: fine.okCount, status: fine.status };
+        });
+        if (!chiuse) throw new Error("riga del carosello non aggiornata a fine produzione");
+        const okCount = contaFatte(chiuse);
+        const finalStatus = statoFinale(chiuse);
 
         await logGeneration({
           userId, brandId, type: "carousel",
