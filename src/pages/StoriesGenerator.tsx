@@ -51,6 +51,10 @@ const StoriesGenerator = () => {
         promptContext: prof.profile.promptContext,
         photoExamples: prof.profile.keywordExamples,
       },
+      // Cose da non dire: per i profili sanitari vale la lista di base delle
+      // promesse (metodoCopy.ts), più le voci scritte dal brand nel Kit.
+      sanitario: prof.id !== 'altro',
+      coseDaNonDire: (activeBrand as { parole_da_evitare?: string[] | null }).parole_da_evitare || [],
       clientInfo: {
         nome_business: activeBrand.nome_business,
         descrizione: activeBrand.descrizione,

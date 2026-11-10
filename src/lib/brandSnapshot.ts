@@ -19,7 +19,7 @@ export const FIELD_LABELS: Record<SnapshotField, string> = {
   website_url: 'Sito principale', descrizione: 'Descrizione', categorie: 'Categorie', servizi: 'Servizi',
   target_pazienti: 'Target', citta: 'Città', tono_voce: 'Tono di voce', persona_scrittura: 'Persona',
   vantaggi_competitivi: 'Vantaggi competitivi', mission: 'Mission', identita_core: 'Identità core',
-  temi_chiave: 'Temi chiave', cta_suggerite: 'Call to action', parole_da_evitare: 'Parole da evitare',
+  temi_chiave: 'Temi chiave', cta_suggerite: 'Call to action', parole_da_evitare: 'Cose da non dire',
   colore_primario: 'Colore primario', colore_secondario: 'Colore secondario', colore_terziario: 'Colore terziario',
   font_intestazioni: 'Font titoli', font_body: 'Font testo', logo_url: 'Logo', post_template_id: 'Sfondo post',
 };

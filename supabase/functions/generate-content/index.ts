@@ -6,7 +6,8 @@ import { callGeminiWithRetry, type GeminiCallResult } from "../_shared/gemini.ts
 import { resolveProfession, professionPromptBlock, professionKeywordExamples, delLuogo, nelMioLuogo, ilCliente } from "../_shared/brand/profession.ts";
 import {
   pubblicoDelBrand, formatoPerId, bloccoFormato, elencoFormati, regoleMetodo, SCHEMA_BRIEF,
-  controlliMeccanici, promptGiudice, leggiGiudizio, type ContestoMetodo, type Giudizio,
+  controlliMeccanici, promptGiudice, leggiGiudizio, daRivedere, regolaCoseDelBrand, senzaClaim,
+  type ContestoMetodo, type Giudizio,
 } from "../_shared/brand/metodoCopy.ts";
 
 const corsHeaders = {
@@ -144,9 +145,15 @@ serve(async (req) => {
       const brand = brandData;
       const luogo = P.luogo;
       const persona = brand.persona_scrittura === "io" ? `prima persona singolare (io / il mio ${luogo})` : `prima persona plurale (noi / ${nelMioLuogo(P, true)})`;
-      cta.push(...(brand.cta_suggerite || []).filter(Boolean));
+      // Vantaggi e CTA arrivano dall'analisi del sito e ne portano le
+      // promesse («risoluzione duratura», «risolvi definitivamente»): per un
+      // profilo sanitario quelle voci non entrano nel prompt come «prove» o
+      // «azioni approvate» (revisione del reparto social, 09/11/2026).
+      const ctaDelKit = (brand.cta_suggerite || []).filter(Boolean);
+      const vantaggiDelKit = (brand.vantaggi_competitivi || []).filter(Boolean);
+      cta.push(...(metodo.sanitario ? senzaClaim(ctaDelKit).tenute : ctaDelKit));
       paroleEvitare.push(...(brand.parole_da_evitare || []).filter(Boolean));
-      const vantaggi = (brand.vantaggi_competitivi || []).filter(Boolean);
+      const vantaggi: string[] = metodo.sanitario ? senzaClaim(vantaggiDelKit).tenute : vantaggiDelKit;
       const temi = (brand.temi_chiave || []).filter(Boolean);
       const servizi = (brand.servizi || []).filter(Boolean);
       // Campi del metodo (migrazione 20261103150000): se mancano in
@@ -183,9 +190,7 @@ ${cta.map((c: string) => `• ${c}`).join("\n")}
 ` : ""}
 ${temi.length > 0 ? `=== TEMI CHIAVE del brand: ${temi.join(", ")}
 ` : ""}
-${paroleEvitare.length > 0 ? `=== PAROLE/ESPRESSIONI BANDITE (output rifiutato se le usi) ===
-${paroleEvitare.map((p: string) => `❌ ${p}`).join("\n")}
-` : ""}
+${regolaCoseDelBrand(paroleEvitare) ? regolaCoseDelBrand(paroleEvitare) + "\n→ Output rifiutato se compaiono.\n" : ""}
 ${frasiPazienti.length > 0 ? `=== LE PAROLE DEI CLIENTI (frasi testuali, come le dicono loro) ===
 ${frasiPazienti.map((f: string) => `«${f}»`).join("\n")}
 → Copertina, slide e caption usano QUESTE parole e questo registro, non il linguaggio da sito. La convinzione comune (A) si scrive come la direbbe uno di loro.
@@ -328,11 +333,13 @@ Regole di forma: la slide 1 è "cover", l'ultima è "cta", quelle in mezzo sono 
     const fonti = [topic, angolo, b.descrizione, b.mission, b.identita_core, b.target_pazienti, b.convinzione_da_ribaltare,
       ...[b.vantaggi_competitivi, b.servizi, b.cta_suggerite, b.frasi_pazienti, b.temi_chiave].flatMap((v) => Array.isArray(v) ? v : [])]
       .filter((x) => typeof x === "string").join("\n");
+    // Al giudice vanno gli stessi dati del prompt: senza le promesse del sito.
+    const pulite = (v: unknown) => metodo.sanitario ? senzaClaim(v).tenute : v;
     const datiBrand = brandData ? [
-      ["Servizi", b.servizi], ["Vantaggi e prove", b.vantaggi_competitivi], ["Azioni approvate", b.cta_suggerite],
+      ["Servizi", b.servizi], ["Vantaggi e prove", pulite(b.vantaggi_competitivi)], ["Azioni approvate", pulite(b.cta_suggerite)],
     ].map(([k, v]) => `${k}: ${(Array.isArray(v) ? v : []).filter(Boolean).join("; ") || "(nessuno)"}`).join("\n") : "";
     const daVotare = (c: any) => ({ brief: c.brief, slides: c.slides, caption_instagram: c.caption_instagram });
-    let meccanici = controlliMeccanici(parsed, fonti, paroleEvitare);
+    let meccanici = controlliMeccanici(parsed, fonti, paroleEvitare, metodo.sanitario);
     let giudizio: Giudizio | null = null;
     const giudica = async (c: any) => {
       const r = await callGeminiWithRetry({
@@ -365,7 +372,7 @@ Riscrivi il JSON completo, stessa struttura.`;
         if (j && Array.isArray(j.slides) && j.slides.length > 0) {
           parsed = j;
           riscritto = true;
-          meccanici = controlliMeccanici(parsed, fonti, paroleEvitare);
+          meccanici = controlliMeccanici(parsed, fonti, paroleEvitare, metodo.sanitario);
           break;
         }
       }
@@ -380,6 +387,15 @@ Riscrivi il JSON completo, stessa struttura.`;
         tipo: i === 0 ? "cover" : i === tot - 1 ? "cta" : "content",
       }));
     }
+
+    // Quello che resta dopo la riscrittura lo vede chi pubblica: promesse
+    // sanitarie e cose che il brand non dice, con le parole esatte.
+    const testoFinale = [
+      ...(Array.isArray(parsed.slides) ? parsed.slides : []).flatMap((s: any) =>
+        [s?.hook, s?.sottotitolo, s?.titolo, s?.testo, s?.testo_cta, s?.bottone_cta].filter((x) => typeof x === "string")),
+      typeof parsed.caption_instagram === "string" ? parsed.caption_instagram : "",
+    ].join("\n");
+    const avvisi = daRivedere(testoFinale, { sanitario: metodo.sanitario, coseDaNonDire: paroleEvitare });
 
     const qualita = {
       modello: modelloUsato,
@@ -423,6 +439,7 @@ Riscrivi il JSON completo, stessa struttura.`;
     return new Response(JSON.stringify({
       ...parsed,
       qualita,
+      da_rivedere: avvisi,
       content: parsed.caption_instagram || "",
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

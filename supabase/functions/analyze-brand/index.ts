@@ -5,6 +5,7 @@ import {
   isProfessionId,
   professionListForPrompt,
 } from "../_shared/brand/profession.ts";
+import { senzaClaim } from "../_shared/brand/metodoCopy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -71,10 +72,10 @@ Analizza attentamente e ricava:
 - I servizi offerti, con il lessico della professione (es. fisioterapia, piani alimentari, personal training, igiene orale, ecc.)
 - Il target di pazienti o clienti (anziani, sportivi, bambini, donne in gravidanza, ecc.)
 - Il tono di comunicazione percepito (professionale, empatico, informale, tecnico)
-- I punti di forza e vantaggi competitivi
+- I punti di forza e vantaggi competitivi: solo FATTI verificabili (specializzazione, formazione, anni di attività, strumenti, numero di recensioni). MAI promesse di risultato prese dal sito: niente «risoluzione duratura», «guarigione», «risultati garantiti», «senza farmaci», «meno sedute». Se il sito ha solo promesse, scrivi il fatto che c'è dietro (es. «si occupa solo di cervicale e vertigini») o lascia fuori la voce
 - La mission o i valori del brand (se presenti)
 - Suggerisci 5 temi chiave adatti per i post social, coerenti con la professione
-- Suggerisci 3 call to action adatte
+- Suggerisci 3 call to action adatte: un'azione (prenota una valutazione, scrivici, chiama), mai una promessa di risultato («Risolvi i tuoi dolori»)
 - La persona di scrittura suggerita ("io" per professionista singolo, "noi" per studio/team)
 - I colori principali del brand: scegli SOLO tra i colori della lista fornita sopra (COLORI CSS TROVATI NEL SITO, oppure COLORI RICORRENTI NELLE IMMAGINI DEL PROFILO se arriva da Instagram: sono i colori che il visitatore vede davvero). Il primario è quello più usato per bottoni, titoli e marchio. Restituisci 3 colori hex presi da quella lista. Se la lista manca o non basta, lascia stringa vuota nei campi che non puoi riempire: NON inventare MAI un colore e NON suggerire colori «di settore».
 - Categorie: scegli tra [${allProfessionCategories().join(", ")}, altro], coerenti con la professione rilevata
@@ -139,6 +140,20 @@ Rispondi con questo JSON esatto:
       return new Response(JSON.stringify({ error: "Errore nell'analisi. Riprova o compila manualmente." }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Le promesse del sito non entrano nel Brand Kit come vantaggi o CTA:
+    // da lì passavano dritte nei post (revisione del reparto social, 09/11/2026).
+    // Il controllo vale per i profili sanitari, cioè tutto tranne «altro».
+    const profSlug = typeof parsed.professione === "string" ? parsed.professione.trim().toLowerCase() : "";
+    if (profSlug !== "altro") {
+      const vantaggi = senzaClaim(parsed.vantaggi_competitivi);
+      const cta = senzaClaim(parsed.cta_suggerite);
+      if (vantaggi.tolte.length || cta.tolte.length) {
+        console.log("Promesse tolte dal kit:", [...vantaggi.tolte, ...cta.tolte].join(" | "));
+      }
+      parsed.vantaggi_competitivi = vantaggi.tenute;
+      parsed.cta_suggerite = cta.tenute.length > 0 ? cta.tenute : ["Prenota una valutazione", "Scrivici per informazioni"];
     }
 
     // Fallback: if Gemini omitted logo_url but we have one from scraping, inject it

@@ -99,6 +99,8 @@ REGOLE CRITICHE:
 - "hashtag_analysis.most_used": USA SOLO hashtag che vedi esplicitamente nei post o nella sezione "HASHTAG OSSERVATI". Se nessun hashtag è presente, ritorna array vuoto. MAI inventare.
 - "hashtag_analysis.suggested": qui PUOI proporre hashtag nuovi rilevanti per il settore, ma devono essere realistici e specifici.
 - Le frequenze e i topic devono derivare dai post mostrati, non da assunzioni generiche.
+- Idee di contenuto e opportunità: mai inventare offerte, programmi, guide o materiali di chi chiede l'analisi («scrivi CERVICALE per il mio programma di 7 giorni»): proponi il tema e l'angolo, non un'offerta che forse non esiste.
+- Mai promesse sanitarie nelle idee: niente guarigione, risultati garantiti o duraturi, «senza farmaci», sintomi che spariscono, tempi o numero di sedute promessi.
 
 Rispondi SOLO con JSON valido.`;
 

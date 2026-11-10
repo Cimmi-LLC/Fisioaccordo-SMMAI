@@ -55,5 +55,6 @@ export function caroselloDaRisposta(raw: any, titoloRiserva: string): CarouselDa
     cta_finale: raw?.cta_finale || '',
     caption_instagram: raw?.caption_instagram || raw?.content || '',
     hashtag_suggeriti: raw?.hashtag_suggeriti || [],
+    da_rivedere: Array.isArray(raw?.da_rivedere) ? raw.da_rivedere.filter((x: unknown) => typeof x === 'string') : [],
   };
 }

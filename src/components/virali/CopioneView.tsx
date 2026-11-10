@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Copy, Smartphone, Clapperboard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { copioneDaLeggere, type Copione } from '@/lib/brand/virali';
+import DaRivedere from '@/components/DaRivedere';
 
 const Blocco: React.FC<{ titolo: string; children: React.ReactNode }> = ({ titolo, children }) => (
   <div>
@@ -49,6 +50,8 @@ const CopioneView: React.FC<{ copione: Copione }> = ({ copione }) => {
               </>}
         </span>
       </div>
+
+      <DaRivedere voci={copione.da_rivedere} quando="registrare" />
 
       {copione.mattoncini_cambiati.length > 0 && (
         <Blocco titolo="Cosa cambia rispetto all'originale">{copione.mattoncini_cambiati.join(', ')}</Blocco>

@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { resolveProfession, professionPromptBlock, type ResolvedProfession } from "../_shared/brand/profession.ts";
 import { callGeminiWithRetry } from "../_shared/gemini.ts";
-import { FORMATI, formatoPerId, pubblicoDelBrand, type Pubblico } from "../_shared/brand/metodoCopy.ts";
+import { FORMATI, REGOLA_CLAIM, formatoPerId, pubblicoDelBrand, regolaCoseDelBrand, senzaClaim, type Pubblico } from "../_shared/brand/metodoCopy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,6 +42,7 @@ serve(async (req) => {
     // La professione decide il mestiere per cui si propongono le idee:
     // scelta nel brand kit, altrimenti rilevata dal brand e dal topic.
     let brandHint = "";
+    let coseDelBrand = "";
     let prof: ResolvedProfession = resolveProfession(null, topic);
     let pubblico: Pubblico = "B2C";
     const authHeader = req.headers.get("authorization");
@@ -66,7 +67,11 @@ serve(async (req) => {
             prof = resolveProfession(brand, topic);
             pubblico = pubblicoDelBrand(brand);
             const frasi = (Array.isArray(brand.frasi_pazienti) ? brand.frasi_pazienti : []).filter(Boolean).slice(0, 10);
-            const vantaggi = (brand.vantaggi_competitivi || []).filter(Boolean);
+            // Le promesse del sito non sono «prove» (vedi generate-content).
+            const vantaggi: string[] = prof.id !== "altro"
+              ? senzaClaim(brand.vantaggi_competitivi).tenute
+              : (brand.vantaggi_competitivi || []).filter(Boolean);
+            coseDelBrand = regolaCoseDelBrand(brand.parole_da_evitare);
             brandHint = `
 CONTESTO BRAND
 - Chi pubblica: ${brand.nome_business || prof.label} (${prof.label})
@@ -99,7 +104,7 @@ REGOLE
 - Il lettore è ${lettore}.
 - Mai prove, numeri, casi o studi inventati: solo quelli del contesto brand.${pubblico === "B2C" && prof.id !== "altro" ? "\n- Nessuna idea deve far capire che si può fare a meno del professionista o dello studio." : ""}
 - Mai «sbloccare». Niente «sapevi che», «la verità su», «non sottovalutare», «X cose che non sai».
-
+${prof.id !== "altro" ? "\n" + REGOLA_CLAIM + "\n" : ""}${coseDelBrand ? "\n" + coseDelBrand + "\n" : ""}
 FORMAT DISPONIBILI (id: punto di partenza)
 ${FORMATI.map((f) => `- ${f.id}: ${f.partenza}`).join("\n")}
 
