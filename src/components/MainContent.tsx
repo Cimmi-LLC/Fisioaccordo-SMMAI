@@ -19,6 +19,7 @@ import { useContentGeneration } from "@/hooks/useContentGeneration";
 import { useNb2Carousel } from "@/hooks/useNb2Carousel";
 import { useActiveBrand } from "@/hooks/useActiveBrand";
 import { resolveProfession } from "@/lib/brand/profession";
+import { templateVecchio } from "@/lib/brand/layouts";
 import { useNavigate } from 'react-router-dom';
 import { ChevronDown, Lightbulb, Sparkles } from 'lucide-react';
 
@@ -68,6 +69,9 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, onContentSav
   // Professione del brand attivo: idee rapide e placeholder nel suo linguaggio.
   const brandProfession = resolveProfession(activeBrand);
   const genesisLocked = brandRecord?.genesis_status === 'locked';
+  // Template approvato del tipo vecchio (disegnato dal modello): non comanda
+  // più le slide, e la pagina lo dice.
+  const tplVecchio = templateVecchio(brandRecord?.genesis_status, brandRecord?.genome);
   const nb2 = useNb2Carousel(brandRecord?.id ?? null, brandRecord?.genome ?? null);
   const producedFingerprint = useRef('');
 
@@ -178,7 +182,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, onContentSav
   // stile di base: il riquadro propone il template su misura come un di più.
   // Prima era un blocco a tutta pagina e chi saltava l'onboarding restava fuori.
   const goToGenesis = () => brandRecord && navigate(`/onboarding/template?brand=${brandRecord.id}`);
-  const testiTpl = testiTemplate(brandRecord?.genesis_status);
+  const testiTpl = testiTemplate(brandRecord?.genesis_status, { templateVecchio: tplVecchio });
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8" style={{ paddingTop: '44px' }}>
@@ -193,7 +197,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, onContentSav
         </h1>
       </div>
 
-      {brandRecord && !genesisLocked && (
+      {brandRecord && (!genesisLocked || tplVecchio) && (
         <Card className="panel-card mb-6">
           <CardContent style={{ padding: 20 }}>
             <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
@@ -206,13 +210,15 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, onContentSav
                   {testiTpl.testo}
                 </p>
               </div>
-              <button
-                onClick={goToGenesis}
-                className="text-white text-[12px] font-black uppercase px-6 py-3 rounded-xl shrink-0"
-                style={{ backgroundColor: 'var(--rosa)', border: 'none', cursor: 'pointer', letterSpacing: '0.5px' }}
-              >
-                {testiTpl.bottone}
-              </button>
+              {testiTpl.bottone && (
+                <button
+                  onClick={goToGenesis}
+                  className="text-white text-[12px] font-black uppercase px-6 py-3 rounded-xl shrink-0"
+                  style={{ backgroundColor: 'var(--rosa)', border: 'none', cursor: 'pointer', letterSpacing: '0.5px' }}
+                >
+                  {testiTpl.bottone}
+                </button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -334,7 +340,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, onContentSav
                       >
                         Genera le slide
                       </button>
-                      {!genesisLocked && (
+                      {(!genesisLocked || tplVecchio) && (
                         <p className="text-[12px]" style={{ color: 'var(--ink3)' }}>
                           {testiTpl.sottoCarosello}
                         </p>

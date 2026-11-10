@@ -26,4 +26,11 @@ describe('testiTemplate', () => {
       expect(t.sottoCarosello).not.toMatch(/partono appena|non c'è ancora/);
     }
   });
+
+  it('template del tipo vecchio: dice che le slide hanno il testo esatto, senza pulsante verso il wizard', () => {
+    const t = testiTemplate('locked', { templateVecchio: true });
+    expect(t.titolo).toMatch(/parola per parola/);
+    expect(t.testo).toMatch(/stile di base/);
+    expect(t.bottone).toBe('');
+  });
 });
