@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   pubblicoDelBrand, FORMATI, formatoPerId, pianoSlide, regoleMetodo, controlliMeccanici, leggiGiudizio, promptGiudice,
-  CRITERI_GIUDICE,
+  CRITERI_GIUDICE, REGOLA_CLAIM, claimSanitari, coseDelBrandIn, daRivedere, regolaCoseDelBrand, senzaClaim,
 } from '../metodoCopy';
 
 describe('pubblicoDelBrand', () => {
@@ -209,5 +209,136 @@ describe('collaudo dopo l\'unione (07/11)', () => {
   });
   it('il format «errore» non chiede più un nome a tutti i costi', () => {
     expect(formatoPerId('errore')!.parti.join(' ')).toMatch(/solo se ne ha uno vero/);
+  });
+});
+
+describe('cose da non dire: promesse sanitarie (revisione del 09/11)', () => {
+  const cosa = (t: string) => claimSanitari(t).map((c) => c.cosa);
+
+  it('trova le frasi segnalate dal reparto social, con le parole esatte', () => {
+    expect(claimSanitari('risolvendo gli sbandamenti in modo duraturo')).toEqual([{ cosa: 'risultato promesso per sempre', frase: 'duraturo' }]);
+    expect(cosa('Scopri perché sbandi e come risolvere il problema senza farmaci.')).toEqual(['«senza farmaci» o «senza operazione»']);
+    expect(cosa('Non serve rassegnarsi o riempirsi di farmaci inutili.')).toEqual(['«senza farmaci» o «senza operazione»']);
+    expect(cosa('Risoluzione duratura dei problemi')).toEqual(['risultato promesso per sempre']);
+    expect(cosa('Riduzione del numero di sedute per maggiore efficacia')).toEqual(['tempi o numero di sedute promessi']);
+    expect(cosa('ti sentirai subito meglio')).toEqual(['tempi o numero di sedute promessi']);
+    expect(cosa('i tuoi sbandamenti spariranno')).toEqual(['sintomi che spariscono']);
+  });
+
+  it('trova guarigione, garanzie, tempi e addii', () => {
+    expect(cosa('Guarisci dal mal di schiena')).toContain('promessa di guarigione');
+    expect(claimSanitari('Risultati garantiti al 100%').map((c) => c.frase)).toEqual(['garantiti', '100%']);
+    expect(cosa('Risolvi definitivamente la cervicale')).toContain('risultato promesso per sempre');
+    expect(cosa('Torni a correre in 3 sedute')).toContain('tempi o numero di sedute promessi');
+    expect(cosa('Meglio già dalla prima seduta')).toContain('tempi o numero di sedute promessi');
+    expect(cosa('Dì addio al dolore')).toContain('sintomi che spariscono');
+    expect(cosa('Eliminiamo il dolore alla spalla')).toContain('sintomi che spariscono');
+    expect(cosa('Torna a muoverti senza dover ricorrere ai farmaci')).toContain('«senza farmaci» o «senza operazione»');
+    expect(cosa('Schiena nuova senza operazione')).toContain('«senza farmaci» o «senza operazione»');
+  });
+
+  it('le frasi oneste passano: negazioni, spiegazioni, consigli', () => {
+    for (const t of [
+      'Il dolore non sparisce con il riposo.',
+      'Non esiste una cura definitiva uguale per tutti.',
+      'Non garantiamo un risultato: dipende dalla persona.',
+      'I muscoli del collo sono pieni di sensori di posizione.',
+      'Se in 3 giorni non passa, fatti vedere.',
+      'Fallo per 2 minuti ogni mattina.',
+      'La terapia manuale lavora sulla rigidità articolare.',
+      'Si risolve in meno tempo quando si capisce da dove parte.',
+      'Commenta VERTIGINI e ti spieghiamo come funziona la valutazione.',
+    ]) expect(claimSanitari(t), t).toEqual([]);
+  });
+
+  it('«risolvere» resta (regola di Attilio); è promessa solo se rivolto a chi legge', () => {
+    expect(claimSanitari('Risolvi i tuoi dolori cervicali: prenota una visita.')).toEqual([{ cosa: 'risultato promesso a chi legge', frase: 'Risolvi i tuoi' }]);
+    expect(cosa('Risolverai il tuo mal di schiena')).toEqual(['risultato promesso a chi legge']);
+    for (const t of ['Il vero motivo della rigidità mattutina (e come risolverla).', 'Risolvere alla radice', 'Così le vertigini si risolvono.', 'Si risolve in meno tempo.']) {
+      expect(claimSanitari(t), t).toEqual([]);
+    }
+  });
+
+  it('le CTA del kit del brand del test: quella che promette esce, le altre restano', () => {
+    const { tenute, tolte } = senzaClaim([
+      'Risolvi i tuoi dolori cervicali: prenota una visita specialistica.',
+      'Hai vertigini? Scopri il nostro trattamento mirato: contattaci ora.',
+      'Chiamaci per una consulenza personalizzata sulla tua problematica.',
+    ]);
+    expect(tolte).toEqual(['Risolvi i tuoi dolori cervicali: prenota una visita specialistica.']);
+    expect(tenute).toHaveLength(2);
+  });
+
+  it('non segnala due volte la stessa frase', () => {
+    expect(claimSanitari('Senza farmaci. Davvero senza farmaci.')).toHaveLength(1);
+  });
+});
+
+describe('cose da non dire del brand', () => {
+  it('trova parole e frasi, senza badare a maiuscole e spazi doppi', () => {
+    expect(coseDelBrandIn('Il nostro  Metodo Esclusivo funziona', ['metodo esclusivo', 'low cost', 'ok'])).toEqual(['metodo esclusivo']);
+    expect(coseDelBrandIn('testo', null)).toEqual([]);
+  });
+
+  it('il blocco per i prompt elenca le voci, vuoto se non ce ne sono', () => {
+    expect(regolaCoseDelBrand(['tecar', '  ', 'prezzi'])).toMatch(/- tecar\n- prezzi/);
+    expect(regolaCoseDelBrand([])).toBe('');
+    expect(regolaCoseDelBrand(undefined)).toBe('');
+  });
+});
+
+describe('daRivedere e senzaClaim', () => {
+  it('per un profilo sanitario unisce promesse e voci del brand', () => {
+    const a = daRivedere('Dolore sparito in 3 sedute col nostro metodo esclusivo', { sanitario: true, coseDaNonDire: ['metodo esclusivo'] });
+    expect(a).toEqual(['tempi o numero di sedute promessi: «in 3 sedute»', 'il brand non lo dice: «metodo esclusivo»']);
+  });
+
+  it('per chi non è sanitario (GestioMed) valgono solo le voci del brand', () => {
+    expect(daRivedere('Agenda piena per sempre', { sanitario: false, coseDaNonDire: [] })).toEqual([]);
+  });
+
+  it('i vantaggi del brand del test: i due claim escono, i fatti restano', () => {
+    const { tenute, tolte } = senzaClaim([
+      'Specializzazione esclusiva in cervicale e vertigini',
+      'Aggiornamento continuo e formazione specifica',
+      'Approccio terapeutico multidisciplinare e mirato',
+      'Riduzione del numero di sedute per maggiore efficacia',
+      'Risoluzione duratura dei problemi',
+      'Elevato numero di recensioni positive',
+    ]);
+    expect(tolte).toEqual(['Riduzione del numero di sedute per maggiore efficacia', 'Risoluzione duratura dei problemi']);
+    expect(tenute).toHaveLength(4);
+    expect(senzaClaim(null)).toEqual({ tenute: [], tolte: [] });
+  });
+});
+
+describe('claim nei controlli e nei prompt', () => {
+  const carosello = {
+    slides: [
+      { tipo: 'cover', hook: 'Soffri di vertigini?', sottotitolo: 'Scopri come risolvere il problema senza farmaci.' },
+      { tipo: 'cta', titolo: 'Torna a muoverti', testo_cta: 'Prenota una valutazione.', bottone_cta: 'Commenta VERTIGINI' },
+    ],
+    caption_instagram: 'Lavoriamo sulla radice del problema, risolvendo gli sbandamenti in modo duraturo.',
+  };
+
+  it('per un profilo sanitario le promesse diventano problemi da riscrivere', () => {
+    const p = controlliMeccanici(carosello, '', [], true);
+    expect(p.filter((x) => x.startsWith('promessa che un profilo sanitario non pubblica'))).toHaveLength(2);
+    expect(p.join(' ')).toMatch(/«senza farmaci»/);
+    expect(p.join(' ')).toMatch(/«duraturo»/);
+  });
+
+  it('senza il flag sanitario il controllo non parte (GestioMed, agenzie)', () => {
+    expect(controlliMeccanici(carosello, '', [], false).join(' ')).not.toMatch(/profilo sanitario/);
+    expect(controlliMeccanici(carosello, '').join(' ')).not.toMatch(/profilo sanitario/);
+  });
+
+  it('la regola entra nel prompt e nel giudice solo per i profili sanitari', () => {
+    const sanitario = { pubblico: 'B2C' as const, lettori: 'i pazienti', sanitario: true };
+    const altro = { pubblico: 'B2B' as const, lettori: 'gli studi', sanitario: false };
+    expect(regoleMetodo(sanitario)).toContain(REGOLA_CLAIM);
+    expect(regoleMetodo(altro)).not.toContain('COSE DA NON DIRE');
+    expect(promptGiudice({}, sanitario, 'vertigini')).toMatch(/«senza farmaci»/);
+    expect(promptGiudice({}, altro, 'agenda')).not.toMatch(/«senza farmaci»/);
   });
 });

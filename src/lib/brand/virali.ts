@@ -578,6 +578,12 @@ export type Copione = {
   durata_stimata_s: number | null;
   semplice: boolean;
   cosa_serve: string[];
+  /**
+   * Frasi da controllare prima di registrare: promesse sanitarie rimaste nel
+   * copione (spesso sono nel format dell'originale) e cose che il brand non
+   * dice. Le aggiunge duplica-video dopo la stesura.
+   */
+  da_rivedere?: string[];
 };
 
 /** Parole che non si usano mai nei contenuti FisioAccordo (preferenze di Attilio). */

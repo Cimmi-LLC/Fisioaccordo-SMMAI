@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { REGOLA_CLAIM, daRivedere, regolaCoseDelBrand } from "@/lib/brand/metodoCopy";
 import { creaCercaFoto, fraseSenzaFoto, messaggioErroreStorie, rispostaNonLeggibile } from "@/lib/storie";
 import { useStoryTemplates } from "@/hooks/useStoryTemplates";
 import { useStoryBatches } from "@/hooks/useStoryBatches";
@@ -821,6 +822,13 @@ async function renderReviewJpeg(reviews_input, client, colorOverrides={}){
 }
 
 
+// Cose da non dire nelle storie: promesse sanitarie (lista di base, per tutti
+// i profili sanitari) e voci del brand. La regola va nel prompt; quello che
+// passa lo stesso viene segnato sulla storia, per chi pubblica.
+const eSanitario=client=>client?.sanitario!==false;
+const regoleCoseDaNonDire=client=>(eSanitario(client)?"\n\n"+REGOLA_CLAIM:"")+(regolaCoseDelBrand(client?.coseDaNonDire)?"\n\n"+regolaCoseDelBrand(client?.coseDaNonDire):"");
+const segnaStoria=(story,client)=>({...story,da_rivedere:daRivedere([story?.headline,story?.text].filter(Boolean).join("\n"),{sanitario:eSanitario(client),coseDaNonDire:client?.coseDaNonDire})});
+
 async function generateStories(client,qty,activeTypes){
   const allowedIds = new Set(activeTypes);
   const allowedTypes = activeTypes.map(id=>STORY_TYPES.find(s=>s.id===id)).filter(Boolean);
@@ -872,7 +880,7 @@ FORMATO SOLO array JSON puro (no backtick, no markdown):
 [{"type":"id","cardType":"normal","typeLabel":"Nome","emoji":"e","headline":"h","text":"t","photoQuery":"2-3 parole semplici inglesi oppure null"}]
 
 Il campo "type" DEVE essere uno tra: ${activeTypes.join(", ")}
-NO CTA commerciali. NO prezzi. NO numeri di telefono.`;
+NO CTA commerciali. NO prezzi. NO numeri di telefono.${regoleCoseDaNonDire(client)}`;
 
   content.push({type:"text",text:prompt});
   const raw=await callAI([{role:"user",content}]);
@@ -889,7 +897,7 @@ NO CTA commerciali. NO prezzi. NO numeri di telefono.`;
     return allowedIds.has(t);
   });
 
-  return filtered.length > 0 ? filtered : all;
+  return (filtered.length > 0 ? filtered : all).map(story=>segnaStoria(story,client));
 }
 
 const Lbl=({c})=><div style={{fontSize:10,color:'var(--ink2)',fontFamily:'Montserrat,sans-serif',textTransform:"uppercase",letterSpacing:"0.8px",marginBottom:6,fontWeight:800}}>{c}</div>;
@@ -1059,6 +1067,9 @@ function StoryItem({story,client,onRegen,idx,onZoom,withPhotos,onFoto}){
     <div style={{padding:"9px 11px",display:"flex",flexDirection:"column",gap:4}}>
       <div style={{fontSize:10,color:ACC,fontWeight:700,fontFamily:"monospace"}}>{story.emoji} {story.typeLabel}</div>
       <div style={{fontSize:11,color:T,lineHeight:1.4,fontWeight:600}}>{(story.headline||"").slice(0,50)}{(story.headline||"").length>50?"...":""}</div>
+      {story.da_rivedere&&story.da_rivedere.length>0&&<div style={{fontSize:10,color:"#b45309",lineHeight:1.35,fontWeight:600}} title="Promesse che un profilo sanitario non pubblica, o cose che il tuo brand non dice">
+        Da rivedere prima di pubblicare: {story.da_rivedere.join(" · ")}
+      </div>}
       {senzaFoto&&!rend&&<div style={{fontSize:10,color:"#b45309",lineHeight:1.35,fontWeight:600}}>
         {senzaFoto}: la storia è uscita solo con il testo.{" "}
         <button onClick={()=>render(true)} style={{background:"none",border:"none",padding:0,color:"#554697",fontWeight:800,fontSize:10,cursor:"pointer",textDecoration:"underline"}}>Riprova la foto</button>
@@ -1201,8 +1212,9 @@ export default function StoriesApp({ client: clientProp }){
   const regenOne=async idx=>{
     const s=stories[idx];
     try{
-      const raw=await callAI([{role:"user",content:'Una storia "'+s.typeLabel+'" per '+genClient.name+'. SOLO JSON:\n{"type":"'+s.type+'","cardType":"'+(s.cardType||"normal")+'","typeLabel":"'+s.typeLabel+'","emoji":"...","headline":"...","text":"...","photoQuery":"..."}'}],500);
-      setStories(p=>p.map((x,i)=>i===idx?JSON.parse(raw.split("```json").join("").split("```").join("").trim()):x));
+      const raw=await callAI([{role:"user",content:'Una storia "'+s.typeLabel+'" per '+genClient.name+'. SOLO JSON:\n{"type":"'+s.type+'","cardType":"'+(s.cardType||"normal")+'","typeLabel":"'+s.typeLabel+'","emoji":"...","headline":"...","text":"...","photoQuery":"..."}'+regoleCoseDaNonDire(genClient)}],500);
+      const nuova=segnaStoria(JSON.parse(raw.split("```json").join("").split("```").join("").trim()),genClient);
+      setStories(p=>p.map((x,i)=>i===idx?nuova:x));
     }catch(e){console.error(e);}
   };
   const handleSchedule=async()=>{

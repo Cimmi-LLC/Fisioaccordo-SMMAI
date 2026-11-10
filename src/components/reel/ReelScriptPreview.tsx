@@ -1,4 +1,5 @@
 import React from 'react';
+import DaRivedere from '@/components/DaRivedere';
 import { Card, CardContent } from '@/components/ui/card';
 import { Copy, RefreshCw, Loader2, Hash, Clock, Film } from 'lucide-react';
 import type { ReelScript } from '@/types/reel';
@@ -65,6 +66,8 @@ const ReelScriptPreview: React.FC<ReelScriptPreviewProps> = ({
           </div>
         </CardContent>
       </Card>
+
+      <DaRivedere voci={script.da_rivedere} quando="registrare" />
 
       {/* Sezioni dello script */}
       {script.sezioni.map((sezione, i) => {

@@ -224,7 +224,7 @@ Nella prima frase della copertina il lettore deve capire che parla di lui: il ta
 - Numeri, percentuali, casi, studi, prezzi, durate: SOLO se sono nel brand kit o nel topic. Mai inventarli, nemmeno «tondi».
 - Le prove si buttano lì di lato («quando lo facciamo in studio…»), non si sbandierano.
 - Le opinioni si dichiarano come opinioni.
-- Mai promettere guarigioni o risultati garantiti.
+- Mai promettere guarigioni o risultati garantiti.${c.sanitario ? '\n\n' + REGOLA_CLAIM : ''}
 
 === CTA ===
 - UNA sola, nativa: un'estensione del valore appena dato, mai incollata.
@@ -281,6 +281,113 @@ ${piano.map((p, i) => `${i + 1}. ${p}`).join('\n')}
 CTA adatta: ${f.cta}.`;
 }
 
+// ── Cose da non dire: promesse che un profilo sanitario non pubblica ──
+//
+// Revisione del reparto social, 09/11/2026: il generatore legge meglio il sito
+// e ne porta le promesse nei contenuti («risoluzione duratura», «senza
+// farmaci», «i tuoi sbandamenti spariranno»). Qui c'è la lista di base, uguale
+// per tutti i profili sanitari; il brand aggiunge le sue nel Brand Kit («Cose
+// da non dire», campo parole_da_evitare).
+//
+// «Risolvere» come verbo resta: è la parola che la regola di Attilio indica al
+// posto di «sbloccare» («si risolve in meno tempo»). È una promessa solo
+// quando è rivolta a chi legge («Risolvi i tuoi dolori cervicali», la CTA
+// segnalata dal reparto) o con «definitivamente», «per sempre», «duraturo».
+
+/** [regola, cosa promette]. Niente lookbehind: questo file gira anche nel browser. */
+const CLAIM_SANITARI: [RegExp, string][] = [
+  [/\bguar(?:ir|isc|igion)[\p{L}]*|\bguarit[oaie]\b|\bmiracol[\p{L}]*/giu, 'promessa di guarigione'],
+  [/\bgarant[\p{L}]+|\bgaranzi[\p{L}]+|\b100\s?%/giu, 'risultato garantito'],
+  [/\bdefinitiv[\p{L}]+|\bper sempre\b|\buna volta per tutte\b|\bduratur[\p{L}]+|\bpermanent[\p{L}]+/giu, 'risultato promesso per sempre'],
+  [/\bsenza\s+(?:più\s+|piu\s+|dover\s+|ricorrere\s+a(?:i|lla|gli)?\s+|bisogno\s+di\s+|prendere\s+|assumere\s+|l'uso\s+di\s+){0,2}(?:i\s+|gli\s+|le\s+)?(?:farmac|medicin|antidolorific|antinfiammator|pastigli|operazion|chirurgi|bisturi|infiltrazion)[\p{L}]*|\bfarmaci\s+inutili\b/giu, '«senza farmaci» o «senza operazione»'],
+  [/\b(?:spar(?:ir|isc)|scompar|svan(?:ir|isc))[\p{L}]*|\bd[iì]'?\s+addio\b|\bdire\s+addio\b|\belimin[\p{L}]+\s+(?:definitivamente\s+)?(?:(?:il|i|la|le|lo|gli|ogni|tuo|tuoi|tua|tue)\s+|l'){1,2}(?:dolor|mal\b|sintom|vertigin|fastidi|sbandament|tension|infiammazion|problem)[\p{L}]*/giu, 'sintomi che spariscono'],
+  [/\brisolv(?:i|erai)\s+(?:subito\s+|finalmente\s+)?(?:(?:il|i|la|le|lo|gli)\s+)?(?:tuo|tuoi|tua|tue)\b/giu, 'risultato promesso a chi legge'],
+  [/\bin\s+(?:sol[ie]\s+|appena\s+|meno\s+di\s+)?(?:\d+|una?|due|tre|quattro|cinque|sei|poch[ei])\s+(?:sedut[ae]|trattament[oi]|incontr[oi])\b|\b(?:già\s+|fin\s+)?dalla\s+prima\s+seduta\b|\bsubito\s+meglio\b|\bsollievo\s+immediato\b|\brisultat[oi]\s+immediat[oi]\b|\b(?:riduzione\s+del\s+numero\s+di|ridurre\s+il\s+numero\s+di|meno)\s+sedute\b/giu, 'tempi o numero di sedute promessi'],
+];
+
+/** Una negazione poco prima («non», «nessun», «mai») rende la frase onesta: «il dolore non sparisce da solo». */
+const NEGATO = /(?:^|[^\p{L}])(?:non|nessun[oa]?|mai|né)(?:[^\p{L}.!?\n][^.!?\n]{0,24})?$/iu;
+
+export type Claim = { cosa: string; frase: string };
+
+/** Promesse sanitarie trovate in un testo, con le parole esatte. */
+export function claimSanitari(testo: string): Claim[] {
+  const t = String(testo || '');
+  const trovati: Claim[] = [];
+  const visti = new Set<string>();
+  for (const [re, cosa] of CLAIM_SANITARI) {
+    for (const m of t.matchAll(re)) {
+      const prima = t.slice(Math.max(0, (m.index ?? 0) - 40), m.index ?? 0);
+      if (NEGATO.test(prima)) continue;
+      const frase = m[0].replace(/\s+/g, ' ').trim();
+      const chiave = cosa + '|' + frase.toLocaleLowerCase('it');
+      if (visti.has(chiave)) continue;
+      visti.add(chiave);
+      trovati.push({ cosa, frase });
+    }
+  }
+  return trovati;
+}
+
+/** Le voci del brand («Cose da non dire») che compaiono nel testo. */
+export function coseDelBrandIn(testo: string, coseDaNonDire: unknown): string[] {
+  const basso = String(testo || '').toLocaleLowerCase('it').replace(/\s+/g, ' ');
+  const lista = Array.isArray(coseDaNonDire) ? coseDaNonDire : [];
+  const trovate: string[] = [];
+  for (const p of lista) {
+    const w = String(p || '').trim();
+    if (w.length > 2 && basso.includes(w.toLocaleLowerCase('it').replace(/\s+/g, ' '))) trovate.push(w);
+  }
+  return [...new Set(trovate)];
+}
+
+/**
+ * Avvisi per chi pubblica o registra: promesse sanitarie (solo per i profili
+ * sanitari) e cose che il brand non dice. Frasi pronte da mostrare.
+ */
+export function daRivedere(testo: string, opz: { sanitario: boolean; coseDaNonDire?: unknown }): string[] {
+  const avvisi = opz.sanitario ? claimSanitari(testo).map((c) => `${c.cosa}: «${c.frase}»`) : [];
+  for (const w of coseDelBrandIn(testo, opz.coseDaNonDire)) avvisi.push(`il brand non lo dice: «${w}»`);
+  return avvisi;
+}
+
+/**
+ * Toglie da una lista del Brand Kit (vantaggi, CTA) le voci che sono promesse:
+ * prese dal sito, non devono arrivare al modello come «prove» o «azioni
+ * approvate».
+ */
+export function senzaClaim(voci: unknown): { tenute: string[]; tolte: string[] } {
+  const tenute: string[] = [];
+  const tolte: string[] = [];
+  for (const v of Array.isArray(voci) ? voci : []) {
+    const t = String(v || '').trim();
+    if (!t) continue;
+    (claimSanitari(t).length > 0 ? tolte : tenute).push(t);
+  }
+  return { tenute, tolte };
+}
+
+/** Regola per i prompt di ogni generatore (post, storie, reel, copioni, idee). */
+export const REGOLA_CLAIM = `=== COSE DA NON DIRE (profilo sanitario: vale sempre) ===
+- Mai promettere il risultato: niente guarigione, niente «garantito», «definitivo», «per sempre», «duraturo», «100%».
+- Mai «senza farmaci» o «senza operazione», mai «farmaci inutili».
+- Mai dire che dolori o sintomi spariranno o si eliminano, mai «subito meglio» o «sollievo immediato», mai «Risolvi i tuoi dolori» rivolto a chi legge.
+- Mai tempi o numero di sedute promessi («in 3 sedute», «dalla prima seduta», «meno sedute»).
+- Si dice cosa fai, per chi e come lavori. Dei risultati si parla come possibilità che dipende dalla persona, mai come promessa.
+- Se una promessa così è scritta nel sito o nei dati del brand, NON riportarla: descrivi il servizio senza la promessa.`;
+
+/** Blocco per i prompt con le voci scritte dal brand; vuoto se non ne ha. */
+export function regolaCoseDelBrand(coseDaNonDire: unknown): string {
+  const voci = (Array.isArray(coseDaNonDire) ? coseDaNonDire : []).map((v) => String(v || '').trim()).filter((v) => v.length > 2);
+  if (voci.length === 0) return '';
+  return `=== COSE CHE QUESTO BRAND NON DICE MAI (parole, frasi, promesse) ===\n${voci.map((v) => `- ${v}`).join('\n')}`;
+}
+
+/** Frase per chi riscrive: cosa togliere e come dirlo. */
+function problemaClaim(c: Claim): string {
+  return `promessa che un profilo sanitario non pubblica (${c.cosa}): «${c.frase}». Toglila: di' cosa fai, per chi e come, senza promettere il risultato`;
+}
+
 // ── Controlli meccanici sul testo uscito ──
 
 const FRASI_VIETATE: [RegExp, string][] = [
@@ -334,10 +441,11 @@ function testiDi(c: TestoCarosello): string[] {
  * promessi e nomi di meccanismi che non stanno né nel brand kit né nel
  * topic (cioè inventati).
  */
-export function controlliMeccanici(c: TestoCarosello, fonti: string, vietateDelBrand: string[] = []): string[] {
+export function controlliMeccanici(c: TestoCarosello, fonti: string, vietateDelBrand: string[] = [], sanitario = false): string[] {
   const problemi: string[] = [];
   const tutto = testiDi(c).join('\n');
   for (const [re, msg] of FRASI_VIETATE) if (re.test(tutto)) problemi.push(msg);
+  if (sanitario) for (const claim of claimSanitari(tutto)) problemi.push(problemaClaim(claim));
   for (const p of vietateDelBrand) {
     const w = String(p || '').trim();
     if (w.length > 2 && tutto.toLocaleLowerCase('it').includes(w.toLocaleLowerCase('it'))) problemi.push(`parola bandita dal brand: «${w}»`);
@@ -389,7 +497,7 @@ Una funzione, un servizio, un risultato garantito («nessuna ora persa», «agen
 ` : ''}
 Sii severo: 5 vuol dire che non cambieresti una parola. Dai un voto da 1 a 5 a ogni criterio (3 = mediocre, 1 = da buttare):
 ${CRITERI_GIUDICE.map(([k, d]) => `- ${k}: ${d}`).join('\n')}
-${c.sanitario && c.pubblico === 'B2C' ? '- Se il testo fa capire che si può fare a meno del professionista o dello studio, «fedele» vale 1.\n' : ''}
+${c.sanitario && c.pubblico === 'B2C' ? '- Se il testo fa capire che si può fare a meno del professionista o dello studio, «fedele» vale 1.\n' : ''}${c.sanitario ? '- Promesse di guarigione, risultati garantiti, definitivi o duraturi, «senza farmaci», sintomi che spariscono, tempi o numero di sedute promessi: «fedele» vale al massimo 2, anche se la promessa viene dai dati del brand.\n' : ''}
 Per ogni voto sotto 4 scrivi in «problemi» cosa cambiare, in concreto (quale slide, quale frase, come).
 
 CAROSELLO

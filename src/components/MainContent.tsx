@@ -10,6 +10,7 @@ import ContentForm from "./ContentForm";
 import Nb2CarouselPreview from "./carousel/Nb2CarouselPreview";
 import ProducedCarouselsList from "./carousel/ProducedCarouselsList";
 import CarouselCopyView from "./carousel/CarouselCopyView";
+import DaRivedere from "./DaRivedere";
 import { caroselloDaRisposta } from "@/lib/carouselText";
 import { testiTemplate } from "@/lib/templateStato";
 import type { CarouselData } from "@/types/carousel";
@@ -304,6 +305,7 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, onContentSav
               })}
             </div>
           )}
+          <DaRivedere voci={carouselDataList[activeVariant]?.da_rivedere} className="mb-4" />
           {carouselDataList[activeVariant] && (nb2.slides.length > 0 || nb2.producing) && (
             <Nb2CarouselPreview
               key={activeVariant}

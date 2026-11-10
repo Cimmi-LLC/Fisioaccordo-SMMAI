@@ -654,8 +654,12 @@ const BrandPage = () => {
               <TagInput tags={brand.cta_suggerite} onChange={v => update('cta_suggerite', v)} placeholder="Aggiungi CTA" />
             </EditableField>
 
-            <EditableField label="Parole da evitare">
-              <TagInput tags={brand.parole_da_evitare} onChange={v => update('parole_da_evitare', v)} placeholder="Aggiungi parola" />
+            <EditableField label="Cose da non dire">
+              <p className="text-[11px] mb-2" style={{ color: 'var(--ink3)' }}>
+                Parole, frasi o promesse che non devono comparire in post, storie, script e copioni (es. «low cost», «metodo esclusivo»).
+                Le promesse sanitarie sono già escluse per tutti: guarigione, risultati garantiti o duraturi, «senza farmaci», sintomi che spariscono, tempi o numero di sedute promessi.
+              </p>
+              <TagInput tags={brand.parole_da_evitare} onChange={v => update('parole_da_evitare', v)} placeholder="Aggiungi parola o frase" />
             </EditableField>
           </div>
 

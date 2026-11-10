@@ -14,6 +14,7 @@ import { adminClient, assertBrandOwnership, requireAuth, requireWithinRateLimit 
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { callGeminiWithRetry } from "../_shared/gemini.ts";
 import { professionPromptBlock, resolveProfession, type ProfessionBrandLike } from "../_shared/brand/profession.ts";
+import { REGOLA_CLAIM, daRivedere } from "../_shared/brand/metodoCopy.ts";
 import {
   SISTEMA_ANALISI,
   SISTEMA_COPIONE,
@@ -250,11 +251,13 @@ async function linkFresco(o: Origine): Promise<string | null> {
 // ── Copione ─────────────────────────────────────────────────────────────
 
 async function scriviCopione(gemini: string, analisi: AnalisiVideo, tipo: TipoCopia, brand: BrandPerCopione & Grezzo, o: Origine, argomento = "") {
+  const prof = resolveProfession(brand as ProfessionBrandLike);
+  const sanitario = prof.id !== "altro";
   const prompt = promptCopione({
     analisi,
     tipo,
     brand,
-    bloccoProfessione: professionPromptBlock(resolveProfession(brand as ProfessionBrandLike)),
+    bloccoProfessione: professionPromptBlock(prof) + (sanitario ? "\n\n" + REGOLA_CLAIM : ""),
     origine: { piattaforma: o.piattaforma === "inserzione" ? "inserzione Meta" : o.piattaforma, handle: o.handle, paese: o.paese, views: o.views },
     argomento,
   });
@@ -278,5 +281,8 @@ async function scriviCopione(gemini: string, analisi: AnalisiVideo, tipo: TipoCo
     // Una sola correzione: stesso copione senza le parole vietate.
     copione = await chiedi(`${prompt}\n\nHai già scritto questo copione:\n${JSON.stringify(copione)}\n\nRiscrivilo uguale togliendo queste parole, che non si usano mai: ${vietate.join(", ")}.`);
   }
-  return copione;
+  // Le promesse rimaste (spesso sono la leva del format originale: «ti
+  // sentirai subito meglio») non si riscrivono: si segnalano a chi registra.
+  const avvisi = daRivedere(testoDelCopione(copione), { sanitario, coseDaNonDire: brand.parole_da_evitare || [] });
+  return avvisi.length ? { ...copione, da_rivedere: avvisi } : copione;
 }

@@ -4,6 +4,7 @@ import { logGeneration } from "../_shared/historyLogger.ts";
 import { requireWithinRateLimit } from "../_shared/auth.ts";
 import { callGeminiWithRetry } from "../_shared/gemini.ts";
 import { resolveProfession, professionPromptBlock, type ResolvedProfession } from "../_shared/brand/profession.ts";
+import { REGOLA_CLAIM, daRivedere, regolaCoseDelBrand, senzaClaim } from "../_shared/brand/metodoCopy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -29,6 +30,7 @@ serve(async (req) => {
     // Load brand kit
     let brandContext = "";
     let brandCta = "Prenota ora";
+    let coseDaNonDire: string[] = [];
     let prof: ResolvedProfession = resolveProfession(null, topic);
     let resolvedUserId: string | null = null;
     let resolvedBrandId: string | null = null;
@@ -61,7 +63,12 @@ serve(async (req) => {
             resolvedBrandId = brand.id;
             prof = resolveProfession(brand, topic);
             const isPlural = brand.persona_scrittura === "noi";
-            brandCta = (brand.cta_suggerite || [])[0] || "Prenota ora";
+            // La CTA del kit viene dal sito e può essere una promessa («Risolvi
+            // definitivamente…»): per un profilo sanitario si usa la prima che
+            // non lo è (revisione del reparto social, 09/11/2026).
+            const ctaDelKit = (brand.cta_suggerite || []).filter(Boolean);
+            brandCta = (prof.id !== "altro" ? senzaClaim(ctaDelKit).tenute : ctaDelKit)[0] || "Prenota una valutazione";
+            coseDaNonDire = (brand.parole_da_evitare || []).filter(Boolean);
             const frasiPazienti = (Array.isArray(brand.frasi_pazienti) ? brand.frasi_pazienti : []).filter(Boolean);
             const convinzione = typeof brand.convinzione_da_ribaltare === "string" ? brand.convinzione_da_ribaltare.trim() : "";
             brandContext = `
@@ -101,7 +108,7 @@ CONTENUTO:
 ${brandContext}
 
 ${professionPromptBlock(prof)}
-
+${prof.id !== "altro" ? "\n" + REGOLA_CLAIM + "\n" : ""}${regolaCoseDelBrand(coseDaNonDire) ? "\n" + regolaCoseDelBrand(coseDaNonDire) + "\n" : ""}
 Rispondi SOLO con JSON valido.`;
 
     const userPrompt = `TEMA DEL REEL: "${topic.trim()}"
@@ -190,6 +197,41 @@ Rispondi con questo JSON:
     } catch {
       throw new Error("Failed to parse AI response");
     }
+
+    // Cose da non dire: promesse sanitarie e voci del brand. Se lo script ne
+    // contiene, una sola riscrittura; quello che resta lo vede chi registra.
+    const testoScript = (p: any) => [
+      ...(Array.isArray(p?.sezioni) ? p.sezioni : []).map((x: any) => x?.testo),
+      p?.script_completo, p?.caption_instagram, p?.titolo_reel,
+    ].filter((x) => typeof x === "string").join("\n");
+    const controlla = (p: any) => daRivedere(testoScript(p), { sanitario: prof.id !== "altro", coseDaNonDire });
+    let avvisi = controlla(parsed);
+    if (avvisi.length > 0) {
+      const riscrittura = await callGeminiWithRetry({
+        apiKey: GEMINI_API_KEY,
+        maxRetries: 2,
+        body: {
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ role: "user", parts: [{ text: `${userPrompt}
+
+Hai già scritto questo script:
+${JSON.stringify(parsed)}
+
+Riscrivilo uguale, stesso JSON, togliendo queste cose che non si possono dire. Al posto di una promessa di' cosa fai, per chi e come, senza promettere il risultato:
+${avvisi.map((a) => `- ${a}`).join("\n")}` }] }],
+          generationConfig: { temperature: 0.6, responseMimeType: "application/json" },
+        },
+      });
+      try {
+        const testo = riscrittura.ok ? riscrittura.data.candidates?.[0]?.content?.parts?.[0]?.text : null;
+        const secondo = testo ? JSON.parse(testo.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()) : null;
+        if (secondo && Array.isArray(secondo.sezioni) && secondo.sezioni.length > 0) {
+          parsed = secondo;
+          avvisi = controlla(parsed);
+        }
+      } catch { /* resta la prima versione, con gli avvisi */ }
+    }
+    parsed.da_rivedere = avvisi;
 
     if (resolvedUserId) {
       await logGeneration({

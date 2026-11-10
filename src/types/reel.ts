@@ -12,6 +12,8 @@ export interface ReelScript {
   script_completo: string;
   caption_instagram: string;
   hashtag_suggeriti: string[];
+  /** Promesse sanitarie o cose che il brand non dice, rimaste nello script dopo la riscrittura. */
+  da_rivedere?: string[];
 }
 
 export const SECTION_COLORS: Record<string, string> = {

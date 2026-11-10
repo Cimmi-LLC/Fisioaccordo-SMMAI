@@ -28,6 +28,8 @@ export interface CarouselData {
   cta_finale: string;
   caption_instagram: string;
   hashtag_suggeriti: string[];
+  /** Promesse sanitarie o cose che il brand non dice, rimaste nel testo dopo la riscrittura. */
+  da_rivedere?: string[];
 }
 
 export interface SlideRenderConfig {
