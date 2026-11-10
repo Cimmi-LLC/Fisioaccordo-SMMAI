@@ -270,18 +270,47 @@ serve(async (req) => {
     const runUsedIds = new Set<number>(excludeSet);
     const results: ImageResult[] = [];
 
-    // Generazione AI in parallelo prima del loop: una slide fallita cade
-    // sullo stock senza bloccare le altre.
+    // Testo, parole chiave e parte del corpo di una slide: servono sia alla
+    // scelta della foto del brand sia alla ricerca stock.
+    const contestoSlide = (slide: any) => {
+      const keywords: string[] = slide.keywords_stock || [];
+      const slideText = [
+        slide.titolo, slide.testo, slide.hook, slide.sottotitolo,
+        ...keywords,
+      ].filter(Boolean).join(" ");
+      return { keywords, slideText, slideContext: extractContextWords(slideText) };
+    };
+
+    // 1) Foto del brand, scelte PRIMA di generare. Fino al 09/11/2026 si
+    // generava un'immagine AI per ogni slide e solo dopo si guardava il pool:
+    // con «usa prima le mie foto» accesa l'immagine veniva buttata ogni volta
+    // (101 in un pomeriggio, 20-120 secondi e circa 0,04 $ l'una).
+    const brandPick = new Map<number, string>();
+    if (brandPool.length > 0) {
+      for (const { slide, originalIndex } of slidesToProcess) {
+        const { keywords, slideContext } = contestoSlide(slide);
+        const foto = pickFromBrandPool([...keywords, ...slideContext], brandPool, usedBrandUrls, fotoMieSempre);
+        if (foto) {
+          usedBrandUrls.add(foto);
+          brandPick.set(originalIndex, foto);
+        }
+      }
+    }
+    const daGenerare = slidesToProcess.filter(({ originalIndex }: any) => !brandPick.has(originalIndex));
+
+    // Generazione AI in parallelo prima del loop, solo per le slide rimaste
+    // senza foto del brand: una slide fallita cade sullo stock senza bloccare
+    // le altre.
     const aiMap = new Map<number, { bucket: string; path: string }>();
-    if (aiEnabled) {
+    if (aiEnabled && daGenerare.length > 0) {
       const aiErrors: AiErrorLog = [];
       console.log(
         "AI decisione: modelli=" + aiModels.join(",") +
         " | gemini=" + (GEMINI_IMG_KEY ? "presente" : "MANCANTE") +
         " | openai=" + (OPENAI_IMG_KEY ? "presente" : "assente") +
-        " | brandId=" + String(brandId) + " | slides=" + slidesToProcess.length,
+        " | brandId=" + String(brandId) + " | slides=" + daGenerare.length + " (foto del brand: " + brandPick.size + ")",
       );
-      await Promise.allSettled(slidesToProcess.map(async ({ slide, originalIndex }: any) => {
+      await Promise.allSettled(daGenerare.map(async ({ slide, originalIndex }: any) => {
         try {
           const prompt = buildAiPrompt(slide, slide?.tipo === "cover", aiStyle, prof.profile);
           const generated = await generateAiImage(prompt, GEMINI_IMG_KEY, aiAspect, aiModels, OPENAI_IMG_KEY, aiErrors);
@@ -296,25 +325,19 @@ serve(async (req) => {
           console.log("AI eccezione slide " + originalIndex + ": " + String(e));
         }
       }));
-      console.log("Immagini AI generate: " + aiMap.size + " su " + slidesToProcess.length);
+      console.log("Immagini AI generate: " + aiMap.size + " su " + daGenerare.length);
       console.log("AI dettaglio tentativi: " + aiErrors.slice(-8).join("  ///  "));
     }
 
     for (const { slide, originalIndex } of slidesToProcess) {
-      const keywords: string[] = slide.keywords_stock || [];
-      const slideText = [
-        slide.titolo, slide.testo, slide.hook, slide.sottotitolo,
-        ...keywords,
-      ].filter(Boolean).join(" ");
-      const slideContext = extractContextWords(slideText);
+      const { keywords, slideText, slideContext } = contestoSlide(slide);
       const bodyPart = detectBodyPart(slideText);
       const isCover = slide.tipo === "cover";
 
-      // 1) Brand pool first
-      if (brandPool.length > 0) {
-        const brandPhoto = pickFromBrandPool([...keywords, ...slideContext], brandPool, usedBrandUrls, fotoMieSempre);
+      // 1) Foto del brand (scelta sopra, prima della generazione)
+      {
+        const brandPhoto = brandPick.get(originalIndex);
         if (brandPhoto) {
-          usedBrandUrls.add(brandPhoto);
           results.push({
             index: originalIndex,
             url: brandPhoto,
