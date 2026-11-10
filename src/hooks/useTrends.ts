@@ -95,7 +95,7 @@ export const useTrends = () => {
     } finally {
       setSearching(false);
     }
-  }, [user, toast, fetchTrends]);
+  }, [user, toast, trends]);
 
   /**
    * Toglie un trend dalla lista e dal database. I trend appena trovati hanno

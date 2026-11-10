@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/errors';
+import { chiudiPendenti } from '@/lib/brand/carouselSlides';
 import { signedUrls, signedUrl } from '@/lib/storage';
 import type { CarouselData, CarouselSlideData } from '@/types/carousel';
 import type { SlideFormat } from '@/lib/brand/genome.ts';
@@ -89,6 +90,8 @@ export function useNb2Carousel(brandId: string | null, genome: unknown) {
   const lastProgress = useRef(Date.now());
   const lastDoneCount = useRef(-1);
   const [stallo, setStallo] = useState(false);
+  // Riga per cui ho già detto che mancano delle slide (un avviso solo).
+  const avvisatoMancanti = useRef<string | null>(null);
 
   const meta = genome as GenomeWithMeta | null;
   const colors = {
@@ -113,7 +116,7 @@ export function useNb2Carousel(brandId: string | null, genome: unknown) {
       } catch { /* le slide senza URL restano in caricamento, il prossimo giro riprova */ }
     }
 
-    setSlides(rows.map((s) => ({
+    const viste: Nb2Slide[] = rows.map((s) => ({
       index: s.index,
       role: s.role,
       title: s.title,
@@ -123,7 +126,21 @@ export function useNb2Carousel(brandId: string | null, genome: unknown) {
       path: s.path,
       imageUrl: s.path ? (urlCache.current.get(s.path) || null) : null,
       error: s.error ?? null,
-    })));
+    }));
+    // Riga chiusa: una slide senza immagine e senza errore non arriverà più
+    // (caroselli «ready» con slide perse, fino al 09/11/2026). Niente
+    // rotellina: «Riprova» su quella slide.
+    const chiusa = row.status !== 'producing';
+    const { slides: mostrate, quante: mancanti } = chiusa ? chiudiPendenti(viste) : { slides: viste, quante: 0 };
+    setSlides(mostrate);
+    if (mancanti > 0 && avvisatoMancanti.current !== row.id) {
+      avvisatoMancanti.current = row.id;
+      toast({
+        title: mancanti === 1 ? 'Manca una slide' : `Mancano ${mancanti} slide`,
+        description: 'Non sono arrivate in fondo. Aprile dalle miniature e premi «Riprova».',
+        variant: 'destructive',
+      });
+    }
 
     // Avanzamento reale: ogni slide chiusa (bene o male) azzera il watchdog.
     const avanzate = rows.filter((s) => s.path || s.error).length;
