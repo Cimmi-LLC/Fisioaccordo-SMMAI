@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { REGOLA_CLAIM, daRivedere, regolaCoseDelBrand } from "@/lib/brand/metodoCopy";
+import { creaCercaFoto, fraseSenzaFoto, messaggioErroreStorie, rispostaNonLeggibile } from "@/lib/storie";
 import { useStoryTemplates } from "@/hooks/useStoryTemplates";
 import { useStoryBatches } from "@/hooks/useStoryBatches";
 import ScheduleStoriesDialog from "@/components/schedule/ScheduleStoriesDialog";
@@ -311,65 +312,36 @@ function photoSeedFromQuery(q){
   return (h%900)+100;
 }
 
-// Cache key version: bump to force invalidation across deploys/code changes.
-// IMPORTANT: only successful URL responses are cached; nulls are NOT cached so
-// transient failures don't poison the cache for the rest of the session.
-const FETCH_PHOTO_CACHE_VERSION='v4';
-const photoCache=new Map();
-
 // NO topic anchor anymore. The LLM's photoQuery is already topical
 // (back pain, posture, etc.). Adding "medical" / "european" / "professional"
 // was over-constraining the search and returning zero results from Freepik.
 // We rely on server-side hard-reject for the few wildlife/landscape outliers.
-const TOPIC_ANCHOR='';
 
-async function fetchPhoto(q, brandId){
-  if(!q){
-    console.log('[fetchPhoto] ❌ no query, skipping');
-    return null;
-  }
-  // anchor is intentionally empty now — LLM's photoQuery is already topical
-  const anchoredQuery=TOPIC_ANCHOR?`${q} ${TOPIC_ANCHOR}`:q;
-  const cacheKey=`${FETCH_PHOTO_CACHE_VERSION}::${brandId||'-'}::${anchoredQuery}`;
-  if(photoCache.has(cacheKey)){
-    const cached=photoCache.get(cacheKey);
-    console.log('[fetchPhoto] 💾 cache hit for "'+q+'":',cached?'✅ '+cached.slice(0,80):'❌ null');
-    return cached;
-  }
-  console.log('[fetchPhoto] 🔍 calling edge function for "'+q+'" (brandId:',brandId||'none',')');
-  try{
+// Una chiamata per foto: chi la chiede mentre è in corso riceve la stessa
+// risposta, al massimo 3 insieme, tempo massimo e pausa dopo un errore
+// (src/lib/storie.ts). Fino al 09/11/2026 ogni aggiornamento della pagina
+// rilanciava la ricerca di tutte le storie: 100 chiamate per 10 foto.
+const cercaFotoStoria=creaCercaFoto({
+  chiama: async (q, brandId)=>{
     const { data, error } = await supabase.functions.invoke('generate-carousel-images',{
       body:{
-        slides:[{tipo:'content',keywords_stock:[anchoredQuery],numero:1}],
+        slides:[{tipo:'content',keywords_stock:[q],numero:1}],
         singleIndex:0,
         brandId:brandId||undefined,
       },
     });
     if(error){
-      console.error('[fetchPhoto] ❌ edge function error:',error);
-      return null; // don't cache failures
+      console.error('[fetchPhoto] edge function error for "'+q+'":',error);
+      return {url:null,errore:error.message||'errore'};
     }
-    console.log('[fetchPhoto] 📦 response data:',data);
-    const url=data?.images?.[0]?.url||null;
-    const errMsg=data?.images?.[0]?.error||null;
-    const queryUsed=data?.images?.[0]?.queryUsed||null;
-    if(url){
-      console.log('[fetchPhoto] ✅ got URL for "'+q+'":',url.slice(0,100),'(query used:',queryUsed,')');
-      photoCache.set(cacheKey,url);
-      return url;
-    }
-    if(errMsg==='freepik_rate_limit'){
-      // Cache null to avoid hammering the API — limit resets in ~24h
-      console.warn('[fetchPhoto] 🚫 Freepik daily rate limit reached. Foto disabilitate per oggi.');
-      photoCache.set(cacheKey,null);
-      return null;
-    }
-    console.warn('[fetchPhoto] ❌ no URL for "'+q+'" — error:',errMsg,'queryUsed:',queryUsed);
-    return null;
-  }catch(e){
-    console.error('[fetchPhoto] 💥 exception for "'+q+'":',e);
-    return null; // don't cache exceptions
-  }
+    const img=data?.images?.[0];
+    if(!img?.url)console.warn('[fetchPhoto] no URL for "'+q+'" — error:',img?.error||null,'queryUsed:',img?.queryUsed||null);
+    return {url:img?.url||null,errore:img?.error||null};
+  },
+});
+
+async function fetchPhoto(q, brandId){
+  return (await cercaFotoStoria.cerca(q,brandId)).url;
 }
 
 async function loadImg(src){
@@ -1063,30 +1035,27 @@ function ClientForm({init,onSave,onCancel}){
   </div>;
 }
 
-function StoryItem({story,client,onRegen,idx,onZoom,withPhotos}){
+function StoryItem({story,client,onRegen,idx,onZoom,withPhotos,onFoto}){
   const [jpg,setJpg]=useState(null);const [rend,setRend]=useState(false);
-  const render=useCallback(async()=>{
-    setRend(true);
+  // Motivo per cui la storia è uscita senza foto (null = ha la foto o non la prevede).
+  const [senzaFoto,setSenzaFoto]=useState(null);
+  const render=useCallback(async(forza=false)=>{
+    setRend(true);setSenzaFoto(null);
     try{
       await ensureFont(client.brandFont||"Montserrat");
       let pi=null;
       const np=withPhotos&&(TYPES_WITH_PHOTO.includes(story.type)||TYPES_WITH_PHOTO.includes(story.cardType));
-      console.log('[StoryItem] story',idx,'np:',np,'photoQuery:',story.photoQuery,'type:',story.type,'cardType:',story.cardType);
       if(np&&story.photoQuery){
-        const u=await fetchPhoto(story.photoQuery,client.id);
-        if(u){
-          pi=await loadImg(u);
-          console.log('[StoryItem] story',idx,'loadImg result:',pi?'✅ image loaded':'❌ loadImg returned null (CORS?)');
-        }
-      } else if(!np){
-        console.log('[StoryItem] story',idx,'⏭️ skipping photo: type not in TYPES_WITH_PHOTO or withPhotos=false');
-      } else if(!story.photoQuery){
-        console.log('[StoryItem] story',idx,'⏭️ skipping photo: LLM returned null/empty photoQuery');
+        onFoto&&onFoto(idx,"cerco");
+        const esito=await cercaFotoStoria.cerca(story.photoQuery,client.id,{forza});
+        if(esito.url)pi=await loadImg(esito.url);
+        if(pi){onFoto&&onFoto(idx,"ok");}
+        else{setSenzaFoto(fraseSenzaFoto(esito.url?"errore":esito.motivo));onFoto&&onFoto(idx,"senza");}
       }
       setJpg(await renderJpeg(story,client,pi));
     }catch(e){console.error(e);}
     setRend(false);
-  },[story,client,withPhotos]);
+  },[story,client,withPhotos,idx,onFoto]);
   useEffect(()=>{render();},[render]);
   const dl=()=>{if(!jpg)return;const a=document.createElement("a");a.href=jpg;a.download="storia_"+(client.name||"f").replace(/\s/g,"_")+"_"+(idx+1)+".jpg";a.click();};
   return <div style={{background:S,borderRadius:14,overflow:"hidden",border:GLASS_BD,transition:"border-color .2s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=ACC+"55"} onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(85,70,151,0.10)"}>
@@ -1100,6 +1069,10 @@ function StoryItem({story,client,onRegen,idx,onZoom,withPhotos}){
       <div style={{fontSize:11,color:T,lineHeight:1.4,fontWeight:600}}>{(story.headline||"").slice(0,50)}{(story.headline||"").length>50?"...":""}</div>
       {story.da_rivedere&&story.da_rivedere.length>0&&<div style={{fontSize:10,color:"#b45309",lineHeight:1.35,fontWeight:600}} title="Promesse che un profilo sanitario non pubblica, o cose che il tuo brand non dice">
         Da rivedere prima di pubblicare: {story.da_rivedere.join(" · ")}
+      </div>}
+      {senzaFoto&&!rend&&<div style={{fontSize:10,color:"#b45309",lineHeight:1.35,fontWeight:600}}>
+        {senzaFoto}: la storia è uscita solo con il testo.{" "}
+        <button onClick={()=>render(true)} style={{background:"none",border:"none",padding:0,color:"#554697",fontWeight:800,fontSize:10,cursor:"pointer",textDecoration:"underline"}}>Riprova la foto</button>
       </div>}
       <div style={{display:"flex",gap:5,marginTop:4}}>
         <button onClick={()=>onRegen(idx)} title="Rigenera questa storia" aria-label="Rigenera" style={{flex:"0 0 36px",height:30,background:"rgba(85,70,151,0.10)",border:"1px solid rgba(85,70,151,0.25)",borderRadius:7,color:"#554697",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}} onMouseEnter={e=>{e.currentTarget.style.background="rgba(85,70,151,0.20)";}} onMouseLeave={e=>{e.currentTarget.style.background="rgba(85,70,151,0.10)";}}><RefreshCw size={13} strokeWidth={2.5}/></button>
@@ -1196,8 +1169,14 @@ export default function StoriesApp({ client: clientProp }){
   const setDefaultBg=(v)=>{setDefaultBgState(v);try{localStorage.setItem("smm_default_bg_"+(genClient?.id||""),v);}catch{}};
 
   const sharedTemplate = storyTemplate || reviewTemplate || genClient?.templateDataUrl || null;
-  const storyClient = {...(genClient||{}), templateDataUrl: storyTemplate || sharedTemplate, bgIsLight: true, defaultBg};
-  const reviewClient = {...(genClient||{}), templateDataUrl: reviewTemplate || sharedTemplate, bgIsLight: true, defaultBg};
+  // Oggetti stabili: cambiano solo quando cambia davvero qualcosa che si
+  // disegna. Creati a ogni render, facevano ridisegnare ogni storia (e
+  // ricercare ogni foto) a ogni aggiornamento della pagina.
+  const storyClient = useMemo(()=>({...(genClient||{}), templateDataUrl: storyTemplate || sharedTemplate, bgIsLight: true, defaultBg}),[genClient,storyTemplate,sharedTemplate,defaultBg]);
+  const reviewClient = useMemo(()=>({...(genClient||{}), templateDataUrl: reviewTemplate || sharedTemplate, bgIsLight: true, defaultBg}),[genClient,reviewTemplate,sharedTemplate,defaultBg]);
+  // Stato delle foto, storia per storia: "cerco" | "ok" | "senza".
+  const [fotoStato,setFotoStato]=useState({});
+  const segnaFoto=useCallback((i,stato)=>setFotoStato(p=>p[i]===stato?p:{...p,[i]:stato}),[]);
   const templateFileRef=useRef();
 
   const handleTemplateUpload=(_type,e)=>{
@@ -1214,12 +1193,20 @@ export default function StoriesApp({ client: clientProp }){
   const generate=async()=>{
     if(!genClient)return;setLoading(true);setErr("");setGenMsg("Generazione...");
     try{
-      const l=await generateStories(genClient,qty,types||genClient.selectedTypes);
+      let l;
+      try{l=await generateStories(genClient,qty,types||genClient.selectedTypes);}
+      catch(e){
+        // Risposta arrivata ma non leggibile: un secondo tentativo, da soli.
+        if(!rispostaNonLeggibile(e))throw e;
+        console.warn("[storie] risposta non leggibile, riprovo una volta:",e);
+        l=await generateStories(genClient,qty,types||genClient.selectedTypes);
+      }
+      setFotoStato({});
       setStories(l);
       // Persist batch (non-blocking)
       saveBatch('topic', { qty, types, label: (genClient.name||'') + ' — ' + qty + ' storie' }, l);
     }
-    catch(e){setErr("Errore. Riprova.");console.error(e);}
+    catch(e){setErr(messaggioErroreStorie(e));console.error(e);}
     setLoading(false);setGenMsg("");
   };
   const regenOne=async idx=>{
@@ -1454,8 +1441,16 @@ export default function StoriesApp({ client: clientProp }){
             {stories.length>0&&<SBtn sx={{padding:"14px 20px"}} onClick={dlAll} disabled={!!genMsg||preparingSchedule}>{genMsg&&!preparingSchedule?"...":"Scarica Tutte"}</SBtn>}
             {stories.length>0&&<button onClick={handleSchedule} disabled={!!genMsg||preparingSchedule} style={{padding:"14px 20px",borderRadius:12,border:"none",cursor:preparingSchedule?"wait":"pointer",background:"linear-gradient(135deg, var(--viola) 0%, var(--rosa) 100%)",color:"#fff",fontSize:13,fontWeight:800,letterSpacing:"0.5px",textTransform:"uppercase",boxShadow:"0 4px 12px rgba(230,0,126,0.25)",opacity:(!!genMsg||preparingSchedule)?0.6:1}}>{preparingSchedule?"Preparo...":"⏰ Programma"}</button>}
           </div>
+          {stories.length>0&&withPhotos&&(()=>{
+            const stati=Object.values(fotoStato);
+            if(!stati.length)return null;
+            const pronte=stati.filter(x=>x==="ok").length, senza=stati.filter(x=>x==="senza").length, cerco=stati.filter(x=>x==="cerco").length;
+            return <div style={{fontSize:12,fontWeight:600,color:"var(--ink2)",marginBottom:10}}>
+              Foto: {pronte} di {stati.length} pronte{cerco>0?" · ne cerco ancora "+cerco+" (fino a un minuto l'una)":""}{senza>0?" · "+senza+" senza foto: su quelle storie c'è «Riprova la foto»":""}
+            </div>;
+          })()}
           {stories.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(165px,1fr))",gap:12}}>
-            {stories.map((s,i)=><StoryItem key={i+"-"+(s.headline||"")+(s.cardType||"")} story={s} client={storyClient} onRegen={regenOne} idx={i} onZoom={setZoomJpg} withPhotos={withPhotos}/>)}
+            {stories.map((s,i)=><StoryItem key={i+"-"+(s.headline||"")+(s.cardType||"")} story={s} client={storyClient} onRegen={regenOne} idx={i} onZoom={setZoomJpg} withPhotos={withPhotos} onFoto={segnaFoto}/>)}
           </div>}
         </div>}
 
