@@ -12,12 +12,28 @@ export type TestiTemplate = {
   testo: string;
   /** Riga corta sotto un carosello già scritto. */
   sottoCarosello: string;
+  /** Vuoto = nessun pulsante. */
   bottone: string;
 };
 
 const BASE = 'Le slide grafiche escono comunque, nello stile di base e nei colori del tuo brand.';
 
-export function testiTemplate(stato: string | null | undefined): TestiTemplate {
+/**
+ * Template approvato del tipo vecchio (disegnato dal modello delle immagini,
+ * prima del 06/11/2026): dal 10/11 non comanda più le slide, perché il
+ * modello sbagliava le parole. Il template approvato è immutabile, quindi
+ * niente pulsante verso il wizard: per sceglierne uno dei 3 layout nuovi va
+ * prima sbloccato dal database (come GestioMed il 07/11).
+ */
+const VECCHIO: TestiTemplate = {
+  titolo: 'Le slide ora hanno il testo impaginato, parola per parola',
+  testo: 'Il template di prima lo disegnava l\'AI insieme al testo, e a volte sbagliava le parole. Ora le slide escono nello stile di base, nei colori e col logo del tuo brand, col testo esatto.',
+  sottoCarosello: 'Slide nello stile di base, nei colori del tuo brand, col testo esatto.',
+  bottone: '',
+};
+
+export function testiTemplate(stato: string | null | undefined, opzioni: { templateVecchio?: boolean } = {}): TestiTemplate {
+  if (opzioni.templateVecchio) return VECCHIO;
   if (stato === 'awaiting_approval') {
     return {
       titolo: 'Il template è pronto: manca la tua scelta',

@@ -2,7 +2,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   LAYOUT_IDS, alberoSlide, coloriLayout, contrasto, corpoAdatto, estraiDato, evidenziaAuto, nomeCorto,
-  GIALLO_EVIDENZA, layoutConsigliato, layoutDiBase, vuoleFoto, type InputSlide, type Nodo,
+  GIALLO_EVIDENZA, chiusura, genomaDelPilota, layoutConsigliato, layoutDiBase, produceConNb2, templateVecchio, vuoleFoto,
+  type InputSlide, type Nodo,
 } from '../layouts.ts';
 import { genomaPerLayout, validateGenome } from '../genome.ts';
 import { leggiTestiProva, promptTestiProva, testiDaSegnaposto } from '../layoutCopy.ts';
@@ -246,5 +247,73 @@ describe('nomeCorto', () => {
 
   it('accorcia i nomi lunghi a parole intere', () => {
     expect(nomeCorto('Centro Riabilitativo Mare Blu Associati')).toBe('Centro Riabilitativo Mare Blu');
+  });
+});
+
+describe('chiusura: il pulsante è il bottone del copy', () => {
+  it('caso del 09/11: «Commenta VERTIGINI» arriva sulla slide, il testo resta sopra', () => {
+    const c = chiusura({ testo: 'Se gli sbandamenti partono dal collo, si può lavorare sulla causa.', azione: 'Commenta VERTIGINI' });
+    expect(c).toEqual({ sotto: 'Se gli sbandamenti partono dal collo, si può lavorare sulla causa.', azione: 'Commenta VERTIGINI' });
+  });
+
+  it('su tutti e 3 i layout la slide di chiusura scrive il pulsante del copy', () => {
+    for (const layout of LAYOUT_IDS) {
+      const t = testi(alberoSlide({ ...BASE, layout, role: 'cta', titolo: 'Vuoi capire da dove parte?', testo: 'Ti spieghiamo come funziona la valutazione.', azione: 'Commenta VERTIGINI', indice: 4 }));
+      expect(t).toContain('Commenta VERTIGINI');
+      expect(t.join(' ')).toMatch(/Ti spieghiamo come funziona la valutazione/);
+    }
+  });
+
+  it('se il testo ripete il pulsante non lo scrive due volte', () => {
+    expect(chiusura({ testo: 'Commenta SPALLA.', azione: 'Commenta SPALLA' })).toEqual({ sotto: '', azione: 'Commenta SPALLA' });
+    expect(chiusura({ testo: 'Vuoi saperne di più? Commenta SPALLA', azione: 'Commenta SPALLA' }))
+      .toEqual({ sotto: 'Vuoi saperne di più?', azione: 'Commenta SPALLA' });
+  });
+
+  it('senza bottone resta la regola di prima (ultima frase breve)', () => {
+    expect(chiusura({ testo: 'Commenta PROVA e ti mando il link' })).toEqual({ sotto: '', azione: 'Commenta PROVA e ti mando il link' });
+    expect(chiusura({ testo: 'Una frase lunga che spiega bene perché conviene farsi vedere da qualcuno. Scrivici oggi.' }).azione).toBe('Scrivici oggi.');
+  });
+
+  it('un «bottone» lungo come una frase non diventa un pulsante', () => {
+    const lungo = 'Prenota adesso la tua valutazione specialistica completa in studio da noi a Roma';
+    expect(chiusura({ testo: 'Testo.', azione: lungo }).azione).not.toBe(lungo);
+  });
+});
+
+describe('template del tipo vecchio (disegnato dal modello)', () => {
+  const NB2 = { archetype: 'diagonal_band', format: '4:5' };
+  const PILOTA = { archetype: 'text_heavy_left', stile_pilota: 'editoriale', logo_slots: {} };
+
+  it('un template NB2 approvato non comanda più la produzione', () => {
+    expect(produceConNb2(true, undefined, NB2)).toBe(false);
+    expect(produceConNb2(true, null, null)).toBe(false);
+  });
+
+  it('resta su NB2 solo il brand del pilota', () => {
+    expect(genomaDelPilota(PILOTA)).toBe(true);
+    expect(genomaDelPilota(NB2)).toBe(false);
+    expect(produceConNb2(true, undefined, PILOTA)).toBe(true);
+    expect(produceConNb2(false, undefined, PILOTA)).toBe(false);
+  });
+
+  it('un template a layout non è mai NB2', () => {
+    expect(produceConNb2(true, 'brand_pieno', PILOTA)).toBe(false);
+  });
+
+  it('la pagina riconosce il template vecchio: locked, senza layout, non pilota', () => {
+    expect(templateVecchio('locked', NB2)).toBe(true);
+    expect(templateVecchio('locked', { layout: 'carta_clinica' })).toBe(false);
+    expect(templateVecchio('locked', PILOTA)).toBe(false);
+    expect(templateVecchio('draft', NB2)).toBe(false);
+    expect(templateVecchio('locked', null)).toBe(true);
+  });
+});
+
+describe('layout C, piede della copertina', () => {
+  it('il nome lungo dello studio si ferma a una parola intera («…CERVICA» il 10/11)', () => {
+    const t = testi(alberoSlide({ ...BASE, layout: 'carta_clinica', role: 'cover', nome: 'Studio di Fisioterapia Cervicale Vertigini del Dott. Daniel Di Segni' }));
+    expect(t).toContain('STUDIO DI FISIOTERAPIA');
+    expect(t.join(' ')).not.toMatch(/CERVICA(\s|$)/);
   });
 });

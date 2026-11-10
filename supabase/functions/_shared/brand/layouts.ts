@@ -375,6 +375,11 @@ export type InputSlide = {
   etichetta: string;
   titolo: string;
   testo?: string;
+  /**
+   * Testo del pulsante della chiusura: il `bottone_cta` del copy («Commenta
+   * VERTIGINI»). Se manca, il pulsante è l'ultima frase breve del testo.
+   */
+  azione?: string;
   /** Numero d'ordine («02») delle slide di contenuto. */
   numero?: string;
   indice: number;
@@ -437,6 +442,28 @@ function divideChiusura(testo?: string): { sotto: string; azione: string } {
   return { sotto: t, azione: '' };
 }
 
+/** Oltre questa lunghezza un «pulsante» non è un pulsante: resta nel testo. */
+const AZIONE_MAX = 64;
+
+/**
+ * Testo e pulsante dell'ultima slide. Il pulsante è l'azione del copy, la
+ * stessa della didascalia: fino al 09/11/2026 non arrivava alle slide e il
+ * post diceva «Commenta VERTIGINI» mentre la grafica diceva altro.
+ */
+export function chiusura(i: Pick<InputSlide, 'testo' | 'azione'>): { sotto: string; azione: string } {
+  const azione = testoPiano(i.azione || '');
+  if (!azione || azione.length > AZIONE_MAX) return divideChiusura(i.testo);
+  const testo = testoPiano(i.testo || '');
+  const piatto = (x: string) => x.toLocaleLowerCase('it').replace(/[\s.!?…:»«"']+$/u, '').trim();
+  // Il testo ripete il pulsante: non si scrive due volte.
+  if (piatto(testo) === piatto(azione)) return { sotto: '', azione };
+  if (piatto(testo).endsWith(piatto(azione))) {
+    const fin = testo.toLocaleLowerCase('it').lastIndexOf(piatto(azione));
+    return { sotto: testo.slice(0, fin).replace(/[\s:,;–-]+$/u, '').trim(), azione };
+  }
+  return { sotto: testo, azione };
+}
+
 // ── A · Colore del brand ────────────────────────────────────────────
 
 function layoutA(i: InputSlide): Figlio[] {
@@ -495,7 +522,7 @@ function layoutA(i: InputSlide): Figlio[] {
     ];
   }
 
-  const { sotto, azione } = divideChiusura(i.testo);
+  const { sotto, azione } = chiusura(i);
   const conFoto = !!i.foto;
   return [
     sfondo(50, 15), testa,
@@ -550,7 +577,7 @@ function layoutB(i: InputSlide): Figlio[] {
     ];
   }
 
-  const { sotto, azione } = divideChiusura(i.testo);
+  const { sotto, azione } = chiusura(i);
   const alto = i.foto ? 690 : 0;
   return [
     el('div', { position: 'absolute', left: 0, top: 0, width: LARGHEZZA, height: ALTEZZA, backgroundColor: c.carta }),
@@ -600,7 +627,7 @@ function layoutC(i: InputSlide): Figlio[] {
       conFoto ? null : el('div', {
         position: 'absolute', left: M, bottom: 80, width: CONTENUTO, justifyContent: 'space-between', paddingTop: 24,
         borderTop: `2px solid ${c.inchiostro}`, fontFamily: 'Inter', fontSize: 26, fontWeight: 700, letterSpacing: 3, color: inchiostro,
-      }, el('span', {}, testoPiano(i.nome).toLocaleUpperCase('it').slice(0, 30)), el('span', {}, 'SCORRI ›')),
+      }, el('span', {}, nomeCorto(i.nome, 30).toLocaleUpperCase('it')), el('span', {}, 'SCORRI ›')),
     ];
   }
 
@@ -617,7 +644,7 @@ function layoutC(i: InputSlide): Figlio[] {
     ];
   }
 
-  const { sotto, azione } = divideChiusura(i.testo);
+  const { sotto, azione } = chiusura(i);
   return [
     base, testa,
     el('div', { position: 'absolute', left: M, top: 300, width: CONTENUTO, flexDirection: 'column', gap: 36 },
@@ -645,6 +672,38 @@ export function vuoleFoto(layout: LayoutId, role: LayoutRole): 'serve' | 'se_c_e
   if (role === 'content') return 'no';
   if (layout === 'foto_editoriale') return 'serve';
   return 'se_c_e';
+}
+
+/**
+ * Genoma del brand del pilota delle scoperte (campi `stile_pilota` o
+ * `logo_slots`): ha una produzione sua e il suo template non si tocca.
+ */
+export function genomaDelPilota(genomaBrand: unknown): boolean {
+  if (!genomaBrand || typeof genomaBrand !== 'object') return false;
+  const g = genomaBrand as Record<string, unknown>;
+  return g.stile_pilota != null || g.logo_slots != null;
+}
+
+/**
+ * Le slide le disegna ancora il modello delle immagini (NB2) sul template
+ * approvato? Dal 10/11/2026 solo per il brand del pilota. Per tutti gli altri
+ * template approvati prima del 06/11/2026 la produzione passa ai layout, col
+ * testo impaginato parola per parola: su quei template il modello scriveva
+ * «CERVIVELLO», fondeva le righe e copriva le illustrazioni (revisione del
+ * reparto social, 09/11/2026).
+ */
+export function produceConNb2(templateCompleto: boolean, layoutDellaVariante: unknown, genomaBrand: unknown): boolean {
+  return templateCompleto && !isLayoutId(layoutDellaVariante) && genomaDelPilota(genomaBrand);
+}
+
+/**
+ * Brand con un template approvato del tipo vecchio (disegnato dal modello),
+ * che non comanda più le slide: la pagina glielo dice.
+ */
+export function templateVecchio(genesisStatus: unknown, genomaBrand: unknown): boolean {
+  if (genesisStatus !== 'locked' || genomaDelPilota(genomaBrand)) return false;
+  const layout = genomaBrand && typeof genomaBrand === 'object' ? (genomaBrand as { layout?: unknown }).layout : null;
+  return !isLayoutId(layout);
 }
 
 /** Layout proposto per primo: chi ha foto proprie parte dalla foto. */

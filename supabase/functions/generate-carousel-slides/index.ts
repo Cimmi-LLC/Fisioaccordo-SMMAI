@@ -27,7 +27,7 @@ import { sanitize } from "../_shared/brand/genesisPrompt.ts";
 import type { SlideRole } from "../_shared/brand/archetypes.ts";
 import { COST_NB2_IMAGE_1K } from "../_shared/brand/costs.ts";
 import { resolveProfession, type ProfessionBrandLike } from "../_shared/brand/profession.ts";
-import { evidenziaAuto, isLayoutId, layoutDiBase, vuoleFoto, type LayoutId } from "../_shared/brand/layouts.ts";
+import { evidenziaAuto, isLayoutId, layoutDiBase, produceConNb2, vuoleFoto, type LayoutId } from "../_shared/brand/layouts.ts";
 import { applicaSlide, chiudiProduzione, contaFatte, scriviSlides, statoFinale, type IoRiga, type RigaSlides } from "../_shared/brand/carouselSlides.ts";
 import {
   DISEGNI_IN_PARALLELO, caricaFoto, chiamaDisegno, coloriDelBrand, disegnaLayout, fotoDelBrand, leggiSpec, logoDelBrand,
@@ -55,6 +55,8 @@ type SlideInput = {
   role: SlideRole;
   title: string;
   body?: string;
+  /** Pulsante della slide di chiusura: il bottone_cta del copy. */
+  button?: string;
   number?: string;
   illustration?: string;
 };
@@ -317,7 +319,8 @@ async function disegnaSlideLayout(
     const tutte = await fotoDelBrand(supabase, brandId, b);
 
     // Template scelto: il suo layout. Senza template (brand nuovo, wizard
-    // saltato, proposte mai scelte): il layout di base, nei colori del kit.
+    // saltato, proposte mai scelte) o con un template del tipo vecchio,
+    // disegnato dal modello: il layout di base, nei colori del kit.
     const layout: LayoutId = v && isLayoutId(v.genome?.layout)
       ? v.genome!.layout as LayoutId
       : layoutDiBase((b.genome as { layout?: unknown } | null)?.layout, tutte.length > 0);
@@ -342,6 +345,7 @@ async function disegnaSlideLayout(
       etichetta,
       titolo: evidenziaAuto(slide.title || ""),
       testo: slide.body || "",
+      azione: slide.role === "cta" ? slide.button || "" : "",
       numero: slide.number,
       indice: slide.index,
       totale,
@@ -426,12 +430,6 @@ serve(async (req) => {
     for (const v of (variants || []) as VariantRow[]) byRole.set(v.slide_role, v);
     const templateCompleto = byRole.has("cover") && byRole.has("content") && byRole.has("cta");
 
-    // Template a layout (o nessun template): le slide le disegna il server (4:5, testo esatto).
-    const aLayout = !templateCompleto || isLayoutId(byRole.get("content")!.genome?.layout);
-
-    // Formato dal genoma congelato del template (default 1:1 per i vecchi NB2).
-    const format = aLayout || byRole.get("content")!.genome?.format === "4:5" ? "4:5" : "1:1";
-
     // Modello scelto dallo studio (brands.image_model, card impostazioni) e
     // professione del brand: il suo kicker (es. NUTRIZIONE) sostituisce
     // {{kicker}} nello skeleton della cover.
@@ -440,13 +438,30 @@ serve(async (req) => {
       .select("*")
       .eq("id", brandId)
       .maybeSingle();
+
+    // Le slide le disegna il server (4:5, testo esatto) per tutti: template a
+    // layout, nessun template, e anche i template del tipo vecchio (NB2,
+    // approvati prima del 06/11/2026), dove il modello sbagliava le parole.
+    // Resta su NB2 solo il brand del pilota (vedi produceConNb2).
+    const templateVecchio = templateCompleto && !isLayoutId(byRole.get("content")!.genome?.layout);
+    const aLayout = !produceConNb2(
+      templateCompleto,
+      templateCompleto ? byRole.get("content")!.genome?.layout : null,
+      (brandPrefs as { genome?: unknown } | null)?.genome,
+    );
+
+    // Formato dal genoma congelato del template (default 1:1 per i vecchi NB2).
+    const format = aLayout || byRole.get("content")!.genome?.format === "4:5" ? "4:5" : "1:1";
     const modelKey = String((brandPrefs as { image_model?: string } | null)?.image_model || "nano-2");
     const models = MODEL_CASCADES[modelKey] || MODEL_CASCADES["nano-2"];
     const kicker = resolveProfession(brandPrefs as unknown as ProfessionBrandLike | null).kicker;
     // Il colore del kit comanda sul template: un centro blu non pubblica viola.
     const brandPrimary = coloreSceltoDalKit((brandPrefs as Record<string, unknown> | null)?.colore_primario);
     const brandSecondary = coloreSceltoDalKit((brandPrefs as Record<string, unknown> | null)?.colore_secondario);
-    console.log("Produzione:", templateCompleto ? (aLayout ? "template a layout" : "template NB2 " + models.join(" -> ")) : "layout di base (nessun template)", "| kicker:", kicker, "| colore kit:", brandPrimary || "(default)");
+    const comeProduce = !templateCompleto ? "layout di base (nessun template)"
+      : !aLayout ? "template NB2 " + models.join(" -> ")
+      : templateVecchio ? "layout di base (template vecchio non usato)" : "template a layout";
+    console.log("Produzione:", comeProduce, "| kicker:", kicker, "| colore kit:", brandPrimary || "(default)");
 
     // Scarica le 3 reference una volta sola (solo per i template NB2).
     const refCache = new Map<SlideRole, string>();
@@ -526,7 +541,7 @@ serve(async (req) => {
         userId, brandId, type: "carousel",
         status: result.path ? "success" : "failed",
         title: "Rigenerazione slide " + (slides[0].index + 1),
-        metadata: { phase: "regenerate-slide", carouselId: rowId, layout: aLayout, template: templateCompleto ? "scelto" : "base", estimated_cost_usd: result.path && !aLayout ? COST_NB2_IMAGE_1K : 0 },
+        metadata: { phase: "regenerate-slide", carouselId: rowId, layout: aLayout, template: !templateCompleto ? "base" : templateVecchio && aLayout ? "vecchio_non_usato" : "scelto", estimated_cost_usd: result.path && !aLayout ? COST_NB2_IMAGE_1K : 0 },
       });
       if (!result.path) return jsonResponse(req, { error: result.error || "generazione fallita" }, 502);
       return jsonResponse(req, { bucket: OUTPUT_BUCKET, path: result.path, index: result.index });
@@ -594,7 +609,7 @@ serve(async (req) => {
           userId, brandId, type: "carousel",
           status: finalStatus === "ready" ? "success" : finalStatus === "partial" ? "partial" : "failed",
           title: "Produzione carosello (" + okCount + "/" + slides.length + " slide)",
-          metadata: { phase: "produce-slides", carouselId: rowId, format, layout: aLayout, template: templateCompleto ? "scelto" : "base", estimated_cost_usd: aLayout ? 0 : okCount * COST_NB2_IMAGE_1K },
+          metadata: { phase: "produce-slides", carouselId: rowId, format, layout: aLayout, template: !templateCompleto ? "base" : templateVecchio && aLayout ? "vecchio_non_usato" : "scelto", estimated_cost_usd: aLayout ? 0 : okCount * COST_NB2_IMAGE_1K },
         });
       } catch (e) {
         console.error("Produzione background fallita:", e);

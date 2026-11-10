@@ -19,6 +19,8 @@ export interface Nb2Slide {
   role: 'cover' | 'content' | 'cta';
   title: string;
   body: string;
+  /** Pulsante della chiusura (bottone_cta del copy). */
+  button?: string;
   number: string;
   /** Soggetto dell'illustrazione esplicativa (solo content). */
   illustration: string;
@@ -121,6 +123,7 @@ export function useNb2Carousel(brandId: string | null, genome: unknown) {
       role: s.role,
       title: s.title,
       body: s.body || '',
+      button: s.button || '',
       number: s.number || String(s.index + 1).padStart(2, '0'),
       illustration: s.illustration || '',
       path: s.path,
@@ -240,6 +243,7 @@ export function useNb2Carousel(brandId: string | null, genome: unknown) {
         role: slideRole(s),
         title: slideTitle(s),
         body: slideBody(s),
+        button: s.tipo === 'cta' ? (s.bottone_cta || '') : '',
         number: String(s.numero ?? i + 1).padStart(2, '0'),
         illustration: slideIllustration(s),
       }));
@@ -311,6 +315,7 @@ export function useNb2Carousel(brandId: string | null, genome: unknown) {
         role: current.role,
         title: override?.title ?? current.title,
         body: override?.body ?? current.body,
+        button: current.button || '',
         number: current.number,
         illustration: current.illustration,
       };
