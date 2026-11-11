@@ -84,10 +84,35 @@ export type BrandColor = { hex: string; count: number; source: "dichiarato" | "f
  * che non stanno in nessun elenco (su cervicalevertigini.it #45629f per
  * Facebook e #5eb2ef per Twitter).
  */
-const REGOLA_SOCIAL = /[^{}]*(?:facebook|twitter|instagram|whatsapp|youtube|linkedin|tiktok|telegram|pinterest|messenger|trustpilot|google-?plus|gplus)[^{}]*\{[^{}]*\}/gi;
+const SOCIAL = /facebook|twitter|instagram|whatsapp|youtube|linkedin|tiktok|telegram|pinterest|messenger|trustpilot|google-?plus|gplus/i;
 
+/**
+ * Una passata sola sul CSS, regola per regola. Fino all'11/11/2026 era una
+ * regex che ripartiva da ogni carattere: col font-awesome di
+ * cervicalevertigini.it (pieno di «.fa-facebook») 4 secondi di calcolo, e la
+ * funzione online si fermava al limite di 2.
+ */
 export function senzaRegoleSocial(css: string): string {
-  return css.replace(REGOLA_SOCIAL, ' ');
+  let out = '';
+  let copiatoFino = 0;
+  let inizioSelettore = 0;
+  for (let i = 0; i < css.length; i++) {
+    const c = css[i];
+    if (c !== '{' && c !== '}') continue;
+    if (c === '{') {
+      let j = i + 1;
+      while (j < css.length && css[j] !== '{' && css[j] !== '}') j++;
+      if (css[j] === '}' && SOCIAL.test(css.slice(inizioSelettore, i))) {
+        out += css.slice(copiatoFino, inizioSelettore) + ' ';
+        copiatoFino = j + 1;
+        inizioSelettore = j + 1;
+        i = j;
+        continue;
+      }
+    }
+    inizioSelettore = i + 1;
+  }
+  return out + css.slice(copiatoFino);
 }
 
 export function coloriDelSito(html: string, cssEsterno: string): BrandColor[] {
