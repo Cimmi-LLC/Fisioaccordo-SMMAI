@@ -7,7 +7,10 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 const ROOT = resolve(__dirname, '../../../..');
-const MIRRORED = ['archetypes.ts', 'genome.ts', 'genesisPrompt.ts', 'artDirector.ts', 'profession.ts', 'virali.ts', 'instagramProfile.ts', 'reel.ts', 'layouts.ts', 'layoutCopy.ts', 'metodoCopy.ts', 'carouselSlides.ts', 'coloriSito.ts'];
+const MIRRORED = ['archetypes.ts', 'genome.ts', 'genesisPrompt.ts', 'artDirector.ts', 'profession.ts', 'virali.ts', 'instagramProfile.ts', 'reel.ts', 'layouts.ts', 'layoutCopy.ts', 'metodoCopy.ts', 'carouselSlides.ts'];
+
+// Una riga per file, così due PR aperte insieme non toccano la stessa riga.
+MIRRORED.push('coloriSito.ts');
 
 describe('sincronizzazione mirror Vite <-> Deno', () => {
   it.each(MIRRORED)('%s e byte-identico tra src e _shared', (file) => {
