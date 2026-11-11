@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { Upload, X, Loader2, Tag as TagIcon } from 'lucide-react';
 import { useBrandPhotos, type BrandPhoto } from '@/hooks/useBrandPhotos';
+import { haTestoSopra, tagVisibili } from '@/lib/brand/fotoBrand';
 
 interface Props {
   brandId: string | null;
@@ -41,14 +42,16 @@ const BrandPhotoGallery: React.FC<Props> = ({ brandId }) => {
   const startEdit = (photo: BrandPhoto) => {
     setEditingId(photo.id);
     setDraftCaption(photo.caption || '');
-    setDraftTags(photo.tags.join(', '));
+    setDraftTags(tagVisibili(photo.tags).join(', '));
   };
   const saveEdit = async (photo: BrandPhoto) => {
     const tags = draftTags
       .split(',')
       .map(t => t.trim().toLowerCase())
       .filter(Boolean);
-    await updateMeta(photo, { caption: draftCaption.trim() || null, tags });
+    // I tag di servizio (foto già guardata, testo sopra, volto) restano.
+    const diServizio = photo.tags.filter(t => t.startsWith('__'));
+    await updateMeta(photo, { caption: draftCaption.trim() || null, tags: [...new Set([...tags, ...diServizio])] });
     setEditingId(null);
   };
 
@@ -130,7 +133,7 @@ const BrandPhotoGallery: React.FC<Props> = ({ brandId }) => {
                     <input
                       value={draftTags}
                       onChange={e => setDraftTags(e.target.value)}
-                      placeholder="tag1, tag2 (inglese)"
+                      placeholder="tag1, tag2"
                       className="text-[10px] rounded px-1.5 py-1 outline-none"
                       style={{ border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--ink)' }}
                     />
@@ -157,8 +160,8 @@ const BrandPhotoGallery: React.FC<Props> = ({ brandId }) => {
                       {photo.caption || '+ aggiungi didascalia'}
                     </div>
                     <div className="flex flex-wrap gap-0.5 items-center min-h-[14px]">
-                      {photo.tags.length > 0 ? (
-                        photo.tags.slice(0, 3).map(t => (
+                      {tagVisibili(photo.tags).length > 0 ? (
+                        tagVisibili(photo.tags).slice(0, 3).map(t => (
                           <span key={t} className="text-[8px] px-1 py-0.5 rounded" style={{ background: 'var(--viola-dim)', color: 'var(--viola)' }}>{t}</span>
                         ))
                       ) : (
@@ -166,10 +169,15 @@ const BrandPhotoGallery: React.FC<Props> = ({ brandId }) => {
                           <TagIcon className="h-2 w-2" /> nessun tag
                         </span>
                       )}
-                      {photo.tags.length > 3 && (
-                        <span className="text-[8px]" style={{ color: 'var(--ink3)' }}>+{photo.tags.length - 3}</span>
+                      {tagVisibili(photo.tags).length > 3 && (
+                        <span className="text-[8px]" style={{ color: 'var(--ink3)' }}>+{tagVisibili(photo.tags).length - 3}</span>
                       )}
                     </div>
+                    {haTestoSopra(photo.tags) && (
+                      <div className="text-[9px] font-semibold leading-tight" style={{ color: '#b45309' }}>
+                        Ha già testo o logo sopra: non la usiamo come sfondo.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

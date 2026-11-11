@@ -869,10 +869,10 @@ LUNGHEZZA per tipo:
 - prima_dopo: confronto breve prima/dopo (max 150 char)
 
 REGOLE per il campo "photoQuery":
-- 2-3 parole INGLESI semplici e generaliste, inerenti al mestiere di chi pubblica (${prof?prof.settore:"salute / benessere / fisico"})
-- Preferisci parole comuni che esistono SICURAMENTE in stock photography
-- Esempi BUONI: "back pain", "good posture", "stretching exercise", "yoga", "office desk", "running", "healthy food", "meditation", "elderly walking", "neck massage", "knee pain"${photoHint}
-- Esempi DA EVITARE: parole inventate, frasi lunghe (>4 parole), metafore, termini medici tecnici troppo specifici
+- 2-4 parole INGLESI che descrivono la SCENA di QUESTA storia: la parte del corpo, il gesto o la situazione di cui parla, dentro la nicchia di chi pubblica (${prof?prof.settore:"salute / benessere / fisico"}${client.focus?"; si occupa di: "+client.focus:""})
+- La scena deve c'entrare con l'argomento della storia e con quello che fa chi pubblica. MAI scene generiche da benessere ("yoga", "healthy food", "meditation", "running", "drinking water") se la storia non parla proprio di quello
+- Esempi per uno studio che tratta cervicale e vertigini: "neck physiotherapy treatment", "woman dizzy holding head", "stiff neck at desk"${photoHint}
+- Parole comuni, che esistono in stock photography: niente parole inventate, metafore o termini medici rari; massimo 4 parole
 - Per storie di tipo quiz_domanda / quiz_risposta usa null (non servono foto)
 - Per ogni altra storia di solito metti una query concreta
 
@@ -1200,6 +1200,17 @@ export default function StoriesApp({ client: clientProp }){
         if(!rispostaNonLeggibile(e))throw e;
         console.warn("[storie] risposta non leggibile, riprovo una volta:",e);
         l=await generateStories(genClient,qty,types||genClient.selectedTypes);
+      }
+      // Prima di cercare le foto: quelle del brand non ancora guardate
+      // ricevono le etichette (cosa mostrano, se hanno testo sopra), così la
+      // scelta va per argomento. Al massimo 15 secondi, poi si va avanti.
+      if(withPhotos&&genClient.id&&genClient.id!=="active-brand"){
+        try{
+          await Promise.race([
+            supabase.functions.invoke('generate-carousel-images',{body:{action:'etichetta',brandId:genClient.id}}),
+            new Promise(r=>setTimeout(r,15000)),
+          ]);
+        }catch(e){console.warn("[storie] etichette delle foto saltate:",e);}
       }
       setFotoStato({});
       setStories(l);

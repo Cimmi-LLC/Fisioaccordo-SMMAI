@@ -3,6 +3,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { adminClient, assertBrandOwnership, requireAuth, requireWithinRateLimit } from "../_shared/auth.ts";
 import { corsHeaders, handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { safeFetch } from "../_shared/ssrf.ts";
+import { callGeminiWithRetry } from "../_shared/gemini.ts";
+import { PROMPT_ETICHETTE, daGuardare, leggiEtichette, scegliFoto, tagDaEtichette } from "../_shared/brand/fotoBrand.ts";
 import { resolveProfession, getProfession, DEFAULT_PROFESSION_ID, type ProfessionBrandLike, type ProfessionProfile, type ResolvedProfession } from "../_shared/brand/profession.ts";
 import {
   AI_MODEL_SETS,
@@ -117,6 +119,20 @@ serve(async (req) => {
         ? clientExcludeIds.map((n: any) => Number(n)).filter((n: number) => Number.isFinite(n))
         : []
     );
+
+    // ── ETICHETTA: guarda le foto del brand non ancora viste (cosa mostrano,
+    // se hanno testo sopra, se c'è un volto) e salva le etichette nei tag.
+    // La chiama il sito dopo un caricamento e prima di cercare le foto.
+    if ((body as Record<string, unknown>).action === "etichetta") {
+      if (!brandId) return jsonResponse(req, { error: "brandId obbligatorio" }, 400);
+      const admin = adminClient();
+      const own = await assertBrandOwnership(admin, verifiedUserId, String(brandId));
+      if (!own.ok) return jsonResponse(req, { error: own.error }, own.status);
+      const rl = await requireWithinRateLimit(admin, verifiedUserId, "etichetta-foto", 10, 60);
+      if (!rl.ok) return jsonResponse(req, { error: rl.error }, rl.status);
+      const esito = await etichettaFotoDelBrand(admin, String(brandId));
+      return jsonResponse(req, esito);
+    }
 
     const PIXABAY_API_KEY = Deno.env.get("PIXABAY_API_KEY");
     if (!PIXABAY_API_KEY) {
@@ -289,7 +305,7 @@ serve(async (req) => {
     if (brandPool.length > 0) {
       for (const { slide, originalIndex } of slidesToProcess) {
         const { keywords, slideContext } = contestoSlide(slide);
-        const foto = pickFromBrandPool([...keywords, ...slideContext], brandPool, usedBrandUrls, fotoMieSempre);
+        const foto = scegliFoto(brandPool, [...keywords, ...slideContext], usedBrandUrls, fotoMieSempre);
         if (foto) {
           usedBrandUrls.add(foto);
           brandPick.set(originalIndex, foto);
@@ -437,29 +453,74 @@ serve(async (req) => {
  * - `sempre` = true («usa prima le mie foto, sempre»): se nessuna è rilevante
  *   se ne prende comunque una, riusando il pool quando è esaurito.
  */
-function pickFromBrandPool(
-  keywords: string[],
-  pool: Array<{ url: string; tags: string[]; caption: string | null }>,
-  used: Set<string>,
-  sempre: boolean,
-): string | null {
-  if (pool.length === 0) return null;
-  const available = pool.filter(p => !used.has(p.url));
-  const candidates = available.length > 0 ? available : pool; // re-allow used if pool exhausted
+// ── Etichette delle foto del brand ──────────────────────────────────────
+const FOTO_PER_GIRO = 8;
+const FOTO_MAX_BYTE = 4 * 1024 * 1024;
 
-  const lowerKw = keywords.map(k => k.toLowerCase());
-  const scored = candidates.map(p => {
-    const haystack = [...p.tags, p.caption || ""].join(" ").toLowerCase();
-    let score = 0;
-    for (const kw of lowerKw) if (kw && haystack.includes(kw)) score++;
-    return { url: p.url, score };
-  });
+function tipoImmagine(b: Uint8Array): string | null {
+  if (b[0] === 0x89 && b[1] === 0x50) return "image/png";
+  if (b[0] === 0xff && b[1] === 0xd8) return "image/jpeg";
+  if (b[0] === 0x52 && b[1] === 0x49 && b[8] === 0x57 && b[9] === 0x45) return "image/webp";
+  return null;
+}
 
-  scored.sort((a, b) => b.score - a.score);
-  const best = scored[0];
-  if (best.score > 0) return best.url;
-  if (!sempre) return null;
-  return candidates[Math.floor(Math.random() * candidates.length)].url;
+/** Guarda fino a 8 foto non ancora viste e ne salva le etichette. Una foto che fallisce resta da guardare. */
+async function etichettaFotoDelBrand(
+  supabase: ReturnType<typeof adminClient>,
+  brandId: string,
+): Promise<{ etichettate: number; rimaste: number }> {
+  const chiave = Deno.env.get("GEMINI_API_KEY");
+  const { data } = await supabase
+    .from("brand_photos")
+    .select("id, url, storage_path, tags, caption")
+    .eq("brand_id", brandId)
+    .limit(60);
+  const righe = ((data || []) as Array<{ id: string; url: string | null; storage_path: string | null; tags: string[] | null; caption: string | null }>)
+    .filter((r) => daGuardare(r.tags));
+  if (!chiave || righe.length === 0) return { etichettate: 0, rimaste: righe.length };
+
+  const una = async (r: typeof righe[number]): Promise<boolean> => {
+    try {
+      let indirizzo = r.url || "";
+      if (r.storage_path) {
+        // Ridotta: al modello basta, e costa meno.
+        const { data: firmata } = await supabase.storage.from("user-photos")
+          .createSignedUrl(r.storage_path, 120, { transform: { width: 768, quality: 70 } });
+        indirizzo = firmata?.signedUrl || indirizzo;
+      }
+      if (!/^https:\/\//.test(indirizzo)) return false;
+      const risposta = await safeFetch(indirizzo, { maxBytes: FOTO_MAX_BYTE, timeoutMs: 8000 });
+      if (!risposta.ok) return false;
+      const byte = risposta.bytes;
+      const tipo = tipoImmagine(byte);
+      if (!tipo || byte.length === 0 || byte.length > FOTO_MAX_BYTE) return false;
+      let bin = "";
+      for (let i = 0; i < byte.length; i += 0x8000) bin += String.fromCharCode(...byte.subarray(i, i + 0x8000));
+      const res = await callGeminiWithRetry({
+        apiKey: chiave,
+        model: "gemini-2.5-flash",
+        maxRetries: 2,
+        body: {
+          contents: [{ role: "user", parts: [{ inline_data: { mime_type: tipo, data: btoa(bin) } }, { text: PROMPT_ETICHETTE }] }],
+          generationConfig: { temperature: 0, responseMimeType: "application/json" },
+        },
+      });
+      const e = res.ok ? leggiEtichette(String(res.data?.candidates?.[0]?.content?.parts?.[0]?.text || "")) : null;
+      if (!e) return false;
+      const { error } = await supabase.from("brand_photos")
+        .update({ tags: tagDaEtichette(e, r.tags || []), caption: r.caption || e.descrizione || null })
+        .eq("id", r.id);
+      return !error;
+    } catch (err) {
+      console.warn("etichetta foto fallita:", (err as Error).message);
+      return false;
+    }
+  };
+
+  const esiti = await Promise.all(righe.slice(0, FOTO_PER_GIRO).map(una));
+  const fatte = esiti.filter(Boolean).length;
+  console.log("Foto del brand etichettate: " + fatte + " su " + Math.min(righe.length, FOTO_PER_GIRO));
+  return { etichettate: fatte, rimaste: righe.length - fatte };
 }
 
 /**

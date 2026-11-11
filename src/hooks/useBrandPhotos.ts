@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { signedUrl } from '@/lib/storage';
+import { daGuardare } from '@/lib/brand/fotoBrand';
 
 export interface BrandPhoto {
   id: string;
@@ -92,6 +93,28 @@ export const useBrandPhotos = (brandId: string | null) => {
       }
     })();
   }, [user]);
+
+  // Etichette automatiche: le foto non ancora guardate dal modello (cosa
+  // mostrano, se hanno testo sopra, se c'è un volto) si mandano a etichettare
+  // poco dopo il caricamento. Al massimo 3 giri per pagina aperta: se il
+  // servizio non risponde non si insiste.
+  const giriEtichette = useRef(0);
+  const daEtichettare = photos.filter((p) => daGuardare(p.tags)).length;
+  useEffect(() => {
+    if (!brandId || daEtichettare === 0 || giriEtichette.current >= 3) return;
+    const attesa = setTimeout(async () => {
+      giriEtichette.current++;
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-carousel-images', {
+          body: { action: 'etichetta', brandId },
+        });
+        if (!error && (data?.etichettate || 0) > 0) await load();
+      } catch (e) {
+        console.warn('[useBrandPhotos] etichette saltate:', e);
+      }
+    }, 2500);
+    return () => clearTimeout(attesa);
+  }, [brandId, daEtichettare, load]);
 
   const addFromFile = useCallback(async (file: File, caption?: string, tags?: string[]) => {
     if (!user || !brandId) {

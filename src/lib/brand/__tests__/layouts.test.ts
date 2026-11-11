@@ -317,3 +317,31 @@ describe('layout C, piede della copertina', () => {
     expect(t.join(' ')).not.toMatch(/CERVICA(\s|$)/);
   });
 });
+
+describe('volto in copertina (avatar)', () => {
+  /** Altezze di tutte le immagini dell'albero. */
+  function altezzeImg(n: Nodo | string | undefined): number[] {
+    if (n === undefined || typeof n === 'string') return [];
+    const qui = n.type === 'img' ? [Number((n.props as { height?: number }).height)] : [];
+    const c = n.props.children as Nodo | string | Array<Nodo | string> | undefined;
+    return [...qui, ...(Array.isArray(c) ? c : [c]).flatMap((x) => altezzeImg(x))];
+  }
+  const ritratto = { foto: 'data:image/jpeg;base64,AAAA', fotoDim: { w: 900, h: 1600 } };
+
+  it('un volto si disegna alla sua altezza vera, così il ritaglio parte dall\'alto e la testa resta', () => {
+    for (const layout of LAYOUT_IDS) {
+      const conVolto = alberoSlide({ ...BASE, ...ritratto, fotoVolto: true, layout, role: 'cover' });
+      const senza = alberoSlide({ ...BASE, ...ritratto, fotoVolto: false, layout, role: 'cover' });
+      expect(Math.max(...altezzeImg(conVolto))).toBeGreaterThan(Math.max(...altezzeImg(senza)));
+      expect(stiliPuliti(conVolto)).toBe(true);
+    }
+  });
+
+  it('una foto orizzontale o senza misure resta col ritaglio normale', () => {
+    const base = alberoSlide({ ...BASE, foto: ritratto.foto, layout: 'brand_pieno', role: 'cover' });
+    const larga = alberoSlide({ ...BASE, foto: ritratto.foto, fotoVolto: true, fotoDim: { w: 1600, h: 900 }, layout: 'brand_pieno', role: 'cover' });
+    const senzaMisure = alberoSlide({ ...BASE, foto: ritratto.foto, fotoVolto: true, layout: 'brand_pieno', role: 'cover' });
+    expect(altezzeImg(larga)).toEqual(altezzeImg(base));
+    expect(altezzeImg(senzaMisure)).toEqual(altezzeImg(base));
+  });
+});

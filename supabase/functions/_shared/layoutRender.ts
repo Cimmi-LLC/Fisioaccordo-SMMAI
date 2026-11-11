@@ -14,6 +14,7 @@ import satori from "npm:satori@0.12.2";
 import { Resvg, initWasm } from "npm:@resvg/resvg-wasm@2.6.2";
 import { ALTEZZA, LARGHEZZA, alberoSlide, coloriLayout, isLayoutId, type ColoriLayout, type Immagine, type InputSlide, type LayoutId, type LayoutRole } from "./brand/layouts.ts";
 import type { TestiProva } from "./brand/layoutCopy.ts";
+import { haTestoSopra } from "./brand/fotoBrand.ts";
 import type { adminClient } from "./auth.ts";
 
 type Admin = ReturnType<typeof adminClient>;
@@ -130,11 +131,16 @@ export async function caricaFoto(supabase: Admin, rif: RifFoto | null | undefine
   return orig.length <= MAX_BYTE ? immagineDaByte(orig) : null;
 }
 
-/** Foto vere dello studio: tabella brand_photos, poi le foto del Brand Kit. */
+/**
+ * Foto vere dello studio: tabella brand_photos, poi le foto del Brand Kit.
+ * Restano fuori quelle che hanno già testo o logo sopra (copertine di video,
+ * locandine): sulla slide ci finirebbe sopra altro testo.
+ */
 export async function fotoDelBrand(supabase: Admin, brandId: string, brand: Record<string, unknown>): Promise<RifFoto[]> {
   const out: RifFoto[] = [];
-  const { data } = await supabase.from("brand_photos").select("url, storage_path").eq("brand_id", brandId).limit(12);
-  for (const r of (data || []) as Array<{ url: string | null; storage_path: string | null }>) {
+  const { data } = await supabase.from("brand_photos").select("url, storage_path, tags").eq("brand_id", brandId).limit(24);
+  for (const r of (data || []) as Array<{ url: string | null; storage_path: string | null; tags: string[] | null }>) {
+    if (haTestoSopra(r.tags)) continue;
     if (r.storage_path) out.push({ bucket: "user-photos", path: r.storage_path });
     else if (r.url) out.push({ url: r.url });
   }
