@@ -613,8 +613,9 @@ const BrandPage = () => {
               <h2 className="text-[14px] font-bold" style={{ color: 'var(--ink)' }}>Avatar</h2>
             </div>
             <p className="text-[12px] mb-4" style={{ color: 'var(--ink3)' }}>
-              Foto a mezzo busto col volto ben visibile. Serve SOLO all'analisi dello stile quando crei il template
-              (colori, atmosfera): non viene usata per generare immagini della tua persona.
+              Foto a mezzo busto col volto ben visibile. Serve all'analisi dello stile quando crei il template
+              (colori, atmosfera) e non viene mai usata per generare immagini della tua persona. Se accendi
+              «Usa prima le mie foto, sempre», questa foto, così com'è, va sulla copertina dei caroselli.
             </p>
             <SinglePhotoUpload url={brand.avatar_url} onChange={v => update('avatar_url', v)} shape="circle" />
           </div>

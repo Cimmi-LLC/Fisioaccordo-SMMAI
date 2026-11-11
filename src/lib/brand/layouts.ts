@@ -276,6 +276,35 @@ function img(src: string, w: number, h: number, style: Record<string, unknown> =
   return { type: 'img', props: { src, width: w, height: h, style: { width: w, height: h, objectFit: 'cover', ...style } } };
 }
 
+/**
+ * La foto della slide nel suo riquadro. Di norma si ritaglia al centro; un
+ * volto (avatar a mezzo busto) si ritaglia dall'alto, se no il taglio porta
+ * via la testa. Satori non applica objectPosition: la foto si disegna alla
+ * sua altezza vera dentro un riquadro che taglia quello che avanza sotto.
+ */
+function fotoSlide(i: Pick<InputSlide, 'foto' | 'fotoVolto' | 'fotoDim'>, w: number, h: number, style: Record<string, unknown> = {}): Nodo {
+  const alta = altezzaVolto(i, w, h);
+  if (alta) {
+    return el('div', { width: w, height: h, overflow: 'hidden', alignItems: 'flex-start', ...style },
+      img(i.foto!, w, alta, { flexShrink: 0 }));
+  }
+  return img(i.foto!, w, h, style);
+}
+
+/** Altezza a cui disegnare un volto largo `w` per ritagliarlo dall'alto in un riquadro alto `h`; null = ritaglio normale. */
+function altezzaVolto(i: Pick<InputSlide, 'fotoVolto' | 'fotoDim'>, w: number, h: number): number | null {
+  const d = i.fotoVolto ? i.fotoDim : undefined;
+  if (!d || !(d.w > 0) || !(d.h > 0)) return null;
+  const alta = Math.round((w * d.h) / d.w);
+  return alta > h ? alta : null;
+}
+
+/** Foto dentro un riquadro che ha già le sue misure e taglia quello che avanza (alignItems: flex-start). */
+function fotoNelRiquadro(i: Pick<InputSlide, 'foto' | 'fotoVolto' | 'fotoDim'>, w: number, h: number): Nodo {
+  const alta = altezzaVolto(i, w, h);
+  return alta ? img(i.foto!, w, alta, { flexShrink: 0 }) : img(i.foto!, w, h);
+}
+
 /** Colore CSS (#rgb, #rrggbb, #rrggbbaa, rgba()) → stop SVG con opacità a parte. */
 function stop(colore: string, offset: number): string {
   let col = colore.trim();
@@ -371,6 +400,10 @@ export type InputSlide = {
   logo: Immagine | null;
   /** Foto o schermata (data URL); null = versione senza foto. */
   foto: string | null;
+  /** La foto è il volto del professionista (avatar): il ritaglio tiene la parte alta, dove sta la faccia. */
+  fotoVolto?: boolean;
+  /** Misure vere della foto: servono a ritagliare un volto dall'alto. */
+  fotoDim?: { w: number; h: number };
   /** Etichetta di copertina (es. «Studi e centri sanitari»). */
   etichetta: string;
   titolo: string;
@@ -481,9 +514,9 @@ function layoutA(i: InputSlide): Figlio[] {
     ? el('div', { position: 'absolute', left: 0, top: 0, width: LARGHEZZA, height: ALTEZZA },
       ombra(rot, top, 46, 14, 0.12), ombra(rot, top, 30, 6, 0.16), ombra(rot, top, 16, 0, 0.2),
       el('div', {
-        position: 'absolute', left: 90, top, borderRadius: 30, overflow: 'hidden',
-        border: '5px solid rgba(255,255,255,0.92)', transform: `rotate(${rot}deg)`,
-      }, img(i.foto, 900, 540)))
+        position: 'absolute', left: 90, top, width: 910, height: 550, borderRadius: 30, overflow: 'hidden',
+        border: '5px solid rgba(255,255,255,0.92)', transform: `rotate(${rot}deg)`, alignItems: 'flex-start',
+      }, fotoNelRiquadro(i, 900, 540)))
     : null;
   const hl = { color: c.evidenza };
 
@@ -547,7 +580,7 @@ function layoutB(i: InputSlide): Figlio[] {
     const corpo = corpoAdatto(i.titolo, 116, 4, CONTENUTO);
     return [
       el('div', { position: 'absolute', left: 0, top: 0, width: LARGHEZZA, height: ALTEZZA, backgroundColor: c.notte }),
-      i.foto ? img(i.foto, LARGHEZZA, 900, { position: 'absolute', left: 0, top: 0 }) : null,
+      i.foto ? fotoSlide(i, LARGHEZZA, 900, { position: 'absolute', left: 0, top: 0 }) : null,
       i.foto
         ? verticale([['rgba(0,0,0,0.18)', 0], ['rgba(0,0,0,0)', 0.22], [`${c.notte}8c`, 0.5], [c.notte, 0.68]])
         : radiale(85, 10, [[mescola(c.primario, c.notte, 0.55), 0], [c.notte, 0.6]]),
@@ -623,7 +656,7 @@ function layoutC(i: InputSlide): Figlio[] {
         : (...f: Figlio[]) => centrato(180, 1170, { gap: 30 }, ...f))(
         ricco(i.titolo, { size: corpoAdatto(i.titolo, conFoto ? 124 : 144, conFoto ? 4 : 5, CONTENUTO, 'Fraunces'), weight: 600, family: 'Fraunces', color: inchiostro, ls: -3, lh: 1.0, hl: { color: accento } }),
         i.testo ? el('div', { fontFamily: 'Inter', fontSize: 38, fontWeight: 500, color: tenue, lineHeight: 1.3 }, testoPiano(i.testo)) : null),
-      conFoto ? el('div', { position: 'absolute', left: M, bottom: 90, borderRadius: 28, overflow: 'hidden' }, img(i.foto!, CONTENUTO, 430)) : null,
+      conFoto ? el('div', { position: 'absolute', left: M, bottom: 90, width: CONTENUTO, height: 430, borderRadius: 28, overflow: 'hidden', alignItems: 'flex-start' }, fotoNelRiquadro(i, CONTENUTO, 430)) : null,
       conFoto ? null : el('div', {
         position: 'absolute', left: M, bottom: 80, width: CONTENUTO, justifyContent: 'space-between', paddingTop: 24,
         borderTop: `2px solid ${c.inchiostro}`, fontFamily: 'Inter', fontSize: 26, fontWeight: 700, letterSpacing: 3, color: inchiostro,

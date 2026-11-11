@@ -326,11 +326,23 @@ async function disegnaSlideLayout(
       : layoutDiBase((b.genome as { layout?: unknown } | null)?.layout, tutte.length > 0);
 
     // Foto: una vera dello studio (a rotazione fra i caroselli), altrimenti
-    // quella scelta per il template approvato.
+    // quella scelta per il template approvato. Con «usa prima le mie foto,
+    // sempre» accesa e l'avatar caricato, la copertina usa il volto: la foto
+    // vera del professionista, così com'è.
     let foto = null;
+    let fotoVolto = false;
     if (vuoleFoto(layout, slide.role) !== "no") {
-      const rif = scegli(tutte, rowId + slide.role) ?? (v ? leggiSpec(v.prompt_skeleton)?.foto : null) ?? null;
-      foto = await caricaFoto(supabase, rif);
+      const avatar = slide.role === "cover" && b.foto_mie_sempre === true && typeof b.avatar_url === "string" && b.avatar_url
+        ? { url: b.avatar_url as string }
+        : null;
+      if (avatar) {
+        foto = await caricaFoto(supabase, avatar);
+        fotoVolto = !!foto;
+      }
+      if (!foto) {
+        const rif = scegli(tutte, rowId + slide.role) ?? (v ? leggiSpec(v.prompt_skeleton)?.foto : null) ?? null;
+        foto = await caricaFoto(supabase, rif);
+      }
     }
     const logo = await logoDelBrand(supabase, brandId, b.logo_url);
     const etichetta = v?.genome?.layout_etichetta || resolveProfession(b as unknown as ProfessionBrandLike).kicker;
@@ -342,6 +354,8 @@ async function disegnaSlideLayout(
       nome: String(b.nome_business || "Studio"),
       logo,
       foto: foto?.src ?? null,
+      fotoVolto,
+      fotoDim: foto ? { w: foto.w, h: foto.h } : undefined,
       etichetta,
       titolo: evidenziaAuto(slide.title || ""),
       testo: slide.body || "",

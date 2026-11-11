@@ -1,6 +1,7 @@
 // «Usa prima le mie foto, sempre»: opzione secca chiesta dalla revisione del
 // 03/11. Spenta: le foto caricate entrano solo quando combaciano con le
-// keyword della slide. Accesa: ogni slide parte da una foto del pool.
+// keyword della slide. Accesa: nelle storie sempre una foto del pool (a
+// rotazione, mai quelle con testo sopra) e avatar in copertina dei caroselli.
 // Salvataggio dedicato (colonna brands.foto_mie_sempre, migrazione 20261103150000).
 
 import React, { useEffect, useState } from 'react';
@@ -54,7 +55,9 @@ const FotoPrimaSwitch: React.FC<{ brandId: string | null }> = ({ brandId }) => {
       <span>
         <span className="block text-[13px] font-bold" style={{ color: 'var(--ink)' }}>Usa prima le mie foto, sempre</span>
         <span className="block text-[11px]" style={{ color: 'var(--ink3)' }}>
-          Spento: le tue foto entrano solo quando c'entrano col contenuto della slide. Acceso: ogni slide parte da una tua foto.
+          Spento: nelle storie le tue foto entrano solo quando c'entrano con l'argomento. Acceso: nelle storie c'è sempre una tua foto
+          (a rotazione, mai quelle con testo o logo sopra) e la copertina dei caroselli usa il tuo volto, se hai caricato l'avatar.
+          Copertina e chiusura dei caroselli usano comunque una tua foto, quando ne hai.
         </span>
       </span>
     </label>
