@@ -1,5 +1,6 @@
 import type { ScrapedRaw } from "./types.ts";
 import type { ResolvedProfession } from "../_shared/brand/profession.ts";
+import { pulisciHashtag } from "../_shared/brand/metodoCopy.ts";
 
 /** Chi chiede l'analisi: il brand attivo e la sua professione. */
 export type AnalysisOwner = {
@@ -97,12 +98,19 @@ export const LEGACY_SYSTEM_PROMPT = `Sei un esperto analista di social media mar
 REGOLE CRITICHE:
 - Basa OGNI analisi (engagement, topic, hashtag, frequenza) SOLO sui dati reali forniti nel prompt.
 - "hashtag_analysis.most_used": USA SOLO hashtag che vedi esplicitamente nei post o nella sezione "HASHTAG OSSERVATI". Se nessun hashtag è presente, ritorna array vuoto. MAI inventare.
-- "hashtag_analysis.suggested": qui PUOI proporre hashtag nuovi rilevanti per il settore, ma devono essere realistici e specifici.
+- "hashtag_analysis.suggested": qui PUOI proporre hashtag nuovi rilevanti per il settore, ma devono essere realistici, specifici e scritti in italiano corretto: rileggi l'ortografia di ogni parola («posturacorretta», non «posturacorreta»). Nel dubbio su come si scrive, non metterlo.
 - Le frequenze e i topic devono derivare dai post mostrati, non da assunzioni generiche.
 - Idee di contenuto e opportunità: mai inventare offerte, programmi, guide o materiali di chi chiede l'analisi («scrivi CERVICALE per il mio programma di 7 giorni»): proponi il tema e l'angolo, non un'offerta che forse non esiste.
 - Mai promesse sanitarie nelle idee: niente guarigione, risultati garantiti o duraturi, «senza farmaci», sintomi che spariscono, tempi o numero di sedute promessi.
 
 Rispondi SOLO con JSON valido.`;
+
+/** Hashtag suggeriti senza spazi, simboli o doppioni, col cancelletto davanti. */
+export function pulisciSuggeriti(parsed: any): void {
+  const lista = parsed?.hashtag_analysis?.suggested;
+  if (!Array.isArray(lista)) return;
+  parsed.hashtag_analysis.suggested = pulisciHashtag(lista, 12).map((h) => "#" + h);
+}
 
 export function buildLegacyUserPrompt(competitorContext: string, owner?: AnalysisOwner | null): string {
   const settore = owner?.prof.profile.settore || "salute e benessere";

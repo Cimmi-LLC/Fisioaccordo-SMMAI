@@ -280,6 +280,20 @@ const MainContent: React.FC<MainContentProps> = React.memo(({ user, onContentSav
               onPhotoRemove={() => {}}
             />
           )}
+          {/* I campi del metodo ci sono dal 03/11 ma stanno in una scheda che
+              pochi aprono: finché sono vuoti, la pagina lo ricorda. */}
+          {brandRecord && !((brandRecord as { frasi_pazienti?: string[] | null }).frasi_pazienti?.length) && (
+            <p className="text-[12px] mt-3" style={{ color: 'var(--ink3)' }}>
+              Oggi il copy parte da quello che c'è scritto sul tuo sito. Per farlo parlare come i tuoi pazienti, scrivi 3 frasi che ti dicono loro:{' '}
+              <button
+                type="button"
+                onClick={() => navigate('/brand?tab=preferenze')}
+                style={{ background: 'none', border: 'none', padding: 0, color: 'var(--viola)', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                Brand Kit, scheda Preferenze
+              </button>.
+            </p>
+          )}
         </div>
         <div className="min-w-0">
           {carouselDataList.length > 1 && (

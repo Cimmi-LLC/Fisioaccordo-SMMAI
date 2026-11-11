@@ -661,7 +661,7 @@ REGOLE
 - Hook allineato: parlato, testo in alto e visivo dicono la stessa cosa nello stesso momento. Testo in alto al massimo 6 parole, grande, mai in basso.
 - Valore entro 5 secondi e almeno un consiglio pratico che si applica subito, concreto come nell'originale: numeri, tempi, posizioni, ripetizioni (es. «dieci respiri lenti da sdraiato», non «fai esercizi di stabilità»). Ogni frase deve valere: se non la pagheresti 100 dollari, toglila.
 - Nel corpo del video solo valore: niente frasi che presentano lo studio o il professionista («noi ti guidiamo…», «nel nostro studio…»). Lo studio compare solo nella CTA.
-- Una sola CTA, nativa, estensione del video: meglio un lead magnet legato al video con una parola chiave da scrivere nei commenti. Mai «scrivimi in DM» automatico ai nuovi follower.
+- Una sola CTA, nativa, estensione del video. Un lead magnet (guida, pdf, video, scheda) SOLO se compare scritto nei dati del brand qui sopra: mai inventare guide, programmi o materiali che lo studio non ha. Se non c'è, la CTA è «commenta PAROLA e ti rispondo sul tuo caso» oppure una delle CTA del brand, e "lead_magnet" resta vuoto. Mai «scrivimi in DM» automatico ai nuovi follower.
 - ${origine.paese === 'IT' ? 'Il video è italiano: non riusare le sue frasi, riscrivile con parole tue.' : 'Il video è straniero: non tradurre, adatta al pubblico italiano (modi di dire, sistema sanitario, esempi).'}
 - Niente nomi, marchi o prodotti del video originale. Niente diagnosi, niente promesse di guarigione. Mai la parola «sbloccare»: si dice aiutare, risolvere in meno tempo, più risultati.
 - "frasi" contiene tutto il parlato, dall'hook alla CTA compresi, una frase per riga, nell'ordine in cui si dice.

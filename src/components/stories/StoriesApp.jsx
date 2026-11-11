@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { REGOLA_CLAIM, daRivedere, regolaCoseDelBrand } from "@/lib/brand/metodoCopy";
-import { creaCercaFoto, fraseSenzaFoto, messaggioErroreStorie, rispostaNonLeggibile } from "@/lib/storie";
+import { coloreLeggibile, creaCercaFoto, fraseSenzaFoto, messaggioErroreStorie, rispostaNonLeggibile } from "@/lib/storie";
 import { useStoryTemplates } from "@/hooks/useStoryTemplates";
 import { useStoryBatches } from "@/hooks/useStoryBatches";
 import ScheduleStoriesDialog from "@/components/schedule/ScheduleStoriesDialog";
@@ -503,7 +503,8 @@ async function renderJpeg(story, client, photoImg){
   const ctx=cv.getContext("2d");
   const fn="'"+(client.brandFont||"Montserrat")+"', sans-serif";
   const colors=client.brandColors?.length>=2?client.brandColors:["#2d6a2d","#7bc67b"];
-  const primary=colors[0], secondary=colors[1]||colors[0];
+  // Le storie hanno il fondo chiaro: un colore del brand che lì non si legge diventa inchiostro.
+  const primary=coloreLeggibile(colors[0]), secondary=coloreLeggibile(colors[1]||colors[0]);
   const isAnswer=story.cardType==="quiz_risposta";
   const bgLight=client.bgIsLight!==false;
 

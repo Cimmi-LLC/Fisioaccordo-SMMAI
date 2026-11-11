@@ -41,14 +41,14 @@ export const useTrends = () => {
 
   useEffect(() => { fetchTrends(); }, [fetchTrends]);
 
-  const findTrends = useCallback(async (niche: string, platform: string, append = false) => {
+  const findTrends = useCallback(async (niche: string, platform: string, append = false, contesto = '') => {
     if (!user) return null;
     setSearching(true);
     try {
       const excludeTopics = append ? trends.map(t => t.topic) : [];
 
       const { data, error } = await supabase.functions.invoke('find-trends', {
-        body: { niche, platform, count: 10, excludeTopics }
+        body: { niche, platform, count: 10, excludeTopics, contesto }
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);

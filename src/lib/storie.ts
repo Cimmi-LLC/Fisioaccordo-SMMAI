@@ -7,6 +7,8 @@
 // Riprova.». Qui: una chiamata per foto, poche insieme, un tempo massimo, una
 // pausa dopo un errore, e il motivo detto in italiano.
 
+import { contrasto } from './brand/layouts';
+
 export type MotivoFoto = 'tempo' | 'errore' | 'nessuna';
 
 export type EsitoFoto = { url: string | null; motivo: MotivoFoto | null };
@@ -132,4 +134,19 @@ export function messaggioErroreStorie(err: unknown): string {
 export function rispostaNonLeggibile(err: unknown): boolean {
   const t = err instanceof Error ? err.message : '';
   return /no json array|unexpected token|unexpected end|is not valid json/i.test(t);
+}
+
+/** Inchiostro usato al posto di un colore del brand troppo chiaro. */
+export const INCHIOSTRO_STORIE = '#1f2430';
+
+/**
+ * Colore per testi e pulsanti delle storie, che hanno il fondo chiaro: un
+ * colore del brand che sul bianco non si legge (giallo, menta, azzurro
+ * pallido) lascia il posto all'inchiostro. Prova del 10/11/2026: le storie
+ * di un brand giallo uscivano con il testo giallo su fondo chiaro.
+ */
+export function coloreLeggibile(hex: string | null | undefined, minimo = 2.2): string {
+  const c = String(hex || '').trim();
+  if (!/^#[0-9a-f]{6}$/i.test(c)) return INCHIOSTRO_STORIE;
+  return contrasto(c, '#ffffff') >= minimo ? c : INCHIOSTRO_STORIE;
 }

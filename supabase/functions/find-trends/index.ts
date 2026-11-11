@@ -70,7 +70,12 @@ serve(async (req) => {
       }
     }
 
-    const { niche, platform, count, excludeTopics } = await req.json();
+    const { niche, platform, count, excludeTopics, contesto } = await req.json();
+    // Servizi e pubblico del brand, mandati dal sito: senza, uno studio che
+    // tratta solo cervicale e vertigini riceveva temi da fisioterapia generica.
+    const bloccoBrand = typeof contesto === "string" && contesto.trim()
+      ? `\n\nCHI PUBBLICA (dal suo Brand Kit)\n${contesto.trim().slice(0, 900)}\nAlmeno 7 temi su ${count || 10} devono riguardare proprio questi servizi e questo pubblico; gli altri possono essere della nicchia in generale.`
+      : "";
     if (!niche) {
       return new Response(JSON.stringify({ error: "Specifica una nicchia" }), {
         status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -88,7 +93,7 @@ serve(async (req) => {
 
     const prompt = `Sei un trend analyst esperto. Oggi è ${today}.
 
-Trova esattamente ${numTrends} temi caldi per la nicchia "${niche}" sulla piattaforma ${platform || "Instagram"}.${excludeBlock}
+Trova esattamente ${numTrends} temi caldi per la nicchia "${niche}" sulla piattaforma ${platform || "Instagram"}.${excludeBlock}${bloccoBrand}
 
 Chi li usa è un professionista o uno studio LOCALE italiano che pubblica per i propri pazienti/clienti.
 I temi devono essere:

@@ -14,7 +14,7 @@ import { adminClient, assertBrandOwnership, requireAuth, requireWithinRateLimit 
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { callGeminiWithRetry } from "../_shared/gemini.ts";
 import { professionPromptBlock, resolveProfession, type ProfessionBrandLike } from "../_shared/brand/profession.ts";
-import { REGOLA_CLAIM, daRivedere } from "../_shared/brand/metodoCopy.ts";
+import { REGOLA_CLAIM, controlliMeccanici, daRivedere } from "../_shared/brand/metodoCopy.ts";
 import {
   SISTEMA_ANALISI,
   SISTEMA_COPIONE,
@@ -284,5 +284,16 @@ async function scriviCopione(gemini: string, analisi: AnalisiVideo, tipo: TipoCo
   // Le promesse rimaste (spesso sono la leva del format originale: «ti
   // sentirai subito meglio») non si riscrivono: si segnalano a chi registra.
   const avvisi = daRivedere(testoDelCopione(copione), { sanitario, coseDaNonDire: brand.parole_da_evitare || [] });
+  // Un materiale promesso (guida, pdf, programma) deve stare nei dati del
+  // brand: il 09/11 il copione prometteva «una guida gratuita per i tuoi
+  // sbandamenti» a uno studio che non ce l'ha.
+  const g = brand as Grezzo;
+  const fonti = [g.descrizione, g.mission, ...[g.servizi, g.vantaggi_competitivi, g.cta_suggerite].flatMap((v) => Array.isArray(v) ? v : [])]
+    .filter((x) => typeof x === "string").join("\n");
+  const promesse = controlliMeccanici(
+    { slides: [{ tipo: "cta", testo: [copione.cta, copione.lead_magnet, copione.didascalia].filter(Boolean).join("\n") }] },
+    fonti,
+  ).filter((p) => p.startsWith("promette un materiale"));
+  for (const p of promesse) avvisi.push(p.replace(/: usa «commenta PAROLA.*$/, ""));
   return avvisi.length ? { ...copione, da_rivedere: avvisi } : copione;
 }

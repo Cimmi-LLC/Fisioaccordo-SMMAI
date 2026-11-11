@@ -66,7 +66,7 @@ serve(async (req) => {
     const systemPrompt = `Sei un esperto di marketing per professionisti della salute (fisioterapisti, osteopati, poliambulatori, nutrizionisti, personal trainer, psicologi, dentisti e altre figure sanitarie) e anche per brand di altri settori, compresi i personal brand. Hai estratto il contenuto del sito web o del profilo Instagram (bio e didascalie dei post) di uno studio, di un professionista o di un brand. Il tuo compito è analizzare questo contenuto e costruire un profilo completo del brand.
 
 Analizza attentamente e ricava:
-- Il nome esatto dello studio/brand
+- Il nome dello studio/brand come lo direbbe un paziente: corto, al massimo 40 caratteri, senza l'elenco dei servizi. Se il titolo del sito è «Studio di Fisioterapia Cervicale Vertigini del Dott. Mario Rossi», il nome è «Studio Dott. Mario Rossi»
 - La professione di chi pubblica: scegli UNO slug tra [${professionListForPrompt()}]. Usa "altro" solo se nessuna voce descrive il mestiere, e in quel caso scrivi l'etichetta in "professione_label" (es. "Terapista occupazionale"). Se lo studio riunisce più specialisti scegli "poliambulatorio".
 - Una descrizione breve e professionale (max 300 caratteri)
 - I servizi offerti, con il lessico della professione (es. fisioterapia, piani alimentari, personal training, igiene orale, ecc.)
@@ -76,7 +76,7 @@ Analizza attentamente e ricava:
 - La mission o i valori del brand (se presenti)
 - Suggerisci 5 temi chiave adatti per i post social, coerenti con la professione
 - Suggerisci 3 call to action adatte: un'azione (prenota una valutazione, scrivici, chiama), mai una promessa di risultato («Risolvi i tuoi dolori»)
-- La persona di scrittura suggerita ("io" per professionista singolo, "noi" per studio/team)
+- La persona di scrittura: "io" se il sito presenta UNA sola persona (un nome e cognome, «Dott.», «il mio studio», una sola biografia), anche quando si chiama «Studio…»; "noi" solo se ci sono più professionisti o un centro con un team
 - I colori principali del brand: scegli SOLO tra i colori della lista fornita sopra (COLORI CSS TROVATI NEL SITO, oppure COLORI RICORRENTI NELLE IMMAGINI DEL PROFILO se arriva da Instagram: sono i colori che il visitatore vede davvero). Il primario è quello più usato per bottoni, titoli e marchio. Restituisci 3 colori hex presi da quella lista. Se la lista manca o non basta, lascia stringa vuota nei campi che non puoi riempire: NON inventare MAI un colore e NON suggerire colori «di settore».
 - Categorie: scegli tra [${allProfessionCategories().join(", ")}, altro], coerenti con la professione rilevata
 
