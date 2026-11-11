@@ -4,7 +4,7 @@ import { logGeneration } from "../_shared/historyLogger.ts";
 import { requireWithinRateLimit } from "../_shared/auth.ts";
 import { callGeminiWithRetry } from "../_shared/gemini.ts";
 import { resolveProfession, professionPromptBlock, type ResolvedProfession } from "../_shared/brand/profession.ts";
-import { REGOLA_CLAIM, daRivedere, regolaCoseDelBrand, senzaClaim } from "../_shared/brand/metodoCopy.ts";
+import { REGOLA_CLAIM, daRivedere, pulisciHashtag, regolaCoseDelBrand, senzaClaim } from "../_shared/brand/metodoCopy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,7 +16,16 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { topic, brandId } = await req.json();
+    const { topic, brandId, durata: durataChiesta } = await req.json();
+    // Durata a scelta (30, 45 o 60 secondi). Revisione del reparto social,
+    // 09/11/2026: 60 secondi fissi sono lunghi per il format.
+    const DURATE: Record<number, { parole: string; tempi: [string, string, string, string, string] }> = {
+      30: { parole: "65-75", tempi: ["0-3", "3-6", "6-10", "10-25", "25-30"] },
+      45: { parole: "100-115", tempi: ["0-3", "3-8", "8-15", "15-37", "37-45"] },
+      60: { parole: "130-150", tempi: ["0-3", "4-10", "10-20", "20-50", "50-60"] },
+    };
+    const durata = [30, 45, 60].includes(Number(durataChiesta)) ? Number(durataChiesta) : 45;
+    const D = DURATE[durata];
 
     if (!topic || typeof topic !== "string" || topic.trim().length < 2) {
       return new Response(JSON.stringify({ error: "Topic is required" }), {
@@ -104,7 +113,7 @@ CONTENUTO:
 - Valore vero entro i primi 5 secondi e almeno un consiglio applicabile subito, con numeri o tempi concreti (mai statistiche inventate).
 - UNA SOLA CTA, alla fine, naturale come estensione del video. Mai CTA in mezzo.
 - Zero gergo tecnico non spiegato, mai linguaggio aziendale, tono diretto e personale.
-- Totale parole script: 130-150 (60 secondi di parlato).
+- Totale parole script: ${D.parole} (${durata} secondi di parlato).
 ${brandContext}
 
 ${professionPromptBlock(prof)}
@@ -112,52 +121,52 @@ ${prof.id !== "altro" ? "\n" + REGOLA_CLAIM + "\n" : ""}${regolaCoseDelBrand(cos
 Rispondi SOLO con JSON valido.`;
 
     const userPrompt = `TEMA DEL REEL: "${topic.trim()}"
-DURATA: 60 secondi (circa 130-150 parole totali)
+DURATA: ${durata} secondi (circa ${D.parole} parole totali)
 
 Scrivi la sceneggiatura con questa struttura:
 
-1. GANCIO (0-3 sec): Frase che blocca lo scorrimento. Affermazione provocatoria, domanda pungente o promessa impossibile da ignorare. [INQUADRATURA: primo piano viso, guarda dritto in camera]
+1. GANCIO (${D.tempi[0]} sec): Frase che blocca lo scorrimento. Affermazione provocatoria, domanda pungente o promessa impossibile da ignorare. [INQUADRATURA: primo piano viso, guarda dritto in camera]
 
-2. PROBLEMA (4-10 sec): Lo spettatore deve sentirsi letto nel pensiero. Descrivi la loro situazione con tale precisione da farli pensare "Parla proprio di me." [INQUADRATURA: busto, gestualità naturale]
+2. PROBLEMA (${D.tempi[1]} sec): Lo spettatore deve sentirsi letto nel pensiero. Descrivi la loro situazione con tale precisione da farli pensare "Parla proprio di me." [INQUADRATURA: busto, gestualità naturale]
 
-3. PROMESSA (10-20 sec): Spiega cosa scopriranno se continuano a guardare. Includi un OPEN LOOP: fai una domanda che risponderai solo alla fine. [INQUADRATURA: busto]
+3. PROMESSA (${D.tempi[2]} sec): Spiega cosa scopriranno se continuano a guardare. Includi un OPEN LOOP: fai una domanda che risponderai solo alla fine. [INQUADRATURA: busto]
 
-4. CONTENUTO (20-50 sec): Sviluppa l'idea in modo chiaro. Frasi brevi, esempi concreti, numeri reali. Parla come in una conversazione vera. [Indica cambio inquadratura se utile]
+4. CONTENUTO (${D.tempi[3]} sec): Sviluppa l'idea in modo chiaro. Frasi brevi, esempi concreti, numeri reali. Parla come in una conversazione vera. [Indica cambio inquadratura se utile]
 
-5. CHIUSURA + CTA (50-60 sec): Risolvi l'open loop. Frase finale che genera emozione o urgenza. CTA: "${brandCta}" [INQUADRATURA: primo piano, tono diretto e caldo]
+5. CHIUSURA + CTA (${D.tempi[4]} sec): Risolvi l'open loop. Frase finale che genera emozione o urgenza. CTA: "${brandCta}" [INQUADRATURA: primo piano, tono diretto e caldo]
 
 Rispondi con questo JSON:
 {
   "titolo_reel": "Titolo breve del reel",
-  "durata_stimata": "60 secondi",
+  "durata_stimata": "${durata} secondi",
   "sezioni": [
     {
       "nome": "GANCIO",
-      "timing": "0-3 secondi",
+      "timing": "${D.tempi[0]} secondi",
       "testo": "testo parlato...",
       "inquadratura": "Primo piano viso, guarda in camera"
     },
     {
       "nome": "PROBLEMA",
-      "timing": "4-10 secondi",
+      "timing": "${D.tempi[1]} secondi",
       "testo": "testo parlato...",
       "inquadratura": "Busto, gestualità naturale"
     },
     {
       "nome": "PROMESSA",
-      "timing": "10-20 secondi",
+      "timing": "${D.tempi[2]} secondi",
       "testo": "testo parlato...",
       "inquadratura": "Busto"
     },
     {
       "nome": "CONTENUTO",
-      "timing": "20-50 secondi",
+      "timing": "${D.tempi[3]} secondi",
       "testo": "testo parlato...",
       "inquadratura": "..."
     },
     {
       "nome": "CHIUSURA + CTA",
-      "timing": "50-60 secondi",
+      "timing": "${D.tempi[4]} secondi",
       "testo": "testo parlato...",
       "inquadratura": "Primo piano, tono diretto"
     }
@@ -232,6 +241,7 @@ ${avvisi.map((a) => `- ${a}`).join("\n")}` }] }],
       } catch { /* resta la prima versione, con gli avvisi */ }
     }
     parsed.da_rivedere = avvisi;
+    parsed.hashtag_suggeriti = pulisciHashtag(parsed.hashtag_suggeriti);
 
     if (resolvedUserId) {
       await logGeneration({

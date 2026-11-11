@@ -118,7 +118,10 @@ const BrandPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-  const [activeTab, setActiveTab] = useState<'brand' | 'gallery' | 'preferences'>('brand');
+  // «?tab=preferenze» apre direttamente la scheda con le parole dei pazienti e le cose da non dire.
+  const [activeTab, setActiveTab] = useState<'brand' | 'gallery' | 'preferences'>(
+    () => (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'preferenze' ? 'preferences' : 'brand'),
+  );
   // Ultimo stato salvato (o caricato): serve ad "Annulla modifiche".
   const [savedBrand, setSavedBrand] = useState<BrandProfile | null>(null);
   // Rianalisi di un sito collegato: risultato, sito, e stato del modulo prima

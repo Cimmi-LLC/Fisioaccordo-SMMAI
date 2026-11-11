@@ -56,11 +56,23 @@ const TrendExplorer: React.FC<TrendExplorerProps> = ({ onUseTrend }) => {
   const [lastNiche, setLastNiche] = useState('');
   const [lastPlatform, setLastPlatform] = useState('');
 
+  // Servizi, pubblico e temi del brand attivo: pesano sui temi proposti.
+  const contestoBrand = (): string => {
+    const b = activeBrand as { servizi?: string[] | null; target_pazienti?: string | null; temi_chiave?: string[] | null; citta?: string | null } | null;
+    if (!b) return '';
+    return [
+      b.servizi?.length ? 'Servizi: ' + b.servizi.slice(0, 8).join(', ') : '',
+      b.target_pazienti ? 'A chi parla: ' + b.target_pazienti : '',
+      b.temi_chiave?.length ? 'Temi del brand: ' + b.temi_chiave.slice(0, 6).join(', ') : '',
+      b.citta ? 'Città: ' + b.citta : '',
+    ].filter(Boolean).join('\n');
+  };
+
   const handleSearch = () => {
     if (!niche.trim()) return;
     setLastNiche(niche.trim());
     setLastPlatform(platform);
-    findTrends(niche.trim(), platform, false);
+    findTrends(niche.trim(), platform, false, contestoBrand());
   };
 
   // I trend in pagina possono arrivare dal database (ricerche dei giorni
@@ -76,7 +88,7 @@ const TrendExplorer: React.FC<TrendExplorerProps> = ({ onUseTrend }) => {
     const piattaforma = lastPlatform || platform;
     setLastNiche(nicchia);
     setLastPlatform(piattaforma);
-    findTrends(nicchia, piattaforma, true);
+    findTrends(nicchia, piattaforma, true, contestoBrand());
   };
 
   const developIdea = (topic: string, target: DevTarget) => {

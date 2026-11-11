@@ -11,7 +11,7 @@ export const useReelScript = () => {
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
 
-  const generateScripts = useCallback(async (topic: string, qty: number = 1) => {
+  const generateScripts = useCallback(async (topic: string, qty: number = 1, durata: 30 | 45 | 60 = 45) => {
     if (!topic.trim()) {
       toast({ title: 'Inserisci un argomento', variant: 'destructive' });
       return;
@@ -28,7 +28,7 @@ export const useReelScript = () => {
           ? `\n\nGenera la variazione #${i + 1} di ${count}: cambia angle/hook/struttura rispetto alle altre.`
           : '';
         return supabase.functions.invoke('generate-reel-script', {
-          body: { topic: topic + variationHint, brandId: activeBrandId },
+          body: { topic: topic + variationHint, brandId: activeBrandId, durata },
         }).then(({ data, error }) => {
           setProgress(p => ({ ...p, done: p.done + 1 }));
           if (error) throw new Error(error.message);

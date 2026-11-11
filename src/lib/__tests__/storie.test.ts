@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { creaCercaFoto, fraseSenzaFoto, messaggioErroreStorie, rispostaNonLeggibile, type RispostaFoto } from '../storie';
+import { INCHIOSTRO_STORIE, coloreLeggibile, creaCercaFoto, fraseSenzaFoto, messaggioErroreStorie, rispostaNonLeggibile, type RispostaFoto } from '../storie';
 
 const lenta = (risposta: RispostaFoto, ms = 5) => new Promise<RispostaFoto>((r) => setTimeout(() => r(risposta), ms));
 
@@ -105,5 +105,19 @@ describe('messaggi', () => {
     expect(fraseSenzaFoto('tempo')).toMatch(/in tempo/);
     expect(fraseSenzaFoto('nessuna')).toMatch(/Nessuna foto adatta/);
     expect(fraseSenzaFoto('errore')).toBe('La foto non è arrivata');
+  });
+});
+
+describe('coloreLeggibile (storie su fondo chiaro)', () => {
+  it('un giallo o una menta non si leggono sul chiaro: inchiostro', () => {
+    expect(coloreLeggibile('#ffd700')).toBe(INCHIOSTRO_STORIE);
+    expect(coloreLeggibile('#b6e3d4')).toBe(INCHIOSTRO_STORIE);
+  });
+  it('i colori che si leggono restano quelli del brand', () => {
+    for (const c of ['#00539e', '#554697', '#e6007e', '#f0853d']) expect(coloreLeggibile(c)).toBe(c);
+  });
+  it('colore mancante o scritto male: inchiostro', () => {
+    expect(coloreLeggibile(null)).toBe(INCHIOSTRO_STORIE);
+    expect(coloreLeggibile('blu')).toBe(INCHIOSTRO_STORIE);
   });
 });

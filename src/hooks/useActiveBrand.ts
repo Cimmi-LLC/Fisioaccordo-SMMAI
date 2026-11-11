@@ -6,6 +6,9 @@ import type { BrandProfile } from '@/types/brand';
 
 const LS_KEY = 'fisioaccordo:active_brand_id';
 
+/** Evento del browser: il brand attivo è cambiato (detail = id del brand). */
+const EVENTO_BRAND_ATTIVO = 'smm:brand-attivo';
+
 export const useActiveBrand = () => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -44,10 +47,29 @@ export const useActiveBrand = () => {
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
+  // Ogni componente che usa questo hook ha il suo stato: quando il brand
+  // cambia dal menu, gli altri lo devono sapere. Prima la pagina Post teneva
+  // riquadro del template e caroselli del brand precedente fino al
+  // ricaricamento (visto nella prova del 10/11/2026).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sente = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      if (typeof id !== 'string' || !id) return;
+      setActiveBrandIdState((prima) => (prima === id ? prima : id));
+      if (!brands.some((b) => b.id === id)) void loadAll();
+    };
+    window.addEventListener(EVENTO_BRAND_ATTIVO, sente);
+    return () => window.removeEventListener(EVENTO_BRAND_ATTIVO, sente);
+  }, [brands, loadAll]);
+
   const setActiveBrand = useCallback(async (brandId: string) => {
     if (!user) return;
     setActiveBrandIdState(brandId);
-    if (typeof window !== 'undefined') localStorage.setItem(LS_KEY, brandId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LS_KEY, brandId);
+      window.dispatchEvent(new CustomEvent(EVENTO_BRAND_ATTIVO, { detail: brandId }));
+    }
     try {
       await supabase
         .from('user_settings')

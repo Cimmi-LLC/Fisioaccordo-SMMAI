@@ -529,3 +529,24 @@ export function leggiGiudizio(raw: string): Giudizio | null {
     return null;
   }
 }
+
+// ── Hashtag ──
+
+/**
+ * Hashtag pronti da incollare: senza cancelletto, senza spazi («#mal di
+ * testa» non è un hashtag valido: diventa «maldite sta» su Instagram), solo
+ * lettere, numeri e trattino basso, niente doppioni.
+ */
+export function pulisciHashtag(lista: unknown, massimo = 15): string[] {
+  const visti = new Set<string>();
+  const out: string[] = [];
+  for (const v of Array.isArray(lista) ? lista : []) {
+    const h = String(v ?? '').replace(/^#+/, '').normalize('NFC').replace(/[^\p{L}\p{N}_]/gu, '');
+    const chiave = h.toLocaleLowerCase('it');
+    if (h.length < 2 || h.length > 40 || visti.has(chiave)) continue;
+    visti.add(chiave);
+    out.push(h);
+    if (out.length >= massimo) break;
+  }
+  return out;
+}

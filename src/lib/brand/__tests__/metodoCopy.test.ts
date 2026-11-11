@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   pubblicoDelBrand, FORMATI, formatoPerId, pianoSlide, regoleMetodo, controlliMeccanici, leggiGiudizio, promptGiudice,
-  CRITERI_GIUDICE, REGOLA_CLAIM, claimSanitari, coseDelBrandIn, daRivedere, regolaCoseDelBrand, senzaClaim,
+  CRITERI_GIUDICE, REGOLA_CLAIM, claimSanitari, coseDelBrandIn, daRivedere, regolaCoseDelBrand, senzaClaim, pulisciHashtag,
 } from '../metodoCopy';
 
 describe('pubblicoDelBrand', () => {
@@ -340,5 +340,15 @@ describe('claim nei controlli e nei prompt', () => {
     expect(regoleMetodo(altro)).not.toContain('COSE DA NON DIRE');
     expect(promptGiudice({}, sanitario, 'vertigini')).toMatch(/«senza farmaci»/);
     expect(promptGiudice({}, altro, 'agenda')).not.toMatch(/«senza farmaci»/);
+  });
+});
+
+describe('pulisciHashtag', () => {
+  it('caso del 09/11: «#mal di testa» diventa un hashtag valido', () => {
+    expect(pulisciHashtag(['#mal di testa', 'cervicale', '#Cervicale', ' #vertigini! ', '', 'a'])).toEqual(['malditesta', 'cervicale', 'vertigini']);
+  });
+  it('tiene accenti e numeri, rispetta il massimo, regge un valore che non è una lista', () => {
+    expect(pulisciHashtag(['perché', 'top10', 'x_y'], 2)).toEqual(['perché', 'top10']);
+    expect(pulisciHashtag(null)).toEqual([]);
   });
 });

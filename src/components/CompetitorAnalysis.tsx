@@ -24,7 +24,16 @@ const CompetitorAnalysis: React.FC = () => {
         const professione = (activeBrand as { professione?: string | null } | null)?.professione || null;
         const attivi = tutti.filter((a) => a.attivo);
         const dellaNicchia = professione ? attivi.filter((a) => a.professione === professione) : attivi;
-        setSuggeriti((dellaNicchia.length > 0 ? dellaNicchia : attivi).slice(0, 12));
+        // La stessa persona può essere in libreria due volte (Instagram e
+        // TikTok): nella lista compare una volta sola.
+        const visti = new Set<string>();
+        const unici = (dellaNicchia.length > 0 ? dellaNicchia : attivi).filter((a) => {
+          const chiave = (a.nome || a.handle || '').trim().toLowerCase() || a.handle;
+          if (visti.has(chiave)) return false;
+          visti.add(chiave);
+          return true;
+        });
+        setSuggeriti(unici.slice(0, 12));
       } catch { /* la sezione virali può non essere disponibile: pazienza */ }
     })();
   }, [activeBrand]);

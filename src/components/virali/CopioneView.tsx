@@ -6,6 +6,15 @@ import { useToast } from '@/hooks/use-toast';
 import { copioneDaLeggere, type Copione } from '@/lib/brand/virali';
 import DaRivedere from '@/components/DaRivedere';
 
+// I mattoncini arrivano dal modello coi nomi del metodo («topic», «hook»…):
+// a schermo si scrivono in italiano.
+const MATTONCINI: Record<string, string> = {
+  topic: 'l\'argomento', hook: 'la frase d\'apertura', cta: 'l\'invito finale', format: 'il format',
+  contrarian_take: 'la tesi controcorrente', 'contrarian take': 'la tesi controcorrente', seed: 'l\'idea di partenza',
+  struttura: 'la struttura', layout: 'l\'impaginazione',
+};
+const nomeMattoncino = (m: string) => MATTONCINI[m.trim().toLowerCase()] || m;
+
 const Blocco: React.FC<{ titolo: string; children: React.ReactNode }> = ({ titolo, children }) => (
   <div>
     <div className="text-xs font-bold uppercase tracking-wide mb-1" style={{ color: 'var(--ink3)' }}>{titolo}</div>
@@ -54,7 +63,7 @@ const CopioneView: React.FC<{ copione: Copione }> = ({ copione }) => {
       <DaRivedere voci={copione.da_rivedere} quando="registrare" />
 
       {copione.mattoncini_cambiati.length > 0 && (
-        <Blocco titolo="Cosa cambia rispetto all'originale">{copione.mattoncini_cambiati.join(', ')}</Blocco>
+        <Blocco titolo="Cosa cambia rispetto all'originale">{copione.mattoncini_cambiati.map(nomeMattoncino).join(', ')}</Blocco>
       )}
       <Blocco titolo="Testo in alto (primi secondi)">
         <span className="font-bold">{copione.testo_in_alto}</span>

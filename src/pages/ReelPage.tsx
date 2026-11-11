@@ -20,13 +20,15 @@ const ReelPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [topic, setTopic] = useState('');
   const [qty, setQty] = useState<number>(1);
+  // Durata dello script: 45 secondi di partenza (60 fissi erano lunghi per il format).
+  const [durata, setDurata] = useState<30 | 45 | 60>(45);
   const [activeIndex, setActiveIndex] = useState(0);
   const { scripts, generating, progress, generateScripts, copyScript, copyCaption } = useReelScript();
   const [publishOpen, setPublishOpen] = useState(false);
   const activeScript = scripts[activeIndex];
 
   const handleGenerate = () => {
-    if (topic.trim()) generateScripts(topic.trim(), qty);
+    if (topic.trim()) generateScripts(topic.trim(), qty, durata);
   };
 
   // Deep-link from Trend page: prefill topic + auto-generate when ?topic=…&auto=1
@@ -41,7 +43,7 @@ const ReelPage = () => {
     if (auto) {
       autoFiredRef.current = true;
       // Defer to next tick so React commits the topic state first
-      setTimeout(() => generateScripts(incoming, qty), 0);
+      setTimeout(() => generateScripts(incoming, qty, durata), 0);
       // Strip params so a future refresh doesn't re-fire the generation
       setSearchParams({}, { replace: true });
     }
@@ -98,6 +100,35 @@ const ReelPage = () => {
               onFocus={e => { e.currentTarget.style.borderColor = 'var(--rosa)'; }}
               onBlur={e => { e.currentTarget.style.borderColor = 'var(--line)'; }}
             />
+
+            {/* Durata */}
+            <div className="mt-4">
+              <label className="block text-[12px] font-bold mb-2" style={{ color: 'var(--ink)' }}>
+                Quanto deve durare?
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {([30, 45, 60] as const).map(sec => {
+                  const isActive = durata === sec;
+                  return (
+                    <button
+                      key={sec}
+                      type="button"
+                      onClick={() => setDurata(sec)}
+                      disabled={generating}
+                      className="text-[13px] font-black py-2.5 rounded-lg transition-all disabled:opacity-50"
+                      style={{
+                        backgroundColor: isActive ? 'var(--rosa)' : 'var(--bg)',
+                        color: isActive ? '#fff' : 'var(--ink3)',
+                        border: isActive ? 'none' : '1px solid var(--line)',
+                        cursor: generating ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      {sec} secondi
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* Quantity selector */}
             <div className="mt-4" data-tour="reel-quantity">
