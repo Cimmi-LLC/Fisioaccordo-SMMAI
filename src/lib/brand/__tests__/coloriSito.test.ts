@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COLORI_SOCIAL, coloriDelSito } from '../coloriSito';
+import { COLORI_SOCIAL, coloriDelSito, senzaRegoleSocial } from '../coloriSito';
 import { siteGroundedColors } from '../../siteColors';
 
 // Un sito come quello del test del 09/11: blu del brand, pulsanti verdi, e
@@ -59,5 +59,30 @@ describe('coloriDelSito', () => {
     const c = coloriDelSito('<html></html>', tema).map((x) => x.hex);
     expect(c).toEqual(expect.arrayContaining(['#00539e', '#f0853d']));
     for (const no of ['#45629f', '#5eb2ef', '#f09433', '#e6683c']) expect(c).not.toContain(no);
+  });
+});
+
+describe('senzaRegoleSocial', () => {
+  const VECCHIA = /[^{}]*(?:facebook|twitter|instagram|whatsapp|youtube|linkedin|tiktok|telegram|pinterest|messenger|trustpilot|google-?plus|gplus)[^{}]*\{[^{}]*\}/gi;
+
+  it('toglie le stesse regole della regex di prima', () => {
+    const css = [
+      '.btn-orange{background:#f0853d}',
+      'a.btn-facebook, .x { background:#45629f }',
+      '@media (max-width:600px){.btn-twitter{color:#5eb2ef}.menu{color:#00539e}}',
+      'body{color:#333}',
+      '.fa-instagram:before{content:"\\f16d"}',
+      '.instagram-feed { }',
+    ].join('\n');
+    expect(senzaRegoleSocial(css)).toBe(css.replace(VECCHIA, ' '));
+  });
+
+  it('CSS da 400 KB pieno di icone social: resta sotto il secondo (prima 4 s, limite online 2 s)', () => {
+    const icone = ['facebook', 'twitter', 'instagram', 'youtube', 'linkedin'];
+    let css = '';
+    for (let i = 0; css.length < 400_000; i++) css += `.fa-${icone[i % 5]}-${i}:before{content:"\\f${i}"}.fa-x${i}:before{content:"\\e${i}"}`;
+    const t = performance.now();
+    senzaRegoleSocial(css);
+    expect(performance.now() - t).toBeLessThan(1000);
   });
 });
