@@ -1,14 +1,14 @@
 // Corso per andare virali — 3 consigli sull'account, legati alla lezione.
 //
-// Input: { brandId, lessonId }. Solo admin (la sezione è riservata) e solo
-// brand propri. Legge il testo della lezione, il Brand Kit e le metriche
-// Instagram degli ultimi 120 giorni (post_metrics), calcola mediana e
+// Input: { brandId, lessonId }. Solo brand propri (dal 15/11/2026 il corso
+// lo vedono tutti gli account, prima era riservato agli admin). Legge il
+// testo della lezione, il Brand Kit e le metriche Instagram degli ultimi
+// 120 giorni (post_metrics), calcola mediana e
 // outlier (5× la mediana) e chiede a Gemini 3 consigli concreti che
 // applicano la lezione a quell'account, citando i numeri. Il risultato si
 // salva in course_advice, così riaprendo la lezione si rivede.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { adminClient, requireAuth, assertBrandOwnership, requireWithinRateLimit } from "../_shared/auth.ts";
 import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { callGeminiWithRetry } from "../_shared/gemini.ts";
@@ -53,14 +53,6 @@ const median = (xs: number[]) => {
   const m = Math.floor(s.length / 2);
   return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
 };
-
-async function isAdmin(authHeader: string): Promise<boolean> {
-  const client = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    global: { headers: { Authorization: authHeader } },
-  });
-  const { data, error } = await client.rpc("is_admin");
-  return !error && data === true;
-}
 
 function summarize(rows: MetricRow[]) {
   // Una riga per post al giorno: si tiene l'ultima fotografia di ogni post.
@@ -120,7 +112,6 @@ serve(async (req) => {
   try {
     const auth = await requireAuth(req);
     if (!auth.ok) return jsonResponse(req, { error: auth.error }, auth.status);
-    if (!(await isAdmin(auth.authHeader))) return jsonResponse(req, { error: "Sezione riservata agli amministratori" }, 403);
 
     const body = await req.json().catch(() => null) as { brandId?: string; lessonId?: string } | null;
     const brandId = String(body?.brandId || "");

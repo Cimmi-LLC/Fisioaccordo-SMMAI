@@ -41,7 +41,7 @@ const CorsoPage: React.FC = () => {
     }
   }, [user]);
 
-  useEffect(() => { if (isAdmin) load(); }, [isAdmin, load]);
+  useEffect(() => { load(); }, [load]);
 
   // /corso senza lezione: si riparte dalla prima non studiata (o dalla guida).
   useEffect(() => {
@@ -69,15 +69,6 @@ const CorsoPage: React.FC = () => {
     }
   };
 
-  if (!isAdmin) {
-    return (
-      <div className="max-w-xl mx-auto p-6 pt-16 text-center">
-        <h1 className="text-2xl font-black" style={{ color: 'var(--ink)' }}>Corso per andare virali</h1>
-        <p className="mt-3" style={{ color: 'var(--ink)', opacity: 0.7 }}>Questa sezione è riservata agli amministratori.</p>
-      </div>
-    );
-  }
-
   if (!lessons) {
     return <div className="min-h-[60vh] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" style={{ color: 'var(--viola)' }} /></div>;
   }
@@ -87,7 +78,10 @@ const CorsoPage: React.FC = () => {
       <div className="max-w-xl mx-auto p-6 pt-12 space-y-4">
         <h1 className="text-2xl font-black" style={{ color: 'var(--ink)' }}>Corso per andare virali</h1>
         {loadError && <p className="text-sm" style={{ color: '#ae2418' }}>Non riesco a leggere il corso: {loadError}</p>}
-        <CourseImport hasCourse={false} onImported={load} />
+        {/* Il corso lo vedono tutti; caricarlo e aggiornarlo resta agli admin. */}
+        {isAdmin
+          ? <CourseImport hasCourse={false} onImported={load} />
+          : <p className="text-sm" style={{ color: 'var(--ink)', opacity: 0.7 }}>Il corso non è ancora stato caricato: torna più tardi.</p>}
       </div>
     );
   }
@@ -103,14 +97,16 @@ const CorsoPage: React.FC = () => {
             style={{ border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--ink)' }} aria-expanded={indexOpen}>
             <List className="h-4 w-4" /> Indice
           </button>
-          <button onClick={() => setShowImport((v) => !v)} className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg"
-            style={{ border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--ink)' }} title="Aggiorna il testo del corso">
-            <Settings2 className="h-4 w-4" /> <span className="hidden sm:inline">Aggiorna corso</span>
-          </button>
+          {isAdmin && (
+            <button onClick={() => setShowImport((v) => !v)} className="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg"
+              style={{ border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--ink)' }} title="Aggiorna il testo del corso">
+              <Settings2 className="h-4 w-4" /> <span className="hidden sm:inline">Aggiorna corso</span>
+            </button>
+          )}
         </div>
       </header>
 
-      {showImport && <div className="mb-6"><CourseImport hasCourse onImported={() => { setShowImport(false); load(); }} /></div>}
+      {isAdmin && showImport && <div className="mb-6"><CourseImport hasCourse onImported={() => { setShowImport(false); load(); }} /></div>}
 
       <div className="lg:grid gap-8" style={{ gridTemplateColumns: '300px minmax(0, 1fr)' }}>
         <aside className={`${indexOpen ? 'block' : 'hidden'} lg:block mb-6 lg:mb-0`}>
