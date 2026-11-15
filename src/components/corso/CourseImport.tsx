@@ -40,7 +40,7 @@ const CourseImport: React.FC<Props> = ({ hasCourse, onImported }) => {
     <div className="rounded-2xl p-5" style={{ background: 'var(--surface)', border: '1px solid var(--line)' }}>
       <p className="font-bold" style={{ color: 'var(--ink)' }}>{hasCourse ? 'Aggiorna il corso' : 'Carica il corso'}</p>
       <p className="text-sm mt-1" style={{ color: 'var(--ink)', opacity: 0.7 }}>
-        Scegli il file HTML del corso. {hasCourse ? 'Sostituisce le lezioni; le tue spunte restano.' : 'Lo vedono solo gli amministratori.'}
+        Scegli il file HTML del corso. {hasCourse ? 'Sostituisce le lezioni; le tue spunte restano.' : 'Lo vedono tutti gli account; caricarlo possono solo gli amministratori.'}
       </p>
       <input ref={input} type="file" accept=".html,text/html" className="hidden" onChange={(e) => e.target.files?.[0] && onFile(e.target.files[0])} />
       <button onClick={() => input.current?.click()} disabled={busy}

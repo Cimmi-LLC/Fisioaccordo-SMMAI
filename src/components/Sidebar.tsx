@@ -22,8 +22,12 @@ const NAV_ITEMS = [
 
 const ADMIN_NAV_ITEMS = [
   { to: '/brands', label: 'I miei Brand', icon: Briefcase },
-  { to: '/corso', label: 'Corso per andare virali', icon: GraduationCap },
 ];
+
+// Il corso lo vedono tutti gli account (Attilio, 15/11/2026: «fai vedere
+// quella sezione a tutti gli account, esattamente come la vedo io»): stesso
+// posto e stesso stile della voce admin, sopra Post.
+const CORSO_ITEM = { to: '/corso', label: 'Corso per andare virali', icon: GraduationCap };
 
 const BOTTOM_ITEMS = [
   { to: '/brand', label: 'Il tuo Brand', icon: Building2 },
@@ -156,7 +160,7 @@ const Sidebar: React.FC = () => {
 
       {/* Main nav */}
       <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {isAdmin && ADMIN_NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+        {[...(isAdmin ? ADMIN_NAV_ITEMS : []), CORSO_ITEM].map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
@@ -173,7 +177,7 @@ const Sidebar: React.FC = () => {
             {label}
           </NavLink>
         ))}
-        {isAdmin && <div style={{ height: 1, backgroundColor: 'var(--line)', margin: '6px 4px' }} />}
+        <div style={{ height: 1, backgroundColor: 'var(--line)', margin: '6px 4px' }} />
         {NAV_ITEMS.map(({ to, label, icon: Icon }) => {
           const tourKey = to === '/posts' ? 'nav-post'
             : to === '/storie' ? 'nav-storie'
