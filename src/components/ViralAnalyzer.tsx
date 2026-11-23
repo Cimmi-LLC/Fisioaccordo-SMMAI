@@ -8,6 +8,8 @@ import { useViralAnalysis } from '@/hooks/useViralAnalysis';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import TestoMarkdown, { InlineMarkdown } from '@/components/TestoMarkdown';
+import { senzaMarkdown } from '@/lib/testoMarkdown';
 
 const MAX_VIDEO_MB = 20;
 
@@ -295,9 +297,8 @@ const ViralAnalyzer: React.FC = () => {
                   <Eye className="h-5 w-5" style={{ color: 'var(--viola)' }} />
                   <span className="text-base font-bold" style={{ color: 'var(--ink)' }}>Perché funziona</span>
                 </div>
-                <p className="text-base leading-relaxed" style={{ color: 'var(--ink2)' }}>
-                  {result.analysis}
-                </p>
+                {/* Il modello scrive in markdown («**Titolo:** testo», elenchi): si rende, niente asterischi a schermo. */}
+                <TestoMarkdown testo={result.analysis} className="text-base leading-relaxed" style={{ color: 'var(--ink2)' }} />
               </div>
             )}
 
@@ -311,13 +312,13 @@ const ViralAnalyzer: React.FC = () => {
                   </div>
                   <div className="space-y-2 text-sm" style={{ color: 'var(--ink2)' }}>
                     {result.patterns.hook_type && (
-                      <div><strong style={{ color: 'var(--ink)' }}>Hook:</strong> {result.patterns.hook_type}</div>
+                      <div><strong style={{ color: 'var(--ink)' }}>Hook:</strong> <InlineMarkdown testo={result.patterns.hook_type} /></div>
                     )}
                     {result.patterns.cta_style && (
-                      <div><strong style={{ color: 'var(--ink)' }}>CTA:</strong> {result.patterns.cta_style}</div>
+                      <div><strong style={{ color: 'var(--ink)' }}>CTA:</strong> <InlineMarkdown testo={result.patterns.cta_style} /></div>
                     )}
                     {result.patterns.hashtag_strategy && (
-                      <div><strong style={{ color: 'var(--ink)' }}>Hashtag:</strong> {result.patterns.hashtag_strategy}</div>
+                      <div><strong style={{ color: 'var(--ink)' }}>Hashtag:</strong> <InlineMarkdown testo={result.patterns.hashtag_strategy} /></div>
                     )}
                     {result.patterns.emotional_triggers?.length > 0 && (
                       <div className="pt-2" style={{ borderTop: '1px solid rgba(229,38,127,0.15)' }}>
@@ -348,7 +349,7 @@ const ViralAnalyzer: React.FC = () => {
                         >
                           {i + 1}
                         </span>
-                        <span className="pt-0.5">{s}</span>
+                        <span className="pt-0.5"><InlineMarkdown testo={s} /></span>
                       </li>
                     ))}
                   </ol>
@@ -361,9 +362,7 @@ const ViralAnalyzer: React.FC = () => {
                     <ImageIcon className="h-5 w-5" style={{ color: '#38bdf8' }} />
                     <span className="text-base font-bold" style={{ color: '#38bdf8' }}>Analisi visiva</span>
                   </div>
-                  <p className="text-sm leading-relaxed" style={{ color: 'var(--ink2)' }}>
-                    {result.visual_analysis}
-                  </p>
+                  <TestoMarkdown testo={result.visual_analysis} className="text-sm leading-relaxed" style={{ color: 'var(--ink2)' }} />
                 </div>
               )}
 
@@ -373,9 +372,7 @@ const ViralAnalyzer: React.FC = () => {
                     <Volume2 className="h-5 w-5" style={{ color: '#f59e0b' }} />
                     <span className="text-base font-bold" style={{ color: '#f59e0b' }}>Analisi audio</span>
                   </div>
-                  <p className="text-sm leading-relaxed" style={{ color: 'var(--ink2)' }}>
-                    {result.audio_analysis}
-                  </p>
+                  <TestoMarkdown testo={result.audio_analysis} className="text-sm leading-relaxed" style={{ color: 'var(--ink2)' }} />
                 </div>
               )}
             </div>
@@ -396,7 +393,7 @@ const ViralAnalyzer: React.FC = () => {
                       >
                         {i + 1}
                       </span>
-                      <span>{t}</span>
+                      <span><InlineMarkdown testo={t} /></span>
                     </li>
                   ))}
                 </ul>
@@ -439,7 +436,7 @@ const ViralAnalyzer: React.FC = () => {
                   >
                     <Badge variant="outline" className="text-xs">{a.platform}</Badge>
                     <span className="truncate flex-1 font-medium" style={{ color: 'var(--ink)' }}>
-                      {a.post_url || a.analysis_text?.substring(0, 60) || 'Analisi video'}
+                      {a.post_url || (a.analysis_text ? senzaMarkdown(a.analysis_text).substring(0, 60) : '') || 'Analisi video'}
                     </span>
                     {typeof score === 'number' && (
                       <span

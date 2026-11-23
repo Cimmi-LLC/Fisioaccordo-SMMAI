@@ -9,6 +9,7 @@ import { urlInserzione } from '@/lib/brand/virali';
 import { eliminaCopione, inserzionePerId, listaCopioni, videoPerId, type CopioneSalvato } from '@/services/virali';
 import CopioneView from './CopioneView';
 import { dataBreve } from './comuni';
+import { senzaMarkdown } from '@/lib/testoMarkdown';
 
 const CopioniTab: React.FC = () => {
   const { toast } = useToast();
@@ -63,9 +64,9 @@ const CopioniTab: React.FC = () => {
       {lista.map((c) => (
         <div key={c.id} className="flex flex-wrap items-center gap-3 rounded-2xl border bg-white p-3">
           <button onClick={() => apri(c)} className="text-left grow min-w-0">
-            <div className="font-bold truncate" style={{ color: 'var(--ink)' }}>{c.copione.titolo}</div>
+            <div className="font-bold truncate" style={{ color: 'var(--ink)' }}>{senzaMarkdown(c.copione.titolo)}</div>
             <div className="text-xs truncate" style={{ color: 'var(--ink3)' }}>
-              {dataBreve(c.creato_il)} · {c.copione.testo_in_alto || c.copione.hook_parlato}
+              {dataBreve(c.creato_il)} · {senzaMarkdown(c.copione.testo_in_alto || c.copione.hook_parlato)}
             </div>
           </button>
           <Badge variant="outline">{c.tipo === 'esatta' ? 'Copia esatta' : 'Copia vicina'}</Badge>

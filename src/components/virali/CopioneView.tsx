@@ -5,6 +5,8 @@ import { Copy, Smartphone, Clapperboard } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { copioneDaLeggere, type Copione } from '@/lib/brand/virali';
 import DaRivedere from '@/components/DaRivedere';
+import TestoMarkdown, { InlineMarkdown } from '@/components/TestoMarkdown';
+import { senzaMarkdown } from '@/lib/testoMarkdown';
 
 // I mattoncini arrivano dal modello coi nomi del metodo («topic», «hook»…):
 // a schermo si scrivono in italiano.
@@ -26,7 +28,8 @@ const CopioneView: React.FC<{ copione: Copione }> = ({ copione }) => {
   const { toast } = useToast();
   const copia = async (testo: string, cosa: string) => {
     try {
-      await navigator.clipboard.writeText(testo);
+      // Negli appunti senza asterischi: Instagram non legge il markdown.
+      await navigator.clipboard.writeText(senzaMarkdown(testo));
       toast({ title: `${cosa} copiato` });
     } catch {
       toast({ title: 'Copia non riuscita', description: 'Seleziona il testo e copialo a mano.', variant: 'destructive' });
@@ -36,7 +39,7 @@ const CopioneView: React.FC<{ copione: Copione }> = ({ copione }) => {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-lg font-black" style={{ color: 'var(--ink)' }}>{copione.titolo}</span>
+        <span className="text-lg font-black" style={{ color: 'var(--ink)' }}><InlineMarkdown testo={copione.titolo} /></span>
         <Badge variant="outline">{copione.tipo === 'esatta' ? 'Copia esatta' : 'Copia vicina'}</Badge>
         {copione.durata_stimata_s ? <Badge variant="outline">~{Math.round(copione.durata_stimata_s)} s</Badge> : null}
       </div>
@@ -54,8 +57,8 @@ const CopioneView: React.FC<{ copione: Copione }> = ({ copione }) => {
           {copione.semplice
             ? 'Semplice: lo registri da solo col telefono, parlando in camera.'
             : <>
-                <span className="font-bold">Attenzione ai mezzi:</span> il video originale usa cose che potresti non avere
-                — {copione.cosa_serve.join(', ') || 'più del solo telefono'}. In «Come girarlo» trovi l'alternativa realistica.
+                <span className="font-bold">Attenzione ai mezzi:</span> il video originale usa cose che potresti non avere:{' '}
+                <InlineMarkdown testo={copione.cosa_serve.join(', ') || 'più del solo telefono'} />. In «Come girarlo» trovi l'alternativa realistica.
               </>}
         </span>
       </div>
@@ -63,36 +66,36 @@ const CopioneView: React.FC<{ copione: Copione }> = ({ copione }) => {
       <DaRivedere voci={copione.da_rivedere} quando="registrare" />
 
       {copione.mattoncini_cambiati.length > 0 && (
-        <Blocco titolo="Cosa cambia rispetto all'originale">{copione.mattoncini_cambiati.map(nomeMattoncino).join(', ')}</Blocco>
+        <Blocco titolo="Cosa cambia rispetto all'originale"><InlineMarkdown testo={copione.mattoncini_cambiati.map(nomeMattoncino).join(', ')} /></Blocco>
       )}
       <Blocco titolo="Testo in alto (primi secondi)">
-        <span className="font-bold">{copione.testo_in_alto}</span>
+        <span className="font-bold"><InlineMarkdown testo={copione.testo_in_alto} /></span>
       </Blocco>
-      <Blocco titolo="Cosa si vede nei primi 3 secondi">{copione.hook_visivo}</Blocco>
+      <Blocco titolo="Cosa si vede nei primi 3 secondi"><InlineMarkdown testo={copione.hook_visivo} /></Blocco>
       <Blocco titolo="Cosa dici, una frase per riga">
         <ol className="list-decimal pl-5 space-y-1">
-          {copione.frasi.map((f, i) => <li key={i}>{f}</li>)}
+          {copione.frasi.map((f, i) => <li key={i}><InlineMarkdown testo={f} /></li>)}
         </ol>
       </Blocco>
       {copione.parola_chiave && (
         <Blocco titolo="Lead magnet">
           Parola da commentare: <span className="font-bold">{copione.parola_chiave}</span>
-          {copione.lead_magnet ? ` · ${copione.lead_magnet}` : ''}
+          {copione.lead_magnet ? <> · <InlineMarkdown testo={copione.lead_magnet} /></> : null}
         </Blocco>
       )}
       {copione.testi_a_schermo.length > 0 && (
         <Blocco titolo="Testi a schermo">
           <ul className="space-y-1">
-            {copione.testi_a_schermo.map((t, i) => <li key={i}><span style={{ color: 'var(--ink3)' }}>{t.quando}</span> · {t.testo}</li>)}
+            {copione.testi_a_schermo.map((t, i) => <li key={i}><span style={{ color: 'var(--ink3)' }}>{t.quando}</span> · <InlineMarkdown testo={t.testo} /></li>)}
           </ul>
         </Blocco>
       )}
       {copione.come_girarlo.length > 0 && (
         <Blocco titolo="Come girarlo">
-          <ul className="list-disc pl-5 space-y-1">{copione.come_girarlo.map((c, i) => <li key={i}>{c}</li>)}</ul>
+          <ul className="list-disc pl-5 space-y-1">{copione.come_girarlo.map((c, i) => <li key={i}><InlineMarkdown testo={c} /></li>)}</ul>
         </Blocco>
       )}
-      {copione.didascalia && <Blocco titolo="Didascalia">{copione.didascalia}</Blocco>}
+      {copione.didascalia && <Blocco titolo="Didascalia"><TestoMarkdown testo={copione.didascalia} /></Blocco>}
 
       <div className="flex flex-wrap gap-2 pt-1">
         <Button size="sm" onClick={() => copia(copioneDaLeggere(copione), 'Copione')}>
