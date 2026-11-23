@@ -2,13 +2,17 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { REGOLA_CLAIM, daRivedere, regolaCoseDelBrand } from "@/lib/brand/metodoCopy";
-import { coloreLeggibile, creaCercaFoto, fraseSenzaFoto, messaggioErroreStorie, rispostaNonLeggibile } from "@/lib/storie";
+import { coloreLeggibile, creaCercaFoto, fraseSenzaFoto, messaggioErroreStorie, pianoFotoStorie, rispostaNonLeggibile } from "@/lib/storie";
 import { useStoryTemplates } from "@/hooks/useStoryTemplates";
 import { useStoryBatches } from "@/hooks/useStoryBatches";
 import ScheduleStoriesDialog from "@/components/schedule/ScheduleStoriesDialog";
 
 const STORY_TYPES=[{id:"quiz",label:"Quiz (2 card)",emoji:"❓"},{id:"curiosita",label:"Curiosità",emoji:"💡"},{id:"mito_verita",label:"Mito o Verità?",emoji:"🔍"},{id:"consiglio",label:"Consiglio",emoji:"🌿"},{id:"sapevi_che",label:"Lo Sapevi Che?",emoji:"🧠"},{id:"domanda_aperta",label:"Domanda Aperta",emoji:"💬"},{id:"mini_esercizio",label:"Mini Esercizio",emoji:"🏃"},{id:"prima_dopo",label:"Prima e Dopo",emoji:"📊"}];
 const TYPES_WITH_PHOTO=["curiosita","consiglio","mini_esercizio","mito_verita","sapevi_che","domanda_aperta","prima_dopo","quiz_domanda"];
+const storiaConFoto=s=>TYPES_WITH_PHOTO.includes(s?.type)||TYPES_WITH_PHOTO.includes(s?.cardType);
+// Piano delle foto di una generazione (src/lib/storie.ts): fatto quando
+// arrivano le storie, non quando se ne rigenera una.
+const nuovoPianoFoto=l=>pianoFotoStorie(l||[],storiaConFoto,"g"+Date.now().toString(36));
 const TONES=[["amichevole","Amichevole"],["professionale","Professionale"],["motivazionale","Motivazionale"],["educativo","Educativo"]];
 const GFONTS=["Montserrat","Raleway","Playfair Display","Nunito","Poppins","Lato","Oswald","Merriweather","Ubuntu","DM Sans","Inter","Bebas Neue","Quicksand","Josefin Sans"];
 // Unsplash not used - using Picsum Photos (no API key needed)
@@ -322,12 +326,16 @@ function photoSeedFromQuery(q){
 // (src/lib/storie.ts). Fino al 09/11/2026 ogni aggiornamento della pagina
 // rilanciava la ricerca di tutte le storie: 100 chiamate per 10 foto.
 const cercaFotoStoria=creaCercaFoto({
-  chiama: async (q, brandId)=>{
+  chiama: async (q, brandId, piano)=>{
     const { data, error } = await supabase.functions.invoke('generate-carousel-images',{
       body:{
         slides:[{tipo:'content',keywords_stock:[q],numero:1}],
         singleIndex:0,
         brandId:brandId||undefined,
+        // Le query di tutte le storie con foto e il posto di questa: il
+        // server spartisce le foto del brand sull'intera generazione.
+        pianoFoto:piano?.query,
+        pianoIndice:piano?.indice,
       },
     });
     if(error){
@@ -340,8 +348,8 @@ const cercaFotoStoria=creaCercaFoto({
   },
 });
 
-async function fetchPhoto(q, brandId){
-  return (await cercaFotoStoria.cerca(q,brandId)).url;
+async function fetchPhoto(q, brandId, piano){
+  return (await cercaFotoStoria.cerca(q,brandId,{piano})).url;
 }
 
 async function loadImg(src){
@@ -1036,7 +1044,7 @@ function ClientForm({init,onSave,onCancel}){
   </div>;
 }
 
-function StoryItem({story,client,onRegen,idx,onZoom,withPhotos,onFoto}){
+function StoryItem({story,client,onRegen,idx,onZoom,withPhotos,onFoto,piano}){
   const [jpg,setJpg]=useState(null);const [rend,setRend]=useState(false);
   // Motivo per cui la storia è uscita senza foto (null = ha la foto o non la prevede).
   const [senzaFoto,setSenzaFoto]=useState(null);
@@ -1048,7 +1056,7 @@ function StoryItem({story,client,onRegen,idx,onZoom,withPhotos,onFoto}){
       const np=withPhotos&&(TYPES_WITH_PHOTO.includes(story.type)||TYPES_WITH_PHOTO.includes(story.cardType));
       if(np&&story.photoQuery){
         onFoto&&onFoto(idx,"cerco");
-        const esito=await cercaFotoStoria.cerca(story.photoQuery,client.id,{forza});
+        const esito=await cercaFotoStoria.cerca(story.photoQuery,client.id,{forza,piano});
         if(esito.url)pi=await loadImg(esito.url);
         if(pi){onFoto&&onFoto(idx,"ok");}
         else{setSenzaFoto(fraseSenzaFoto(esito.url?"errore":esito.motivo));onFoto&&onFoto(idx,"senza");}
@@ -1056,7 +1064,7 @@ function StoryItem({story,client,onRegen,idx,onZoom,withPhotos,onFoto}){
       setJpg(await renderJpeg(story,client,pi));
     }catch(e){console.error(e);}
     setRend(false);
-  },[story,client,withPhotos,idx,onFoto]);
+  },[story,client,withPhotos,idx,onFoto,piano]);
   useEffect(()=>{render();},[render]);
   const dl=()=>{if(!jpg)return;const a=document.createElement("a");a.href=jpg;a.download="storia_"+(client.name||"f").replace(/\s/g,"_")+"_"+(idx+1)+".jpg";a.click();};
   return <div style={{background:S,borderRadius:14,overflow:"hidden",border:GLASS_BD,transition:"border-color .2s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=ACC+"55"} onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(85,70,151,0.10)"}>
@@ -1135,6 +1143,8 @@ export default function StoriesApp({ client: clientProp }){
   const genClient = clientProp;
   const [mode,setMode]=useState("content");
   const [stories,setStories]=useState([]);
+  // Posto di ogni storia nel piano delle foto (null = senza foto).
+  const [pianoFoto,setPianoFoto]=useState([]);
   const { templates: savedTemplates, addTemplateFromFile, removeTemplate, busy: templatesBusy } = useStoryTemplates();
   const { batches: storyBatches, saveBatch, deleteBatch, reload: reloadBatches } = useStoryBatches();
   const [scheduleOpen,setScheduleOpen]=useState(false);
@@ -1214,6 +1224,7 @@ export default function StoriesApp({ client: clientProp }){
         }catch(e){console.warn("[storie] etichette delle foto saltate:",e);}
       }
       setFotoStato({});
+      setPianoFoto(nuovoPianoFoto(l));
       setStories(l);
       // Persist batch (non-blocking)
       saveBatch('topic', { qty, types, label: (genClient.name||'') + ' — ' + qty + ' storie' }, l);
@@ -1240,7 +1251,7 @@ export default function StoriesApp({ client: clientProp }){
         setGenMsg("Anteprima "+(i+1)+"/"+stories.length+"...");
         let pi=null;
         const np=withPhotos&&(TYPES_WITH_PHOTO.includes(stories[i].type)||TYPES_WITH_PHOTO.includes(stories[i].cardType));
-        if(np&&stories[i].photoQuery){const u=await fetchPhoto(stories[i].photoQuery,genClient?.id);if(u)pi=await loadImg(u);}
+        if(np&&stories[i].photoQuery){const u=await fetchPhoto(stories[i].photoQuery,genClient?.id,pianoFoto[i]);if(u)pi=await loadImg(u);}
         const dataUrl=await renderJpeg(stories[i],storyClient,pi);
         items.push({
           id:String(i),
@@ -1270,7 +1281,7 @@ export default function StoriesApp({ client: clientProp }){
         let pi=null;
         await ensureFont(genClient.brandFont||"Montserrat");
       const np=withPhotos&&(TYPES_WITH_PHOTO.includes(stories[i].type)||TYPES_WITH_PHOTO.includes(stories[i].cardType));
-        if(np&&stories[i].photoQuery){const u=await fetchPhoto(stories[i].photoQuery,genClient?.id);if(u)pi=await loadImg(u);}
+        if(np&&stories[i].photoQuery){const u=await fetchPhoto(stories[i].photoQuery,genClient?.id,pianoFoto[i]);if(u)pi=await loadImg(u);}
         const dataUrl=await renderJpeg(stories[i],storyClient,pi);
         const b64=dataUrl.split(",")[1];
         folder.file("storia_"+(i+1)+".jpg",b64,{base64:true});
@@ -1462,7 +1473,7 @@ export default function StoriesApp({ client: clientProp }){
             </div>;
           })()}
           {stories.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(165px,1fr))",gap:12}}>
-            {stories.map((s,i)=><StoryItem key={i+"-"+(s.headline||"")+(s.cardType||"")} story={s} client={storyClient} onRegen={regenOne} idx={i} onZoom={setZoomJpg} withPhotos={withPhotos} onFoto={segnaFoto}/>)}
+            {stories.map((s,i)=><StoryItem key={i+"-"+(s.headline||"")+(s.cardType||"")} story={s} client={storyClient} onRegen={regenOne} idx={i} onZoom={setZoomJpg} withPhotos={withPhotos} onFoto={segnaFoto} piano={pianoFoto[i]||null}/>)}
           </div>}
         </div>}
 
@@ -1609,7 +1620,7 @@ export default function StoriesApp({ client: clientProp }){
                 const sourceColor=isStories?"#3b82f6":(b.source_type==="reviews"?"#10b981":(b.source_type==="manual"?"#f59e0b":"#8b5cf6"));
                 const sourceLabel=isStories?"Storie":(b.source_type==="reviews"?"Recensioni Google":(b.source_type==="manual"?"Recensioni manuali":"Recensioni da file"));
                 const reload=()=>{
-                  if(isStories){setStories(b.stories||[]);setMode("content");}
+                  if(isStories){setPianoFoto(nuovoPianoFoto(b.stories));setStories(b.stories||[]);setMode("content");}
                   else{setReviews(b.stories||[]);setMode("reviews");}
                 };
                 return(

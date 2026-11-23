@@ -4,7 +4,7 @@ import { adminClient, assertBrandOwnership, requireAuth, requireWithinRateLimit 
 import { corsHeaders, handlePreflight, jsonResponse } from "../_shared/cors.ts";
 import { safeFetch } from "../_shared/ssrf.ts";
 import { callGeminiWithRetry } from "../_shared/gemini.ts";
-import { PROMPT_ETICHETTE, daGuardare, leggiEtichette, scegliFoto, tagDaEtichette } from "../_shared/brand/fotoBrand.ts";
+import { PROMPT_ETICHETTE, assegnaFoto, daGuardare, leggiEtichette, tagDaEtichette } from "../_shared/brand/fotoBrand.ts";
 import { resolveProfession, getProfession, DEFAULT_PROFESSION_ID, type ProfessionBrandLike, type ProfessionProfile, type ResolvedProfession } from "../_shared/brand/profession.ts";
 import {
   AI_MODEL_SETS,
@@ -113,6 +113,19 @@ serve(async (req) => {
     }
     // Note: client-supplied `userId` is IGNORED. We always use verifiedUserId.
     const { slides, carouselId, singleIndex, brandId, debug, excludeIds: clientExcludeIds } = body as Record<string, any>;
+    // Piano delle foto (storie): le parole di TUTTE le storie con foto della
+    // generazione, nell'ordine in cui si vedono, e il posto di questa. Ogni
+    // storia chiede la sua foto con una chiamata a parte: senza il piano ogni
+    // chiamata sceglieva da sola e la stessa foto finiva su 7 storie su 10.
+    const pianoGrezzo = (body as Record<string, unknown>).pianoFoto;
+    const pianoIndiceGrezzo = (body as Record<string, unknown>).pianoIndice;
+    const pianoFoto: string[] | null = Array.isArray(pianoGrezzo)
+      && pianoGrezzo.length > 0 && pianoGrezzo.length <= 40
+      && Number.isInteger(pianoIndiceGrezzo)
+      && (pianoIndiceGrezzo as number) >= 0 && (pianoIndiceGrezzo as number) < pianoGrezzo.length
+      ? pianoGrezzo.map((q) => String(q ?? "").slice(0, 120))
+      : null;
+    const pianoIndice = pianoFoto ? (pianoIndiceGrezzo as number) : -1;
     // Client passes excludeIds as array of numbers (used by regenerate flow)
     const excludeSet = new Set<number>(
       Array.isArray(clientExcludeIds)
@@ -208,7 +221,11 @@ serve(async (req) => {
         const { data, error } = await supabaseAdmin
           .from("brand_photos")
           .select("url, storage_path, tags, caption")
-          .eq("brand_id", brandId);
+          .eq("brand_id", brandId)
+          // Ordine fisso: ogni chiamata del piano deve vedere le foto nello
+          // stesso ordine, o la spartizione cambia da una storia all'altra.
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true });
         if (!error && Array.isArray(data)) {
           brandPool = (await Promise.all(data.map(async (r: any) => {
             let url: string = r.url || "";
@@ -229,7 +246,6 @@ serve(async (req) => {
         console.warn("brand pool load failed:", e);
       }
     }
-    const usedBrandUrls = new Set<string>(); // avoid repeating same brand photo across slides
 
     // ── AI IMAGES: cascata modelli da brands.image_model, stile del prompt
     // da brands.slide_style. Le immagini generate hanno la precedenza sullo
@@ -301,15 +317,35 @@ serve(async (req) => {
     // generava un'immagine AI per ogni slide e solo dopo si guardava il pool:
     // con «usa prima le mie foto» accesa l'immagine veniva buttata ogni volta
     // (101 in un pomeriggio, 20-120 secondi e circa 0,04 $ l'una).
+    // Le foto si spartiscono fra tutte le slide insieme (assegnaFoto: prima
+    // tutte, poi la meno usata, mai su due slide vicine), anche quando se ne
+    // rifà una sola: con il piano delle storie, altrimenti con le slide del
+    // carosello.
     const brandPick = new Map<number, string>();
     if (brandPool.length > 0) {
-      for (const { slide, originalIndex } of slidesToProcess) {
-        const { keywords, slideContext } = contestoSlide(slide);
-        const foto = scegliFoto(brandPool, [...keywords, ...slideContext], usedBrandUrls, fotoMieSempre);
-        if (foto) {
-          usedBrandUrls.add(foto);
-          brandPick.set(originalIndex, foto);
-        }
+      const paroleDi = (slide: any) => {
+        const { keywords, slideContext } = contestoSlide(slide || {});
+        return [...keywords, ...slideContext];
+      };
+      if (pianoFoto && slidesToProcess.length === 1) {
+        const piano = assegnaFoto(
+          brandPool,
+          pianoFoto.map((q) => paroleDi({ keywords_stock: q ? [q] : [] })),
+          fotoMieSempre,
+        );
+        const foto = piano[pianoIndice];
+        if (foto) brandPick.set(slidesToProcess[0].originalIndex, foto);
+      } else {
+        const tutte = contentSlides.some((c: any) => c.originalIndex === slidesToProcess[0]?.originalIndex)
+          ? contentSlides
+          : slidesToProcess;
+        const piano = assegnaFoto(brandPool, tutte.map(({ slide }: any) => paroleDi(slide)), fotoMieSempre);
+        tutte.forEach(({ originalIndex }: any, k: number) => {
+          const foto = piano[k];
+          if (foto && slidesToProcess.some((d: any) => d.originalIndex === originalIndex)) {
+            brandPick.set(originalIndex, foto);
+          }
+        });
       }
     }
     const daGenerare = slidesToProcess.filter(({ originalIndex }: any) => !brandPick.has(originalIndex));

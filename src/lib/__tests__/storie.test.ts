@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { INCHIOSTRO_STORIE, coloreLeggibile, creaCercaFoto, fraseSenzaFoto, messaggioErroreStorie, rispostaNonLeggibile, type RispostaFoto } from '../storie';
+import { FOTO_PER_PIANO, INCHIOSTRO_STORIE, coloreLeggibile, creaCercaFoto, fraseSenzaFoto, messaggioErroreStorie, pianoFotoStorie, rispostaNonLeggibile, type PostoNelPiano, type RispostaFoto } from '../storie';
 
 const lenta = (risposta: RispostaFoto, ms = 5) => new Promise<RispostaFoto>((r) => setTimeout(() => r(risposta), ms));
 
@@ -119,5 +119,48 @@ describe('coloreLeggibile (storie su fondo chiaro)', () => {
   it('colore mancante o scritto male: inchiostro', () => {
     expect(coloreLeggibile(null)).toBe(INCHIOSTRO_STORIE);
     expect(coloreLeggibile('blu')).toBe(INCHIOSTRO_STORIE);
+  });
+});
+
+describe('piano delle foto (una generazione intera)', () => {
+  type S = { type?: string; photoQuery?: string | null };
+  const conFoto = (s: S) => s.type !== 'quiz_risposta';
+
+  it('ogni storia con foto ha il suo posto; le altre nessuno', () => {
+    const storie: S[] = [
+      { type: 'curiosita', photoQuery: 'neck pain' },
+      { type: 'quiz_risposta', photoQuery: 'neck' },
+      { type: 'consiglio', photoQuery: null },
+      { type: 'consiglio', photoQuery: ' neck pain ' },
+    ];
+    const piano = pianoFotoStorie(storie, conFoto, 'g1');
+    expect(piano[1]).toBeNull();
+    expect(piano[2]).toBeNull();
+    expect(piano[0]).toEqual({ id: 'g1/0', query: ['neck pain', 'neck pain'], indice: 0 });
+    expect(piano[3]).toEqual({ id: 'g1/0', query: ['neck pain', 'neck pain'], indice: 1 });
+  });
+
+  it('oltre 40 storie con foto si apre un secondo piano', () => {
+    const storie: S[] = Array.from({ length: FOTO_PER_PIANO + 2 }, (_, i) => ({ type: 'curiosita', photoQuery: 'q' + i }));
+    const piano = pianoFotoStorie(storie, conFoto, 'g');
+    expect(piano[FOTO_PER_PIANO - 1]).toMatchObject({ id: 'g/0', indice: FOTO_PER_PIANO - 1 });
+    expect(piano[FOTO_PER_PIANO]).toMatchObject({ id: 'g/1', indice: 0, query: ['q40', 'q41'] });
+  });
+
+  it('due storie con la stessa query ma posti diversi: due ricerche, ognuna col suo posto', async () => {
+    const visti: Array<PostoNelPiano | null | undefined> = [];
+    const chiama = vi.fn((q: string, _b: string | null, piano?: PostoNelPiano | null) => {
+      visti.push(piano);
+      return lenta({ url: `https://x/${q}/${piano?.indice}.jpg` });
+    });
+    const { cerca } = creaCercaFoto({ chiama });
+    const [a, b] = pianoFotoStorie([{ photoQuery: 'neck pain' }, { photoQuery: 'neck pain' }], () => true, 'g');
+    const [ea, eb] = await Promise.all([cerca('neck pain', 'brand', { piano: a }), cerca('neck pain', 'brand', { piano: b })]);
+    expect(chiama).toHaveBeenCalledTimes(2);
+    expect(ea.url).not.toBe(eb.url);
+    expect(visti.map((p) => p?.indice)).toEqual([0, 1]);
+    // Scaricare lo ZIP dopo: stesso posto, nessuna chiamata in più.
+    await cerca('neck pain', 'brand', { piano: a });
+    expect(chiama).toHaveBeenCalledTimes(2);
   });
 });
