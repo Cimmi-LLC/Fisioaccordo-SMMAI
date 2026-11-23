@@ -53,7 +53,7 @@ const TagInput: React.FC<{ tags: string[]; onChange: (t: string[]) => void; plac
         ))}
       </div>
       <div className="flex gap-1.5">
-        <Input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(input); } }} placeholder={placeholder} className="text-xs h-8" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '8px' }} />
+        <Input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(input); } }} onBlur={() => { if (input.trim()) addTag(input); }} placeholder={placeholder} className="text-xs h-8" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '8px' }} />
         <button onClick={() => addTag(input)} disabled={!input.trim()} className="px-2 h-8 rounded-lg text-xs font-bold disabled:opacity-30" style={{ backgroundColor: 'var(--viola-dim)', color: 'var(--viola)', border: 'none', cursor: 'pointer' }}><Plus className="h-3.5 w-3.5" /></button>
       </div>
     </div>
@@ -217,6 +217,15 @@ const BrandPage = () => {
       setLoading(false);
     })();
   }, [user]);
+
+  // Modifiche non salvate: il browser chiede conferma prima di chiudere o
+  // ricaricare (il 18/11 Persona e Cose da non dire si perdevano così).
+  useEffect(() => {
+    if (!hasChanges) return;
+    const avvisa = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', avvisa);
+    return () => window.removeEventListener('beforeunload', avvisa);
+  }, [hasChanges]);
 
   const update = (field: string, value: any) => {
     setBrand(prev => ({ ...prev, [field]: value }));
@@ -668,7 +677,12 @@ const BrandPage = () => {
           </div>
 
           {/* Campi del metodo contenuti (parole dei pazienti, contrarian take) */}
-          <MetodoContenutiCard brandId={brand.id || null} />
+          <MetodoContenutiCard
+            frasi={brand.frasi_pazienti || []}
+            convinzione={brand.convinzione_da_ribaltare || ''}
+            profilo={brand.profilo_detestato || ''}
+            onChange={(campo, valore) => update(campo, valore)}
+          />
 
           {/* Tono di voce */}
           <div className="rounded-2xl p-6 space-y-4" style={{ backgroundColor: 'var(--surface)', border: '1px solid var(--line)' }}>

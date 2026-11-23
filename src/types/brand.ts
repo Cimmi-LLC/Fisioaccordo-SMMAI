@@ -35,6 +35,10 @@ export interface BrandProfile {
   gallery_photos: string[];
   // Content preferences
   parole_da_evitare: string[];
+  // Campi del metodo contenuti (frasi testuali dei pazienti, contrarian take)
+  frasi_pazienti: string[];
+  convinzione_da_ribaltare: string;
+  profilo_detestato: string;
   pubblicazione_automatica: boolean;
   identita_core: string;
   story_templates?: string[];
@@ -70,6 +74,9 @@ export const EMPTY_BRAND: BrandProfile = {
   location_photos: [],
   gallery_photos: [],
   parole_da_evitare: [],
+  frasi_pazienti: [],
+  convinzione_da_ribaltare: '',
+  profilo_detestato: '',
   pubblicazione_automatica: false,
   identita_core: '',
 };
