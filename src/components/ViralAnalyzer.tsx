@@ -179,17 +179,9 @@ const ViralAnalyzer: React.FC = () => {
                 <span>· max {MAX_VIDEO_MB} MB</span>
               </div>
               <p className="text-xs mt-3 max-w-md leading-relaxed" style={{ color: 'var(--ink3)' }}>
-                Scarica il reel (es. da{' '}
-                <a
-                  href="https://snapinsta.to/it"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={e => e.stopPropagation()}
-                  style={{ color: 'var(--rosa)' }}
-                >
-                  snapinsta.app
-                </a>
-                ) e caricalo qui. L'intelligenza artificiale analizzerà inquadrature, transizioni, audio e testo.
+                {/* Niente siti terzi per scaricare i reel (revisione 18/11): si usa il file che si ha già. */}
+                Carica il file del tuo video: lo trovi nel rullino del telefono, oppure usa il file originale montato.
+                L'intelligenza artificiale analizzerà inquadrature, transizioni, audio e testo.
                 Il file viene cancellato dopo l'analisi.
               </p>
             </div>
