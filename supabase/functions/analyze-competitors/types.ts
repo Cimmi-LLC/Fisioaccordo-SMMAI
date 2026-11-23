@@ -37,7 +37,7 @@ export interface LegacyOutputV1 {
   engagement_rate: string; // "alto/medio/basso"
   content_strategy: {
     main_topics: string[];
-    posting_frequency: string;
+    posting_frequency?: string; // calcolata dalle date in index.ts, assente se non si può
     best_content_type: string;
     tone_of_voice: string;
   };

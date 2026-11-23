@@ -5,6 +5,7 @@ import { buildLegacyContext, LEGACY_SYSTEM_PROMPT, buildLegacyUserPrompt, filter
 import { callGemini } from "./llm.ts";
 import { adminClient, requireAuth, requireWithinRateLimit } from "../_shared/auth.ts";
 import { resolveProfession } from "../_shared/brand/profession.ts";
+import { frequenzaDaDate, togliNonDeducibili } from "../_shared/brand/analisiCompetitor.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -82,6 +83,9 @@ serve(async (req) => {
     // nella libreria «Video virali» (stesse tabelle del team): si analizzano
     // quelli, che hanno views, didascalie e trascrizioni vere.
     let fonteDati: "instagram" | "virali" | null = scrapedData && scrapedData.posts.length > 0 ? "instagram" : null;
+    // Frequenza di pubblicazione: si calcola dalle date vere, non la stima il
+    // modello (il 18/11 scriveva «non deducibile dai dati forniti»).
+    let frequenza: string | null = fonteDati === "instagram" ? frequenzaDaDate(scrapedData!.posts.map((p) => p.timestamp), "post") : null;
     if (!fonteDati && username) {
       try {
         const handle = String(username).trim().toLowerCase().replace(/^@/, "").split(/[/?#\s]/)[0];
@@ -120,6 +124,22 @@ serve(async (req) => {
           };
           fonteDati = "virali";
           console.log(`analyze-competitors: uso ${posts.length} video dalla libreria virali per @${handle}`);
+          // I 12 video sopra sono i più visti, non gli ultimi: per la
+          // frequenza servono le date degli ultimi video in libreria, di una
+          // piattaforma sola (lo stesso video può stare su Instagram e TikTok).
+          const { data: recenti } = await adminClient()
+            .from("virali_video")
+            .select("piattaforma, pubblicato_il")
+            .eq("handle", handle)
+            .not("pubblicato_il", "is", null)
+            .order("pubblicato_il", { ascending: false })
+            .limit(60);
+          const perPiattaforma = new Map<string, string[]>();
+          for (const r of (recenti || []) as Array<{ piattaforma: string; pubblicato_il: string }>) {
+            perPiattaforma.set(r.piattaforma, [...(perPiattaforma.get(r.piattaforma) || []), r.pubblicato_il]);
+          }
+          const date = [...perPiattaforma.values()].sort((a, b) => b.length - a.length)[0] || [];
+          frequenza = frequenzaDaDate(date.slice(0, 30), "video");
         }
       } catch (e) {
         console.warn("lettura libreria virali fallita:", e);
@@ -148,12 +168,9 @@ serve(async (req) => {
     if (scrapedData) {
       try {
         extendedMetrics = computeMetrics(scrapedData, profile);
-        if (extendedMetrics.engagement_rate === null && profile === null) {
-          warnings.push("engagement_rate non calcolabile: dati profilo non disponibili");
-        }
       } catch (err) {
         if (err instanceof InsufficientDataError) {
-          warnings.push(`Profilo con dati insufficienti: ${err.postsFound} post estratti`);
+          warnings.push(`Ho letto solo ${err.postsFound} post: prendi l'analisi come indicativa.`);
           // Don't fail — let LLM generate something based on what we have
         } else {
           console.error("Metrics computation error:", err);
@@ -179,6 +196,15 @@ serve(async (req) => {
     // 5a. Strip hallucinated hashtags from "most_used" — keep only those actually observed
     filterMostUsedAgainstObserved(parsed, scrapedData);
     pulisciSuggeriti(parsed);
+
+    // 5a-bis. Frequenza dalle date vere; senza date la riga non c'è. Poi via
+    // ogni campo in cui il modello dice che il dato manca: davanti al
+    // cliente niente «non deducibile» o «non determinabile».
+    if (parsed?.content_strategy && typeof parsed.content_strategy === "object") {
+      if (frequenza) parsed.content_strategy.posting_frequency = frequenza;
+      else delete parsed.content_strategy.posting_frequency;
+    }
+    parsed = togliNonDeducibili(parsed);
 
     // 5b. Attach v1 scraped_metrics (compat) + new extended metrics (additive)
     if (scrapedData) {

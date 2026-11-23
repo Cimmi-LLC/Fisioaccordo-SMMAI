@@ -7,6 +7,7 @@ import { useActiveBrand } from '@/hooks/useActiveBrand';
 import { analizzaVideo, scriviCopione, type Sorgente } from '@/services/virali';
 import type { AnalisiVideo, Copione, TipoCopia } from '@/lib/brand/virali';
 import CopioneView from './CopioneView';
+import { InlineMarkdown } from '@/components/TestoMarkdown';
 
 /** «Duplica questo video»: prima guarda l'originale, poi scrive il copione per il brand attivo. */
 const DuplicaPanel: React.FC<{ sorgente: Sorgente; analisiIniziale: AnalisiVideo | null }> = ({ sorgente, analisiIniziale }) => {
@@ -86,7 +87,13 @@ const DuplicaPanel: React.FC<{ sorgente: Sorgente; analisiIniziale: AnalisiVideo
         {occupato && (
           <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--ink)' }}>
             <Loader2 className="h-4 w-4 animate-spin" />
-            {fase === 'guardo' ? 'Guardo il video originale… (30-90 s)' : `Scrivo il copione per ${nomeBrand}… (20-60 s)`}
+            {/* Tempi misurati sul codice di duplica-video: il copione è una
+                chiamata a Gemini che si ripete se escono parole vietate, più
+                i tentativi sugli errori (il 18/11 è arrivato dopo 110 s); il
+                video, se il link è scaduto, si richiede anche ad Apify. */}
+            {fase === 'guardo'
+              ? 'Guardo il video originale… ci vogliono 1-2 minuti, a volte 3. Resta su questa pagina.'
+              : `Scrivo il copione per ${nomeBrand}… ci vogliono 1-2 minuti. Resta su questa pagina.`}
           </div>
         )}
       </div>
@@ -94,9 +101,10 @@ const DuplicaPanel: React.FC<{ sorgente: Sorgente; analisiIniziale: AnalisiVideo
       {analisi && !copione && (
         <div className="space-y-2 text-sm" style={{ color: 'var(--ink)' }}>
           <div className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--ink3)' }}>Perché funziona</div>
-          <div><span className="font-semibold">Format:</span> {analisi.format} · <span className="font-semibold">Hook:</span> {analisi.hook.tipo_parlato}</div>
-          {analisi.hook.parlato && <div><span className="font-semibold">Prima frase:</span> «{analisi.hook.parlato}»</div>}
-          <ul className="list-disc pl-5 space-y-1">{analisi.perche_funziona.map((p, i) => <li key={i}>{p}</li>)}</ul>
+          <div><span className="font-semibold">Format:</span> <InlineMarkdown testo={analisi.format} /> · <span className="font-semibold">Hook:</span> <InlineMarkdown testo={analisi.hook.tipo_parlato} /></div>
+          {analisi.hook.parlato && <div><span className="font-semibold">Prima frase:</span> «<InlineMarkdown testo={analisi.hook.parlato} />»</div>}
+          {/* Il modello scrive spesso «**Titolo:** motivo»: il grassetto si rende, non si vedono gli asterischi. */}
+          <ul className="list-disc pl-5 space-y-1">{analisi.perche_funziona.map((p, i) => <li key={i}><InlineMarkdown testo={p} /></li>)}</ul>
         </div>
       )}
 

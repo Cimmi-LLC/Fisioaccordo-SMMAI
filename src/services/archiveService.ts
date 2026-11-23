@@ -1,6 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
+import { copioneDaLeggere, type Copione } from '@/lib/brand/virali';
+import { senzaMarkdown } from '@/lib/testoMarkdown';
 
-// Archivio contenuti: ogni cosa generata finisce qui.
+// Archivio contenuti: post e caroselli (generated_contents), più storie,
+// recensioni e copioni dei video virali letti dalle loro tabelle (in fondo).
 // is_published = false  -> scheda 'Non pubblicato'
 // is_published = true   -> scheda 'Pubblicato' (con data e ora)
 
@@ -160,4 +163,86 @@ export async function syncPublishedFromScheduler(): Promise<number> {
     console.warn('[archivio] sync programmati fallito:', e);
     return 0;
   }
+}
+
+// ── Storie, recensioni e copioni dei video virali ───────────────────────
+// Non stanno in generated_contents ma nelle loro tabelle, già salvati per
+// intero: l'archivio li legge e basta (niente «pubblicato», si copiano).
+// Gli script dei reel invece non si salvano da nessuna parte (in
+// generation_history resta solo un'anteprima di 200 caratteri), quindi
+// in archivio non ci sono.
+
+// Tabelle non ancora nei tipi generati: si passa da `any`.
+const db = supabase as any;
+
+export type ExtraKind = 'storie' | 'recensioni' | 'copione';
+
+export interface ExtraRow {
+  id: string;
+  kind: ExtraKind;
+  title: string;
+  created_at: string;
+  /** Testo intero, da copiare e da leggere in «Apri». */
+  text: string;
+  /** Solo per i copioni: il copione intero, per mostrarlo come in Video virali. */
+  copione?: Copione;
+}
+
+function testoStorie(stories: any[], recensioni: boolean): string {
+  return (Array.isArray(stories) ? stories : [])
+    .map((s) => {
+      if (!s || typeof s !== 'object') return '';
+      if (recensioni) {
+        const chi = [s.name, s.platform].filter(Boolean).join(', ');
+        return `«${String(s.text || '').trim()}»${chi ? ` (${chi})` : ''}`;
+      }
+      return [s.headline, s.text].filter(Boolean).map((x: unknown) => String(x).trim()).join('\n');
+    })
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+/** Storie e recensioni salvate dalla pagina Storie (generated_story_batches). */
+export async function listStoryBatches(): Promise<ExtraRow[]> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth?.user) return [];
+  const { data, error } = await db
+    .from('generated_story_batches')
+    .select('id, source_type, source_meta, stories, story_count, created_at')
+    .eq('user_id', auth.user.id)
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) { console.warn('[archivio] storie non lette:', error.message); return []; }
+  return ((data || []) as any[]).map((b) => {
+    const recensioni = b.source_type !== 'topic';
+    const quante = b.story_count || (Array.isArray(b.stories) ? b.stories.length : 0);
+    return {
+      id: b.id,
+      kind: recensioni ? 'recensioni' : 'storie',
+      title: (b.source_meta?.label as string) || `${quante} ${recensioni ? 'recensioni' : 'storie'}`,
+      created_at: b.created_at,
+      text: testoStorie(b.stories, recensioni),
+    } as ExtraRow;
+  });
+}
+
+/** Copioni scritti da «Duplica questo video» (virali_copioni). */
+export async function listCopioni(): Promise<ExtraRow[]> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth?.user) return [];
+  const { data, error } = await db
+    .from('virali_copioni')
+    .select('id, copione, creato_il')
+    .eq('user_id', auth.user.id)
+    .order('creato_il', { ascending: false })
+    .limit(100);
+  if (error) { console.warn('[archivio] copioni non letti:', error.message); return []; }
+  return ((data || []) as any[]).filter((c) => c.copione).map((c) => ({
+    id: c.id,
+    kind: 'copione',
+    title: senzaMarkdown(c.copione.titolo || 'Copione'),
+    created_at: c.creato_il,
+    text: senzaMarkdown(copioneDaLeggere(c.copione as Copione)),
+    copione: c.copione as Copione,
+  }));
 }
