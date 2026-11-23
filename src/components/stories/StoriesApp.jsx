@@ -3,6 +3,7 @@ import { RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { REGOLA_CLAIM, daRivedere, regolaCoseDelBrand } from "@/lib/brand/metodoCopy";
 import { SFONDI_PRONTI, dipingi, disegnaSfondo, impaginaRecensioni, impaginaStoria } from "@/lib/storieDisegno";
+import { nomeAutore, testoRecensione } from "@/lib/brand/recensioni";
 import { coloreLeggibile, creaCercaFoto, fraseSenzaFoto, messaggioErroreStorie, pianoFotoStorie, rispostaNonLeggibile } from "@/lib/storie";
 import { useStoryTemplates } from "@/hooks/useStoryTemplates";
 import { useStoryBatches } from "@/hooks/useStoryBatches";
@@ -279,6 +280,11 @@ async function parseFileReviews(file){
   return JSON.parse(raw.slice(s,e+1));
 }
 
+// Recensioni da Google Maps / MioDottore (anche quelle già salvate prima del
+// 18/11): nome vero o vuoto (mai «2 recensioni»), testo senza <br> né entità.
+const pulisciRecensioni=list=>(list||[]).map(r=>({...r,name:nomeAutore(r?.name)||"",text:testoRecensione(r?.text)}));
+const nomeMostrato=r=>nomeAutore(r?.name)||"Paziente";
+
 function cleanReviewText(t){
   if(!t)return t;
   return t
@@ -443,7 +449,7 @@ async function renderReviewJpeg(reviews_input, client, colorOverrides={}){
   }
 
   const misura=(t,f)=>{ctx.font=f;return ctx.measureText(t).width;};
-  const { elementi }=impaginaRecensioni(reviewList,{
+  const { elementi }=impaginaRecensioni(pulisciRecensioni(reviewList),{
     W,H,conTemplate:!!client.templateDataUrl,font:fn,misura,
     colori:{
       titolo: colorOverrides.titleColor || (bgLight ? darkCol : lightCol),
@@ -758,8 +764,8 @@ function ReviewCard({review,client,idx,onZoom,onEdit,titleColor,textColor,author
       <div style={{position:"absolute",top:6,left:6,background:ACC+"cc",borderRadius:6,padding:"2px 8px",fontSize:9,color:"#062020",fontWeight:700}}>rec</div>
     </div>
     <div style={{padding:"9px 11px",display:"flex",flexDirection:"column",gap:4}}>
-      <div style={{fontSize:11,color:ACC,fontWeight:700}}>{"★".repeat(Array.isArray(review)?review[0].stars||5:review.stars||5)} {Array.isArray(review)?review.length+" recensioni":review.name}</div>
-      <div style={{fontSize:10,color:M,lineHeight:1.4}}>{(Array.isArray(review)?review[0].text:review.text||"").slice(0,60)}...</div>
+      <div style={{fontSize:11,color:ACC,fontWeight:700}}>{"★".repeat(Array.isArray(review)?review[0].stars||5:review.stars||5)} {Array.isArray(review)?review.map(nomeMostrato).join(" · "):nomeMostrato(review)}</div>
+      <div style={{fontSize:10,color:M,lineHeight:1.4}}>{testoRecensione(Array.isArray(review)?review[0].text:review.text).replace(/\n+/g," ").slice(0,60)}...</div>
       <div style={{display:"flex",gap:5,marginTop:4}}>
         <button onClick={()=>onEdit(idx)} style={{flex:1,background:"rgba(85,70,151,0.04)",border:GLASS_BD,borderRadius:7,color:M,fontSize:10,padding:"5px",cursor:"pointer"}}>edit</button>
         <button onClick={dl} disabled={!jpg} style={{flex:2,background:jpg?"rgba(85,70,151,0.10)":"rgba(85,70,151,0.04)",border:`1px solid ${jpg?"rgba(255,255,255,0.35)":"rgba(85,70,151,0.10)"}`,borderRadius:7,color:jpg?ACC:M,fontSize:10,padding:"5px",cursor:jpg?"pointer":"not-allowed",fontWeight:700}}>JPG</button>
@@ -949,7 +955,7 @@ export default function StoriesApp({ client: clientProp }){
       if(fnErr)throw new Error(fnErr.message||'Errore scraping');
       if(data?.error)throw new Error(data.error);
       if(data.reviews&&data.reviews.length>0){
-        setReviews(data.reviews);setRMsg(data.reviews.length+" recensioni trovate su Google Maps!");
+        setReviews(pulisciRecensioni(data.reviews));setRMsg(data.reviews.length+" recensioni trovate su Google Maps!");
         saveBatch('reviews', { url, label: data.reviews.length+' recensioni da Google Maps' }, data.reviews);
       }
       else setRErr("Nessuna recensione trovata per questo link.");
@@ -1250,7 +1256,7 @@ export default function StoriesApp({ client: clientProp }){
                 const sourceLabel=isStories?"Storie":(b.source_type==="reviews"?"Recensioni Google":(b.source_type==="manual"?"Recensioni manuali":"Recensioni da file"));
                 const reload=()=>{
                   if(isStories){setPianoFoto(nuovoPianoFoto(b.stories));setStories(b.stories||[]);setMode("content");}
-                  else{setReviews(b.stories||[]);setMode("reviews");}
+                  else{setReviews(pulisciRecensioni(b.stories));setMode("reviews");}
                 };
                 return(
                   <div key={b.id} style={{background:"var(--surface)",border:"1px solid var(--line)",borderRadius:12,padding:"14px 16px",display:"flex",alignItems:"center",gap:12}}>

@@ -11,6 +11,7 @@ const MIRRORED = ['archetypes.ts', 'genome.ts', 'genesisPrompt.ts', 'artDirector
 
 // Una riga per file, così due PR aperte insieme non toccano la stessa riga.
 MIRRORED.push('coloriSito.ts');
+MIRRORED.push('recensioni.ts');
 
 describe('sincronizzazione mirror Vite <-> Deno', () => {
   it.each(MIRRORED)('%s e byte-identico tra src e _shared', (file) => {
