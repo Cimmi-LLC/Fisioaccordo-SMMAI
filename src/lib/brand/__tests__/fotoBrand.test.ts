@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  TAG_TESTO, TAG_VISTA, TAG_VOLTO, daGuardare, haTestoSopra, leggiEtichette, scegliFoto, tagDaEtichette, tagVisibili,
+  TAG_TESTO, TAG_VISTA, TAG_VOLTO, assegnaFoto, daGuardare, haTestoSopra, leggiEtichette, scegliFoto, tagDaEtichette, tagVisibili,
   type FotoPool,
 } from '../fotoBrand';
 
@@ -66,5 +66,68 @@ describe('scegliFoto', () => {
   it('conta anche la didascalia scritta dallo studio; pool vuoto = nessuna foto', () => {
     expect(scegliFoto([foto('a.jpg', [], 'Esercizio per il ginocchio')], ['ginocchio'], new Set(), false)).toBe('a.jpg');
     expect(scegliFoto([], ['collo'], new Set(), true)).toBeNull();
+  });
+});
+
+describe('assegnaFoto (tutte le storie di una generazione insieme)', () => {
+  // Il brand della prova del 18/11: cervicale e vertigini, 5 foto in galleria.
+  const galleria = [
+    foto('collo-1.jpg', ['collo', 'neck', 'terapia manuale', TAG_VISTA]),
+    foto('collo-2.jpg', ['collo', 'neck', 'cervicale', TAG_VISTA]),
+    foto('vertigini.jpg', ['vertigini', 'dizzy', 'testa', TAG_VISTA]),
+    foto('studio.jpg', ['studio', 'lettino', TAG_VISTA]),
+    foto('esercizio.jpg', ['esercizio', 'exercise', 'collo', TAG_VISTA]),
+    foto('copertina.jpg', ['collo', 'neck', 'cervicale', TAG_VISTA, TAG_TESTO], 'Copertina del video'),
+  ];
+  const storie = [
+    ['neck', 'pain'], ['collo', 'cervicale'], ['dizzy', 'vertigini'], ['neck', 'exercise'], ['collo'],
+    ['neck', 'stiff'], ['vertigini', 'testa'], ['collo', 'terapia manuale'], ['neck'], ['esercizio', 'collo'],
+  ];
+  const conta = (urls: Array<string | null>) => {
+    const m = new Map<string, number>();
+    for (const u of urls) if (u) m.set(u, (m.get(u) || 0) + 1);
+    return m;
+  };
+
+  it('caso del 18/11: 5 foto e 10 storie, ogni foto al massimo 2 volte e mai su due storie vicine', () => {
+    const r = assegnaFoto(galleria, storie, true);
+    expect(r.every(Boolean)).toBe(true);
+    const usi = conta(r);
+    expect(usi.size).toBe(5);
+    expect(Math.max(...usi.values())).toBe(2);
+    for (let i = 1; i < r.length; i++) expect(r[i]).not.toBe(r[i - 1]);
+    expect(r).not.toContain('copertina.jpg');
+  });
+
+  it('prima si usano tutte le foto: le prime 5 storie hanno 5 foto diverse', () => {
+    const r = assegnaFoto(galleria, storie.slice(0, 5), true);
+    expect(new Set(r).size).toBe(5);
+  });
+
+  it('a parità di usi vince la foto che c\'entra con la storia', () => {
+    const r = assegnaFoto(galleria, [['vertigini', 'dizzy']], true);
+    expect(r).toEqual(['vertigini.jpg']);
+  });
+
+  it('senza «sempre»: solo foto che c\'entrano, e nessuna si ripete finché ce ne sono di mai usate', () => {
+    const r = assegnaFoto(galleria, [['vertigini'], ['vertigini'], ['vertigini']], false);
+    expect(r[0]).toBe('vertigini.jpg');
+    expect(r.filter((u) => u === 'vertigini.jpg')).toHaveLength(1);
+    expect(r.filter(Boolean)).toHaveLength(1);
+  });
+
+  it('una foto sola: mai su due storie vicine, le altre restano senza', () => {
+    const r = assegnaFoto([foto('unica.jpg', ['collo'])], [['collo'], ['collo'], ['collo'], ['collo']], true);
+    expect(r).toEqual(['unica.jpg', null, 'unica.jpg', null]);
+  });
+
+  it('le foto con testo o logo sopra non escono mai; galleria vuota = nessuna foto', () => {
+    expect(assegnaFoto([galleria[5]], [['collo'], ['neck']], true)).toEqual([null, null]);
+    expect(assegnaFoto([], [['collo']], true)).toEqual([null]);
+    expect(assegnaFoto(galleria, [], true)).toEqual([]);
+  });
+
+  it('stesso ingresso, stessa spartizione (ogni storia la ricalcola da sola sul server)', () => {
+    expect(assegnaFoto(galleria, storie, true)).toEqual(assegnaFoto(galleria, storie, true));
   });
 });

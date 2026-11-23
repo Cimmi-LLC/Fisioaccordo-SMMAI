@@ -2,13 +2,19 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { REGOLA_CLAIM, daRivedere, regolaCoseDelBrand } from "@/lib/brand/metodoCopy";
-import { coloreLeggibile, creaCercaFoto, fraseSenzaFoto, messaggioErroreStorie, rispostaNonLeggibile } from "@/lib/storie";
+import { SFONDI_PRONTI, dipingi, disegnaSfondo, impaginaRecensioni, impaginaStoria } from "@/lib/storieDisegno";
+import { nomeAutore, testoRecensione } from "@/lib/brand/recensioni";
+import { coloreLeggibile, creaCercaFoto, fraseSenzaFoto, messaggioErroreStorie, pianoFotoStorie, rispostaNonLeggibile } from "@/lib/storie";
 import { useStoryTemplates } from "@/hooks/useStoryTemplates";
 import { useStoryBatches } from "@/hooks/useStoryBatches";
 import ScheduleStoriesDialog from "@/components/schedule/ScheduleStoriesDialog";
 
 const STORY_TYPES=[{id:"quiz",label:"Quiz (2 card)",emoji:"❓"},{id:"curiosita",label:"Curiosità",emoji:"💡"},{id:"mito_verita",label:"Mito o Verità?",emoji:"🔍"},{id:"consiglio",label:"Consiglio",emoji:"🌿"},{id:"sapevi_che",label:"Lo Sapevi Che?",emoji:"🧠"},{id:"domanda_aperta",label:"Domanda Aperta",emoji:"💬"},{id:"mini_esercizio",label:"Mini Esercizio",emoji:"🏃"},{id:"prima_dopo",label:"Prima e Dopo",emoji:"📊"}];
 const TYPES_WITH_PHOTO=["curiosita","consiglio","mini_esercizio","mito_verita","sapevi_che","domanda_aperta","prima_dopo","quiz_domanda"];
+const storiaConFoto=s=>TYPES_WITH_PHOTO.includes(s?.type)||TYPES_WITH_PHOTO.includes(s?.cardType);
+// Piano delle foto di una generazione (src/lib/storie.ts): fatto quando
+// arrivano le storie, non quando se ne rigenera una.
+const nuovoPianoFoto=l=>pianoFotoStorie(l||[],storiaConFoto,"g"+Date.now().toString(36));
 const TONES=[["amichevole","Amichevole"],["professionale","Professionale"],["motivazionale","Motivazionale"],["educativo","Educativo"]];
 const GFONTS=["Montserrat","Raleway","Playfair Display","Nunito","Poppins","Lato","Oswald","Merriweather","Ubuntu","DM Sans","Inter","Bebas Neue","Quicksand","Josefin Sans"];
 // Unsplash not used - using Picsum Photos (no API key needed)
@@ -274,6 +280,11 @@ async function parseFileReviews(file){
   return JSON.parse(raw.slice(s,e+1));
 }
 
+// Recensioni da Google Maps / MioDottore (anche quelle già salvate prima del
+// 18/11): nome vero o vuoto (mai «2 recensioni»), testo senza <br> né entità.
+const pulisciRecensioni=list=>(list||[]).map(r=>({...r,name:nomeAutore(r?.name)||"",text:testoRecensione(r?.text)}));
+const nomeMostrato=r=>nomeAutore(r?.name)||"Paziente";
+
 function cleanReviewText(t){
   if(!t)return t;
   return t
@@ -322,12 +333,16 @@ function photoSeedFromQuery(q){
 // (src/lib/storie.ts). Fino al 09/11/2026 ogni aggiornamento della pagina
 // rilanciava la ricerca di tutte le storie: 100 chiamate per 10 foto.
 const cercaFotoStoria=creaCercaFoto({
-  chiama: async (q, brandId)=>{
+  chiama: async (q, brandId, piano)=>{
     const { data, error } = await supabase.functions.invoke('generate-carousel-images',{
       body:{
         slides:[{tipo:'content',keywords_stock:[q],numero:1}],
         singleIndex:0,
         brandId:brandId||undefined,
+        // Le query di tutte le storie con foto e il posto di questa: il
+        // server spartisce le foto del brand sull'intera generazione.
+        pianoFoto:piano?.query,
+        pianoIndice:piano?.indice,
       },
     });
     if(error){
@@ -340,8 +355,8 @@ const cercaFotoStoria=creaCercaFoto({
   },
 });
 
-async function fetchPhoto(q, brandId){
-  return (await cercaFotoStoria.cerca(q,brandId)).url;
+async function fetchPhoto(q, brandId, piano){
+  return (await cercaFotoStoria.cerca(q,brandId,{piano})).url;
 }
 
 async function loadImg(src){
@@ -353,20 +368,6 @@ async function loadImg(src){
     img.src=src;
   });
 }
-function drawWrap(ctx,text,cx,y,maxW,lineH){
-  if(!text)return y;ctx.textAlign="center";const words=text.split(" ");let line="";
-  for(const w of words){const t=line?line+" "+w:w;if(ctx.measureText(t).width>maxW&&line){ctx.fillText(line,cx,y);line=w;y+=lineH;}else line=t;}
-  if(line){ctx.fillText(line,cx,y);y+=lineH;}return y;
-}
-function drawWrapLeft(ctx,text,x,y,maxW,lineH){
-  if(!text)return y;ctx.textAlign="left";const words=text.split(" ");let line="";
-  for(const w of words){const t=line?line+" "+w:w;if(ctx.measureText(t).width>maxW&&line){ctx.fillText(line,x,y);line=w;y+=lineH;}else line=t;}
-  if(line){ctx.fillText(line,x,y);y+=lineH;}return y;
-}
-function rrect(ctx,x,y,w,h,r){
-  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);ctx.arcTo(x,y,x+r,y,r);ctx.closePath();
-}
-
 // Carica Google Font e aspetta che sia disponibile nel canvas
 const _fontCache={};
 async function ensureFont(family){
@@ -393,109 +394,10 @@ async function ensureFont(family){
   }
 }
 
-/**
- * Merge lines that look like a SINGLE sentence the LLM split with \n.
- * If a line doesn't end with sentence punctuation AND the next line isn't a
- * list/option marker (A. / B. / C. / 1. / -), they get joined into one line.
- * Empty lines and proper paragraph breaks are preserved.
- */
-function mergeBrokenSentences(text){
-  if(!text)return text;
-  const lines=text.split("\n");
-  const out=[];
-  for(let i=0;i<lines.length;i++){
-    const cur=lines[i].trim();
-    if(!cur){continue;}
-    if(out.length>0){
-      const prev=out[out.length-1];
-      const prevEndsSentence=/[.!?:;…)]$/.test(prev);
-      const curIsListItem=/^([A-C][.\)]|\d+[.\)]|[-•])\s/.test(cur);
-      if(!prevEndsSentence && !curIsListItem){
-        out[out.length-1]=prev+" "+cur;
-        continue;
-      }
-    }
-    out.push(cur);
-  }
-  return out.join("\n");
-}
-
-/**
- * Relative luminance (0..1) of a hex color via WCAG-style sRGB formula.
- * Returns ~0 for black, ~1 for white.
- */
-function colorLuminance(hex){
-  if(!hex||typeof hex!=="string")return 0.5;
-  const h=hex.replace("#","");
-  if(h.length!==6)return 0.5;
-  const toLin=v=>{const s=v/255;return s<=0.03928?s/12.92:Math.pow((s+0.055)/1.055,2.4);};
-  const r=toLin(parseInt(h.slice(0,2),16));
-  const g=toLin(parseInt(h.slice(2,4),16));
-  const b=toLin(parseInt(h.slice(4,6),16));
-  return 0.2126*r+0.7152*g+0.0722*b;
-}
-
-/**
- * Configure ctx so that drawn text gets a subtle dark shadow IF the chosen
- * fill color would be too washed out on a white bg. Call `clearContrastShadow`
- * after drawing to reset.
- */
-function applyContrastShadow(ctx, fillHex){
-  if(colorLuminance(fillHex) > 0.55){
-    ctx.shadowColor = "rgba(0,0,0,0.45)";
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 1;
-  }
-}
-function clearContrastShadow(ctx){
-  ctx.shadowColor = "transparent";
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 0;
-}
-
-// ── Sfondi di default (revisione 03/11) ─────────────────────────────────
-// Un terapista un template grafico non ce l'ha: senza upload si usano questi
-// sfondi pronti, disegnati coi colori del brand. Il logo NON è mai uno sfondo.
-export const DEFAULT_BGS=[
-  {id:"morbido",label:"Morbido"},
-  {id:"angoli",label:"Angoli"},
-  {id:"banda",label:"Banda"},
-];
-
-function drawDefaultBackground(ctx,W,H,colors,variant){
-  const p1=(colors&&colors[0])||"#554697";
-  const p2=(colors&&colors[1])||p1;
-  // Base sempre chiara e leggibile.
-  ctx.fillStyle="#f7f7fa"; ctx.fillRect(0,0,W,H);
-  ctx.save();
-  if(variant==="angoli"){
-    ctx.globalAlpha=0.12; ctx.fillStyle=p1;
-    ctx.beginPath(); ctx.arc(0,0,W*0.45,0,Math.PI*2); ctx.fill();
-    ctx.globalAlpha=0.10; ctx.fillStyle=p2;
-    ctx.beginPath(); ctx.arc(W,H,W*0.55,0,Math.PI*2); ctx.fill();
-    ctx.globalAlpha=1; ctx.fillStyle=p1;
-    ctx.fillRect(0,0,W,14);
-  } else if(variant==="banda"){
-    ctx.globalAlpha=0.08; ctx.fillStyle=p1;
-    ctx.beginPath();
-    ctx.moveTo(0,H*0.30); ctx.lineTo(W,H*0.14); ctx.lineTo(W,H*0.40); ctx.lineTo(0,H*0.56); ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha=0.10; ctx.fillStyle=p2;
-    ctx.beginPath();
-    ctx.moveTo(0,H*0.78); ctx.lineTo(W,H*0.64); ctx.lineTo(W,H); ctx.lineTo(0,H); ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha=1; ctx.fillStyle=p1;
-    ctx.fillRect(0,H-14,W,14);
-  } else { // morbido
-    ctx.globalAlpha=0.10; ctx.fillStyle=p1;
-    ctx.beginPath(); ctx.ellipse(W*0.92,H*0.10,W*0.5,W*0.5,0,0,Math.PI*2); ctx.fill();
-    ctx.globalAlpha=0.08; ctx.fillStyle=p2;
-    ctx.beginPath(); ctx.ellipse(W*0.06,H*0.92,W*0.55,W*0.55,0,0,Math.PI*2); ctx.fill();
-  }
-  ctx.restore();
-}
+// Sfondi pronti, impaginazione e disegno di storie e recensioni stanno in
+// src/lib/storieDisegno.ts (provati nei test): il blocco si misura prima e
+// si mette al centro della zona libera, ogni riga centrata.
+export const DEFAULT_BGS=SFONDI_PRONTI;
 
 async function renderJpeg(story, client, photoImg){
   const W=1080, H=1920;
@@ -505,132 +407,25 @@ async function renderJpeg(story, client, photoImg){
   const colors=client.brandColors?.length>=2?client.brandColors:["#2d6a2d","#7bc67b"];
   // Le storie hanno il fondo chiaro: un colore del brand che lì non si legge diventa inchiostro.
   const primary=coloreLeggibile(colors[0]), secondary=coloreLeggibile(colors[1]||colors[0]);
-  const isAnswer=story.cardType==="quiz_risposta";
-  const bgLight=client.bgIsLight!==false;
 
   // Background: template caricato, altrimenti sfondo di default coi colori
   // del brand (mai il logo a tutta pagina).
   if(client.templateDataUrl){
     const bg=await loadImg(client.templateDataUrl);
     if(bg) ctx.drawImage(bg,0,0,W,H);
-    else drawDefaultBackground(ctx,W,H,colors,client.defaultBg);
+    else disegnaSfondo(ctx,W,H,colors,client.defaultBg);
   } else {
-    drawDefaultBackground(ctx,W,H,colors,client.defaultBg);
+    disegnaSfondo(ctx,W,H,colors,client.defaultBg);
   }
 
-  // Safe zone: logo nel template occupa ~22% -> contenuto parte dal 25%
-  // (più alto del 37% precedente per ridurre il vuoto sotto al logo)
-  const SAFE_TOP = client.templateDataUrl ? Math.round(H*0.25) : Math.round(H*0.12);
-  const SAFE_BOT = client.templateDataUrl ? Math.round(H*0.88) : Math.round(H*0.92);
-  const PAD=90, cW=W-PAD*2;
-  let cy = SAFE_TOP;
-
-  // -- BADGE TIPOLOGIA ------------------------------------------
-  const bTxt=(story.typeLabel||"").toUpperCase();
-  ctx.font="700 30px "+fn;
-  const bw=ctx.measureText(bTxt).width+56, bh=52, bx=(W-bw)/2;
-  // pill background
-  ctx.save(); ctx.globalAlpha=0.14; ctx.fillStyle=primary;
-  rrect(ctx,bx,cy,bw,bh,bh/2); ctx.fill(); ctx.restore();
-  // pill border
-  ctx.save(); ctx.globalAlpha=0.35; ctx.strokeStyle=primary; ctx.lineWidth=1.5;
-  rrect(ctx,bx,cy,bw,bh,bh/2); ctx.stroke(); ctx.restore();
-  ctx.fillStyle=primary; ctx.textAlign="center"; ctx.font="700 30px "+fn;
-  ctx.fillText(bTxt, W/2, cy+35);
-  cy += bh+28;
-
-  // -- IMMAGINE / EMOJI -----------------------------------------
-  // Se c'è la foto la disegniamo (rounded rect centrata) e SALTIAMO l'emoji.
-  // Emoji solo come fallback quando manca la foto.
-  if(photoImg){
-    const imgW=Math.round(W*0.66);   // ~712px, centrata
-    const imgH=Math.round(imgW*0.62); // 16:10 portrait-ish
-    const imgX=(W-imgW)/2;
-    const imgY=cy;
-    const radius=32;
-    // cover-crop the source into the target rect
-    const sR=photoImg.width/photoImg.height;
-    const dR=imgW/imgH;
-    let sx=0,sy=0,sw=photoImg.width,sh=photoImg.height;
-    if(sR>dR){sw=photoImg.height*dR;sx=(photoImg.width-sw)/2;}
-    else{sh=photoImg.width/dR;sy=(photoImg.height-sh)/2;}
-    ctx.save();
-    rrect(ctx,imgX,imgY,imgW,imgH,radius);
-    ctx.clip();
-    ctx.drawImage(photoImg,sx,sy,sw,sh,imgX,imgY,imgW,imgH);
-    ctx.restore();
-    cy+=imgH+32;
-  } else if(story.emoji){
-    ctx.font="96px serif"; ctx.textAlign="center";
-    ctx.fillText(story.emoji, W/2, cy+86);
-    cy += 120;
-  }
-
-  // -- HEADLINE / TITOLO ----------------------------------------
-  // Titolo in colore SECONDARY (orange) - accent eye-catching.
-  // Auto-shadow se il brand color è troppo chiaro per bg bianco.
-  const hlFs = isAnswer?62:72;
-  const hlLh = hlFs*1.25;
-  ctx.fillStyle=secondary;
-  ctx.font="900 "+hlFs+"px "+fn;
-  applyContrastShadow(ctx, secondary);
-  cy = drawWrap(ctx, story.headline||"", W/2, cy+hlFs, cW, hlLh);
-  clearContrastShadow(ctx);
-  cy += 18;
-
-  // Separatore decorativo (matcha colore titolo)
-  ctx.save();
-  const sep=ctx.createLinearGradient(W*0.25,0,W*0.75,0);
-  sep.addColorStop(0,secondary+"00"); sep.addColorStop(0.5,secondary+"99"); sep.addColorStop(1,secondary+"00");
-  ctx.strokeStyle=sep; ctx.lineWidth=2.5;
-  ctx.beginPath(); ctx.moveTo(W*0.25,cy); ctx.lineTo(W*0.75,cy); ctx.stroke();
-  ctx.restore();
-  cy += 28;
-
-  // -- TESTO CORPO ------------------------------------------------
-  // Body in PRIMARY. mergeBrokenSentences ricuce frasi spezzate dal LLM con \n.
-  // Interlinea fs*1.2, gap inter-paragrafo 10px (10/20 prima).
-  const cleanedText=mergeBrokenSentences(story.text||"");
-  const paras=cleanedText.split("\n").map(p=>p.trim()).filter(Boolean);
-  for(let pi=0;pi<paras.length;pi++){
-    const p=paras[pi];
-    const isOpt=/^[A-C][\.\) ]/.test(p);
-    const fs=isOpt?46:42;
-    const lh=fs*1.2;
-    const fillCol=isOpt?secondary:primary;
-    ctx.fillStyle=fillCol;
-    ctx.font=(isOpt?"700":"400")+" "+fs+"px "+fn;
-    applyContrastShadow(ctx, fillCol);
-    cy=drawWrap(ctx,p,W/2,cy+fs,cW,lh);
-    clearContrastShadow(ctx);
-    cy+=isOpt?8:10;
-    if(cy>SAFE_BOT) break;
-  }
-
-  // Hint quiz domanda
-  if(story.cardType==="quiz_domanda"){
-    cy+=20;
-    ctx.fillStyle=secondary; ctx.font="italic 500 34px "+fn; ctx.textAlign="center";
-    ctx.globalAlpha=0.75;
-    ctx.fillText("👉 Risposta nella prossima storia!",W/2,cy);
-    ctx.globalAlpha=1;
-  }
-
+  const misura=(t,f)=>{ctx.font=f;return ctx.measureText(t).width;};
+  const { elementi }=impaginaStoria(story,{W,H,conTemplate:!!client.templateDataUrl,font:fn,primary,secondary,conFoto:!!photoImg,misura});
+  dipingi(ctx,elementi,photoImg);
   return cv.toDataURL("image/jpeg",0.93);
-}
-
-
-function getHue(hex){
-  const r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;
-  const max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min;
-  if(d===0)return 0;
-  let h=max===r?((g-b)/d)%6:max===g?(b-r)/d+2:(r-g)/d+4;
-  return Math.round(h*60+360)%360;
 }
 
 async function renderReviewJpeg(reviews_input, client, colorOverrides={}){
   const reviewList = Array.isArray(reviews_input) ? reviews_input : [reviews_input];
-  const n = reviewList.length;
   const W=1080, H=1920;
   const cv=document.createElement("canvas"); cv.width=W; cv.height=H;
   const ctx=cv.getContext("2d");
@@ -643,182 +438,30 @@ async function renderReviewJpeg(reviews_input, client, colorOverrides={}){
   const lum=hex=>{const r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;return 0.2126*r+0.7152*g+0.0722*b;};
   const darkCol = colors.reduce((a,b)=>lum(a)<=lum(b)?a:b, p1);
   const lightCol = colors.reduce((a,b)=>lum(a)>=lum(b)?a:b, p2);
-  const titleCol   = colorOverrides.titleColor  || (bgLight ? darkCol : lightCol);
-  const authorCol  = colorOverrides.authorColor || (bgLight ? darkCol : lightCol);
-  const reviewTextColor = colorOverrides.textColor || (bgLight ? "#2a2a2a" : "#e8e8e8");
-  const cardBg = bgLight ? "rgba(255,255,255,0.97)" : "rgba(14,24,14,0.95)";
 
   // 1. Draw background: template caricato o sfondo di default del brand.
   if(client.templateDataUrl){
     const bg = await loadImg(client.templateDataUrl);
     if(bg) ctx.drawImage(bg,0,0,W,H);
-    else drawDefaultBackground(ctx,W,H,colors,client.defaultBg);
+    else disegnaSfondo(ctx,W,H,colors,client.defaultBg);
   } else {
-    drawDefaultBackground(ctx,W,H,colors,client.defaultBg);
+    disegnaSfondo(ctx,W,H,colors,client.defaultBg);
   }
 
-  // 2. Safe zone - logo nel template occupa ~22% -> contenuto dal 25%
-  // (ridotto dal 37% per limitare il vuoto sotto al logo)
-  const SAFE_TOP = client.templateDataUrl ? Math.round(H * 0.25) : 120;
-  const SAFE_BOT = H - 60;
-  const AVAIL = SAFE_BOT - SAFE_TOP;
-
-  const PAD = 56;
-  const CARD_W = W - PAD*2;
-
-  // 3. Font sizes - compatti e proporzionati
-  const TITLE_FS  = 52;   // "Cosa dicono di noi:" - visibile ma non enorme
-  const STAR_FS   = n===1 ? 44 : n===2 ? 38 : 32;
-  const TEXT_FS   = n===1 ? 38 : n===2 ? 34 : 28;
-  const NAME_FS   = n===1 ? 34 : n===2 ? 30 : 26;  // più piccolo del testo
-  const LH        = TEXT_FS * 1.6;
-  const INNER_H   = 36;
-  const INNER_W   = 36;
-  const BAR_W     = 8;
-
-  // 4. Misura altezza naturale di ogni card
-  ctx.font = "400 "+TEXT_FS+"px "+fn;
-  const MAX_TEXT_W = CARD_W - BAR_W - INNER_W*2;
-
-  function measureLines(text){
-    const words=(text||"").split(" ");
-    let lines=1, line="";
-    for(const w of words){
-      const t=line?line+" "+w:w;
-      if(ctx.measureText(t).width>MAX_TEXT_W&&line){lines++;line=w;}else line=t;
-    }
-    return lines;
-  }
-
-  function naturalCardH(rev){
-    const lines = measureLines(rev.text||"");
-    return INNER_H + STAR_FS + 14 + Math.ceil(lines*LH) + 18 + 1 + 16 + NAME_FS + INNER_H;
-  }
-
-  const naturalH = reviewList.map(naturalCardH);
-  const totalGaps = (n-1);
-  // Gap minimo 16, calcolato in base allo spazio rimanente dopo il titolo
-  const TITLE_BLOCK = TITLE_FS + 32; // title + underline + margin
-  const cardsAvail = AVAIL - TITLE_BLOCK;
-  const totalNatural = naturalH.reduce((a,b)=>a+b,0);
-  const gapRaw = totalGaps>0 ? (cardsAvail - totalNatural) / totalGaps : 0;
-  const GAP = Math.min(48, Math.max(14, gapRaw));
-
-  // Se le card non ci stanno, scala le altezze
-  let cardH_arr;
-  const totalWithGap = totalNatural + GAP*totalGaps;
-  if(totalWithGap <= cardsAvail){
-    cardH_arr = naturalH;
-  } else {
-    const scale = cardsAvail / (totalNatural + 14*totalGaps);
-    cardH_arr = naturalH.map(h=>Math.max(120, Math.floor(h*scale)));
-  }
-
-  // 5. Titolo "Cosa dicono di noi:"
-  const titleY = SAFE_TOP;
-
-  // Pill background dietro il titolo per leggibilità sul template
-  const titleText = "Cosa dicono di noi:";
-  ctx.font = "900 "+TITLE_FS+"px "+fn;
-  const titleW = ctx.measureText(titleText).width;
-  const pillPad = 28;
-  const pillX = (W-titleW)/2 - pillPad;
-  const pillW = titleW + pillPad*2;
-  const pillH = TITLE_FS + 20;
-  ctx.save();
-  ctx.fillStyle = bgLight ? "rgba(255,255,255,0.88)" : "rgba(0,0,0,0.65)";
-  rrect(ctx, pillX, titleY-TITLE_FS+2, pillW, pillH, pillH/2);
-  ctx.fill();
-  ctx.restore();
-
-  // Titolo - colore primario (es. verde scuro), bold, leggibile
-  ctx.fillStyle = titleCol;
-  ctx.font = "900 "+TITLE_FS+"px "+fn;
-  ctx.textAlign = "center";
-  ctx.fillText(titleText, W/2, titleY);
-
-  // Linea decorativa
-  const lineY = titleY + 16;
-  ctx.save();
-  const ul=ctx.createLinearGradient(W*0.3,0,W*0.7,0);
-  ul.addColorStop(0,titleCol+"00"); ul.addColorStop(0.5,titleCol+"aa"); ul.addColorStop(1,titleCol+"00");
-  ctx.strokeStyle=ul; ctx.lineWidth=2.5;
-  ctx.beginPath(); ctx.moveTo(W*0.3,lineY); ctx.lineTo(W*0.7,lineY); ctx.stroke();
-  ctx.restore();
-
-  // 6. Card recensioni
-  let cy = titleY + TITLE_BLOCK;
-
-  for(let ri=0; ri<n; ri++){
-    const rev = reviewList[ri];
-    const cH = cardH_arr[ri];
-    const stars = Math.min(5,Math.max(1,rev.stars||5));
-    const name = rev.name||"Anonimo";
-    const text = rev.text||"";
-
-    // Card shadow + sfondo
-    ctx.save();
-    ctx.shadowColor="rgba(0,0,0,0.13)"; ctx.shadowBlur=24; ctx.shadowOffsetY=5;
-    ctx.fillStyle=cardBg;
-    rrect(ctx,PAD,cy,CARD_W,cH,32); ctx.fill();
-    ctx.restore();
-
-    // Barra colorata sinistra
-    ctx.save();
-    const bar=ctx.createLinearGradient(0,cy,0,cy+cH);
-    bar.addColorStop(0,p1); bar.addColorStop(1,p2);
-    ctx.fillStyle=bar;
-    rrect(ctx,PAD,cy,BAR_W,cH,4); ctx.fill();
-    ctx.restore();
-
-    const iX = PAD + BAR_W + INNER_W;
-    const iW = CARD_W - BAR_W - INNER_W*2;
-    let iy = cy + INNER_H;
-
-    // Stelle
-    ctx.font = STAR_FS+"px serif";
-    ctx.textAlign="left";
-    for(let i=0;i<5;i++){
-      ctx.fillStyle = i<stars ? p2 : (bgLight?"#ddd":"#444");
-      ctx.fillText("★", iX+i*(STAR_FS+2), iy+STAR_FS);
-    }
-    iy += STAR_FS + 14;
-
-    // Testo recensione
-    ctx.font = "400 "+TEXT_FS+"px "+fn;
-    ctx.fillStyle = reviewTextColor;
-    ctx.textAlign = "left";
-    const nameAreaH = 18 + 1 + 16 + NAME_FS + INNER_H;
-    const textAreaH = cH - INNER_H - STAR_FS - 14 - nameAreaH;
-    const maxLines = Math.max(2, Math.floor(textAreaH / LH));
-    const words = text.split(" ");
-    let line="", lc=0;
-    for(const w of words){
-      const t=line?line+" "+w:w;
-      if(ctx.measureText(t).width>iW&&line){
-        if(lc>=maxLines-1){ ctx.fillText(line+"...",iX,iy+TEXT_FS); iy+=LH; lc++; line=""; break; }
-        ctx.fillText(line,iX,iy+TEXT_FS); line=w; iy+=LH; lc++;
-      } else line=t;
-    }
-    if(line&&lc<maxLines){ ctx.fillText(line,iX,iy+TEXT_FS); iy+=LH; }
-
-    // Separatore
-    iy += 18;
-    ctx.save();
-    ctx.strokeStyle=p1; ctx.lineWidth=1; ctx.globalAlpha=0.15;
-    ctx.beginPath(); ctx.moveTo(iX,iy); ctx.lineTo(iX+iW,iy); ctx.stroke();
-    ctx.restore();
-    iy += 16;
-
-    // Nome autore - colore primario (verde scuro), compatto
-    ctx.fillStyle = authorCol;
-    ctx.font = "700 "+NAME_FS+"px "+fn;
-    ctx.textAlign = "left";
-    ctx.fillText("- "+name, iX, iy+NAME_FS);
-
-    cy += cH + (ri<n-1 ? GAP : 0);
-  }
-
+  const misura=(t,f)=>{ctx.font=f;return ctx.measureText(t).width;};
+  const { elementi }=impaginaRecensioni(pulisciRecensioni(reviewList),{
+    W,H,conTemplate:!!client.templateDataUrl,font:fn,misura,
+    colori:{
+      titolo: colorOverrides.titleColor || (bgLight ? darkCol : lightCol),
+      autore: colorOverrides.authorColor || (bgLight ? darkCol : lightCol),
+      testo: colorOverrides.textColor || (bgLight ? "#2a2a2a" : "#e8e8e8"),
+      p1, p2,
+      card: bgLight ? "rgba(255,255,255,0.97)" : "rgba(14,24,14,0.95)",
+      stellaVuota: bgLight?"#ddd":"#444",
+      pillolaTitolo: bgLight ? "rgba(255,255,255,0.88)" : "rgba(0,0,0,0.65)",
+    },
+  });
+  dipingi(ctx,elementi);
   return cv.toDataURL("image/jpeg",0.93);
 }
 
@@ -1036,7 +679,7 @@ function ClientForm({init,onSave,onCancel}){
   </div>;
 }
 
-function StoryItem({story,client,onRegen,idx,onZoom,withPhotos,onFoto}){
+function StoryItem({story,client,onRegen,idx,onZoom,withPhotos,onFoto,piano}){
   const [jpg,setJpg]=useState(null);const [rend,setRend]=useState(false);
   // Motivo per cui la storia è uscita senza foto (null = ha la foto o non la prevede).
   const [senzaFoto,setSenzaFoto]=useState(null);
@@ -1048,7 +691,7 @@ function StoryItem({story,client,onRegen,idx,onZoom,withPhotos,onFoto}){
       const np=withPhotos&&(TYPES_WITH_PHOTO.includes(story.type)||TYPES_WITH_PHOTO.includes(story.cardType));
       if(np&&story.photoQuery){
         onFoto&&onFoto(idx,"cerco");
-        const esito=await cercaFotoStoria.cerca(story.photoQuery,client.id,{forza});
+        const esito=await cercaFotoStoria.cerca(story.photoQuery,client.id,{forza,piano});
         if(esito.url)pi=await loadImg(esito.url);
         if(pi){onFoto&&onFoto(idx,"ok");}
         else{setSenzaFoto(fraseSenzaFoto(esito.url?"errore":esito.motivo));onFoto&&onFoto(idx,"senza");}
@@ -1056,7 +699,7 @@ function StoryItem({story,client,onRegen,idx,onZoom,withPhotos,onFoto}){
       setJpg(await renderJpeg(story,client,pi));
     }catch(e){console.error(e);}
     setRend(false);
-  },[story,client,withPhotos,idx,onFoto]);
+  },[story,client,withPhotos,idx,onFoto,piano]);
   useEffect(()=>{render();},[render]);
   const dl=()=>{if(!jpg)return;const a=document.createElement("a");a.href=jpg;a.download="storia_"+(client.name||"f").replace(/\s/g,"_")+"_"+(idx+1)+".jpg";a.click();};
   return <div style={{background:S,borderRadius:14,overflow:"hidden",border:GLASS_BD,transition:"border-color .2s"}} onMouseEnter={e=>e.currentTarget.style.borderColor=ACC+"55"} onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(85,70,151,0.10)"}>
@@ -1121,8 +764,8 @@ function ReviewCard({review,client,idx,onZoom,onEdit,titleColor,textColor,author
       <div style={{position:"absolute",top:6,left:6,background:ACC+"cc",borderRadius:6,padding:"2px 8px",fontSize:9,color:"#062020",fontWeight:700}}>rec</div>
     </div>
     <div style={{padding:"9px 11px",display:"flex",flexDirection:"column",gap:4}}>
-      <div style={{fontSize:11,color:ACC,fontWeight:700}}>{"★".repeat(Array.isArray(review)?review[0].stars||5:review.stars||5)} {Array.isArray(review)?review.length+" recensioni":review.name}</div>
-      <div style={{fontSize:10,color:M,lineHeight:1.4}}>{(Array.isArray(review)?review[0].text:review.text||"").slice(0,60)}...</div>
+      <div style={{fontSize:11,color:ACC,fontWeight:700}}>{"★".repeat(Array.isArray(review)?review[0].stars||5:review.stars||5)} {Array.isArray(review)?review.map(nomeMostrato).join(" · "):nomeMostrato(review)}</div>
+      <div style={{fontSize:10,color:M,lineHeight:1.4}}>{testoRecensione(Array.isArray(review)?review[0].text:review.text).replace(/\n+/g," ").slice(0,60)}...</div>
       <div style={{display:"flex",gap:5,marginTop:4}}>
         <button onClick={()=>onEdit(idx)} style={{flex:1,background:"rgba(85,70,151,0.04)",border:GLASS_BD,borderRadius:7,color:M,fontSize:10,padding:"5px",cursor:"pointer"}}>edit</button>
         <button onClick={dl} disabled={!jpg} style={{flex:2,background:jpg?"rgba(85,70,151,0.10)":"rgba(85,70,151,0.04)",border:`1px solid ${jpg?"rgba(255,255,255,0.35)":"rgba(85,70,151,0.10)"}`,borderRadius:7,color:jpg?ACC:M,fontSize:10,padding:"5px",cursor:jpg?"pointer":"not-allowed",fontWeight:700}}>JPG</button>
@@ -1135,6 +778,8 @@ export default function StoriesApp({ client: clientProp }){
   const genClient = clientProp;
   const [mode,setMode]=useState("content");
   const [stories,setStories]=useState([]);
+  // Posto di ogni storia nel piano delle foto (null = senza foto).
+  const [pianoFoto,setPianoFoto]=useState([]);
   const { templates: savedTemplates, addTemplateFromFile, removeTemplate, busy: templatesBusy } = useStoryTemplates();
   const { batches: storyBatches, saveBatch, deleteBatch, reload: reloadBatches } = useStoryBatches();
   const [scheduleOpen,setScheduleOpen]=useState(false);
@@ -1214,6 +859,7 @@ export default function StoriesApp({ client: clientProp }){
         }catch(e){console.warn("[storie] etichette delle foto saltate:",e);}
       }
       setFotoStato({});
+      setPianoFoto(nuovoPianoFoto(l));
       setStories(l);
       // Persist batch (non-blocking)
       saveBatch('topic', { qty, types, label: (genClient.name||'') + ' — ' + qty + ' storie' }, l);
@@ -1240,7 +886,7 @@ export default function StoriesApp({ client: clientProp }){
         setGenMsg("Anteprima "+(i+1)+"/"+stories.length+"...");
         let pi=null;
         const np=withPhotos&&(TYPES_WITH_PHOTO.includes(stories[i].type)||TYPES_WITH_PHOTO.includes(stories[i].cardType));
-        if(np&&stories[i].photoQuery){const u=await fetchPhoto(stories[i].photoQuery,genClient?.id);if(u)pi=await loadImg(u);}
+        if(np&&stories[i].photoQuery){const u=await fetchPhoto(stories[i].photoQuery,genClient?.id,pianoFoto[i]);if(u)pi=await loadImg(u);}
         const dataUrl=await renderJpeg(stories[i],storyClient,pi);
         items.push({
           id:String(i),
@@ -1270,7 +916,7 @@ export default function StoriesApp({ client: clientProp }){
         let pi=null;
         await ensureFont(genClient.brandFont||"Montserrat");
       const np=withPhotos&&(TYPES_WITH_PHOTO.includes(stories[i].type)||TYPES_WITH_PHOTO.includes(stories[i].cardType));
-        if(np&&stories[i].photoQuery){const u=await fetchPhoto(stories[i].photoQuery,genClient?.id);if(u)pi=await loadImg(u);}
+        if(np&&stories[i].photoQuery){const u=await fetchPhoto(stories[i].photoQuery,genClient?.id,pianoFoto[i]);if(u)pi=await loadImg(u);}
         const dataUrl=await renderJpeg(stories[i],storyClient,pi);
         const b64=dataUrl.split(",")[1];
         folder.file("storia_"+(i+1)+".jpg",b64,{base64:true});
@@ -1309,7 +955,7 @@ export default function StoriesApp({ client: clientProp }){
       if(fnErr)throw new Error(fnErr.message||'Errore scraping');
       if(data?.error)throw new Error(data.error);
       if(data.reviews&&data.reviews.length>0){
-        setReviews(data.reviews);setRMsg(data.reviews.length+" recensioni trovate su Google Maps!");
+        setReviews(pulisciRecensioni(data.reviews));setRMsg(data.reviews.length+" recensioni trovate su Google Maps!");
         saveBatch('reviews', { url, label: data.reviews.length+' recensioni da Google Maps' }, data.reviews);
       }
       else setRErr("Nessuna recensione trovata per questo link.");
@@ -1462,7 +1108,7 @@ export default function StoriesApp({ client: clientProp }){
             </div>;
           })()}
           {stories.length>0&&<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(165px,1fr))",gap:12}}>
-            {stories.map((s,i)=><StoryItem key={i+"-"+(s.headline||"")+(s.cardType||"")} story={s} client={storyClient} onRegen={regenOne} idx={i} onZoom={setZoomJpg} withPhotos={withPhotos} onFoto={segnaFoto}/>)}
+            {stories.map((s,i)=><StoryItem key={i+"-"+(s.headline||"")+(s.cardType||"")} story={s} client={storyClient} onRegen={regenOne} idx={i} onZoom={setZoomJpg} withPhotos={withPhotos} onFoto={segnaFoto} piano={pianoFoto[i]||null}/>)}
           </div>}
         </div>}
 
@@ -1609,8 +1255,8 @@ export default function StoriesApp({ client: clientProp }){
                 const sourceColor=isStories?"#3b82f6":(b.source_type==="reviews"?"#10b981":(b.source_type==="manual"?"#f59e0b":"#8b5cf6"));
                 const sourceLabel=isStories?"Storie":(b.source_type==="reviews"?"Recensioni Google":(b.source_type==="manual"?"Recensioni manuali":"Recensioni da file"));
                 const reload=()=>{
-                  if(isStories){setStories(b.stories||[]);setMode("content");}
-                  else{setReviews(b.stories||[]);setMode("reviews");}
+                  if(isStories){setPianoFoto(nuovoPianoFoto(b.stories));setStories(b.stories||[]);setMode("content");}
+                  else{setReviews(pulisciRecensioni(b.stories));setMode("reviews");}
                 };
                 return(
                   <div key={b.id} style={{background:"var(--surface)",border:"1px solid var(--line)",borderRadius:12,padding:"14px 16px",display:"flex",alignItems:"center",gap:12}}>

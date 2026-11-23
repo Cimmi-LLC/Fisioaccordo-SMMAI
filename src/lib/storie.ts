@@ -16,8 +16,41 @@ export type EsitoFoto = { url: string | null; motivo: MotivoFoto | null };
 /** Risposta di chi cerca davvero la foto (la funzione edge). */
 export type RispostaFoto = { url?: string | null; errore?: string | null };
 
+/**
+ * Posto di una storia nel piano delle foto della sua generazione: le query
+ * di tutte le storie con foto (nell'ordine in cui si vedono) e quale è la
+ * sua. Il server spartisce le foto del brand sull'intero piano, così la
+ * stessa foto non finisce su tutte le storie (prova del 18/11/2026: 7 su 10).
+ */
+export type PostoNelPiano = { id: string; query: string[]; indice: number };
+
+/** Storie con foto per piano: oltre questo numero si apre un piano nuovo (il server ne accetta 40). */
+export const FOTO_PER_PIANO = 40;
+
+/**
+ * Piano delle foto di una generazione: per ogni storia il suo posto, o null
+ * se la storia non ha foto. Si fa una volta, quando arrivano le storie: chi
+ * rigenera una storia tiene il posto (e la foto del brand) che aveva.
+ */
+export function pianoFotoStorie<T extends { photoQuery?: string | null }>(
+  storie: T[],
+  conFoto: (storia: T) => boolean,
+  id: string,
+): Array<PostoNelPiano | null> {
+  const posti: number[] = [];
+  storie.forEach((s, i) => { if (conFoto(s) && String(s?.photoQuery || '').trim()) posti.push(i); });
+  const esito: Array<PostoNelPiano | null> = storie.map(() => null);
+  for (let da = 0; da < posti.length; da += FOTO_PER_PIANO) {
+    const blocco = posti.slice(da, da + FOTO_PER_PIANO);
+    const query = blocco.map((i) => String(storie[i].photoQuery).trim());
+    const idBlocco = `${id}/${da / FOTO_PER_PIANO}`;
+    blocco.forEach((i, k) => { esito[i] = { id: idBlocco, query, indice: k }; });
+  }
+  return esito;
+}
+
 export type OpzioniCercaFoto = {
-  chiama: (query: string, brandId: string | null) => Promise<RispostaFoto>;
+  chiama: (query: string, brandId: string | null, piano?: PostoNelPiano | null) => Promise<RispostaFoto>;
   /** Ricerche in corso insieme (le altre aspettano il loro turno). */
   inParallelo?: number;
   /** Oltre questo tempo la storia esce senza foto. */
@@ -64,14 +97,14 @@ export function creaCercaFoto(opzioni: OpzioniCercaFoto) {
     if (prossimo) prossimo();
   };
 
-  const unaRicerca = async (query: string, brandId: string | null): Promise<EsitoFoto> => {
+  const unaRicerca = async (query: string, brandId: string | null, piano: PostoNelPiano | null): Promise<EsitoFoto> => {
     await turno();
     let sveglia: ReturnType<typeof setTimeout> | undefined;
     try {
       const scaduto = new Promise<EsitoFoto>((r) => {
         sveglia = setTimeout(() => r({ url: null, motivo: 'tempo' }), tempoMassimo);
       });
-      const chiamata = opzioni.chiama(query, brandId).then<EsitoFoto, EsitoFoto>(
+      const chiamata = opzioni.chiama(query, brandId, piano).then<EsitoFoto, EsitoFoto>(
         (r) => (r?.url ? { url: r.url, motivo: null } : { url: null, motivo: r?.errore ? 'errore' : 'nessuna' }),
         () => ({ url: null, motivo: 'errore' }),
       );
@@ -82,11 +115,20 @@ export function creaCercaFoto(opzioni: OpzioniCercaFoto) {
     }
   };
 
-  /** `forza`: riprova anche se la stessa ricerca è appena fallita («Riprova la foto»). */
-  const cerca = (query: string | null | undefined, brandId?: string | null, opz: { forza?: boolean } = {}): Promise<EsitoFoto> => {
+  /**
+   * `forza`: riprova anche se la stessa ricerca è appena fallita («Riprova la foto»).
+   * `piano`: posto della storia nel piano delle foto; due storie con la stessa
+   * query ma posti diversi sono due ricerche diverse.
+   */
+  const cerca = (
+    query: string | null | undefined,
+    brandId?: string | null,
+    opz: { forza?: boolean; piano?: PostoNelPiano | null } = {},
+  ): Promise<EsitoFoto> => {
     const q = (query || '').trim();
     if (!q) return Promise.resolve({ url: null, motivo: 'nessuna' });
-    const chiave = `${brandId || '-'}::${q}`;
+    const piano = opz.piano || null;
+    const chiave = `${brandId || '-'}::${q}${piano ? `::${piano.id}#${piano.indice}` : ''}`;
     const pronta = riuscite.get(chiave);
     if (pronta) return Promise.resolve({ url: pronta, motivo: null });
     const corso = inCorso.get(chiave);
@@ -95,7 +137,7 @@ export function creaCercaFoto(opzioni: OpzioniCercaFoto) {
     if (fallita && !opz.forza && adesso() - fallita.quando < riposo) {
       return Promise.resolve({ url: null, motivo: fallita.motivo });
     }
-    const p = unaRicerca(q, brandId || null).then((esito) => {
+    const p = unaRicerca(q, brandId || null, piano).then((esito) => {
       inCorso.delete(chiave);
       if (esito.url) { riuscite.set(chiave, esito.url); fallite.delete(chiave); }
       else fallite.set(chiave, { quando: adesso(), motivo: esito.motivo || 'errore' });

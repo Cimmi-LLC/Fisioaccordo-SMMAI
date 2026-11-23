@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { adminClient, requireAuth, requireWithinRateLimit } from "../_shared/auth.ts";
+import { nomeAutore, nomeDaCampi, testoRecensione } from "../_shared/brand/recensioni.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -117,6 +118,8 @@ async function scrapeGoogleMaps(url: string, apifyToken: string) {
         maxReviews: 250,
         language: "it",
         reviewsSort: "newest",
+        // Senza, il nome dell'autore non arriva (campo `name` delle recensioni).
+        scrapeReviewsPersonalData: true,
       }),
     }
   );
@@ -134,13 +137,18 @@ async function scrapeGoogleMaps(url: string, apifyToken: string) {
     for (const r of place.reviews) {
       totalSeen++;
       const stars = Number(r.stars ?? r.rating ?? 5);
-      if (stars < MIN_STARS || !(r.text || r.reviewText)) {
+      // Testo senza tag (<br> = a capo) e con le entità decodificate.
+      const text = testoRecensione(r.text || r.reviewText || "");
+      if (stars < MIN_STARS || !text) {
         filteredOut++;
         continue;
       }
       reviews.push({
-        name: r.name || r.reviewerName || "Anonimo",
-        text: r.text || r.reviewText || "",
+        // Prova del 18/11: in molte card il nome era «2 recensioni», il
+        // contatore dell'autore. nomeDaCampi scarta contatori e «Local Guide»;
+        // senza un nome vero si scrive «Paziente».
+        name: nomeDaCampi(r) || "Paziente",
+        text,
         stars,
         date: r.publishedAtDate || r.date || "",
         source: "google",
@@ -258,8 +266,8 @@ async function scrapeMiodottore(_apifyToken: string, url: string) {
     }
 
     reviews.push({
-      name: name || "Paziente",
-      text,
+      name: nomeAutore(name) || "Paziente",
+      text: testoRecensione(text),
       stars,
       date,
       source: "miodottore",
