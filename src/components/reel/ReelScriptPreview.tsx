@@ -30,7 +30,7 @@ const ReelScriptPreview: React.FC<ReelScriptPreviewProps> = ({
           <div className="py-12 text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" style={{ color: 'var(--viola)' }} />
             <p className="text-[13px] font-semibold" style={{ color: 'var(--ink)' }}>
-              Sto scrivendo il tuo script... (30-60 secondi)
+              Sto scrivendo il tuo script... (da 30 secondi a un minuto e mezzo)
             </p>
             <p className="text-[11px] mt-1" style={{ color: 'var(--ink3)' }}>
               Ci vorrà qualche secondo
@@ -53,7 +53,9 @@ const ReelScriptPreview: React.FC<ReelScriptPreviewProps> = ({
               <div className="text-[16px] font-bold" style={{ color: 'var(--ink)' }}>{script.titolo_reel}</div>
               <div className="flex items-center gap-1.5 mt-1">
                 <Clock className="h-3 w-3" style={{ color: 'var(--ink3)' }} />
-                <span className="text-[11px]" style={{ color: 'var(--ink3)' }}>{script.durata_stimata}</span>
+                <span className="text-[11px]" style={{ color: 'var(--ink3)' }}>
+                  {script.durata_stimata}{script.tipo_gancio ? ` · gancio: ${script.tipo_gancio}` : ''}
+                </span>
               </div>
             </div>
             <button
@@ -87,6 +89,11 @@ const ReelScriptPreview: React.FC<ReelScriptPreviewProps> = ({
               <div className="text-[14px] leading-relaxed mb-2" style={{ color: 'var(--ink)' }}>
                 {sezione.testo}
               </div>
+              {sezione.testo_a_schermo && (
+                <div className="text-[12px] font-bold mb-2 px-2 py-1 rounded-md inline-block" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
+                  A schermo: {sezione.testo_a_schermo}
+                </div>
+              )}
               <div className="text-[11px] italic" style={{ color: 'var(--ink3)' }}>
                 📹 {sezione.inquadratura}
               </div>
@@ -100,10 +107,10 @@ const ReelScriptPreview: React.FC<ReelScriptPreviewProps> = ({
         <CardContent style={{ padding: '16px 20px' }}>
           <div className="flex items-center justify-between mb-3">
             <span className="text-[11px] font-bold uppercase" style={{ color: 'var(--ink3)', letterSpacing: '0.5px' }}>
-              Script completo
+              Script completo (solo parlato)
             </span>
           </div>
-          <div className="p-3 rounded-xl text-[13px] leading-relaxed" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
+          <div className="p-3 rounded-xl text-[13px] leading-relaxed whitespace-pre-line" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', color: 'var(--ink)' }}>
             {script.script_completo}
           </div>
         </CardContent>
@@ -134,7 +141,7 @@ const ReelScriptPreview: React.FC<ReelScriptPreviewProps> = ({
               <div className="flex flex-wrap gap-1">
                 {script.hashtag_suggeriti.map((h, i) => (
                   <span key={i} className="text-[10px] px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--viola-dim)', color: 'var(--viola)' }}>
-                    #{h.replace('#', '')}
+                    #{h.replace(/^#+/, '').toLowerCase()}
                   </span>
                 ))}
               </div>
