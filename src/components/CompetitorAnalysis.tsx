@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useCompetitorAnalysis } from '@/hooks/useCompetitorAnalysis';
 import { useActiveBrand } from '@/hooks/useActiveBrand';
 import { listaAccount, type AccountSeguito } from '@/services/virali';
+import { togliNonDeducibili } from '@/lib/brand/analisiCompetitor';
 
 const CompetitorAnalysis: React.FC = () => {
   const { analyses, analyzing, analyzeCompetitor, deleteAnalysis, updateAnalysis } = useCompetitorAnalysis();
@@ -48,7 +49,8 @@ const CompetitorAnalysis: React.FC = () => {
   const [savingEdit, setSavingEdit] = useState(false);
 
   const openResult = (data: any, id: string | null) => {
-    setResult(data);
+    // Anche le analisi salvate prima del 23/11: via i «non deducibile».
+    setResult(togliNonDeducibili(data));
     setCurrentId(id);
     setEditing(false);
   };
@@ -65,7 +67,7 @@ const CompetitorAnalysis: React.FC = () => {
     const updated = await updateAnalysis(currentId, { competitor_name: editName, summary: editSummary });
     setSavingEdit(false);
     if (updated) {
-      setResult(updated.analysis_data);
+      setResult(togliNonDeducibili(updated.analysis_data));
       setEditing(false);
     }
   };

@@ -7,6 +7,7 @@ export const SNAPSHOT_FIELDS = [
   'nome_business', 'professione', 'professione_custom', 'website_url', 'descrizione', 'categorie',
   'servizi', 'target_pazienti', 'citta', 'tono_voce', 'persona_scrittura', 'vantaggi_competitivi',
   'mission', 'identita_core', 'temi_chiave', 'cta_suggerite', 'parole_da_evitare',
+  'frasi_pazienti', 'convinzione_da_ribaltare', 'profilo_detestato',
   'colore_primario', 'colore_secondario', 'colore_terziario', 'font_intestazioni', 'font_body',
   'logo_url', 'post_template_id',
 ] as const;
@@ -20,6 +21,7 @@ export const FIELD_LABELS: Record<SnapshotField, string> = {
   target_pazienti: 'Target', citta: 'Città', tono_voce: 'Tono di voce', persona_scrittura: 'Persona',
   vantaggi_competitivi: 'Vantaggi competitivi', mission: 'Mission', identita_core: 'Identità core',
   temi_chiave: 'Temi chiave', cta_suggerite: 'Call to action', parole_da_evitare: 'Cose da non dire',
+  frasi_pazienti: 'Frasi dei pazienti', convinzione_da_ribaltare: 'Convinzione da ribaltare', profilo_detestato: 'Profilo da cui distinguersi',
   colore_primario: 'Colore primario', colore_secondario: 'Colore secondario', colore_terziario: 'Colore terziario',
   font_intestazioni: 'Font titoli', font_body: 'Font testo', logo_url: 'Logo', post_template_id: 'Sfondo post',
 };

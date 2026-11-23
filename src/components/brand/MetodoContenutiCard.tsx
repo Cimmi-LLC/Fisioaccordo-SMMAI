@@ -3,76 +3,34 @@
 // (contrarian take) e il profilo di riferimento detestato. Vanno nei prompt
 // di generazione: senza, il copy resta la parafrasi del sito.
 //
-// Card con salvataggio proprio (stesso schema di ImageModelCard): se la
-// migrazione 20261103150000 non è ancora applicata, fallisce solo questa
-// card con un messaggio chiaro, non tutto il Brand Kit.
+// Fino al 18/11/2026 la card aveva un suo pulsante «Salva metodo», che
+// salvava solo queste tre voci: chi lo premeva credeva di aver salvato anche
+// Persona e Cose da non dire (stessa scheda), che restavano perse; e «Salva
+// modifiche» della pagina riscriveva le frasi lette all'apertura. Ora i campi
+// stanno nel modulo del Brand Kit e si salvano tutti col pulsante della pagina.
 
-import React, { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Quote, X, Plus } from 'lucide-react';
+import { Quote, X, Plus } from 'lucide-react';
 
 const MAX_FRASI = 5;
 
-const MetodoContenutiCard: React.FC<{ brandId: string | null }> = ({ brandId }) => {
-  const { toast } = useToast();
-  const [frasi, setFrasi] = useState<string[]>([]);
-  const [nuovaFrase, setNuovaFrase] = useState('');
-  const [convinzione, setConvinzione] = useState('');
-  const [profilo, setProfilo] = useState('');
-  const [nonDisponibile, setNonDisponibile] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
+type Campo = 'frasi_pazienti' | 'convinzione_da_ribaltare' | 'profilo_detestato';
 
-  useEffect(() => {
-    if (!brandId) return;
-    (async () => {
-      const { data, error } = await (supabase as any)
-        .from('brands')
-        .select('frasi_pazienti, convinzione_da_ribaltare, profilo_detestato')
-        .eq('id', brandId)
-        .maybeSingle();
-      if (error) { setNonDisponibile(true); return; }
-      setFrasi(Array.isArray(data?.frasi_pazienti) ? data.frasi_pazienti : []);
-      setConvinzione(data?.convinzione_da_ribaltare || '');
-      setProfilo(data?.profilo_detestato || '');
-    })();
-  }, [brandId]);
+const MetodoContenutiCard: React.FC<{
+  frasi: string[];
+  convinzione: string;
+  profilo: string;
+  onChange: (campo: Campo, valore: string[] | string) => void;
+}> = ({ frasi, convinzione, profilo, onChange }) => {
+  const [nuovaFrase, setNuovaFrase] = useState('');
 
   const addFrase = () => {
     const v = nuovaFrase.trim();
     if (!v || frasi.includes(v) || frasi.length >= MAX_FRASI) return;
-    setFrasi([...frasi, v]);
+    onChange('frasi_pazienti', [...frasi, v]);
     setNuovaFrase('');
-    setDirty(true);
-  };
-
-  const save = async () => {
-    if (!brandId) return;
-    setSaving(true);
-    try {
-      const { error } = await (supabase as any)
-        .from('brands')
-        .update({
-          frasi_pazienti: frasi,
-          convinzione_da_ribaltare: convinzione.trim(),
-          profilo_detestato: profilo.trim(),
-        })
-        .eq('id', brandId);
-      if (error) throw error;
-      setDirty(false);
-      toast({ title: 'Metodo salvato', description: 'Questi campi entrano nei prossimi post, storie e script.' });
-    } catch (e) {
-      toast({
-        title: 'Non salvato',
-        description: e instanceof Error ? e.message : String(e),
-        variant: 'destructive',
-      });
-    } finally {
-      setSaving(false);
-    }
   };
 
   return (
@@ -85,12 +43,6 @@ const MetodoContenutiCard: React.FC<{ brandId: string | null }> = ({ brandId }) 
         Senza questi campi i contenuti ripetono il sito. Con questi parlano come i tuoi pazienti.
       </p>
 
-      {nonDisponibile ? (
-        <p className="text-[12px] font-semibold" style={{ color: '#b45309' }}>
-          Questi campi non sono ancora attivi sul database: serve la migrazione del 03/11 (brand_kit_metodo_e_foto).
-        </p>
-      ) : (
-        <>
           <div>
             <label className="text-[10px] font-black uppercase" style={{ color: 'var(--ink2)', letterSpacing: '0.8px' }}>
               Le frasi dei tuoi pazienti (come le dicono loro, parola per parola)
@@ -102,7 +54,7 @@ const MetodoContenutiCard: React.FC<{ brandId: string | null }> = ({ brandId }) 
               {frasi.map((f, i) => (
                 <Badge key={i} variant="secondary" className="text-[11px] pl-2 pr-1 py-0.5 gap-1">
                   «{f}»
-                  <button onClick={() => { setFrasi(frasi.filter((_, j) => j !== i)); setDirty(true); }} className="hover:text-red-500">
+                  <button onClick={() => onChange('frasi_pazienti', frasi.filter((_, j) => j !== i))} className="hover:text-red-500">
                     <X className="h-3 w-3" />
                   </button>
                 </Badge>
@@ -113,6 +65,7 @@ const MetodoContenutiCard: React.FC<{ brandId: string | null }> = ({ brandId }) 
                 value={nuovaFrase}
                 onChange={e => setNuovaFrase(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addFrase(); } }}
+                onBlur={() => { if (nuovaFrase.trim()) addFrase(); }}
                 placeholder="Scrivi una frase del paziente"
                 className="text-xs h-8"
                 style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: '8px' }}
@@ -130,7 +83,7 @@ const MetodoContenutiCard: React.FC<{ brandId: string | null }> = ({ brandId }) 
             <p className="text-[11px] mb-2" style={{ color: 'var(--ink3)' }}>
               Cosa crede la gente che tu sai essere sbagliato (es. «il mal di schiena si cura col riposo»).
             </p>
-            <Input value={convinzione} onChange={e => { setConvinzione(e.target.value); setDirty(true); }} className="text-sm" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 9 }} />
+            <Input value={convinzione} onChange={e => onChange('convinzione_da_ribaltare', e.target.value)} className="text-sm" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 9 }} />
           </div>
 
           <div>
@@ -140,19 +93,9 @@ const MetodoContenutiCard: React.FC<{ brandId: string | null }> = ({ brandId }) 
             <p className="text-[11px] mb-2" style={{ color: 'var(--ink3)' }}>
               Il tipo di profilo che detesti e a cui NON vuoi somigliare (es. «il collega che posta frasi motivazionali con foto stock»).
             </p>
-            <Input value={profilo} onChange={e => { setProfilo(e.target.value); setDirty(true); }} className="text-sm" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 9 }} />
+            <Input value={profilo} onChange={e => onChange('profilo_detestato', e.target.value)} className="text-sm" style={{ backgroundColor: 'var(--bg)', border: '1px solid var(--line)', borderRadius: 9 }} />
           </div>
 
-          <button
-            onClick={save}
-            disabled={saving || !dirty || !brandId}
-            className="text-white text-[12px] font-black uppercase px-6 py-2.5 rounded-xl disabled:opacity-40"
-            style={{ backgroundColor: 'var(--rosa)', border: 'none', cursor: 'pointer', letterSpacing: '0.5px' }}
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin inline" /> : 'Salva metodo'}
-          </button>
-        </>
-      )}
     </div>
   );
 };

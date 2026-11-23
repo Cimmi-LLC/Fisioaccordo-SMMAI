@@ -51,11 +51,18 @@ serve(async (req) => {
       websiteContent += `\n\nDATI STRUTTURATI (JSON-LD):\n${JSON.stringify(scrapedData.jsonLd).substring(0, 2000)}`;
     }
 
+    // Colori del sito con quanti elementi della pagina li usano (coloriSito.ts).
+    const coloriConUso = (d: { cssColors: string[]; cssColorCounts?: Array<{ hex: string; count: number }> }) => {
+      const usi = new Map((d.cssColorCounts || []).map((c) => [c.hex, c.count]));
+      // I primi 8: oltre, sono colori di pochi elementi (icone, messaggi del modulo).
+      return d.cssColors.slice(0, 8).map((h) => (usi.has(h) ? `${h} (${usi.get(h)} ${usi.get(h) === 1 ? "elemento" : "elementi"})` : h)).join(", ");
+    };
+
     // Add CSS colors found on the site
     if (scrapedData.cssColors?.length > 0) {
       websiteContent += daInstagram
         ? `\n\nCOLORI RICORRENTI NELLE IMMAGINI DEL PROFILO: ${scrapedData.cssColors.join(", ")}\nUsa questi colori come riferimento per determinare i colori del brand.`
-        : `\n\nCOLORI CSS TROVATI NEL SITO: ${scrapedData.cssColors.join(", ")}\nUsa questi colori come riferimento per determinare i colori del brand.`;
+        : `\n\nCOLORI CSS TROVATI NEL SITO, in ordine di quanto si vedono: ${coloriConUso(scrapedData)}\nUsa questi colori come riferimento per determinare i colori del brand. Rispetta l'ordine: il secondario è il colore che viene dopo il primario nella lista, non un colore in fondo alla lista scelto perché contrasta (revisione del 18/11/2026: un arancione presente su un solo cerchietto del sito era diventato il secondario).`;
     }
 
     // Add logo URL if scraped

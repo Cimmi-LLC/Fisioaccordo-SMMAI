@@ -115,9 +115,64 @@ export function senzaRegoleSocial(css: string): string {
   return out + css.slice(copiatoFino);
 }
 
+/** Quante volte ogni classe compare negli elementi della pagina; gli id valgono 1. */
+export function classiUsate(html: string): Map<string, number> {
+  const usate = new Map<string, number>();
+  for (const m of html.matchAll(/\sclass=["']([^"']*)["']/gi)) {
+    for (const c of m[1].split(/\s+/)) if (c) usate.set(c, (usate.get(c) || 0) + 1);
+  }
+  for (const m of html.matchAll(/\sid=["']([^"']+)["']/gi)) usate.set('#' + m[1].trim(), 1);
+  return usate;
+}
+
+/**
+ * Quanti elementi della pagina prende un selettore (stima): per ogni parte
+ * separata da virgola, il minimo fra le classi e gli id che nomina; una parte
+ * senza classi né id (body, h1, a:hover) conta 1.
+ */
+function elementiPresi(selettore: string, usate: Map<string, number>): number {
+  let max = 0;
+  for (const parte of selettore.split(',')) {
+    const nomi = [...parte.matchAll(/([.#])(-?[_a-zA-Z][\w-]*)/g)].map((m) => (m[1] === '#' ? '#' + m[2] : m[2]));
+    const n = nomi.length === 0 ? 1 : Math.min(...nomi.map((c) => usate.get(c) || 0));
+    if (n > max) max = n;
+  }
+  return max;
+}
+
+/**
+ * I colori di un foglio di stile, ognuno col peso degli elementi della pagina
+ * che lo usano davvero. Revisione del 18/11/2026: su cervicalevertigini.it
+ * #f0853d sta in quattro regole del tema (.btn-orange, .bg-orange…) ma nella
+ * pagina c'è un solo cerchietto arancione dietro l'icona del telefono, e il
+ * colore contato regola per regola diventava il secondario del brand.
+ */
+export function coloriPesatiPerUso(css: string, usate: Map<string, number>): Array<{ testo: string; peso: number }> {
+  const out: Array<{ testo: string; peso: number }> = [];
+  let inizioSelettore = 0;
+  for (let i = 0; i < css.length; i++) {
+    const c = css[i];
+    if (c !== '{' && c !== '}') continue;
+    if (c === '{') {
+      let j = i + 1;
+      while (j < css.length && css[j] !== '{' && css[j] !== '}') j++;
+      if (css[j] === '}') {
+        const peso = elementiPresi(css.slice(inizioSelettore, i).replace(/\/\*[\s\S]*?\*\//g, ''), usate);
+        if (peso > 0) out.push({ testo: css.slice(i + 1, j), peso });
+        inizioSelettore = j + 1;
+        i = j;
+        continue;
+      }
+    }
+    inizioSelettore = i + 1;
+  }
+  return out;
+}
+
 export function coloriDelSito(html: string, cssEsterno: string): BrandColor[] {
   const pageCss = senzaRegoleSocial(stripFrameworkCss(html));
   const themeCss = senzaRegoleSocial(stripFrameworkCss(cssEsterno));
+  const usate = classiUsate(html);
 
   // Colori dichiarati come colori del brand (meta theme-color, colori globali
   // di Elementor, variabili --primary/--brand...): piccolo bonus, non priorita
@@ -131,8 +186,9 @@ export function coloriDelSito(html: string, cssEsterno: string): BrandColor[] {
   ];
   for (const re of declPatterns) for (const m of (pageCss + "\n" + themeCss).matchAll(re)) { const h = normHex(m[1]); if (h) declared.add(h); }
 
-  // Frequenza: i colori scritti nella pagina (cio che il visitatore vede)
-  // pesano 3, quelli dei fogli di stile del tema pesano 1.
+  // Frequenza: i colori scritti negli elementi della pagina (style="…", ciò
+  // che il visitatore vede) pesano 3 a volta; quelli delle regole CSS, nella
+  // pagina o nei fogli del tema, pesano quanti elementi le usano.
   const score = new Map<string, number>();
   const uses = new Map<string, number>();
   const count = (text: string, weight: number) => {
@@ -146,8 +202,9 @@ export function coloriDelSito(html: string, cssEsterno: string): BrandColor[] {
       add("#" + [m[1], m[2], m[3]].map((n) => Math.min(255, parseInt(n)).toString(16).padStart(2, "0")).join(""));
     }
   };
-  count(pageCss, 3);
-  count(themeCss, 1);
+  const blocchiStyle = [...pageCss.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1]).join('\n');
+  count(pageCss.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' '), 3);
+  for (const { testo, peso } of coloriPesatiPerUso(blocchiStyle + '\n' + themeCss, usate)) count(testo, peso);
   for (const h of declared) if (!score.has(h)) { score.set(h, 0); uses.set(h, 0); }
 
   const usable = (h: string) => {

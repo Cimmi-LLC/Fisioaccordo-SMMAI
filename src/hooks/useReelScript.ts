@@ -21,14 +21,12 @@ export const useReelScript = () => {
     setScripts([]);
     setProgress({ done: 0, total: count });
     try {
-      // Fire N parallel calls. If user asked for >1, we add a small variation
-      // hint so Gemini doesn't return identical scripts.
+      // N chiamate in parallelo: ognuna sa il suo numero e il server le dà
+      // un tipo di gancio diverso (lista, errore, esperienza, curiosità…).
+      // Prima il numero finiva dentro il tema e ogni script usciva uguale.
       const promises = Array.from({ length: count }, (_, i) => {
-        const variationHint = count > 1
-          ? `\n\nGenera la variazione #${i + 1} di ${count}: cambia angle/hook/struttura rispetto alle altre.`
-          : '';
         return supabase.functions.invoke('generate-reel-script', {
-          body: { topic: topic + variationHint, brandId: activeBrandId, durata },
+          body: { topic: topic.trim(), brandId: activeBrandId, durata, variante: i, totale: count },
         }).then(({ data, error }) => {
           setProgress(p => ({ ...p, done: p.done + 1 }));
           if (error) throw new Error(error.message);
@@ -62,14 +60,18 @@ export const useReelScript = () => {
   const copyScript = useCallback((index: number = 0) => {
     const s = scripts[index];
     if (!s) return;
-    navigator.clipboard.writeText(s.script_completo);
+    // Copione da registrare: parlato e, sotto ogni pezzo, il testo a schermo.
+    const testo = (s.sezioni || []).some(x => x.testo_a_schermo)
+      ? s.sezioni.map(x => `${x.testo}${x.testo_a_schermo ? `\n[A SCHERMO: ${x.testo_a_schermo}]` : ''}`).join('\n\n')
+      : s.script_completo;
+    navigator.clipboard.writeText(testo);
     toast({ title: 'Script copiato!' });
   }, [scripts, toast]);
 
   const copyCaption = useCallback((index: number = 0) => {
     const s = scripts[index];
     if (!s) return;
-    const text = s.caption_instagram + '\n\n' + s.hashtag_suggeriti.map(h => '#' + h.replace('#', '')).join(' ');
+    const text = s.caption_instagram + '\n\n' + s.hashtag_suggeriti.map(h => '#' + h.replace(/^#+/, '').toLowerCase()).join(' ');
     navigator.clipboard.writeText(text);
     toast({ title: 'Caption copiata!' });
   }, [scripts, toast]);

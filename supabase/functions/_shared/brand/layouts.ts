@@ -211,22 +211,51 @@ function larghezzaEm(t: string, famiglia: Famiglia): number {
  * Corpo più grande (≤ base) con cui il testo sta in `maxRighe` righe di
  * `larghezza` px, rispettando gli a capo forzati.
  */
+/** Righe stimate del testo a quel corpo, su `larghezza` px, con gli a capo forzati. */
+export function righeDi(testo: string, corpo: number, larghezza: number, famiglia: Famiglia = 'Inter'): number {
+  const righeForzate = String(testo || '').replace(/\*/g, '').split('\n').map((r) => r.trim()).filter(Boolean);
+  let n = 0;
+  for (const r of righeForzate) {
+    let riga = 0;
+    n++;
+    for (const p of r.split(/\s+/)) {
+      const w = larghezzaEm(p, famiglia) * corpo;
+      const spazio = 0.27 * corpo;
+      if (riga > 0 && riga + spazio + w > larghezza * 0.97) { n++; riga = w; }
+      else riga += (riga > 0 ? spazio : 0) + w;
+    }
+  }
+  return Math.max(1, n);
+}
+
+/** Altezza stimata (px) di un blocco di testo: righe × corpo × interlinea. */
+export function altezzaTesto(testo: string, corpo: number, interlinea: number, larghezza: number, famiglia: Famiglia = 'Inter'): number {
+  return testo ? Math.ceil(righeDi(testo, corpo, larghezza, famiglia) * corpo * interlinea) : 0;
+}
+
+/**
+ * Dove mettere la foto sotto il testo (revisione del 18/11/2026: il
+ * sottotitolo della copertina finiva sotto la foto inclinata, che aveva una
+ * posizione fissa). Prova i corpi del titolo dal più grande; per ognuno
+ * `fineTesto` dice dove finisce il testo. Vince il primo che lascia alla foto
+ * almeno `minimo` px; se nessuno ci riesce, la slide va senza foto: il testo
+ * non si copre mai.
+ */
+export function spazioPerFoto(
+  corpi: number[],
+  fineTesto: (corpo: number) => number,
+  o: { margine: number; primaDa: number; fondo: number; minimo: number },
+): { corpo: number; top: number; altezza: number } | null {
+  for (const corpo of corpi) {
+    const top = Math.max(o.primaDa, Math.ceil(fineTesto(corpo) + o.margine));
+    if (o.fondo - top >= o.minimo) return { corpo, top, altezza: o.fondo - top };
+  }
+  return null;
+}
+
 export function corpoAdatto(testo: string, base: number, maxRighe: number, larghezza: number, famiglia: Famiglia = 'Inter'): number {
   const righeForzate = String(testo || '').replace(/\*/g, '').split('\n').map((r) => r.trim()).filter(Boolean);
-  const righe = (corpo: number) => {
-    let n = 0;
-    for (const r of righeForzate) {
-      let riga = 0;
-      n++;
-      for (const p of r.split(/\s+/)) {
-        const w = larghezzaEm(p, famiglia) * corpo;
-        const spazio = 0.27 * corpo;
-        if (riga > 0 && riga + spazio + w > larghezza * 0.97) { n++; riga = w; }
-        else riga += (riga > 0 ? spazio : 0) + w;
-      }
-    }
-    return Math.max(1, n);
-  };
+  const righe = (corpo: number) => righeDi(testo, corpo, larghezza, famiglia);
   // Con gli a capo forzati ogni riga scelta deve restare una riga sola.
   const limite = righeForzate.length > 1 ? Math.min(maxRighe, righeForzate.length) : maxRighe;
   let corpo = base;
@@ -506,23 +535,30 @@ function layoutA(i: InputSlide): Figlio[] {
     marchio(i, '#ffffff'), contatore(i, 'rgba(255,255,255,0.7)'));
   // Ombra a strati senza sfocatura: il boxShadow sfocato costava 3 s di CPU
   // a slide in Resvg, oltre il limite delle edge function.
-  const ombra = (rot: number, top: number, dy: number, allarga: number, alfa: number) => el('div', {
-    position: 'absolute', left: 90 - allarga, top: top + dy, width: 910 + 2 * allarga, height: 550 + allarga,
+  const ombra = (rot: number, top: number, h: number, dy: number, allarga: number, alfa: number) => el('div', {
+    position: 'absolute', left: 90 - allarga, top: top + dy, width: 910 + 2 * allarga, height: h + allarga,
     borderRadius: 30 + allarga, backgroundColor: `rgba(0,0,0,${alfa})`, transform: `rotate(${rot}deg)`,
   });
-  const card = (rot: number, top: number) => i.foto
+  const card = (rot: number, top: number, h = 550) => i.foto
     ? el('div', { position: 'absolute', left: 0, top: 0, width: LARGHEZZA, height: ALTEZZA },
-      ombra(rot, top, 46, 14, 0.12), ombra(rot, top, 30, 6, 0.16), ombra(rot, top, 16, 0, 0.2),
+      ombra(rot, top, h, 46, 14, 0.12), ombra(rot, top, h, 30, 6, 0.16), ombra(rot, top, h, 16, 0, 0.2),
       el('div', {
-        position: 'absolute', left: 90, top, width: 910, height: 550, borderRadius: 30, overflow: 'hidden',
+        position: 'absolute', left: 90, top, width: 910, height: h, borderRadius: 30, overflow: 'hidden',
         border: '5px solid rgba(255,255,255,0.92)', transform: `rotate(${rot}deg)`, alignItems: 'flex-start',
-      }, fotoNelRiquadro(i, 900, 540)))
+      }, fotoNelRiquadro(i, 900, h - 10)))
     : null;
   const hl = { color: c.evidenza };
 
   if (i.role === 'cover') {
-    const conFoto = !!i.foto;
-    const corpo = corpoAdatto(i.titolo, conFoto ? 124 : 140, conFoto ? 3 : 5, CONTENUTO);
+    // Testo in alto sul fondo pieno del brand, foto inclinata nello spazio che
+    // resta sotto: mai sopra il titolo o il sottotitolo.
+    const sotto = testoPiano(i.testo || '');
+    const corpoSotto = sotto ? corpoAdatto(sotto, 40, 3, CONTENUTO) : 0;
+    const posto = i.foto ? spazioPerFoto([124, 108, 96, 84], (corpo) =>
+      210 + (i.etichetta ? 56 + 34 : 0) + altezzaTesto(i.titolo, corpoAdatto(i.titolo, corpo, 3, CONTENUTO), 1.04, CONTENUTO) + (sotto ? 34 + altezzaTesto(sotto, corpoSotto, 1.3, CONTENUTO) : 0),
+    { margine: 70, primaDa: 700, fondo: ALTEZZA - 90, minimo: 340 }) : null;
+    const conFoto = !!posto;
+    const corpo = posto ? corpoAdatto(i.titolo, posto.corpo, 3, CONTENUTO) : corpoAdatto(i.titolo, 140, 5, CONTENUTO);
     return [
       sfondo(80, 25), testa,
       (conFoto
@@ -534,8 +570,8 @@ function layoutA(i: InputSlide): Figlio[] {
             borderRadius: 999, padding: '10px 26px 10px 18px', fontFamily: 'Inter', fontSize: 28, fontWeight: 800, color: '#ffffff',
           }, el('div', { width: 14, height: 14, borderRadius: 7, backgroundColor: c.evidenza }), testoPiano(i.etichetta))) : null,
         ricco(i.titolo, { size: corpo, weight: 900, color: '#ffffff', ls: -3, lh: 1.0, hl }),
-        i.testo ? el('div', { fontFamily: 'Inter', fontSize: 40, fontWeight: 600, color: c.a_tenue, lineHeight: 1.3 }, testoPiano(i.testo)) : null),
-      card(-3, 770),
+        sotto ? el('div', { fontFamily: 'Inter', fontSize: conFoto ? corpoSotto : 40, fontWeight: 600, color: c.a_tenue, lineHeight: 1.3 }, sotto) : null),
+      posto ? card(-3, posto.top, Math.min(550, posto.altezza)) : null,
       conFoto ? null : scorri(i, '#ffffff'),
     ];
   }
@@ -556,19 +592,24 @@ function layoutA(i: InputSlide): Figlio[] {
   }
 
   const { sotto, azione } = chiusura(i);
-  const conFoto = !!i.foto;
+  // Anche qui la foto (che può uscire dal fondo della slide) parte sotto il pulsante.
+  const posto = i.foto ? spazioPerFoto([100, 88, 76], (corpo) =>
+    210 + altezzaTesto(i.titolo, corpoAdatto(i.titolo, corpo, 3, CONTENUTO), 1.04, CONTENUTO)
+      + (sotto ? 30 + altezzaTesto(sotto, 40, 1.3, CONTENUTO) : 0) + (azione ? 30 + 90 : 0),
+  { margine: 70, primaDa: 860, fondo: ALTEZZA, minimo: 300 }) : null;
+  const conFoto = !!posto;
   return [
     sfondo(50, 15), testa,
     (conFoto
       ? (...f: Figlio[]) => el('div', { position: 'absolute', left: M, top: 210, width: CONTENUTO, flexDirection: 'column', gap: 30 }, ...f)
       : (...f: Figlio[]) => centrato(170, 1200, { gap: 30 }, ...f))(
-      ricco(i.titolo, { size: corpoAdatto(i.titolo, conFoto ? 100 : 116, conFoto ? 3 : 4, CONTENUTO), weight: 900, color: '#ffffff', ls: -3, hl }),
+      ricco(i.titolo, { size: posto ? corpoAdatto(i.titolo, posto.corpo, 3, CONTENUTO) : corpoAdatto(i.titolo, 116, 4, CONTENUTO), weight: 900, color: '#ffffff', ls: -3, hl }),
       sotto ? el('div', { fontFamily: 'Inter', fontSize: 40, fontWeight: 600, color: c.a_tenue, lineHeight: 1.3 }, sotto) : null,
       azione ? el('div', {}, el('div', {
         backgroundColor: c.evidenza, color: c.a_fondo, borderRadius: 999, padding: '22px 40px',
         fontFamily: 'Inter', fontSize: corpoAdatto(azione, 38, 1, CONTENUTO - 80), fontWeight: 900,
       }, azione)) : null),
-    card(3, 860),
+    posto ? card(3, posto.top) : null,
   ];
 }
 
@@ -577,19 +618,36 @@ function layoutA(i: InputSlide): Figlio[] {
 function layoutB(i: InputSlide): Figlio[] {
   const c = i.colori;
   if (i.role === 'cover') {
-    const corpo = corpoAdatto(i.titolo, 116, 4, CONTENUTO);
+    // Il testo sta in basso su una fascia piena; la foto occupa solo lo spazio
+    // sopra e sfuma nella fascia prima che il testo cominci (revisione del
+    // 18/11/2026: niente testo sopra la foto).
+    const sotto = testoPiano(i.testo || '');
+    const altezzaBlocco = (corpo: number) => (i.etichetta ? 26 * 1.2 + 28 : 0)
+      + altezzaTesto(i.titolo, corpoAdatto(i.titolo, corpo, 4, CONTENUTO), 1.06, CONTENUTO)
+      + (sotto ? 28 + altezzaTesto(sotto, 38, 1.3, CONTENUTO) : 0);
+    // Il blocco è ancorato a 150 px dal fondo: la foto finisce 40 px sopra.
+    let base = 116;
+    let altaFoto = 0;
+    if (i.foto) {
+      for (const b of [116, 100, 88]) {
+        const spazio = ALTEZZA - 150 - altezzaBlocco(b) - 40;
+        if (spazio >= 420) { base = b; altaFoto = Math.min(900, Math.floor(spazio)); break; }
+      }
+    }
+    const posto = altaFoto > 0;
+    const corpo = corpoAdatto(i.titolo, base, 4, CONTENUTO);
     return [
       el('div', { position: 'absolute', left: 0, top: 0, width: LARGHEZZA, height: ALTEZZA, backgroundColor: c.notte }),
-      i.foto ? fotoSlide(i, LARGHEZZA, 900, { position: 'absolute', left: 0, top: 0 }) : null,
-      i.foto
-        ? verticale([['rgba(0,0,0,0.18)', 0], ['rgba(0,0,0,0)', 0.22], [`${c.notte}8c`, 0.5], [c.notte, 0.68]])
+      posto ? fotoSlide(i, LARGHEZZA, altaFoto, { position: 'absolute', left: 0, top: 0 }) : null,
+      posto
+        ? verticale([['rgba(0,0,0,0.18)', 0], ['rgba(0,0,0,0)', 0.16], ['rgba(0,0,0,0)', Math.max(0.17, (altaFoto - 220) / ALTEZZA)], [c.notte, altaFoto / ALTEZZA]])
         : radiale(85, 10, [[mescola(c.primario, c.notte, 0.55), 0], [c.notte, 0.6]]),
       el('div', { position: 'absolute', left: M, top: 70, width: CONTENUTO, justifyContent: 'space-between', alignItems: 'center' },
         marchio(i, '#ffffff'), contatore(i, '#ffffff')),
       el('div', { position: 'absolute', left: M, bottom: 150, width: CONTENUTO, flexDirection: 'column', gap: 28 },
         i.etichetta ? el('div', { fontFamily: 'Inter', fontSize: 26, fontWeight: 700, letterSpacing: 5, color: mescola(c.primario, '#ffffff', 0.55) }, testoPiano(i.etichetta).toLocaleUpperCase('it')) : null,
         ricco(i.titolo, { size: corpo, weight: 800, color: '#ffffff', ls: -3, lh: 1.02, hl: { bg: c.primario } }),
-        i.testo ? el('div', { fontFamily: 'Inter', fontSize: 38, fontWeight: 500, color: '#c9cce0', lineHeight: 1.3 }, testoPiano(i.testo)) : null),
+        sotto ? el('div', { fontFamily: 'Inter', fontSize: 38, fontWeight: 500, color: '#c9cce0', lineHeight: 1.3 }, sotto) : null),
       scorri(i, '#ffffff'),
     ];
   }
@@ -648,15 +706,21 @@ function layoutC(i: InputSlide): Figlio[] {
   const base = el('div', { position: 'absolute', left: 0, top: 0, width: LARGHEZZA, height: ALTEZZA, backgroundColor: fondo });
 
   if (i.role === 'cover') {
-    const conFoto = !!i.foto;
+    const sotto = testoPiano(i.testo || '');
+    const posto = i.foto ? spazioPerFoto([124, 108, 96], (corpo) =>
+      230 + altezzaTesto(i.titolo, corpoAdatto(i.titolo, corpo, 4, CONTENUTO, 'Fraunces'), 1.04, CONTENUTO, 'Fraunces')
+        + (sotto ? 30 + altezzaTesto(sotto, 38, 1.3, CONTENUTO) : 0),
+    { margine: 50, primaDa: 700, fondo: ALTEZZA - 90, minimo: 300 }) : null;
+    const conFoto = !!posto;
+    const altaFoto = posto ? Math.min(470, posto.altezza) : 0;
     return [
       base, testa,
       (conFoto
         ? (...f: Figlio[]) => el('div', { position: 'absolute', left: M, top: 230, width: CONTENUTO, flexDirection: 'column', gap: 30 }, ...f)
         : (...f: Figlio[]) => centrato(180, 1170, { gap: 30 }, ...f))(
-        ricco(i.titolo, { size: corpoAdatto(i.titolo, conFoto ? 124 : 144, conFoto ? 4 : 5, CONTENUTO, 'Fraunces'), weight: 600, family: 'Fraunces', color: inchiostro, ls: -3, lh: 1.0, hl: { color: accento } }),
-        i.testo ? el('div', { fontFamily: 'Inter', fontSize: 38, fontWeight: 500, color: tenue, lineHeight: 1.3 }, testoPiano(i.testo)) : null),
-      conFoto ? el('div', { position: 'absolute', left: M, bottom: 90, width: CONTENUTO, height: 430, borderRadius: 28, overflow: 'hidden', alignItems: 'flex-start' }, fotoNelRiquadro(i, CONTENUTO, 430)) : null,
+        ricco(i.titolo, { size: corpoAdatto(i.titolo, posto ? posto.corpo : 144, posto ? 4 : 5, CONTENUTO, 'Fraunces'), weight: 600, family: 'Fraunces', color: inchiostro, ls: -3, lh: 1.0, hl: { color: accento } }),
+        sotto ? el('div', { fontFamily: 'Inter', fontSize: 38, fontWeight: 500, color: tenue, lineHeight: 1.3 }, sotto) : null),
+      conFoto ? el('div', { position: 'absolute', left: M, bottom: 90, width: CONTENUTO, height: altaFoto, borderRadius: 28, overflow: 'hidden', alignItems: 'flex-start' }, fotoNelRiquadro(i, CONTENUTO, altaFoto)) : null,
       conFoto ? null : el('div', {
         position: 'absolute', left: M, bottom: 80, width: CONTENUTO, justifyContent: 'space-between', paddingTop: 24,
         borderTop: `2px solid ${c.inchiostro}`, fontFamily: 'Inter', fontSize: 26, fontWeight: 700, letterSpacing: 3, color: inchiostro,

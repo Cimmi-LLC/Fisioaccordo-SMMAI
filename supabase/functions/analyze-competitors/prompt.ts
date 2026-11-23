@@ -99,7 +99,8 @@ REGOLE CRITICHE:
 - Basa OGNI analisi (engagement, topic, hashtag, frequenza) SOLO sui dati reali forniti nel prompt.
 - "hashtag_analysis.most_used": USA SOLO hashtag che vedi esplicitamente nei post o nella sezione "HASHTAG OSSERVATI". Se nessun hashtag è presente, ritorna array vuoto. MAI inventare.
 - "hashtag_analysis.suggested": qui PUOI proporre hashtag nuovi rilevanti per il settore, ma devono essere realistici, specifici e scritti in italiano corretto: rileggi l'ortografia di ogni parola («posturacorretta», non «posturacorreta»). Nel dubbio su come si scrive, non metterlo.
-- Le frequenze e i topic devono derivare dai post mostrati, non da assunzioni generiche.
+- I topic devono derivare dai post mostrati, non da assunzioni generiche. La frequenza di pubblicazione la calcoliamo noi dalle date: non scriverla.
+- Se un dato non si ricava dai post, lascia il campo vuoto: mai frasi come «non deducibile» o «non determinabile».
 - Idee di contenuto e opportunità: mai inventare offerte, programmi, guide o materiali di chi chiede l'analisi («scrivi CERVICALE per il mio programma di 7 giorni»): proponi il tema e l'angolo, non un'offerta che forse non esiste.
 - Mai promesse sanitarie nelle idee: niente guarigione, risultati garantiti o duraturi, «senza farmaci», sintomi che spariscono, tempi o numero di sedute promessi.
 
@@ -132,7 +133,6 @@ Rispondi SOLO con un JSON valido:
   "engagement_rate": "alto/medio/basso",
   "content_strategy": {
     "main_topics": ["lista dei 3-5 topic principali trattati"],
-    "posting_frequency": "frequenza stimata di pubblicazione",
     "best_content_type": "tipo di contenuto che funziona meglio (carosello, reel, foto, etc.)",
     "tone_of_voice": "tono comunicativo usato"
   },
