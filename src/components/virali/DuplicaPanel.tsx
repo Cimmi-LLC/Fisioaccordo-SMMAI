@@ -86,7 +86,13 @@ const DuplicaPanel: React.FC<{ sorgente: Sorgente; analisiIniziale: AnalisiVideo
         {occupato && (
           <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--ink)' }}>
             <Loader2 className="h-4 w-4 animate-spin" />
-            {fase === 'guardo' ? 'Guardo il video originale… (30-90 s)' : `Scrivo il copione per ${nomeBrand}… (20-60 s)`}
+            {/* Tempi misurati sul codice di duplica-video: il copione è una
+                chiamata a Gemini che si ripete se escono parole vietate, più
+                i tentativi sugli errori (il 18/11 è arrivato dopo 110 s); il
+                video, se il link è scaduto, si richiede anche ad Apify. */}
+            {fase === 'guardo'
+              ? 'Guardo il video originale… ci vogliono 1-2 minuti, a volte 3. Resta su questa pagina.'
+              : `Scrivo il copione per ${nomeBrand}… ci vogliono 1-2 minuti. Resta su questa pagina.`}
           </div>
         )}
       </div>
