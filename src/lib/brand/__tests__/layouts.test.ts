@@ -1,6 +1,6 @@
 // Test dei 3 layout disegnati dal server e dei testi di prova.
 import { describe, it, expect } from 'vitest';
-import {
+import { spazioPerFoto, altezzaTesto,
   LAYOUT_IDS, alberoSlide, coloriLayout, contrasto, corpoAdatto, estraiDato, evidenziaAuto, nomeCorto,
   GIALLO_EVIDENZA, chiusura, genomaDelPilota, layoutConsigliato, layoutDiBase, produceConNb2, templateVecchio, vuoleFoto,
   type InputSlide, type Nodo,
@@ -343,5 +343,24 @@ describe('volto in copertina (avatar)', () => {
     const senzaMisure = alberoSlide({ ...BASE, foto: ritratto.foto, fotoVolto: true, layout: 'brand_pieno', role: 'cover' });
     expect(altezzeImg(larga)).toEqual(altezzeImg(base));
     expect(altezzeImg(senzaMisure)).toEqual(altezzeImg(base));
+  });
+});
+
+describe('spazioPerFoto: la foto sta sempre sotto il testo (revisione del 18/11/2026)', () => {
+  it('col primo corpo che lascia abbastanza spazio, la foto parte dopo la fine del testo', () => {
+    const fine = (corpo: number) => 210 + corpo * 5;
+    const r = spazioPerFoto([124, 108, 96], fine, { margine: 70, primaDa: 700, fondo: 1260, minimo: 340 });
+    expect(r).toEqual({ corpo: 124, top: 900, altezza: 360 });
+  });
+  it('se il testo non lascia spazio a nessun corpo, la slide va senza foto', () => {
+    expect(spazioPerFoto([124, 108], () => 1100, { margine: 70, primaDa: 700, fondo: 1260, minimo: 340 })).toBeNull();
+  });
+  it('copertina A con sottotitolo lungo: la card della foto non copre il testo', () => {
+    const sotto = 'Scopri il vero motivo per cui gli esami non vedono niente e cosa puoi fare da domani mattina';
+    const fine = (corpo: number) => 210 + 90 + altezzaTesto('Vertigini dal collo: non è solo ansia', corpo, 1.04, 904) + 34 + altezzaTesto(sotto, 40, 1.3, 904);
+    expect(fine(124)).toBeGreaterThan(770); // prima la foto partiva fissa a 770
+    const r = spazioPerFoto([124, 108, 96, 84], fine, { margine: 70, primaDa: 700, fondo: 1260, minimo: 340 });
+    expect(r).not.toBeNull();
+    expect(r!.top).toBeGreaterThanOrEqual(fine(r!.corpo) + 70);
   });
 });

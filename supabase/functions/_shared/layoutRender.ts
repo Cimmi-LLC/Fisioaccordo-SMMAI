@@ -139,11 +139,18 @@ export async function caricaFoto(supabase: Admin, rif: RifFoto | null | undefine
 export async function fotoDelBrand(supabase: Admin, brandId: string, brand: Record<string, unknown>): Promise<RifFoto[]> {
   const out: RifFoto[] = [];
   const { data } = await supabase.from("brand_photos").select("url, storage_path, tags").eq("brand_id", brandId).limit(24);
-  for (const r of (data || []) as Array<{ url: string | null; storage_path: string | null; tags: string[] | null }>) {
+  const righe = (data || []) as Array<{ url: string | null; storage_path: string | null; tags: string[] | null }>;
+  for (const r of righe) {
     if (haTestoSopra(r.tags)) continue;
     if (r.storage_path) out.push({ bucket: "user-photos", path: r.storage_path });
     else if (r.url) out.push({ url: r.url });
   }
+  // Le immagini della galleria del Brand Kit non hanno etichette e spesso
+  // vengono dal sito: il 18/11/2026 la copertina ha preso così la copertina
+  // di un video con testo e telefono sopra, già scartata fra le foto caricate
+  // (stessa immagine, etichetta __testo). Servono solo a chi non ha caricato
+  // foto sue.
+  if (righe.length > 0) return out;
   for (const k of ["location_photos", "gallery_photos"]) {
     const v = brand[k];
     if (Array.isArray(v)) for (const u of v) if (typeof u === "string" && u) out.push({ url: u });
